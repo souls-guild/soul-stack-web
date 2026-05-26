@@ -1,0 +1,78 @@
+.cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 110px;
+}
+
+.cell.alert {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+}
+
+.cell.offline {
+  background: transparent;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: var(--t-cell-name-size);
+  font-weight: var(--t-cell-name-weight);
+  color: var(--text-muted);
+}
+
+.offline .name {
+  color: var(--text-faint);
+}
+
+.num {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.val {
+  font-size: var(--t-cell-val-size);
+  font-weight: var(--t-cell-val-weight);
+  letter-spacing: var(--t-cell-val-track);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.offline .val {
+  color: var(--text-faint);
+}
+
+.lbl {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.meta {
+  font-size: var(--t-meta-size);
+  color: var(--text-faint);
+  margin-top: auto;
+  font-feature-settings: 'tnum';
+}
+
+.alert .meta {
+  color: var(--warning);
+}
+
+.offline .meta {
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

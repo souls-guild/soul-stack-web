@@ -1,0 +1,112 @@
+/* ============================================================
+   Soul Stack — design tokens
+   Адаптировано из saltgui-design-system/project/colors_and_type.css
+   (внутренний референс salt-manager). Re-skin: убраны db-brand-цвета
+   (Soul Stack — system-agnostic), переименован комментарий, добавлены
+   роль-specific токены apply/drift (вместо salt's prod-red). Light —
+   default; [data-theme="dark"] на <html> переключает на тёмную тему.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ---------- Surfaces & ink ---------- */
+  --bg:            #fafaf9;
+  --surface:       #ffffff;
+  --surface-2:     #f5f5f4;
+  --border:        #e7e5e4;
+  --border-strong: #d6d3d1;
+  --text:          #1c1917;
+  --text-muted:    #57534e;
+  --text-faint:    #a8a29e;
+
+  /* ---------- Brand & semantic ---------- */
+  --accent:        #0d9488;     /* Keeper accent (teal) */
+  --accent-fg:     #ffffff;
+  --success:       #10b981;     /* ready / connected */
+  --warning:       #d97706;     /* drift / migration_failed informational */
+  --danger:        #dc2626;     /* error_locked / disconnected / failed */
+  --info:          #2563eb;     /* applying / provisioning */
+
+  /* ---------- Geometry ---------- */
+  --radius:        8px;
+  --radius-lg:     12px;
+  --radius-pill:   100px;
+
+  /* ---------- Spacing ---------- */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  28px;
+  --s-8:  32px;
+  --s-9:  36px;
+  --s-10: 48px;
+  --s-11: 64px;
+
+  /* ---------- Type ---------- */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --t-page-title-size:   30px;
+  --t-page-title-weight: 600;
+  --t-page-title-track:  -0.025em;
+  --t-stat-value-size:   28px;
+  --t-stat-value-weight: 600;
+  --t-stat-value-track:  -0.025em;
+  --t-cell-val-size:     26px;
+  --t-cell-val-weight:   600;
+  --t-cell-val-track:    -0.025em;
+  --t-h2-size:           15px;
+  --t-h2-weight:         600;
+  --t-h2-track:          -0.01em;
+  --t-body-size:         14px;
+  --t-body-weight:       400;
+  --t-label-size:        13px;
+  --t-label-weight:      500;
+  --t-cell-name-size:    12.5px;
+  --t-cell-name-weight:  500;
+  --t-stat-label-size:   11px;
+  --t-stat-label-weight: 500;
+  --t-stat-label-track:  0.08em;
+  --t-stat-label-case:   uppercase;
+  --t-meta-size:         11.5px;
+  --t-meta-weight:       400;
+  --t-table-size:        13px;
+  --t-table-weight:      400;
+
+  /* ---------- Motion ---------- */
+  --dur-fast:   0.15s;
+  --dur-theme:  0.2s;
+  --pulse-dur:  2.4s;
+
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg:            #0a0a0a;
+  --surface:       #161615;
+  --surface-2:     #1f1f1e;
+  --border:        #2a2a28;
+  --border-strong: #3a3a37;
+  --text:          #fafaf9;
+  --text-muted:    #a8a29e;
+  --text-faint:    #6b6862;
+  --accent:        #14b8a6;
+  --accent-fg:     #042f2c;
+  --success:       #34d399;
+  --warning:       #fbbf24;
+  --danger:        #f87171;
+  --info:          #60a5fa;
+  color-scheme: dark;
+}
+
+@keyframes ss-pulse {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(2.5); opacity: 0;   }
+}
