@@ -1,0 +1,3644 @@
+openapi: 3.1.0
+info:
+  title: Soul Stack Operator API
+  version: 1.0.0
+  description: |
+    HTTP-фасад Keeper-а для операторов (Архонтов). Каждый endpoint жёстко
+    привязан 1:1 к permission и MCP-tool. Источник правды по semantics —
+    docs/keeper/operator-api.md, по message-форме — proto/operator/v1/.
+
+    Conventions:
+      - URL prefix /v1/ для permission-проверяемых endpoint-ов;
+        health/meta — вне /v1/.
+      - Auth: Authorization: Bearer <JWT> (ADR-014). Bootstrap первого
+        Архонта — administrative subcommand keeper init, не HTTP.
+      - JSON field naming: snake_case (UseProtoNames).
+      - Enum serialization: короткие формы без family-prefix
+        (INCARNATION_STATUS_READY → "ready").
+      - Errors: application/problem+json (RFC 7807).
+      - Time: ISO-8601 / RFC 3339 в UTC.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: https://{keeper}
+    description: |
+      Operator API listener. Адрес — listen.openapi.addr из keeper.yml.
+      Permission-проверяемые endpoints — под /v1/ (path-keys в этом документе
+      уже содержат префикс). Health/meta endpoints (/healthz, /readyz,
+      /openapi.yaml) — корневые, без префикса /v1. Prometheus /metrics — на
+      отдельном listener-е (listen.metrics.addr), не часть этого API.
+    variables:
+      keeper:
+        default: keeper.internal:8080
+        description: KID + listen.openapi.addr из keeper.yml.
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Health/meta endpoints (вне /v1/, без auth).
+  - name: Operator
+    description: Управление Архонтами (ADR-013, ADR-014).
+  - name: Role
+    description: RBAC — роли, permissions и состав операторов (ADR-022).
+  - name: Incarnation
+    description: Жизненный цикл runtime-инстансов сервисов (ADR-009).
+  - name: Soul
+    description: Реестр Souls.
+  - name: Plugin
+    description: Sigil — allow-list целостности плагинов (ADR-026).
+  - name: Sigil
+    description: Ротация trust-anchor-ключей подписи Sigil (ADR-026(h), R3).
+  - name: Service
+    description: Реестр Service-ов service_registry (ADR-028-паттерн RBAC-storage).
+  - name: Augur
+    description: Реестры Augur — Omen (внешняя система) и Rite (grant) (ADR-025, augur.md).
+  - name: Oracle
+    description: Реестры Oracle — Vigil (Soul-side проверка) и Decree (правило reactor) (ADR-030, beacons).
+  - name: Push
+    description: Push-режим SSH-доставки Destiny (docs/keeper/push.md).
+  - name: Cloud
+    description: Cloud-провайдеры — Provider и Profile (docs/keeper/cloud.md).
+
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      operationId: GetHealthz
+      summary: Liveness probe.
+      description: Процесс жив. Не проверяет внешние зависимости.
+      security: []
+      responses:
+        '200':
+          description: Процесс жив.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /readyz:
+    get:
+      tags: [Health]
+      operationId: GetReadyz
+      summary: Readiness probe.
+      description: Postgres + Vault достижимы. Возвращает 503 при not-ready.
+      security: []
+      responses:
+        '200':
+          description: Все зависимости доступны.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Какая-либо зависимость недоступна.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+
+  /openapi.yaml:
+    get:
+      tags: [Health]
+      operationId: GetOpenapiSpec
+      summary: Self-served OpenAPI 3.1 spec.
+      description: |
+        Hand-written спека этого API (RFC 9512 application/yaml).
+        Embed-копия docs/keeper/openapi.yaml внутри keeper-бинаря.
+      security: []
+      responses:
+        '200':
+          description: OpenAPI 3.1 spec.
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /v1/operators:
+    post:
+      tags: [Operator]
+      operationId: CreateOperator
+      summary: Создать Архонта.
+      description: |
+        Permission: operator.create. MCP-tool: keeper.operator.create.
+        Создаёт запись в реестре operators, выпускает первый JWT
+        (TTL = auth.jwt.ttl_default). JWT возвращается один раз.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperatorCreateRequest'
+      responses:
+        '201':
+          description: Архонт создан, JWT выпущен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/operators/{aid}/revoke:
+    post:
+      tags: [Operator]
+      operationId: RevokeOperator
+      summary: Отозвать Архонта.
+      description: |
+        Permission: operator.revoke. MCP-tool: keeper.operator.revoke.
+        Ставит operators.revoked_at = now(). Активные JWT работают до exp.
+        409 would-lock-out-cluster — нельзя отозвать последнего Архонта
+        с *-permission.
+      parameters:
+        - $ref: '#/components/parameters/AidPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperatorRevokeRequest'
+      responses:
+        '204':
+          description: Архонт отозван.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/operators/{aid}/issue-token:
+    post:
+      tags: [Operator]
+      operationId: IssueOperatorToken
+      summary: Выпустить новый JWT для Архонта.
+      description: |
+        Permission: operator.issue-token. MCP-tool: keeper.operator.issue-token.
+        Старые JWT остаются валидными до exp. Новый JWT возвращается один раз.
+      parameters:
+        - $ref: '#/components/parameters/AidPath'
+      responses:
+        '200':
+          description: JWT выпущен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueTokenReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/roles:
+    post:
+      tags: [Role]
+      operationId: CreateRole
+      summary: Создать роль.
+      description: |
+        Permission: role.create. MCP-tool: keeper.role.create.
+        Создаёт роль с набором permissions (replace-семантики нет — это
+        создание). 409 role-already-exists — name уже занят.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+      responses:
+        '201':
+          description: Роль создана.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Role]
+      operationId: ListRoles
+      summary: Список ролей.
+      description: |
+        Permission: role.list. MCP-tool: keeper.role.list.
+        Каталог ролей с их permissions и составом операторов (membership).
+      responses:
+        '200':
+          description: Каталог ролей.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/roles/{name}:
+    delete:
+      tags: [Role]
+      operationId: DeleteRole
+      summary: Удалить роль.
+      description: |
+        Permission: role.delete. MCP-tool: keeper.role.delete.
+        Каскадом сносятся permissions роли и membership. 409 role-builtin —
+        builtin-роль удалять нельзя; 409 would-lock-out-cluster — удаление
+        снимет последнего `*`-админа.
+      parameters:
+        - $ref: '#/components/parameters/RoleNamePath'
+      responses:
+        '204':
+          description: Роль удалена.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/roles/{name}/permissions:
+    patch:
+      tags: [Role]
+      operationId: UpdateRolePermissions
+      summary: Заменить набор permissions роли.
+      description: |
+        Permission: role.update. MCP-tool: keeper.role.update.
+        Replace-семантика: переданный набор полностью заменяет существующий.
+        409 role-builtin — builtin-роль редактировать нельзя;
+        409 would-lock-out-cluster — снятие `*` оставит кластер без админа.
+      parameters:
+        - $ref: '#/components/parameters/RoleNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolePermissionsUpdateRequest'
+      responses:
+        '204':
+          description: Набор permissions заменён.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/roles/{name}/operators:
+    post:
+      tags: [Role]
+      operationId: GrantRoleOperator
+      summary: Назначить оператора в роль.
+      description: |
+        Permission: role.grant-operator. MCP-tool: keeper.role.grant-operator.
+        Идемпотентно: повторный grant той же пары (role, aid) — no-op.
+        404 not-found — целевой AID не существует в реестре операторов.
+      parameters:
+        - $ref: '#/components/parameters/RoleNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantOperatorRequest'
+      responses:
+        '204':
+          description: Оператор назначен в роль.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/roles/{name}/operators/{aid}:
+    delete:
+      tags: [Role]
+      operationId: RevokeRoleOperator
+      summary: Снять оператора с роли.
+      description: |
+        Permission: role.revoke-operator. MCP-tool: keeper.role.revoke-operator.
+        404 not-found — пары (role, aid) нет; 409 would-lock-out-cluster —
+        снятие оставит кластер без `*`-админа.
+      parameters:
+        - $ref: '#/components/parameters/RoleNamePath'
+        - $ref: '#/components/parameters/AidPath'
+      responses:
+        '204':
+          description: Оператор снят с роли.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations:
+    post:
+      tags: [Incarnation]
+      operationId: CreateIncarnation
+      summary: Создать incarnation.
+      description: |
+        Permission: incarnation.create. MCP-tool: keeper.incarnation.create.
+        Запускает scenario create указанного сервиса (async).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncarnationCreateRequest'
+      responses:
+        '202':
+          description: Запуск принят. apply_id для опроса статуса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Incarnation]
+      operationId: ListIncarnations
+      summary: Список incarnation-ов.
+      description: |
+        Permission: incarnation.list. MCP-tool: keeper.incarnation.list.
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: service
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по имени сервиса.
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/IncarnationStatus'
+          description: Фильтр по статусу.
+        - name: coven
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          description: |
+            Фильтр по declared env-тегу incarnation (exact-match по any-of
+            в `incarnation.covens[]`, ADR-008 amendment a). Multi-value (OR) —
+            пост-MVP (`?coven_any=`).
+      responses:
+        '200':
+          description: Страница списка.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}:
+    get:
+      tags: [Incarnation]
+      operationId: GetIncarnation
+      summary: Прочитать spec + state + status incarnation-а.
+      description: |
+        Permission: incarnation.get. MCP-tool: keeper.incarnation.get.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      responses:
+        '200':
+          description: Состояние incarnation-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationGetReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Incarnation]
+      operationId: DestroyIncarnation
+      summary: Удалить incarnation.
+      description: |
+        Permission: incarnation.destroy. MCP-tool: keeper.incarnation.destroy.
+        Async-операция. Operator-facing allow_destroy маппится в internal
+        force (decisions.md → force↔allow_destroy). false — штатный destroy
+        через teardown-scenario `destroy`; true — снос без teardown (DELETE
+        строки напрямую, escape-hatch для incarnation без внешних ресурсов,
+        warning в audit).
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - name: allow_destroy
+          in: query
+          required: true
+          schema:
+            type: boolean
+          description: |
+            Confirmation flag (обязателен; отсутствует/не-boolean → 400).
+            false — destroy через teardown scenario `destroy` (нет scenario в
+            снапшоте сервиса → 422); true — снос без teardown (force, DELETE
+            строки напрямую). Маппится в internal force. Симметрия с MCP-tool
+            keeper.incarnation.destroy.
+      responses:
+        '202':
+          description: Запуск destroy принят.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationDestroyReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/scenarios/{scenario}:
+    post:
+      tags: [Incarnation]
+      operationId: RunIncarnationScenario
+      summary: Запустить scenario против incarnation.
+      description: |
+        Permission: incarnation.run. MCP-tool: keeper.incarnation.run.
+        Async-операция, 202 + apply_id.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - name: scenario
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Имя сценария из scenario/<scenario>/.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncarnationRunRequest'
+      responses:
+        '202':
+          description: Запуск scenario принят.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationRunReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/history:
+    get:
+      tags: [Incarnation]
+      operationId: GetIncarnationHistory
+      summary: Журнал изменений state.
+      description: |
+        Permission: incarnation.history. MCP-tool: keeper.incarnation.history.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница state_history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationHistoryReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/unlock:
+    post:
+      tags: [Incarnation]
+      operationId: UnlockIncarnation
+      summary: Снять error_locked.
+      description: |
+        Permission: incarnation.unlock. MCP-tool: keeper.incarnation.unlock.
+        Снимает статус error_locked после ручного разбора. Оператор берёт
+        на себя ответственность за консистентность хостов.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncarnationUnlockRequest'
+      responses:
+        '200':
+          description: Unlock выполнен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationUnlockReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/check-drift:
+    post:
+      tags: [Incarnation]
+      operationId: CheckIncarnationDrift
+      summary: Scry-проверка drift (ADR-031 Slice B).
+      description: |
+        Permission: incarnation.check-drift. MCP-tool: keeper.incarnation.check-drift.
+        Sync-операция: Keeper рендерит scenario `converge` под текущим
+        service-snapshot-ом, шлёт всем хостам `ApplyRequest{dry_run:true}` через
+        work-queue (Acolyte). Soul зовёт `mod.Plan` вместо `mod.Apply` (pure-
+        read), собирает per-host per-task `changed` и возвращает `DriftReport`.
+        Информационный статус `drift` ставится post-check (НЕ блокирующий —
+        ADR-031(d)). converge-input резолвится auto-from-state по конвенции
+        имени (`incarnation.state.<param>`), `input` в body — operator-override.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncarnationCheckDriftRequest'
+      responses:
+        '200':
+          description: DriftReport собран.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriftReport'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/upgrade:
+    post:
+      tags: [Incarnation]
+      operationId: UpgradeIncarnation
+      summary: Перевод на новую state_schema_version.
+      description: |
+        Permission: incarnation.upgrade. MCP-tool: keeper.incarnation.upgrade.
+        Запускает миграцию state (ADR-019) + переключает service_version
+        одной PG-транзакцией. Async-операция.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncarnationUpgradeRequest'
+      responses:
+        '202':
+          description: Запуск upgrade принят.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationUpgradeReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  # /v1/auth/login — TODO ADR-amendment к ADR-014 (см. open question
+  # «JWT issuance для UI-login flow»). Сейчас JWT выдаётся только через
+  # `keeper init --archon=<aid>` (bootstrap CLI) или
+  # POST /v1/operators/{aid}/issue-token (требует уже валидный JWT). UI
+  # вынужден просить оператора paste JWT из файла — это не UX.
+  #
+  # Расширение требует решения, какие credentials принимает endpoint:
+  # password? OIDC? PKCS? — outside MVP scope, проектируется отдельным ADR.
+  # Эндпоинт здесь намеренно закомментирован: spec-decl без реализации
+  # отлавливается openapi_drift_test, чтобы не плодить «опережающий MVP» dead-code.
+  #
+  # /v1/auth/login:
+  #   post:
+  #     tags: [Operator]
+  #     operationId: AuthLogin
+  #     summary: TODO — обмен credentials → JWT (требует ADR-amendment к ADR-014).
+  #     description: |
+  #       Сейчас JWT выдаётся только через `keeper init` (bootstrap первого
+  #       Архонта, ADR-013) или административный endpoint
+  #       POST /v1/operators/{aid}/issue-token (требует уже валидный JWT).
+  #       UI вынужден просить оператора paste JWT — это не UX.
+  #       Расширение требует решения: cred=password? cred=OIDC? cred=PKCS?
+  #       — outside MVP scope, оформляется отдельным ADR-amendment к ADR-014.
+  #     security: []
+  #     responses:
+  #       '501':
+  #         description: Not implemented (placeholder).
+
+  /v1/souls:
+    post:
+      tags: [Soul]
+      operationId: CreateSoul
+      summary: Зарегистрировать Soul.
+      description: |
+        Permission: soul.create. MCP-tool: keeper.soul.create.
+        Создаёт запись в реестре souls (status: pending). Для transport: agent
+        выпускает первый bootstrap-токен (одноразовый, plain-токен один раз);
+        для transport: ssh токен не выпускается. Полная семантика —
+        docs/soul/onboarding.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SoulCreateRequest'
+      responses:
+        '201':
+          description: Soul зарегистрирована; для agent — bootstrap-токен выпущен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Soul]
+      operationId: ListSouls
+      summary: Список Souls.
+      description: |
+        Permission: soul.list. MCP-tool: keeper.soul.list.
+        Single-Soul read (GET /v1/souls/{sid}) и soulprint-read
+        (GET /v1/souls/{sid}/soulprint) покрываются тем же permission
+        `soul.list` (паттерн service.list / omen.list / vigil.list /
+        decree.list — одно permission на чтение реестра; `soul.get`
+        сознательно отложен, rbac.md §Souls).
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: coven
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          description: |
+            Фильтр по coven-меткам (exact-match по любому значению из
+            souls.coven[]). Несколько значений — повторение query-параметра.
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/SoulStatus'
+          description: Фильтр по статусу.
+        - name: transport
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/SoulTransport'
+          description: Фильтр по транспорту.
+      responses:
+        '200':
+          description: Страница списка Souls.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/souls/coven:
+    post:
+      tags: [Soul]
+      operationId: AssignSoulCoven
+      summary: Массовое назначение/снятие/замена Coven-меток по селектору.
+      description: |
+        Permission: soul.coven-assign. Селектор coven=/host= (домен soul.*).
+        Массово добавляет (mode: append) / снимает (mode: remove) ОДНУ
+        Coven-метку либо ЗАМЕНЯЕТ (mode: replace) набор Coven-меток целиком
+        на хостах под selector ∩ coven-scope оператора. Coven — холодная
+        PG-метка: чистый UPDATE souls, без Redis.
+
+        Форма тела:
+          - mode=append/remove → обязателен `label` (одна метка);
+          - mode=replace → обязателен `labels` (массив, может быть пустым =
+            «снять все»); поле `label` запрещено.
+
+        Двухслойная авторизация:
+          - middleware (право вообще + назначаемая метка ∈ scope оператора:
+            coven-scoped оператор проходит только для метки в своём scope;
+            для replace middleware проверяет первую метку набора, остальные
+            проверяет handler ДО БД);
+          - service: целевые хосты ⊆ coven-scope оператора (scope-intersection);
+            для replace КАЖДАЯ метка набора ∈ scope (иначе validation-failed).
+
+        Селектор включает incarnation= (имя incarnation как корневая
+        Coven-метка по ADR-008); комбинации критериев соединяются AND.
+
+        dry_run (тело или ?dry_run=true) — вернуть matched без UPDATE.
+        Идемпотентность: append не трогает хост, где метка уже есть; remove —
+        где метки нет; replace — где набор уже совпадает (coven IS DISTINCT
+        FROM $labels). Чанкинг с коммитом на чанк: при фейле середины часть
+        изменений зафиксирована (status: partial, безопасно до-повторяется).
+        CEL-предикат — будущий слайс.
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            true — посчитать matched под selector ∩ scope без UPDATE.
+            Эквивалент поля dry_run в теле (OR-объединение).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SoulCovenAssignRequest'
+      responses:
+        '200':
+          description: |
+            Операция выполнена (status: completed) или частично (status:
+            partial — часть чанков закоммичена до фейла). dry_run — matched без
+            изменений.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulCovenAssignReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/souls/{sid}:
+    get:
+      tags: [Soul]
+      operationId: GetSoul
+      summary: Получить одну Soul.
+      description: |
+        Permission: soul.list. MCP-tool: keeper.soul.list (одно permission
+        покрывает list и get — паттерн service.list / omen.list / vigil.list /
+        decree.list; `soul.get` сознательно отложен, rbac.md §Souls). Селектор
+        `host=<sid>` для будущих per-host scope-ролей.
+        404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/SidPath'
+      responses:
+        '200':
+          description: Запись Soul (та же проекция, что в list).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulListEntry'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/souls/{sid}/soulprint:
+    get:
+      tags: [Soul]
+      operationId: GetSoulprint
+      summary: Последний полученный typed-SoulprintReport.
+      description: |
+        Permission: soul.list (тот же, что для GET /v1/souls/{sid};
+        отдельная `soul.soulprint.read` не вводится — паттерн one-permission-
+        per-read, rbac.md §Souls).
+        Возвращает `typed_facts` (proto SoulprintFacts, ADR-018) +
+        collected_at (Soul-side) + received_at (Keeper-side).
+        404 not-found — Soul-а нет в реестре;
+        410 soulprint-not-received — Soul есть, но SoulprintReport ни разу не
+        приходил (`transport: ssh` без агента, либо только что онбординг).
+      parameters:
+        - $ref: '#/components/parameters/SidPath'
+      responses:
+        '200':
+          description: Typed-SoulprintReport.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulprintReadReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '410':
+          description: Soulprint не приходил (запись Soul-а есть, фактов нет).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/souls/{sid}/issue-token:
+    post:
+      tags: [Soul]
+      operationId: IssueSoulToken
+      summary: Перевыпустить bootstrap-токен Soul.
+      description: |
+        Permission: soul.issue-token. MCP-tool: keeper.soul.issue-token.
+        Перевыпуск bootstrap-токена для существующей Soul (transport: agent).
+        Инвариант UNIQUE (sid) WHERE used_at IS NULL — максимум один активный
+        токен. Без force при активном токене → 409 bootstrap-token-active;
+        force=true истекает старый и выпускает новый. Для transport: ssh →
+        422 validation-failed. Plain-токен один раз.
+      parameters:
+        - $ref: '#/components/parameters/SidPath'
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            true — истечь активный токен и выпустить новый. При false и
+            наличии активного токена → 409 bootstrap-token-active.
+      responses:
+        '200':
+          description: Новый bootstrap-токен выпущен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulIssueTokenReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/plugins/sigils:
+    post:
+      tags: [Plugin]
+      operationId: AllowPluginSigil
+      summary: Допустить плагин в allow-list Sigil.
+      description: |
+        Permission: plugin.allow. MCP-tool: keeper.plugin.allow (S4b).
+        Допуск целостности плагина (ADR-026). Keeper читает ТЕКУЩИЙ бинарь +
+        manifest из единственного слота кеша host-а по (namespace, name) —
+        single-slot, ref в чтении НЕ участвует (вариант C), — подписывает блок
+        Sigil-а и вставляет запись в реестр plugin_sigils. `ref` —
+        operator-asserted метка версии (НЕ git-verified); authority целостности
+        — sha256 + подпись Keeper-а. 404 plugin-not-in-cache — плагина нет в
+        кеше; 409 sigil-already-active — активный допуск на (ns, name, ref) уже
+        есть (сперва revoke).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PluginSigilAllowRequest'
+      responses:
+        '201':
+          description: Плагин допущен; в теле sha256 одобренного бинаря.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginSigilAllowReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Plugin]
+      operationId: ListPluginSigils
+      summary: Список активных Sigil-допусков.
+      description: |
+        Permission: plugin.list. MCP-tool: keeper.plugin.list (S4b).
+        Лента активных (не отозванных) записей allow-list-а plugin_sigils, новые
+        первыми. БЕЗ signature и manifest (крипто-материал / крупный JSONB).
+      responses:
+        '200':
+          description: Лента активных допусков.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PluginSigilListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/plugins/sigils/{namespace}/{name}/{ref}:
+    delete:
+      tags: [Plugin]
+      operationId: RevokePluginSigil
+      summary: Отозвать Sigil-допуск.
+      description: |
+        Permission: plugin.revoke. MCP-tool: keeper.plugin.revoke (S4b).
+        Мягкая ревокация активного допуска (ns, name, ref): запись остаётся в
+        реестре для аудита, бинарь перестаёт проходить Sigil-верификацию. 404
+        sigil-not-found — активной записи нет. `ref` — одиночный path-сегмент
+        (tag-ref вида v1.2.3); branch-ref со слешем через path в MVP не
+        поддерживается → 422.
+      parameters:
+        - $ref: '#/components/parameters/PluginNamespacePath'
+        - $ref: '#/components/parameters/PluginNamePath'
+        - $ref: '#/components/parameters/PluginRefPath'
+      responses:
+        '204':
+          description: Допуск отозван.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/sigil/keys:
+    post:
+      tags: [Sigil]
+      operationId: IntroduceSigilKey
+      summary: Ввести новый ключ подписи Sigil.
+      description: |
+        Permission: sigil.key-introduce. MCP-tool: keeper.sigil.key.introduce
+        (ADR-026(h), R3). Keeper генерирует ed25519-пару, пишет приватник в Vault
+        KV и вставляет публичную часть (SPKI) в реестр sigil_signing_keys как
+        active trust-anchor. Ответ несёт key_id + pubkey_pem — приватник НИКОГДА
+        не возвращается (security-инвариант ADR-026(d)). make_primary=true делает
+        ключ primary (новые Sigil-ы подписываются им). После ввода кластер
+        re-load-ит набор якорей (`sigil:anchors-changed`). 409
+        sigil-key-concurrent-change — гонка установки primary (retry).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SigilKeyIntroduceRequest'
+      responses:
+        '201':
+          description: Ключ введён; в теле key_id + публичный ключ (без приватника).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigilKeyIntroduceReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Sigil]
+      operationId: ListSigilKeys
+      summary: Список active ключей подписи Sigil.
+      description: |
+        Permission: sigil.key-list. MCP-tool: keeper.sigil.key.list (R3). Active
+        trust-anchor-ключи подписи (primary первым). БЕЗ vault_ref (внутренняя
+        ссылка на приватник).
+      responses:
+        '200':
+          description: Лента active-ключей подписи.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigilKeyListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/sigil/keys/{key_id}/primary:
+    post:
+      tags: [Sigil]
+      operationId: SetPrimarySigilKey
+      summary: Сделать ключ подписи primary.
+      description: |
+        Permission: sigil.key-set-primary. MCP-tool: keeper.sigil.key.set-primary
+        (R3). Делает active-ключ primary — новые Sigil-ы подписываются им после
+        cluster reload. 404 sigil-key-not-found — ключа нет; 409
+        sigil-key-concurrent-change — гонка primary либо ключ retired.
+      parameters:
+        - $ref: '#/components/parameters/SigilKeyIDPath'
+      responses:
+        '204':
+          description: Ключ стал primary.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/sigil/keys/{key_id}:
+    delete:
+      tags: [Sigil]
+      operationId: RetireSigilKey
+      summary: Вывести ключ подписи из набора.
+      description: |
+        Permission: sigil.key-retire. MCP-tool: keeper.sigil.key.retire (R3).
+        Выводит trust-anchor-ключ (Soul забывает его при следующем
+        SigilTrustAnchors). 404 sigil-key-not-found — active-записи нет; 409
+        sigil-key-last-active — последний active-ключ (набор не должен опустеть);
+        409 sigil-key-primary — primary напрямую (сперва set-primary другому).
+      parameters:
+        - $ref: '#/components/parameters/SigilKeyIDPath'
+      responses:
+        '204':
+          description: Ключ выведен.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/services:
+    post:
+      tags: [Service]
+      operationId: RegisterService
+      summary: Зарегистрировать Service.
+      description: |
+        Permission: service.register. MCP-tool: keeper.service.register
+        (ADR-028-паттерн RBAC-storage). Создаёт запись в реестре
+        service_registry (git-источник + ref + опц. авто-refresh). 409
+        service-already-exists — name занят; 404 not-found — AID создателя
+        отсутствует в реестре operators (FK).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRegisterRequest'
+      responses:
+        '201':
+          description: Service зарегистрирован.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceView'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Service]
+      operationId: ListServices
+      summary: Список Service-ов.
+      description: |
+        Permission: service.list. MCP-tool: keeper.service.list.
+        Реестр зарегистрированных Service-ов (sort name ASC).
+      responses:
+        '200':
+          description: Реестр Service-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/services/{name}:
+    get:
+      tags: [Service]
+      operationId: GetService
+      summary: Получить Service.
+      description: |
+        Permission: service.list. MCP-tool: keeper.service.list (одно
+        permission покрывает list и get). Читает одну запись реестра по имени.
+        404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+      responses:
+        '200':
+          description: Запись Service-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceView'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    patch:
+      tags: [Service]
+      operationId: UpdateService
+      summary: Обновить Service.
+      description: |
+        Permission: service.update. MCP-tool: keeper.service.update.
+        Replace-семантика mutable-полей (git/ref/refresh); name — ключ, не
+        меняется. 404 not-found — записи нет либо AID правщика отсутствует в
+        operators (FK).
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceUpdateRequest'
+      responses:
+        '200':
+          description: Service обновлён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceView'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Service]
+      operationId: DeregisterService
+      summary: Удалить Service из реестра.
+      description: |
+        Permission: service.deregister. MCP-tool: keeper.service.deregister.
+        Удаляет запись реестра по имени. 404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+      responses:
+        '204':
+          description: Service удалён из реестра.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/augur/omens:
+    post:
+      tags: [Augur]
+      operationId: CreateOmen
+      summary: Создать Omen.
+      description: |
+        Permission: omen.create. MCP-tool: keeper.augur.omen.create (ADR-025).
+        Создаёт запись в реестре omens (внешняя система vault/prometheus/elk +
+        endpoint + auth_ref — vault-ref на master-cred, не сам секрет). 409
+        omen-already-exists — name занят; 422 validation-failed — битый
+        name/source_type/endpoint/auth_ref.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OmenCreateRequest'
+      responses:
+        '201':
+          description: Omen создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OmenView'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Augur]
+      operationId: ListOmens
+      summary: Список Omen-ов.
+      description: |
+        Permission: omen.list. MCP-tool: keeper.augur.omen.list.
+        Реестр Omen-ов (sort created_at DESC, name ASC; offset/limit).
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница Omen-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OmenListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/augur/omens/{name}:
+    get:
+      tags: [Augur]
+      operationId: GetOmen
+      summary: Получить Omen.
+      description: |
+        Permission: omen.list. MCP-tool: keeper.augur.omen.list (одно permission
+        покрывает list и get). Читает одну запись по имени. 404 not-found —
+        записи нет.
+      parameters:
+        - $ref: '#/components/parameters/OmenNamePath'
+      responses:
+        '200':
+          description: Запись Omen-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OmenView'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Augur]
+      operationId: DeleteOmen
+      summary: Удалить Omen.
+      description: |
+        Permission: omen.delete. MCP-tool: keeper.augur.omen.delete.
+        Удаляет Omen по имени; каскадно убирает связанные Rite-ы (ON DELETE
+        CASCADE). 404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/OmenNamePath'
+      responses:
+        '204':
+          description: Omen удалён.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/augur/rites:
+    post:
+      tags: [Augur]
+      operationId: CreateRite
+      summary: Создать Rite.
+      description: |
+        Permission: rite.create. MCP-tool: keeper.augur.rite.create (ADR-025).
+        Создаёт grant: субъект (coven XOR sid) × omen → allow-list + delegate +
+        опц. token_ttl/token_num_uses (только vault-delegate). 404 not-found —
+        Omen не существует; 422 validation-failed — нарушение XOR / битый allow /
+        token-поля.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiteCreateRequest'
+      responses:
+        '201':
+          description: Rite создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiteView'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Augur]
+      operationId: ListRites
+      summary: Список Rite-ов Omen-а.
+      description: |
+        Permission: rite.list. MCP-tool: keeper.augur.rite.list.
+        Rite-ы одного Omen-а (фильтр omen ОБЯЗАТЕЛЕН; sort created_at DESC,
+        id ASC). 422 validation-failed — omen не передан / битый.
+      parameters:
+        - $ref: '#/components/parameters/RiteOmenQuery'
+      responses:
+        '200':
+          description: Rite-ы Omen-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiteListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/augur/rites/{id}:
+    delete:
+      tags: [Augur]
+      operationId: DeleteRite
+      summary: Удалить Rite.
+      description: |
+        Permission: rite.delete. MCP-tool: keeper.augur.rite.delete.
+        Удаляет Rite по суррогатному id. 404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/RiteIDPath'
+      responses:
+        '204':
+          description: Rite удалён.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/vigils:
+    post:
+      tags: [Oracle]
+      operationId: CreateVigil
+      summary: Создать Vigil.
+      description: |
+        Permission: vigil.create. MCP-tool: keeper.oracle.vigil.create (ADR-030).
+        Создаёт запись в реестре vigils (Soul-side проверка: check — адрес
+        core-beacon + interval + субъект coven XOR sid). Read-only по конструкции
+        (наблюдает, не мутирует хост). 409 vigil-already-exists — name занят;
+        422 validation-failed — битый name/interval/check/субъект.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VigilCreateRequest'
+      responses:
+        '201':
+          description: Vigil создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VigilView'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Oracle]
+      operationId: ListVigils
+      summary: Список Vigil-ов.
+      description: |
+        Permission: vigil.list. MCP-tool: keeper.oracle.vigil.list.
+        Реестр Vigil-ов (sort created_at DESC, name ASC; offset/limit).
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница Vigil-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VigilListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/vigils/{name}:
+    get:
+      tags: [Oracle]
+      operationId: GetVigil
+      summary: Получить Vigil.
+      description: |
+        Permission: vigil.list. MCP-tool: keeper.oracle.vigil.list (одно
+        permission покрывает list и get). Читает одну запись по имени. 404
+        not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/OracleNamePath'
+      responses:
+        '200':
+          description: Запись Vigil-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VigilView'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Oracle]
+      operationId: DeleteVigil
+      summary: Удалить Vigil.
+      description: |
+        Permission: vigil.delete. MCP-tool: keeper.oracle.vigil.delete.
+        Удаляет Vigil по имени (перестаёт раздаваться хостам в VigilSnapshot;
+        Decree-ы НЕ каскадятся). 404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/OracleNamePath'
+      responses:
+        '204':
+          description: Vigil удалён.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/decrees:
+    post:
+      tags: [Oracle]
+      operationId: CreateDecree
+      summary: Создать Decree.
+      description: |
+        Permission: decree.create. MCP-tool: keeper.oracle.decree.create (ADR-030).
+        Создаёт правило reactor: on_beacon (Vigil) × субъект (coven XOR sid) ×
+        incarnation_name → action_scenario (named, whitelist) + опц. where-CEL
+        предикат над event.data + cooldown. Default-deny. 409 decree-already-exists
+        — name занят; 422 validation-failed — битый name/on_beacon/incarnation_name/
+        action_scenario/субъект/where-CEL/cooldown.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecreeCreateRequest'
+      responses:
+        '201':
+          description: Decree создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecreeView'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Oracle]
+      operationId: ListDecrees
+      summary: Список Decree-ов.
+      description: |
+        Permission: decree.list. MCP-tool: keeper.oracle.decree.list.
+        Реестр Decree-ов (sort created_at DESC, name ASC; offset/limit).
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница Decree-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecreeListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/decrees/{name}:
+    get:
+      tags: [Oracle]
+      operationId: GetDecree
+      summary: Получить Decree.
+      description: |
+        Permission: decree.list. MCP-tool: keeper.oracle.decree.list (одно
+        permission покрывает list и get). Читает одну запись по имени. 404
+        not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/OracleNamePath'
+      responses:
+        '200':
+          description: Запись Decree-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecreeView'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Oracle]
+      operationId: DeleteDecree
+      summary: Удалить Decree.
+      description: |
+        Permission: decree.delete. MCP-tool: keeper.oracle.decree.delete.
+        Удаляет Decree по имени; каскадно чистит cooldown-state (oracle_fires,
+        ON DELETE CASCADE). 404 not-found — записи нет.
+      parameters:
+        - $ref: '#/components/parameters/OracleNamePath'
+      responses:
+        '204':
+          description: Decree удалён.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/push/apply:
+    post:
+      tags: [Push]
+      operationId: PushApply
+      summary: Push-прогон Destiny по SSH.
+      description: |
+        Permission: push.apply. MCP-tool: keeper.push.apply.
+        Async-операция. Полная модель — docs/keeper/push.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushApplyRequest'
+      responses:
+        '202':
+          description: Push-прогон принят.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushApplyReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/push/{apply_id}:
+    get:
+      tags: [Push]
+      operationId: PushGet
+      summary: Состояние push-прогона.
+      description: |
+        Permission: push.read. Variant C orchestrator (docs/keeper/push.md): read-endpoint
+        push_runs-записи. Возвращает status + summary (per-host исходы для терминальных
+        статусов). MCP-tool отсутствует (опрос через REST).
+      parameters:
+        - in: path
+          name: apply_id
+          required: true
+          schema:
+            type: string
+          description: ULID push-прогона.
+      responses:
+        '200':
+          description: Запись push-прогона.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushApplyView'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/push/cleanup:
+    post:
+      tags: [Push]
+      operationId: PushCleanup
+      summary: Чистка /var/lib/soul-stack/ на хосте.
+      description: |
+        Permission: push.cleanup. MCP-tool: keeper.push.cleanup.
+        Async-операция. Полная семантика — docs/keeper/push.md → Cleanup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushCleanupRequest'
+      responses:
+        '202':
+          description: Cleanup-прогон принят.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushCleanupReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/providers:
+    post:
+      tags: [Cloud]
+      operationId: CreateProvider
+      summary: Создать Provider.
+      description: |
+        Permission: provider.create. MCP-tool: keeper.provider.create.
+        Семантика — docs/keeper/cloud.md → Provider и Profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderCreateRequest'
+      responses:
+        '201':
+          description: Provider создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/profiles:
+    post:
+      tags: [Cloud]
+      operationId: CreateProfile
+      summary: Создать Profile.
+      description: |
+        Permission: profile.create. MCP-tool: keeper.profile.create.
+        Семантика — docs/keeper/cloud.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileCreateRequest'
+      responses:
+        '201':
+          description: Profile создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT по ADR-014 (claims iss/sub/iat/exp/roles/bootstrap_initial).
+        Все /v1/* endpoints требуют валидный токен; bootstrap первого
+        Архонта — keeper init administrative subcommand, не HTTP.
+
+  parameters:
+    AidPath:
+      name: aid
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^archon-[a-z0-9-]{1,62}$'
+      description: AID Архонта (naming-rules.md).
+    IncarnationNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Имя incarnation (kebab-case).
+    RoleNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Имя роли (kebab-case).
+    ServiceNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
+      description: Имя Service-а (kebab-case).
+    OmenNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z0-9-]{1,63}$'
+      description: Имя Omen-а (kebab-case, 1..63).
+    RiteIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      description: Суррогатный id Rite-а.
+    RiteOmenQuery:
+      name: omen
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z0-9-]{1,63}$'
+      description: Имя Omen-а — обязательный фильтр списка Rite-ов (augur.md §6).
+    OracleNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z0-9-]{1,63}$'
+      description: Имя Vigil-а / Decree-а (kebab-case, 1..63).
+    SidPath:
+      name: sid
+      in: path
+      required: true
+      schema:
+        type: string
+      description: |
+        SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
+        экранирования). См. operator-api.md → Conventions → ID в path.
+    OffsetQuery:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+      description: Сдвиг от начала набора (default 0).
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 1000
+        default: 50
+      description: Размер страницы (1..1000, default 50).
+    PluginNamespacePath:
+      name: namespace
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+      description: Namespace плагина (тип — cloud / ssh / mod).
+    PluginNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+      description: Имя плагина (kebab-case, как в manifest.name).
+    PluginRefPath:
+      name: ref
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+      description: |
+        Operator-asserted метка версии (tag-ref вида v1.2.3). Одиночный
+        path-сегмент; branch-ref со слешем в MVP не поддерживается.
+    SigilKeyIDPath:
+      name: key_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{64}$'
+      description: id ключа подписи (SHA-256(SPKI), hex lowercase).
+
+  responses:
+    Problem400:
+      description: Malformed request (синтаксис JSON, неверные query-params).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem401:
+      description: Unauthenticated — JWT отсутствует, не валиден или истёк.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem403:
+      description: Forbidden — RBAC-проверка не прошла.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem404:
+      description: |
+        Ресурс не существует (not-found, role-not-found — роли нет или AID
+        не член роли).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem409:
+      description: |
+        Conflict (incarnation-locked, migration-failed, would-lock-out-cluster,
+        incarnation-already-exists, operator-already-exists, soul-already-exists,
+        bootstrap-token-active, role-already-exists, role-builtin).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem422:
+      description: |
+        Validation failed — семантическая ошибка (input не соответствует
+        scenario input-схеме, profile params не соответствует profile_schema,
+        невалидный AID, отсутствует allow_destroy).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem500:
+      description: Internal error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+      required: [status]
+
+    ReadinessStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [not_ready]
+        checks:
+          type: object
+          additionalProperties: true
+          description: Карта зависимость → статус (postgres/vault/...).
+      required: [status]
+
+    ProblemDetails:
+      type: object
+      description: |
+        RFC 7807 Problem Details. Каталог стабильных URN-ов в поле type —
+        docs/keeper/operator-api.md → Типы ошибок.
+      properties:
+        type:
+          type: string
+          format: uri
+          description: |
+            Стабильный URN ошибки для machine-parsing.
+            Пример "https://soul-stack.io/errors/incarnation-locked".
+        title:
+          type: string
+          description: Краткий заголовок (английский, фиксированный для каждого type).
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code (дублируется для удобства клиента).
+        detail:
+          type: string
+          description: Человекочитаемое сообщение со значениями.
+        instance:
+          type: string
+          format: uri
+          description: URI запроса, который привёл к ошибке.
+      required: [type, title, status]
+
+    PaginationRequest:
+      type: object
+      description: |
+        Query-params для list-эндпоинтов. В HTTP передаются как query (offset/limit),
+        в MCP-tool input — как top-level поля. Schema присутствует для 1:1
+        соответствия с proto/operator/v1/common.proto; ни одним $ref в этом
+        документе не используется (HTTP path-операции используют отдельные
+        OffsetQuery/LimitQuery parameters).
+      properties:
+        offset:
+          type: integer
+          format: int32
+          minimum: 0
+          default: 0
+        limit:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 1000
+          default: 50
+
+    PaginationReply:
+      type: object
+      description: |
+        Поля ответа list-эндпоинтов (без items). Schema присутствует для 1:1
+        соответствия с proto/operator/v1/common.proto; *ListReply содержат
+        offset/limit/total inline (плоская форма по PM-decision из proto-task).
+      properties:
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+          description: Общее количество элементов с учётом фильтров.
+
+    IncarnationStatus:
+      type: string
+      enum:
+        - provisioning
+        - ready
+        - applying
+        - error_locked
+        - migration_failed
+        - drift
+        - destroying
+        - destroy_failed
+      description: |
+        Статус runtime-инстанса. В proto константы имеют family-prefix
+        (INCARNATION_STATUS_READY), в JSON API — короткие формы. `drift` —
+        информационный статус Scry (ADR-031), НЕ блокирующий: remediation =
+        обычный apply, который при успехе вернёт incarnation в `ready`.
+
+    SoulTransport:
+      type: string
+      enum:
+        - agent
+        - ssh
+      description: |
+        Способ доставки конфигурации. agent — демон soul поверх mTLS gRPC stream;
+        ssh — push без агента.
+
+    SoulStatus:
+      type: string
+      enum:
+        - pending
+        - connected
+        - disconnected
+        - expired
+      description: Статус Soul в реестре.
+
+    OperatorCreateRequest:
+      type: object
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID нового Архонта (naming-rules.md).
+        display_name:
+          type: string
+          description: Человекочитаемое имя для UI/аудита.
+      required: [aid, display_name]
+
+    OperatorCreateReply:
+      type: object
+      description: |
+        SENSITIVE: поле jwt отдаётся один раз; secret-masking middleware
+        вырезает его из логов/OTel-spans/audit-trail.
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        display_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID Архонта, выполнившего запрос (из JWT.sub).
+        jwt:
+          type: string
+          description: |
+            SENSITIVE: never log. Выпущенный JWT, TTL = auth.jwt.ttl_default.
+            Возвращается один раз — повторный выпуск только через issue-token.
+      required: [aid, display_name, created_at, created_by_aid, jwt]
+
+    OperatorRevokeRequest:
+      type: object
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID Архонта для отзыва (echo из path-param для MCP).
+        reason:
+          type: string
+          description: Свободный текст причины для audit-trail (optional).
+
+    OperatorRevokeReply:
+      type: object
+      description: |
+        Для HTTP 204 No Content тело не пишется; для MCP-tool отдаётся
+        structured-ответ с timestamp-ом. Schema присутствует для 1:1
+        соответствия с proto/operator/v1/operator.proto (симметрия HTTP↔MCP).
+      properties:
+        revoked_at:
+          type: string
+          format: date-time
+          description: Время установки operators.revoked_at.
+
+    IssueTokenRequest:
+      type: object
+      description: |
+        Body запроса пустой; AID цели — в path-param URL. TTL берётся
+        из auth.jwt.ttl_default. Schema присутствует для 1:1 соответствия
+        с proto/operator/v1/operator.proto.
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID Архонта (echo из path-param для MCP).
+
+    IssueTokenReply:
+      type: object
+      description: |
+        SENSITIVE: поле jwt отдаётся один раз, masking-правила те же,
+        что для OperatorCreateReply.jwt.
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        jwt:
+          type: string
+          description: |
+            SENSITIVE: never log. Новый JWT, TTL = auth.jwt.ttl_default.
+        expires_at:
+          type: string
+          format: date-time
+      required: [aid, jwt, expires_at]
+
+    RoleCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя роли (kebab-case), уникальное в кластере.
+        description:
+          type: string
+          description: Человекочитаемое описание роли для UI/аудита.
+        permissions:
+          type: array
+          items:
+            type: string
+          description: |
+            Набор permission-строк роли (например "incarnation.run",
+            "soul.*", "*"). Валидируются rbac.ParsePermission; битый
+            permission → 422 validation-failed.
+      required: [name]
+
+    RoleView:
+      type: object
+      description: |
+        Проекция роли: метаданные, набор permissions и состав операторов
+        (membership). Возвращается в RoleListReply.items[].
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        builtin:
+          type: boolean
+          description: |
+            true — builtin-роль (cluster-admin и т.п.): не удаляется и не
+            редактируется (409 role-builtin).
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Permission-строки роли (пустой массив, если их нет).
+        operators:
+          type: array
+          items:
+            type: string
+            pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID операторов — членов роли (пустой массив, если их нет).
+      required: [name, builtin, permissions, operators]
+
+    RoleListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleView'
+      required: [items]
+
+    RolePermissionsUpdateRequest:
+      type: object
+      description: |
+        Replace-семантика: переданный набор полностью заменяет существующий
+        набор permissions роли.
+      properties:
+        permissions:
+          type: array
+          items:
+            type: string
+          description: |
+            Новый полный набор permission-строк. Битый permission →
+            422 validation-failed.
+      required: [permissions]
+
+    GrantOperatorRequest:
+      type: object
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID оператора, назначаемого в роль (naming-rules.md).
+      required: [aid]
+
+    ServiceRegisterRequest:
+      type: object
+      description: |
+        Регистрация Service-а в реестре service_registry. name+git+ref
+        обязательны; refresh опционален (duration авто-refresh, '5m').
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z][a-z0-9-]*$'
+          description: Имя Service-а (kebab-case).
+        git:
+          type: string
+          description: git-источник service-репо (URL; не секрет).
+        ref:
+          type: string
+          description: git ref (tag/branch) — версия Service-а (ADR-007).
+        refresh:
+          type: string
+          description: Опц. duration авто-refresh ('5m'); опущено — без авто-refresh.
+      required: [name, git, ref]
+
+    ServiceUpdateRequest:
+      type: object
+      description: |
+        Replace-семантика mutable-полей записи Service-а (git/ref/refresh).
+        name — path-параметр (ключ записи), здесь не передаётся.
+      properties:
+        git:
+          type: string
+          description: Новый git-источник.
+        ref:
+          type: string
+          description: Новый git ref.
+        refresh:
+          type: string
+          description: Опц. duration авто-refresh ('5m').
+      required: [git, ref]
+
+    ServiceView:
+      type: object
+      description: |
+        Проекция записи реестра service_registry: имя + git/ref/refresh +
+        audit-метаданные. Возвращается в ServiceListReply.items[] и из
+        register/get/update.
+      properties:
+        name:
+          type: string
+        git:
+          type: string
+        ref:
+          type: string
+        refresh:
+          type: string
+          description: duration авто-refresh; отсутствует, если не задан.
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID создателя; отсутствует у seed/системных записей.
+        updated_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID последнего правщика; отсутствует, если не задан.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [name, git, ref, created_at, updated_at]
+
+    ServiceListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceView'
+      required: [items]
+
+    OmenCreateRequest:
+      type: object
+      description: |
+        Создание Omen-а (внешняя система Augur). Master-credential НЕ передаётся —
+        только auth_ref (vault-ref на него, augur.md §4.1).
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+          description: Имя Omen-а (kebab-case, 1..63).
+        source_type:
+          type: string
+          enum: [vault, prometheus, elk]
+          description: Тип внешней системы.
+        endpoint:
+          type: string
+          description: URL внешней системы (не секрет).
+        auth_ref:
+          type: string
+          pattern: '^vault:'
+          description: vault-ref на master-credential (vault:<mount>/<path>).
+      required: [name, source_type, endpoint, auth_ref]
+
+    OmenView:
+      type: object
+      description: |
+        Проекция записи реестра omens: имя + source_type/endpoint/auth_ref +
+        audit-метаданные. Возвращается из create/get и в OmenListReply.items[].
+      properties:
+        name:
+          type: string
+        source_type:
+          type: string
+          enum: [vault, prometheus, elk]
+        endpoint:
+          type: string
+        auth_ref:
+          type: string
+          description: vault-ref на master-cred; сам секрет не возвращается.
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID создателя; отсутствует у системных записей.
+        created_at:
+          type: string
+          format: date-time
+      required: [name, source_type, endpoint, auth_ref, created_at]
+
+    OmenListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OmenView'
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+      required: [items, offset, limit, total]
+
+    RiteCreateRequest:
+      type: object
+      description: |
+        Создание Rite-а (grant). Субъект — XOR coven/sid. allow — объект, форма
+        зависит от source_type Omen-а (vault {paths?,policies?} / prometheus
+        {queries} / elk {indices}, augur.md §4.2). token_ttl/token_num_uses —
+        только vault-delegate.
+      properties:
+        omen:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+          description: Omen, к которому относится grant.
+        coven:
+          type: string
+          description: Субъект-grant по Coven-метке (XOR с sid).
+        sid:
+          type: string
+          description: Субъект-grant по конкретному SID (XOR с coven).
+        allow:
+          type: object
+          description: Allow-list; форма по source_type Omen-а.
+        delegate:
+          type: boolean
+          description: false — брокер (MVP-1); true — делегация (MVP-2).
+        token_ttl:
+          type: string
+          description: TTL минтуемого scoped-токена; только vault-delegate.
+        token_num_uses:
+          type: integer
+          minimum: 0
+          description: Лимит использований токена; только vault-delegate.
+      required: [omen, allow]
+
+    RiteView:
+      type: object
+      description: |
+        Проекция записи реестра rites: id + omen + субъект + allow + delegate +
+        token-поля + audit-метаданные.
+      properties:
+        id:
+          type: integer
+          format: int64
+        omen:
+          type: string
+        coven:
+          type: string
+        sid:
+          type: string
+        allow:
+          type: object
+        delegate:
+          type: boolean
+        token_ttl:
+          type: string
+        token_num_uses:
+          type: integer
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        created_at:
+          type: string
+          format: date-time
+      required: [id, omen, allow, delegate, created_at]
+
+    RiteListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiteView'
+      required: [items]
+
+    VigilCreateRequest:
+      type: object
+      description: |
+        Создание Vigil-а (Soul-side проверка beacons). Субъект — XOR coven/sid.
+        params — объект, форма зависит от check (path / service-name / порог);
+        typed-схема отложена (ADR-030). enabled опц. (опущено → true).
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+          description: Имя Vigil-а (kebab-case, 1..63).
+        coven:
+          type: array
+          items:
+            type: string
+          description: Субъект-метки coven (XOR с sid).
+        sid:
+          type: string
+          description: Субъект — один конкретный SID (XOR с coven).
+        interval:
+          type: string
+          description: Частота проверки (duration-конвенция, напр. '30s').
+        check:
+          type: string
+          description: Адрес core-beacon (напр. 'core.beacon.file_changed').
+        params:
+          type: object
+          description: Параметры проверки; форма зависит от check.
+        enabled:
+          type: boolean
+          description: Активна ли проверка. По умолчанию true.
+      required: [name, interval, check]
+
+    VigilView:
+      type: object
+      description: |
+        Проекция записи реестра vigils: имя + субъект + interval/check/params +
+        enabled + audit-метаданные. Возвращается из create/get и в
+        VigilListReply.items[].
+      properties:
+        name:
+          type: string
+        coven:
+          type: array
+          items:
+            type: string
+        sid:
+          type: string
+        interval:
+          type: string
+        check:
+          type: string
+        params:
+          type: object
+        enabled:
+          type: boolean
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID создателя; отсутствует у системных записей.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [name, interval, check, params, enabled, created_at, updated_at]
+
+    VigilListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VigilView'
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+      required: [items, offset, limit, total]
+
+    DecreeCreateRequest:
+      type: object
+      description: |
+        Создание Decree-а (правило reactor). Субъект — XOR coven/sid.
+        incarnation_name обязательно (ServiceRef резолвится из неё; ADR-030).
+        where — опц. CEL-предикат над event.data (compile-проверяется на create).
+        action_scenario — named scenario (whitelist). enabled опц. (опущено → true).
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+          description: Имя Decree-а (kebab-case, 1..63).
+        on_beacon:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+          description: Имя Vigil-а, на чей Portent правило реагирует.
+        where:
+          type: string
+          description: Опц. CEL-предикат над event.data; compile-проверяется.
+        coven:
+          type: array
+          items:
+            type: string
+          description: Субъект-метки coven (XOR с sid).
+        sid:
+          type: string
+          description: Субъект — один конкретный SID (XOR с coven).
+        incarnation_name:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{0,62}$'
+          description: Таргет-incarnation реакции (обязательно).
+        action_scenario:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*$'
+          description: Named scenario (whitelist; raw-команда отвергнута).
+        action_input:
+          type: object
+          description: Вход сценария (vault-ref едет как есть).
+        cooldown:
+          type: string
+          description: Минимальный интервал между срабатываниями per-(decree, subject).
+        enabled:
+          type: boolean
+          description: Активно ли правило. По умолчанию true.
+      required: [name, on_beacon, incarnation_name, action_scenario]
+
+    DecreeView:
+      type: object
+      description: |
+        Проекция записи реестра decrees: имя + on_beacon + субъект +
+        incarnation_name + action_scenario/action_input + where/cooldown +
+        enabled + audit-метаданные.
+      properties:
+        name:
+          type: string
+        on_beacon:
+          type: string
+        where:
+          type: string
+        coven:
+          type: array
+          items:
+            type: string
+        sid:
+          type: string
+        incarnation_name:
+          type: string
+        action_scenario:
+          type: string
+        action_input:
+          type: object
+        cooldown:
+          type: string
+        enabled:
+          type: boolean
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [name, on_beacon, incarnation_name, action_scenario, action_input, cooldown, enabled, created_at, updated_at]
+
+    DecreeListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DecreeView'
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+      required: [items, offset, limit, total]
+
+    PluginSigilAllowRequest:
+      type: object
+      description: |
+        Допуск плагина в allow-list Sigil. Бинарь + manifest Keeper читает из
+        кеша host-а по (namespace, name); хеш бинаря НЕ передаётся клиентом —
+        Keeper считает его сам (вариант C). ref — operator-asserted метка.
+      properties:
+        namespace:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+          description: Namespace плагина (тип — cloud / ssh / mod).
+        name:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+          description: Имя плагина (как в manifest.name).
+        ref:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+          description: Operator-asserted метка версии (НЕ git-verified, tag-ref).
+      required: [namespace, name, ref]
+
+    PluginSigilAllowReply:
+      type: object
+      properties:
+        namespace:
+          type: string
+        name:
+          type: string
+        ref:
+          type: string
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 одобренного бинаря (hex lowercase), посчитанный Keeper-ом.
+      required: [namespace, name, ref, sha256]
+
+    PluginSigilView:
+      type: object
+      description: |
+        Проекция активного допуска. БЕЗ signature и manifest (крипто-материал /
+        крупный JSONB query/audit-слой).
+      properties:
+        namespace:
+          type: string
+        name:
+          type: string
+        ref:
+          type: string
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        allowed_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID Архонта, допустившего плагин.
+        allowed_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Время ревокации; null у активных записей.
+      required: [namespace, name, ref, sha256, allowed_by_aid, allowed_at]
+
+    PluginSigilListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PluginSigilView'
+      required: [items]
+
+    SigilKeyIntroduceRequest:
+      type: object
+      description: |
+        Ввод нового ключа подписи Sigil. Тело опционально (пустое = make_primary
+        false). Keypair генерируется Keeper-ом, клиент его НЕ передаёт.
+      properties:
+        make_primary:
+          type: boolean
+          default: false
+          description: Сделать новый ключ primary (новые Sigil-ы подписываются им).
+
+    SigilKeyIntroduceReply:
+      type: object
+      description: |
+        Результат ввода ключа. БЕЗ приватника (он в Vault; security-инвариант
+        ADR-026(d)).
+      properties:
+        key_id:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Стабильный id ключа (SHA-256(SPKI), hex).
+        pubkey_pem:
+          type: string
+          description: Публичная часть (SPKI PEM).
+        is_primary:
+          type: boolean
+        status:
+          type: string
+          enum: [active, retired]
+        introduced_at:
+          type: string
+          format: date-time
+      required: [key_id, pubkey_pem, is_primary, status, introduced_at]
+
+    SigilKeyView:
+      type: object
+      description: Проекция active-ключа подписи. БЕЗ vault_ref.
+      properties:
+        key_id:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        is_primary:
+          type: boolean
+        status:
+          type: string
+          enum: [active, retired]
+        introduced_at:
+          type: string
+          format: date-time
+      required: [key_id, is_primary, status, introduced_at]
+
+    SigilKeyListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SigilKeyView'
+      required: [items]
+
+    IncarnationCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя нового instance (kebab-case), корневая Coven-метка.
+        service:
+          type: string
+          description: Имя сервиса из keeper.yml services.
+        covens:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          description: >-
+            Declared environment-теги incarnation (ADR-008 amendment a).
+            Опциональны (по умолчанию пустой массив). Несут RBAC coven-scope
+            incarnation-операций: эффективный scope = covens ∪ {name}.
+            Coven-scoped оператор не может создать incarnation с тегом вне
+            своего scope.
+        input:
+          type: object
+          additionalProperties: true
+          description: Input для scenario create. По умолчанию пустой объект.
+      required: [name, service]
+
+    IncarnationCreateReply:
+      type: object
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID запуска.
+        incarnation:
+          type: string
+          description: Имя созданного instance (echo).
+      required: [apply_id, incarnation]
+
+    IncarnationRunRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя instance (echo из path-param).
+        scenario:
+          type: string
+          description: Имя сценария (echo из path-param).
+        input:
+          type: object
+          additionalProperties: true
+          description: Input scenario.
+
+    IncarnationRunReply:
+      type: object
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        incarnation:
+          type: string
+        scenario:
+          type: string
+      required: [apply_id, incarnation, scenario]
+
+    IncarnationGetReply:
+      type: object
+      properties:
+        name:
+          type: string
+        service:
+          type: string
+        service_version:
+          type: string
+          description: Пин-версия сервиса (git-ref).
+        state_schema_version:
+          type: integer
+          format: int32
+          description: Версия state_schema (ADR-019).
+        covens:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          description: >-
+            Declared environment-теги incarnation (ADR-008 amendment a).
+            Источник RBAC coven-scope (covens ∪ {name}). Всегда массив (пустой,
+            если тегов нет).
+        spec:
+          type: object
+          additionalProperties: true
+          description: jsonb — то, что задекларировал оператор.
+        state:
+          type: object
+          additionalProperties: true
+          description: jsonb — текущая структурированная конфигурация.
+        status:
+          $ref: '#/components/schemas/IncarnationStatus'
+        status_details:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Детали ошибки, если status локирующий.
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        last_drift_check_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            ADR-031 Slice C. Время завершения последнего dry_run-прогона
+            converge (фон или on-demand из Slice B). Отсутствует, если
+            incarnation ни разу не сканировалась.
+        last_drift_summary:
+          type: object
+          nullable: true
+          description: >-
+            ADR-031 Slice C. Counts-агрегат последнего DriftReport.
+            Отсутствует, если incarnation ни разу не сканировалась.
+          properties:
+            hosts_drifted:
+              type: integer
+              format: int32
+            hosts_clean:
+              type: integer
+              format: int32
+            hosts_unsupported:
+              type: integer
+              format: int32
+            hosts_failed:
+              type: integer
+              format: int32
+            total_hosts:
+              type: integer
+              format: int32
+            scanned_at:
+              type: string
+              format: date-time
+      required:
+        - name
+        - service
+        - service_version
+        - state_schema_version
+        - covens
+        - status
+        - created_by_aid
+        - created_at
+        - updated_at
+
+    IncarnationListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/IncarnationGetReply'
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+      required: [items, offset, limit, total]
+
+    IncarnationHistoryReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StateHistoryEntry'
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+      required: [items, offset, limit, total]
+
+    StateHistoryEntry:
+      type: object
+      description: Запись state_history (architecture.md → state_history).
+      properties:
+        history_id:
+          type: string
+          description: PK записи, UUID.
+        scenario:
+          type: string
+          description: |
+            Имя сценария, приведшего к изменению ("migration" для шагов миграции).
+        state_before:
+          type: object
+          additionalProperties: true
+        state_after:
+          type: object
+          additionalProperties: true
+        changed_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        created_at:
+          type: string
+          format: date-time
+      required: [history_id, scenario, changed_by_aid, apply_id, created_at]
+
+    IncarnationUnlockRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя instance (echo из path-param).
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: |
+            Свободный текст; пишется в state_history.metadata.unlock_reason.
+      required: [reason]
+
+    IncarnationUnlockReply:
+      type: object
+      properties:
+        name:
+          type: string
+        previous_status:
+          $ref: '#/components/schemas/IncarnationStatus'
+        status:
+          $ref: '#/components/schemas/IncarnationStatus'
+        unlocked_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        unlocked_at:
+          type: string
+          format: date-time
+      required: [name, previous_status, status, unlocked_by_aid, unlocked_at]
+
+    IncarnationUpgradeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя instance (echo из path-param).
+        to_version:
+          type: string
+          description: Целевая версия сервиса (git-ref).
+      required: [to_version]
+
+    IncarnationUpgradeReply:
+      type: object
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      required: [apply_id]
+
+    IncarnationDestroyReply:
+      type: object
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      required: [apply_id]
+
+    IncarnationCheckDriftRequest:
+      type: object
+      description: |
+        Body POST /v1/incarnations/{name}/check-drift. Все поля опциональны:
+        input override converge-параметров (перекрывает auto-from-state по
+        конвенции имени). Пустое тело допустимо — drift-проверка идёт только по
+        incarnation.state.
+      properties:
+        input:
+          type: object
+          additionalProperties: true
+          description: |
+            Override converge-параметров. Имена/типы совпадают со схемой
+            input: в scenario/converge/main.yml сервиса.
+
+    DriftReport:
+      type: object
+      description: |
+        Финальный отчёт Scry-проверки drift (ADR-031 Slice B). Содержит per-host
+        агрегаты + summary. incarnation.status переводится handler-ом в `drift`
+        post-check, если есть hosts_drifted/hosts_failed > 0 (информационно, НЕ
+        блокирует remediation — ADR-031(d)).
+      properties:
+        checked_at:
+          type: string
+          format: date-time
+        incarnation:
+          type: string
+        scenario_ref:
+          type: string
+          description: Имя сценария Scry — `converge`.
+        hosts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriftHostReport'
+        summary:
+          $ref: '#/components/schemas/DriftSummary'
+      required: [checked_at, incarnation, scenario_ref, hosts, summary]
+
+    DriftHostReport:
+      type: object
+      properties:
+        sid:
+          type: string
+        status:
+          type: string
+          enum: [clean, drifted, unsupported, failed]
+          description: |
+            clean — все task-ы хоста вернули changed=false;
+            drifted — хотя бы один task changed=true;
+            unsupported — хотя бы один community-модуль без PlanReadSafe-
+            capability (default-deny, ADR-031); failed — реальная ошибка Plan.
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriftTaskResult'
+      required: [sid, status, tasks]
+
+    DriftTaskResult:
+      type: object
+      properties:
+        idx:
+          type: integer
+          minimum: 0
+          description: task_idx из scenario.tasks[] после include-expand.
+        module:
+          type: string
+          description: '`<namespace>.<module>.<state>` из RenderedTask.Module.'
+        action:
+          type: string
+          description: Имя задачи (RenderedTask.Name), пустое если name не задан.
+        changed:
+          type: boolean
+          description: true → drift на этом task-е.
+        message:
+          type: string
+          description: |
+            Operator-facing описание (пустое для clean). Заполняется только для
+            failed/unsupported из error_summary первой упавшей задачи.
+      required: [idx, module, changed]
+
+    DriftSummary:
+      type: object
+      properties:
+        hosts_drifted:
+          type: integer
+          minimum: 0
+        hosts_clean:
+          type: integer
+          minimum: 0
+        hosts_unsupported:
+          type: integer
+          minimum: 0
+        hosts_failed:
+          type: integer
+          minimum: 0
+      required: [hosts_drifted, hosts_clean, hosts_unsupported, hosts_failed]
+
+    SoulCreateRequest:
+      type: object
+      properties:
+        sid:
+          type: string
+          description: SID нового хоста = FQDN (docs/soul/identity.md).
+        transport:
+          $ref: '#/components/schemas/SoulTransport'
+        covens:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+            maxLength: 63
+          description: |
+            Стабильные Coven-метки хоста (ADR-008): kebab-case, привязываются
+            при онбординге. Default []. Дальнейшие изменения набора — через
+            scenario-шаг core.soul.registered (append/replace/remove).
+      required: [sid, transport]
+
+    SoulCreateReply:
+      type: object
+      description: |
+        SENSITIVE: поле bootstrap_token отдаётся один раз (только для
+        transport: agent); secret-masking middleware вырезает его из
+        логов/OTel-spans/audit-trail.
+      properties:
+        sid:
+          type: string
+        transport:
+          $ref: '#/components/schemas/SoulTransport'
+        covens:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/SoulStatus'
+        registered_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID Архонта, выполнившего запрос (из JWT.sub).
+        bootstrap_token:
+          type: string
+          description: |
+            SENSITIVE: never log. Plain bootstrap-токен, присутствует только
+            для transport: agent. Возвращается один раз — повторный выпуск
+            через POST /v1/souls/{sid}/issue-token.
+        expires_at:
+          type: string
+          format: date-time
+          description: Срок истечения bootstrap-токена (вместе с bootstrap_token).
+      required: [sid, transport, status, registered_at, created_by_aid]
+
+    SoulIssueTokenReply:
+      type: object
+      description: |
+        SENSITIVE: поле bootstrap_token отдаётся один раз; masking-правила
+        те же, что для SoulCreateReply.bootstrap_token.
+      properties:
+        sid:
+          type: string
+        bootstrap_token:
+          type: string
+          description: |
+            SENSITIVE: never log. Новый plain bootstrap-токен, TTL по умолчанию.
+        expires_at:
+          type: string
+          format: date-time
+      required: [sid, bootstrap_token, expires_at]
+
+    SoulListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoulListEntry'
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int32
+      required: [items, offset, limit, total]
+
+    SoulListEntry:
+      type: object
+      description: Проекция реестра souls (docs/keeper/storage.md, docs/soul/identity.md).
+      properties:
+        sid:
+          type: string
+          description: SID = FQDN хоста.
+        transport:
+          $ref: '#/components/schemas/SoulTransport'
+        status:
+          $ref: '#/components/schemas/SoulStatus'
+        covens:
+          type: array
+          items:
+            type: string
+          description: Coven-метки хоста (стабильные теги, ADR-008).
+        last_seen_at:
+          type: string
+          format: date-time
+        last_seen_by_kid:
+          type: string
+          description: KID Keeper-инстанса, видевшего последний контакт.
+        registered_at:
+          type: string
+          format: date-time
+      required: [sid, transport, status, registered_at]
+
+    SoulprintReadReply:
+      type: object
+      description: |
+        `GET /v1/souls/{sid}/soulprint`: проекция `souls.{soulprint_facts,
+        soulprint_collected_at, soulprint_received_at}` — последний полученный
+        typed-SoulprintReport (ADR-018). Ключи внутри typed_facts — proto field
+        names (snake_case, `pkg_mgr`/`init_system`), форма по
+        proto SoulprintFacts.
+      properties:
+        sid:
+          type: string
+        typed_facts:
+          $ref: '#/components/schemas/SoulprintFacts'
+        collected_at:
+          type: string
+          format: date-time
+          description: Soul-side timestamp момента сбора фактов.
+        received_at:
+          type: string
+          format: date-time
+          description: Keeper-side timestamp приёма стрима.
+      required: [sid, typed_facts]
+
+    SoulprintFacts:
+      type: object
+      description: |
+        Typed-факты Soulprint (ADR-018, docs/soul/soulprint.md). Соответствует
+        proto-сообщению `SoulprintFacts` (proto/keeper/v1/soulprint.proto).
+        Все вложенные поля собираются Soul-агентом; пост-MVP-расширения
+        (uptime/timezone/virtualization/cloud_provider/disks/bios) — additional
+        field-номера в proto, additionalProperties для wire-compat.
+      properties:
+        sid:
+          type: string
+          description: Echo SID для логов; authority — mTLS peer cert.
+        hostname:
+          type: string
+          description: Короткое имя хоста, `uname -n`.
+        os:
+          $ref: '#/components/schemas/SoulprintOsFacts'
+        kernel:
+          $ref: '#/components/schemas/SoulprintKernelFacts'
+        cpu:
+          $ref: '#/components/schemas/SoulprintCpuFacts'
+        memory:
+          $ref: '#/components/schemas/SoulprintMemoryFacts'
+        network:
+          $ref: '#/components/schemas/SoulprintNetworkFacts'
+
+    SoulprintOsFacts:
+      type: object
+      description: Факты об операционной системе (ADR-018).
+      properties:
+        family:
+          type: string
+          description: debian / rhel / alpine / windows / darwin.
+        distro:
+          type: string
+        version:
+          type: string
+        codename:
+          type: string
+        arch:
+          type: string
+          description: amd64 / arm64.
+        pkg_mgr:
+          type: string
+          description: apt / dnf / apk / pacman.
+        init_system:
+          type: string
+          description: systemd / openrc / sysv / launchd.
+
+    SoulprintKernelFacts:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Полная версия с dist-suffix (5.15.0-101-generic).
+        release:
+          type: string
+          description: Только версия ядра (5.15.0).
+
+    SoulprintCpuFacts:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int32
+          description: Количество logical CPUs (с учётом HT/SMT).
+        model:
+          type: string
+        vendor:
+          type: string
+
+    SoulprintMemoryFacts:
+      type: object
+      description: Объёмы памяти в МБ.
+      properties:
+        total_mb:
+          type: integer
+          format: int64
+        available_mb:
+          type: integer
+          format: int64
+        swap_mb:
+          type: integer
+          format: int64
+
+    SoulprintNetworkFacts:
+      type: object
+      properties:
+        primary_ip:
+          type: string
+          description: Основной IPv4 (интерфейс с default-route).
+        fqdn:
+          type: string
+        interfaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoulprintNetworkInterface'
+
+    SoulprintNetworkInterface:
+      type: object
+      properties:
+        name:
+          type: string
+        ipv4:
+          type: array
+          items:
+            type: string
+          description: IPv4-адреса в CIDR (10.0.0.1/24).
+        ipv6:
+          type: array
+          items:
+            type: string
+        mac:
+          type: string
+        mtu:
+          type: integer
+          format: int32
+
+    SoulCovenAssignRequest:
+      type: object
+      description: |
+        Bulk coven-assign: одна метка за вызов (append/remove) или набор
+        целиком (replace). XOR-форма: append/remove → label, replace → labels.
+      properties:
+        mode:
+          type: string
+          enum: [append, remove, replace]
+          description: |
+            append — добавить метку; remove — снять; replace — заменить набор
+            Coven-меток хоста целиком.
+        label:
+          type: string
+          pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          maxLength: 63
+          description: |
+            Назначаемая/снимаемая Coven-метка для append/remove (kebab-case,
+            ADR-008). Запрещён для mode=replace (используйте labels).
+        labels:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+            maxLength: 63
+          description: |
+            Набор Coven-меток для mode=replace (может быть пустым = «снять
+            все»). КАЖДАЯ метка обязана быть в coven-scope оператора.
+            Запрещён для mode=append/remove (используйте label).
+        selector:
+          $ref: '#/components/schemas/SoulCovenAssignSelector'
+        dry_run:
+          type: boolean
+          default: false
+          description: |
+            true — посчитать matched под selector ∩ scope без UPDATE.
+            Объединяется по OR с query-параметром ?dry_run.
+      required: [mode, selector]
+
+    SoulCovenAssignSelector:
+      type: object
+      description: |
+        Подмножество словаря таргетинга soul.* (all/sids/coven/incarnation/
+        status). CEL-предикат сознательно не поддержан (доказуемость
+        scope-проверки). Должен задавать хотя бы один критерий (all=true или
+        sids/coven/incarnation/status). Комбинации критериев соединяются AND.
+      properties:
+        all:
+          type: boolean
+          default: false
+          description: Без host-фильтра (весь реестр ∩ scope оператора).
+        sids:
+          type: array
+          items:
+            type: string
+          description: Точечный список хостов (SID = FQDN).
+        coven:
+          type: string
+          pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          maxLength: 63
+          description: Хосты, у которых уже есть эта Coven-метка.
+        incarnation:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{0,62}$'
+          maxLength: 63
+          description: |
+            Хосты этой incarnation. Имя incarnation — корневая Coven-метка
+            (ADR-008); матчинг через `name = ANY(coven)`.
+        status:
+          $ref: '#/components/schemas/SoulStatus'
+          description: Фильтр по статусу.
+
+    SoulCovenAssignReply:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [append, remove, replace]
+        label:
+          type: string
+          description: Применённая метка для append/remove (зеркало input).
+        labels:
+          type: array
+          items:
+            type: string
+          description: Применённый набор меток для replace (зеркало input).
+        matched:
+          type: integer
+          format: int32
+          description: Сколько хостов попало под selector ∩ scope.
+        changed:
+          type: integer
+          format: int32
+          description: Сколько строк фактически изменено (идемпотентный отсев не считается).
+        status:
+          type: string
+          enum: [completed, partial]
+          description: |
+            completed — все чанки закоммичены (или dry_run); partial — фейл
+            середины, 1..K-1 чанков зафиксированы (безопасно до-повторяется).
+        dry_run:
+          type: boolean
+      required: [mode, label, matched, changed, status, dry_run]
+
+    PushApplyRequest:
+      type: object
+      properties:
+        inventory:
+          type: array
+          items:
+            type: string
+          description: |
+            Список SID (FQDN) target-хостов. Хосты должны существовать
+            в реестре souls с transport: ssh.
+        destiny:
+          type: string
+          description: |
+            Ссылка на Destiny в форме "<name>@<ref>" — name из
+            default_destiny_source + git-tag/branch.
+        input:
+          type: object
+          additionalProperties: true
+          description: Input для destiny.
+        ssh_provider:
+          type: string
+          description: |
+            Имя SshProvider из keeper.yml plugins.ssh_providers[].name.
+            По умолчанию — первый зарегистрированный.
+        cleanup_stale_versions:
+          type: boolean
+          default: false
+          description: |
+            Удалить устаревшие версии soul-бинаря/модулей в той же SSH-сессии.
+      required: [inventory, destiny]
+
+    PushApplyReply:
+      type: object
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      required: [apply_id]
+
+    PushApplyView:
+      type: object
+      description: |
+        Состояние push-прогона (Variant C orchestrator, docs/keeper/push.md).
+        Возвращается GET /v1/push/{apply_id}.
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        inventory_sids:
+          type: array
+          items:
+            type: string
+        destiny_ref:
+          type: string
+          description: '<name>@<ref> запроса.'
+        ssh_provider:
+          type: string
+        input:
+          type: object
+          additionalProperties: true
+        cleanup_stale:
+          type: boolean
+        status:
+          type: string
+          enum: [pending, running, success, partial_failed, failed, cancelled]
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          description: Отсутствует пока статус pending/running.
+        started_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        summary:
+          type: object
+          additionalProperties: true
+          description: |
+            Per-host исходы прогона (присутствует для терминальных статусов).
+            Форма: {hosts: [{sid, status, error?}], total, success_count, fail_count}.
+            Для cancelled (Reaper orphan-purge) — дополнительно orphan_purged: true + reason.
+      required: [apply_id, inventory_sids, destiny_ref, cleanup_stale, status, started_at]
+
+    PushCleanupRequest:
+      type: object
+      properties:
+        inventory:
+          type: array
+          items:
+            type: string
+          description: Список SID (FQDN) target-хостов.
+        ssh_provider:
+          type: string
+        full:
+          type: boolean
+          default: false
+          description: |
+            true — стереть /var/lib/soul-stack/ целиком (для revoke);
+            false (default) — только устаревшие версии.
+      required: [inventory]
+
+    PushCleanupReply:
+      type: object
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      required: [apply_id]
+
+    ProviderCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя Provider (kebab-case), уникальное в кластере.
+        type:
+          type: string
+          description: |
+            Имя CloudDriver-плагина (aws/yc/…) из
+            keeper.yml plugins.cloud_drivers[].name.
+        region:
+          type: string
+          description: Регион/zone провайдера.
+        credentials_ref:
+          type: string
+          pattern: '^vault:.+$'
+          description: |
+            Vault-ref до credentials (формат "vault:<path>"). Сам secret
+            в БД не пишется. SENSITIVE: secret-masking middleware заменяет
+            значение на "vault:***" в логах.
+      required: [name, type, region, credentials_ref]
+
+    ProviderCreateReply:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        region:
+          type: string
+        credentials_ref:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+      required: [name, type, region, credentials_ref, created_at, created_by_aid]
+
+    ProfileCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Имя Profile (kebab-case).
+        provider:
+          type: string
+          description: Имя зарегистрированного Provider.
+        params:
+          type: object
+          additionalProperties: true
+          description: |
+            Параметры VM, валидируются против profile_schema CloudDriver-плагина.
+        cloud_init:
+          type: string
+          description: Сырая cloud-init userdata (optional).
+      required: [name, provider, params]
+
+    ProfileCreateReply:
+      type: object
+      properties:
+        name:
+          type: string
+        provider:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        cloud_init:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+      required: [name, provider, params, created_at, created_by_aid]

@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:api": "bash scripts/gen-api.sh"
+    "gen:api": "openapi-typescript vendor/openapi/keeper.yaml -o src/api/types.gen.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

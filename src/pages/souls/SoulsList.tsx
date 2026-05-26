@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { keeperApi, type SoulStatus, type SoulTransport } from '../../api/keeper';
@@ -9,6 +9,9 @@ import styles from '../common.module.css';
 
 const SOUL_STATUSES: SoulStatus[] = ['pending', 'connected', 'disconnected', 'expired'];
 const SOUL_TRANSPORTS: SoulTransport[] = ['agent', 'ssh'];
+
+// Конвенция coven-метки (openapi.yaml): lowercase, цифры, дефис-разделитель.
+const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 function formatTimeAgo(iso: string | undefined): string {
   if (!iso) return '—';
@@ -21,18 +24,38 @@ function formatTimeAgo(iso: string | undefined): string {
   return `${Math.floor(deltaSec / 86_400)}d назад`;
 }
 
+// Парсит CSV-строку coven-меток ("prod, redis-prod, stage") в массив
+// валидных меток + список невалидных (для inline-warning). openapi.yaml
+// поддерживает `?coven=X&coven=Y` (style: form, explode: true) — multi-OR.
+function parseCovens(input: string): { valid: string[]; invalid: string[] } {
+  const tokens = input
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  const valid: string[] = [];
+  const invalid: string[] = [];
+  for (const t of tokens) {
+    if (COVEN_PATTERN.test(t)) valid.push(t);
+    else invalid.push(t);
+  }
+  return { valid, invalid };
+}
+
 export function SoulsList() {
   const [status, setStatus] = useState<SoulStatus | ''>('');
   const [transport, setTransport] = useState<SoulTransport | ''>('');
   const [coven, setCoven] = useState<string>('');
 
+  const parsed = useMemo(() => parseCovens(coven), [coven]);
+  const covenFilter = parsed.valid.length > 0 ? parsed.valid : undefined;
+
   const q = useQuery({
-    queryKey: ['souls', { status, transport, coven }],
+    queryKey: ['souls', { status, transport, coven: covenFilter }],
     queryFn: () =>
       keeperApi.souls.list({
         status: status || undefined,
         transport: transport || undefined,
-        coven: coven.trim() ? [coven.trim()] : undefined,
+        coven: covenFilter,
         limit: 200,
       }),
   });
@@ -73,14 +96,27 @@ export function SoulsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Coven (exact)</div>
+          <div className={styles.metaKey}>Covens (CSV, OR)</div>
           <input
             type="text"
             value={coven}
             onChange={(e) => setCoven(e.target.value)}
-            placeholder="prod / coven-tag"
-            style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)' }}
+            placeholder="prod, redis-prod, ..."
+            aria-invalid={parsed.invalid.length > 0 ? 'true' : undefined}
+            style={{
+              padding: '8px 10px',
+              borderRadius: 'var(--radius)',
+              border: `1px solid ${parsed.invalid.length > 0 ? 'var(--danger)' : 'var(--border)'}`,
+              background: 'var(--surface)',
+              fontFamily: 'var(--font-mono)',
+              minWidth: 240,
+            }}
           />
+          {parsed.invalid.length > 0 ? (
+            <span style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4, display: 'block' }}>
+              Не валидные метки: {parsed.invalid.join(', ')} (lowercase, цифры, дефис-разделитель).
+            </span>
+          ) : null}
         </label>
       </div>
 

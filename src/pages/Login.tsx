@@ -84,8 +84,11 @@ export function Login() {
             <span className={styles.error}>{errors.token.message}</span>
           ) : (
             <span className={styles.hint}>
-              Bootstrap-токен из файла, выданного <code className="mono">keeper init --archon</code>, либо токен,
+              Пока эндпоинта <code className="mono">/v1/auth/login</code> нет, вставляйте JWT вручную:
+              bootstrap-токен из файла <code className="mono">keeper init --archon</code> либо токен,
               выданный <code className="mono">POST /v1/operators/{'{aid}'}/issue-token</code>.
+              См. ADR-014 amendment (in progress). Токен проверяется ping-ом
+              <code className="mono">GET /v1/incarnations?limit=1</code>.
             </span>
           )}
         </label>

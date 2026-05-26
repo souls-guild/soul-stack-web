@@ -18,6 +18,11 @@ const INCARNATION_STATUSES: IncarnationStatus[] = [
   'destroy_failed',
 ];
 
+// Конвенция coven-метки в openapi.yaml: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
+// (lowercase, дефис как разделитель). Сверяем заранее, чтобы не отправлять
+// 422 на Keeper.
+const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
 function formatTimeAgo(iso: string | null | undefined): string {
   if (!iso) return '—';
   const ts = new Date(iso).getTime();
@@ -33,21 +38,22 @@ export function IncarnationsList() {
   const [status, setStatus] = useState<IncarnationStatus | ''>('');
   const [coven, setCoven] = useState<string>('');
 
+  const trimmedCoven = coven.trim();
+  const covenValid = trimmedCoven === '' || COVEN_PATTERN.test(trimmedCoven);
+  const effectiveCoven = covenValid && trimmedCoven !== '' ? trimmedCoven : undefined;
+
   const q = useQuery({
-    queryKey: ['incarnations', { status, coven }],
+    queryKey: ['incarnations', { status, coven: effectiveCoven }],
     queryFn: () =>
       keeperApi.incarnations.list({
         status: status || undefined,
-        // openapi.yaml не предоставляет coven-filter для incarnation-list (только для souls);
-        // оставлено как text-filter, применяемое клиентом ниже.
+        coven: effectiveCoven,
         limit: 100,
       }),
+    enabled: covenValid,
   });
 
-  const items = (q.data?.items ?? []).filter((row) => {
-    if (!coven.trim()) return true;
-    return row.covens.some((c) => c.includes(coven.trim()));
-  });
+  const items = q.data?.items ?? [];
 
   return (
     <div className={styles.page}>
@@ -72,14 +78,26 @@ export function IncarnationsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Coven contains</div>
+          <div className={styles.metaKey}>Coven (exact)</div>
           <input
             type="text"
             value={coven}
             onChange={(e) => setCoven(e.target.value)}
             placeholder="prod / staging / ..."
-            style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)' }}
+            aria-invalid={!covenValid ? 'true' : undefined}
+            style={{
+              padding: '8px 10px',
+              borderRadius: 'var(--radius)',
+              border: `1px solid ${covenValid ? 'var(--border)' : 'var(--danger)'}`,
+              background: 'var(--surface)',
+              fontFamily: 'var(--font-mono)',
+            }}
           />
+          {!covenValid ? (
+            <span style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4, display: 'block' }}>
+              Не валидная coven-метка (ожидается lowercase, цифры и дефис как разделитель).
+            </span>
+          ) : null}
         </label>
       </div>
 

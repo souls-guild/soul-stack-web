@@ -129,15 +129,15 @@ export function IncarnationDetail() {
           ) : null}
           <div className={styles.timeline}>
             {history.data?.items.map((entry) => (
-              <div key={entry.apply_id} className={styles.timelineItem}>
+              <div key={entry.history_id} className={styles.timelineItem}>
                 <div className={styles.timelineHead}>
                   <span>{entry.scenario}</span>
-                  <span>{entry.started_at}</span>
+                  <span>{entry.created_at}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12 }}>
-                  <Badge tone={incarnationTone(entry.status_before)}>{entry.status_before}</Badge>
-                  <span style={{ color: 'var(--text-faint)' }}>→</span>
-                  <Badge tone={incarnationTone(entry.status_after)}>{entry.status_after}</Badge>
+                  <span className="mono" style={{ color: 'var(--text-faint)' }}>
+                    apply: {entry.apply_id}
+                  </span>
                   <span className="mono" style={{ color: 'var(--text-faint)', marginLeft: 'auto' }}>
                     by {entry.changed_by_aid}
                   </span>
@@ -163,10 +163,10 @@ export function IncarnationDetail() {
           {drift ? (
             <>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <Badge tone="warn">drifted: {drift.counts.hosts_drifted}</Badge>
-                <Badge tone="ok">clean: {drift.counts.hosts_clean}</Badge>
-                <Badge tone="muted">unsupported: {drift.counts.hosts_unsupported}</Badge>
-                <Badge tone="danger">failed: {drift.counts.hosts_failed}</Badge>
+                <Badge tone="warn">drifted: {drift.summary.hosts_drifted}</Badge>
+                <Badge tone="ok">clean: {drift.summary.hosts_clean}</Badge>
+                <Badge tone="muted">unsupported: {drift.summary.hosts_unsupported}</Badge>
+                <Badge tone="danger">failed: {drift.summary.hosts_failed}</Badge>
               </div>
               <JsonViewer value={drift} />
             </>

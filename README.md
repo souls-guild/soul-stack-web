@@ -9,6 +9,52 @@ Parity-аналог: **SaltStack ↔ salt-manager**, **OpenStack ↔ Horizon**,
 Извлечён 2026-05-26 из `soul-stack/ui/` scaffold (5 страниц, 7 тестов,
 lint+build зелёные на момент выноса).
 
+## What's new (Iteration 1, 2026-05-26)
+
+Подключение к свежим endpoint-ам core (commit 549be43):
+
+- `GET /v1/souls/{sid}` — single Soul fetch (заменяет старое list-and-find).
+- `GET /v1/souls/{sid}/soulprint` — typed SoulprintReport (ADR-018);
+  410 → graceful «soulprint ещё не получен».
+- `?coven=<x>` server-side фильтр для `GET /v1/incarnations`.
+- `?coven=X&coven=Y` multi-OR-фильтр для `GET /v1/souls`
+  (`style: form, explode: true`).
+
+Страницы:
+
+- `/souls/:sid` — раскрыто из плейсхолдера в полноценный detail с вкладками
+  **Overview / Soulprint / History** (last — TODO до появления
+  `GET /v1/souls/{sid}/history`).
+  Soulprint-tab рендерит `typed_facts` (os/kernel/cpu/memory/network) +
+  visual-warn на skew `collected_at` ↔ `received_at` > 10 минут.
+- `/incarnations` — серверный coven-filter (заменил клиентский
+  substring); inline-валидация coven-pattern.
+- `/souls` — multi-coven фильтр (CSV `prod, redis-prod, …`).
+- `/login` — help-text про paste-JWT и про отсутствие
+  `/v1/auth/login` (ADR-014 amendment in progress).
+
+## Sync with core
+
+OpenAPI вендорится в `vendor/openapi/keeper.yaml`, чтобы dev-окружение
+получало актуальные типы без core-репо. Обновление — manual:
+
+```bash
+cp ../soul-stack/docs/keeper/openapi.yaml vendor/openapi/keeper.yaml
+npm run gen:api
+```
+
+`vendor/openapi/keeper.yaml` коммитится в репо; `src/api/types.gen.ts` —
+generated, в `.gitignore`.
+
+## Known gaps
+
+- `/v1/auth/login` ещё не выставлен (требует ADR-014 amendment).
+  Текущий UX — paste JWT.
+- `GET /v1/souls/{sid}/history` нет в core — вкладка History в
+  SoulDetail показывает TODO.
+- Audit-log viewer — отложен (нет endpoint).
+- `?coven_any=` для incarnations (multi-OR) — пост-MVP в core.
+
 SPA-фронтенд Keeper Operator API. Отдельный артефакт (Variant B), не embedded
 в `keeper`-бинарь. Поднимается локально для разработки и серверится
 production-build-ом отдельно (deployment-слайс — позже).
@@ -56,32 +102,27 @@ endpoint-а в openapi заменим `/login`-форму на нормальн�
 
 ## Генерация TS-типов из OpenAPI
 
-Скрипт `scripts/gen-api.sh` запускает `openapi-typescript` против
-`../docs/keeper/openapi.yaml` и кладёт результат в
-`src/api/types.gen.ts`. Запуск:
+`npm run gen:api` запускает `openapi-typescript` против
+`vendor/openapi/keeper.yaml` и кладёт результат в `src/api/types.gen.ts`:
 
 ```bash
-cd ui
 npm run gen:api
 ```
 
 Не запускается автоматически в `vite build` — оператор обновляет вручную
 при изменении openapi (явный пайплайн, никакого скрытого магического
-кодогена).
+кодогена). Источник правды для типов — generated-файл; `src/api/keeper.ts`
+re-export-ит схемы через `components['schemas']['…']`.
 
-До первой генерации в `src/api/keeper.ts` есть узкий ручной surface
-(зеркало нужных схем). После `gen:api` можно переключаться на
-`import type { components } from './types.gen'`.
-
-## Реализованные страницы (pilot)
+## Реализованные страницы
 
 | Path | Назначение |
 | ---- | ---------- |
-| `/login` | Вход Архонта по JWT-токену. |
-| `/incarnations` | Список incarnation-ов: name / service / status / last_drift_check / updated_at. Фильтры status + coven (substring). |
-| `/incarnations/:name` | Detail: вкладки State (jsonb), Spec (jsonb), History (state_history timeline), Drift (кнопка check-drift + DriftReport). |
-| `/souls` | Список Souls: sid / status / transport / covens / last_seen_at. Фильтры status + transport + coven (exact). |
-| `/souls/:sid` | Минимальный detail (плейсхолдер Soulprint — endpoint в MVP openapi не выставлен). |
+| `/login` | Вход Архонта по JWT-токену (ping-валидация). |
+| `/incarnations` | Список: name / service / status / last_drift_check / updated_at. Фильтры status + coven (server-side, exact). |
+| `/incarnations/:name` | Detail: вкладки State / Spec / History / Drift (кнопка check-drift + DriftReport). |
+| `/souls` | Список: sid / status / transport / covens / last_seen_at. Фильтры status + transport + covens (server-side, CSV OR). |
+| `/souls/:sid` | Detail: вкладки Overview / Soulprint (typed_facts ADR-018) / History (TODO). |
 
 Сайдбар: пункт «Audit» — placeholder (disabled).
 
@@ -89,8 +130,6 @@ npm run gen:api
 
 - Полный CRUD: создание incarnation / создание Soul / coven-assign UI / role-management.
 - `/applies/:id` страница live-следящая за apply (требует SSE-endpoint).
-- Soulprint detail (`GET /v1/souls/{sid}/soulprint`, ADR-018) — open question
-  в openapi.yaml: нет `soul.get` permission и endpoint-а в MVP.
 - Audit-log viewer.
 - Push-операции (`POST /v1/push/apply`).
 - Bulk-actions (выбор N incarnation-ов / N Souls).
@@ -136,8 +175,10 @@ ui/
 ├── index.html
 ├── package.json
 ├── README.md                            # этот файл
-├── scripts/
-│   └── gen-api.sh                       # openapi-typescript → types.gen.ts
+├── vendor/
+│   └── openapi/
+│       ├── keeper.yaml                  # synced from core (commit-id в vendor/openapi/README.md)
+│       └── README.md
 ├── src/
 │   ├── App.tsx
 │   ├── main.tsx

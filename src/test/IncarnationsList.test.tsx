@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
 import { IncarnationsList } from '../pages/incarnations/IncarnationsList';
 import { installFetchMock } from './fetchMock';
@@ -68,5 +69,50 @@ describe('IncarnationsList', () => {
     await waitFor(() => {
       expect(screen.getByText(/не найдено/i)).toBeInTheDocument();
     });
+  });
+
+  it('передаёт server-side coven=<x> в запрос /v1/incarnations', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      calls.push(urlStr);
+      return new Response(JSON.stringify({ items: [], offset: 0, limit: 100, total: 0 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    const user = userEvent.setup();
+    const covenInput = await screen.findByPlaceholderText(/prod \/ staging/i);
+    await user.type(covenInput, 'prod');
+
+    await waitFor(() => {
+      expect(calls.some((u) => u.includes('coven=prod'))).toBe(true);
+    });
+  });
+
+  it('inline-error на невалидной coven-метке (не отправляет запрос)', async () => {
+    let called = 0;
+    globalThis.fetch = (async () => {
+      called += 1;
+      return new Response(JSON.stringify({ items: [], offset: 0, limit: 100, total: 0 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    const user = userEvent.setup();
+    const covenInput = await screen.findByPlaceholderText(/prod \/ staging/i);
+    // Поднимаемся до initial call с пустым coven.
+    await waitFor(() => expect(called).toBeGreaterThanOrEqual(1));
+    const initial = called;
+    await user.type(covenInput, 'Prod-Bad!');
+    expect(await screen.findByText(/Не валидная coven-метка/i)).toBeInTheDocument();
+    // Перезапроса с невалидным значением не было.
+    expect(called).toBe(initial);
   });
 });
