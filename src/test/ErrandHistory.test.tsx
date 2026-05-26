@@ -11,7 +11,7 @@ describe('ErrandHistory', () => {
     tokenStore.clear();
   });
 
-  it('рендерит список и фильтрует по module-substring клиентски', async () => {
+  it('рендерит список errand-ов из GET /v1/errands', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -52,14 +52,27 @@ describe('ErrandHistory', () => {
       expect(screen.getByText('host01')).toBeInTheDocument();
       expect(screen.getByText('host02')).toBeInTheDocument();
     });
+  });
 
+  it('module CSV-фильтр уходит в query как multi-value ?module=', async () => {
+    let lastUrl = '';
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+    renderWithProviders(<ErrandHistory />, '/errand/history');
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/core.cmd/i), 'shell');
-
-    // После client-side filter остаётся только core.cmd.shell.
+    await user.type(
+      screen.getByPlaceholderText(/core.cmd.shell, core.exec.run/i),
+      'core.cmd.shell,core.exec.run',
+    );
     await waitFor(() => {
-      expect(screen.getByText('host01')).toBeInTheDocument();
-      expect(screen.queryByText('host02')).not.toBeInTheDocument();
+      // Multi-value `?module=X&module=Y` — оба параметра в URL.
+      expect(lastUrl).toMatch(/module=core\.cmd\.shell/);
+      expect(lastUrl).toMatch(/module=core\.exec\.run/);
     });
   });
 });

@@ -144,6 +144,145 @@ paths:
         '409': { $ref: '#/components/responses/Problem409' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Operator]
+      operationId: ListOperators
+      summary: Список Архонтов (paged + фильтры).
+      description: |
+        Permission: operator.list. Read-only, без audit.
+        Фильтры (опционально): auth_method (jwt/mtls/combined), revoked
+        (bool, default false — только активные). Пагинация — стандартная.
+      parameters:
+        - in: query
+          name: auth_method
+          required: false
+          schema:
+            type: string
+            enum: [jwt, mtls, combined]
+          description: Фильтр по форме credential.
+        - in: query
+          name: revoked
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            false — только активные (revoked_at IS NULL). true — включая
+            ревокнутых. Default = false (UI-friendly).
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Лента Архонтов под фильтром.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperatorListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/operators/{aid}:
+    get:
+      tags: [Operator]
+      operationId: GetOperator
+      summary: Detail Архонта.
+      description: |
+        Permission: operator.list (одна permission покрывает list+get в MVP,
+        паттерн service.list / soul.list). Read-only, без audit.
+      parameters:
+        - $ref: '#/components/parameters/AidPath'
+      responses:
+        '200':
+          description: Archon найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operator'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/audit:
+    get:
+      tags: [Audit]
+      operationId: ListAuditEvents
+      summary: Лента audit-events (paged + фильтры).
+      description: |
+        Permission: audit.read. Read-only — без audit-trail (чтение audit_log
+        НЕ пишется в audit_log, чтобы не было рекурсии).
+        Фильтры (все опциональны): type (multi-value OR), source (multi-value
+        OR), archon_aid (exact), correlation_id (exact), started_after /
+        started_before (RFC3339, обе границы включающие). Пагинация —
+        стандартная (offset/limit).
+      parameters:
+        - in: query
+          name: type
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          description: |
+            Multi-value `?type=X&type=Y`. Exact-match OR (event_type IN (X,Y)).
+        - in: query
+          name: source
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [signal, api, mcp, keeper_internal, soul_grpc, background]
+          style: form
+          explode: true
+          description: Multi-value `?source=api&source=mcp`. Exact-match OR.
+        - in: query
+          name: archon_aid
+          required: false
+          schema:
+            type: string
+            pattern: '^archon-[a-z0-9-]{1,62}$'
+          description: AID Архонта-инициатора (exact match).
+        - in: query
+          name: correlation_id
+          required: false
+          schema:
+            type: string
+          description: ULID цепочки связанных событий (exact match).
+        - in: query
+          name: started_after
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: created_at >= started_after (RFC3339, включающая).
+        - in: query
+          name: started_before
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: created_at <= started_before (RFC3339, включающая).
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Лента audit-events под фильтром.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
 
   /v1/operators/{aid}/revoke:
     post:
@@ -978,6 +1117,18 @@ paths:
             type: string
             format: date-time
           description: Фильтр по началу (started_at > value).
+        - in: query
+          name: module
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          description: |
+            Multi-value `?module=X&module=Y`. Exact-match OR (module IN (X,Y));
+            regex/glob не поддерживается (ТЗ UI iter 2).
         - in: query
           name: offset
           required: false
@@ -2178,6 +2329,111 @@ components:
             SENSITIVE: never log. Выпущенный JWT, TTL = auth.jwt.ttl_default.
             Возвращается один раз — повторный выпуск только через issue-token.
       required: [aid, display_name, created_at, created_by_aid, jwt]
+
+    Operator:
+      type: object
+      description: |
+        Запись реестра operators (ADR-014). Возвращается /v1/operators (list) и
+        /v1/operators/{aid} (detail). `bootstrap_initial` — derived-флаг
+        (created_by_aid == null у первого Архонта через `keeper init`).
+      properties:
+        aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        display_name:
+          type: string
+        auth_method:
+          type: string
+          enum: [jwt, mtls, combined]
+        created_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          nullable: true
+          description: null для первого bootstrap-Архонта (ADR-013).
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: null для активного Архонта.
+        bootstrap_initial:
+          type: boolean
+          description: true — первый Архонт через `keeper init` (created_by_aid==null).
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [aid, display_name, auth_method, created_at, bootstrap_initial]
+
+    OperatorListReply:
+      type: object
+      description: |
+        GET /v1/operators paged-list. items — Operator[]; offset/limit/total —
+        стандартная сквозная пагинация (shared/api).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Operator'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
+    AuditEvent:
+      type: object
+      description: |
+        Одна запись audit_log (ADR-022). Возвращается GET /v1/audit. payload —
+        свободный jsonb, форма зависит от event_type; секреты маскируются на
+        write-path (audit.MaskSecrets), read-path их НЕ декодирует обратно.
+      properties:
+        id:
+          type: string
+          description: ULID-26 (audit_log.audit_id).
+        type:
+          type: string
+          description: '`<area>.<action>` (см. docs/naming-rules.md → Audit-events).'
+        source:
+          type: string
+          enum: [signal, api, mcp, keeper_internal, soul_grpc, background]
+        archon_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+          nullable: true
+          description: AID инициатора (null для signal/keeper_internal/soul_grpc/background).
+        correlation_id:
+          type: string
+          nullable: true
+          description: ULID цепочки связанных событий (reuse apply_id для soul_grpc).
+        created_at:
+          type: string
+          format: date-time
+        payload:
+          type: object
+          additionalProperties: true
+      required: [id, type, source, created_at, payload]
+
+    AuditEventListReply:
+      type: object
+      description: |
+        GET /v1/audit paged-list. items — AuditEvent[]; offset/limit/total —
+        стандартная сквозная пагинация.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
 
     OperatorRevokeRequest:
       type: object

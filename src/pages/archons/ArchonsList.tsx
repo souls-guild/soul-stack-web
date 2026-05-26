@@ -1,16 +1,35 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   keeperApi,
   type OperatorCreateReply,
   type IssueTokenReply,
+  type OperatorAuthMethod,
+  type Operator,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Button, Input } from '../../components/primitives';
+import { Badge, Button, Input } from '../../components/primitives';
 import styles from '../common.module.css';
 
 // AID-валидатор симметричен openapi pattern '^archon-[a-z0-9-]{1,62}$'.
 const AID_PATTERN = /^archon-[a-z0-9-]{1,62}$/;
+
+const AUTH_METHODS: OperatorAuthMethod[] = ['jwt', 'mtls', 'combined'];
+
+function authMethodTone(m: OperatorAuthMethod | string | undefined):
+  'ok' | 'warn' | 'info' | 'muted' {
+  switch (m) {
+    case 'mtls':
+      return 'ok';
+    case 'combined':
+      return 'info';
+    case 'jwt':
+      return 'warn';
+    default:
+      return 'muted';
+  }
+}
 
 // JWT отдаётся один раз — показываем в modal-блоке с кнопкой copy.
 function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: string; onClose: () => void }) {
@@ -68,13 +87,104 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
   );
 }
 
+function ArchonsTable({ items, onIssue, onRevoke }: {
+  items: Operator[];
+  onIssue: (aid: string) => void;
+  onRevoke: (aid: string) => void;
+}) {
+  return (
+    <table className={styles.table}>
+      <thead>
+        <tr>
+          <th>AID</th>
+          <th>Display name</th>
+          <th>Auth</th>
+          <th>Created</th>
+          <th>Created by</th>
+          <th>Revoked</th>
+          <th>Bootstrap</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((op) => {
+          const revoked = Boolean(op.revoked_at);
+          return (
+            <tr key={op.aid}>
+              <td>
+                <Link to={`/archons/${encodeURIComponent(op.aid)}`}>{op.aid}</Link>
+              </td>
+              <td>{op.display_name}</td>
+              <td><Badge tone={authMethodTone(op.auth_method)}>{op.auth_method}</Badge></td>
+              <td className="mono">{op.created_at}</td>
+              <td className="mono">{op.created_by_aid ?? '—'}</td>
+              <td className="mono">{op.revoked_at ?? '—'}</td>
+              <td>{op.bootstrap_initial ? <Badge tone="info">initial</Badge> : '—'}</td>
+              <td>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    disabled={revoked}
+                    onClick={() => onIssue(op.aid)}
+                    title={revoked ? 'Архонт отозван' : 'Выпустить новый JWT'}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      background: 'transparent',
+                      cursor: revoked ? 'not-allowed' : 'pointer',
+                      fontSize: 12,
+                    }}
+                  >
+                    Issue token
+                  </button>
+                  <button
+                    disabled={revoked}
+                    onClick={() => onRevoke(op.aid)}
+                    title={revoked ? 'Уже отозван' : 'Отозвать Архонта'}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid var(--danger)',
+                      borderRadius: 'var(--radius)',
+                      background: 'transparent',
+                      color: revoked ? 'var(--text-faint)' : 'var(--danger)',
+                      cursor: revoked ? 'not-allowed' : 'pointer',
+                      fontSize: 12,
+                    }}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 export function ArchonsList() {
+  const qc = useQueryClient();
+
   const [aidNew, setAidNew] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [aidIssue, setAidIssue] = useState('');
-  const [aidRevoke, setAidRevoke] = useState('');
-  const [revokeReason, setRevokeReason] = useState('');
   const [revealed, setRevealed] = useState<{ jwt: string; expiresAt?: string } | null>(null);
+
+  const [authMethod, setAuthMethod] = useState<OperatorAuthMethod | ''>('');
+  const [includeRevoked, setIncludeRevoked] = useState(false);
+  const [limit, setLimit] = useState(50);
+  const [offset, setOffset] = useState(0);
+
+  const list = useQuery({
+    queryKey: ['operators.list', { authMethod, includeRevoked, limit, offset }],
+    queryFn: () =>
+      keeperApi.operators.list({
+        auth_method: authMethod || undefined,
+        revoked: includeRevoked || undefined,
+        limit,
+        offset,
+      }),
+  });
 
   const createMut = useMutation({
     mutationFn: () => keeperApi.operators.create({ aid: aidNew, display_name: displayName }),
@@ -82,28 +192,35 @@ export function ArchonsList() {
       setRevealed({ jwt: reply.jwt });
       setAidNew('');
       setDisplayName('');
+      qc.invalidateQueries({ queryKey: ['operators.list'] });
     },
   });
 
   const issueMut = useMutation({
-    mutationFn: () => keeperApi.operators.issueToken(aidIssue),
+    mutationFn: (aid: string) => keeperApi.operators.issueToken(aid),
     onSuccess: (reply: IssueTokenReply) => {
       setRevealed({ jwt: reply.jwt, expiresAt: reply.expires_at });
-      setAidIssue('');
     },
   });
 
   const revokeMut = useMutation({
-    mutationFn: () => keeperApi.operators.revoke(aidRevoke, { aid: aidRevoke, reason: revokeReason || undefined }),
+    mutationFn: ({ aid, reason }: { aid: string; reason?: string }) =>
+      keeperApi.operators.revoke(aid, { aid, reason }),
     onSuccess: () => {
-      setAidRevoke('');
-      setRevokeReason('');
+      qc.invalidateQueries({ queryKey: ['operators.list'] });
     },
   });
 
   const aidNewValid = AID_PATTERN.test(aidNew);
-  const aidIssueValid = AID_PATTERN.test(aidIssue);
-  const aidRevokeValid = AID_PATTERN.test(aidRevoke);
+
+  function handleRevokeClick(aid: string) {
+    const reason = window.prompt(`Отозвать ${aid}? Активные JWT работают до exp.\nReason (optional):`);
+    if (reason === null) return; // отмена
+    revokeMut.mutate({ aid, reason: reason || undefined });
+  }
+
+  const items = list.data?.items ?? [];
+  const total = list.data?.total ?? 0;
 
   return (
     <div className={styles.page}>
@@ -112,20 +229,6 @@ export function ArchonsList() {
           <h1 className={styles.title}>Archons</h1>
           <div className={styles.crumbs}>операторы кластера (ADR-013/014)</div>
         </div>
-      </div>
-
-      <div
-        style={{
-          background: 'color-mix(in srgb, var(--info, #4b8bff) 6%, var(--surface))',
-          border: '1px dashed var(--border)',
-          borderRadius: 'var(--radius)',
-          padding: 'var(--s-3) var(--s-4)',
-          fontSize: 12.5,
-          color: 'var(--text-muted)',
-        }}
-      >
-        <code className="mono">GET /v1/operators</code> ещё не выставлен — таблицы существующих
-        Архонтов нет. Доступны create / issue-token / revoke по AID.
       </div>
 
       {revealed ? (
@@ -168,27 +271,80 @@ export function ArchonsList() {
         ) : null}
       </section>
 
-      <section className={styles.section} aria-label="Выпустить новый токен">
-        <h2 className={styles.sectionTitle}>Выпустить новый JWT</h2>
+      <section className={styles.section} aria-label="Список Архонтов">
+        <h2 className={styles.sectionTitle}>Существующие</h2>
         <div className={styles.filters}>
-          <Input
-            label="AID"
-            value={aidIssue}
-            onChange={(e) => setAidIssue(e.target.value)}
-            placeholder="archon-alice"
-            mono
-            error={aidIssue && !aidIssueValid ? 'pattern ^archon-[a-z0-9-]{1,62}$' : undefined}
-          />
-          <div style={{ alignSelf: 'flex-end' }}>
-            <Button
-              variant="primary"
-              disabled={!aidIssueValid || issueMut.isPending}
-              onClick={() => issueMut.mutate()}
+          <label>
+            <div className={styles.metaKey}>Auth method</div>
+            <select
+              value={authMethod}
+              onChange={(e) => { setAuthMethod(e.target.value as OperatorAuthMethod | ''); setOffset(0); }}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
             >
-              {issueMut.isPending ? 'Выпускаем…' : 'Issue token'}
-            </Button>
-          </div>
+              <option value="">— все —</option>
+              {AUTH_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className={styles.metaKey}>Включая revoked</span>
+            <input
+              type="checkbox"
+              checked={includeRevoked}
+              onChange={(e) => { setIncludeRevoked(e.target.checked); setOffset(0); }}
+              style={{ width: 18, height: 18, accentColor: 'var(--accent)' }}
+            />
+          </label>
+          <label>
+            <div className={styles.metaKey}>Limit</div>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={limit}
+              onChange={(e) => { setLimit(Math.max(1, Math.min(200, Number(e.target.value) || 50))); setOffset(0); }}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', width: 80 }}
+            />
+          </label>
         </div>
+
+        {list.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+        {list.error ? (
+          <div className={styles.errorBox}>
+            {list.error instanceof ApiError ? `Ошибка ${list.error.status}: ${list.error.message}` : String(list.error)}
+          </div>
+        ) : null}
+
+        {list.data && items.length === 0 ? (
+          <div className={styles.empty}>Архонтов под фильтр не найдено.</div>
+        ) : null}
+
+        {items.length > 0 ? (
+          <>
+            <ArchonsTable
+              items={items}
+              onIssue={(aid) => issueMut.mutate(aid)}
+              onRevoke={handleRevokeClick}
+            />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
+              <button
+                disabled={offset === 0}
+                onClick={() => setOffset(Math.max(0, offset - limit))}
+                style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset === 0 ? 'not-allowed' : 'pointer' }}
+              >
+                ← Prev
+              </button>
+              <span>{offset + 1}–{offset + items.length} of {total}</span>
+              <button
+                disabled={offset + limit >= total}
+                onClick={() => setOffset(offset + limit)}
+                style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset + limit >= total ? 'not-allowed' : 'pointer' }}
+              >
+                Next →
+              </button>
+            </div>
+          </>
+        ) : null}
+
         {issueMut.error ? (
           <div className={styles.errorBox}>
             {issueMut.error instanceof ApiError
@@ -196,47 +352,12 @@ export function ArchonsList() {
               : String(issueMut.error)}
           </div>
         ) : null}
-      </section>
-
-      <section className={styles.section} aria-label="Отозвать Архонта">
-        <h2 className={styles.sectionTitle}>Отозвать Архонта</h2>
-        <div className={styles.filters}>
-          <Input
-            label="AID"
-            value={aidRevoke}
-            onChange={(e) => setAidRevoke(e.target.value)}
-            placeholder="archon-alice"
-            mono
-            error={aidRevoke && !aidRevokeValid ? 'pattern ^archon-[a-z0-9-]{1,62}$' : undefined}
-          />
-          <Input
-            label="Reason"
-            value={revokeReason}
-            onChange={(e) => setRevokeReason(e.target.value)}
-            placeholder="optional"
-          />
-          <div style={{ alignSelf: 'flex-end' }}>
-            <Button
-              variant="danger"
-              disabled={!aidRevokeValid || revokeMut.isPending}
-              onClick={() => {
-                if (!window.confirm(`Отозвать ${aidRevoke}? Активные JWT работают до exp.`)) return;
-                revokeMut.mutate();
-              }}
-            >
-              {revokeMut.isPending ? 'Отзываем…' : 'Revoke'}
-            </Button>
-          </div>
-        </div>
         {revokeMut.error ? (
           <div className={styles.errorBox}>
             {revokeMut.error instanceof ApiError
               ? `Ошибка ${revokeMut.error.status}: ${revokeMut.error.message}`
               : String(revokeMut.error)}
           </div>
-        ) : null}
-        {revokeMut.isSuccess ? (
-          <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>Архонт отозван.</div>
         ) : null}
       </section>
     </div>

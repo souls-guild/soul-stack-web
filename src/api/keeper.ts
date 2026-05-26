@@ -38,6 +38,13 @@ export type OperatorCreateRequest = components['schemas']['OperatorCreateRequest
 export type OperatorCreateReply = components['schemas']['OperatorCreateReply'];
 export type OperatorRevokeRequest = components['schemas']['OperatorRevokeRequest'];
 export type IssueTokenReply = components['schemas']['IssueTokenReply'];
+export type Operator = components['schemas']['Operator'];
+export type OperatorListReply = components['schemas']['OperatorListReply'];
+export type OperatorAuthMethod = NonNullable<Operator['auth_method']>;
+
+export type AuditEvent = components['schemas']['AuditEvent'];
+export type AuditEventListReply = components['schemas']['AuditEventListReply'];
+export type AuditEventSource = NonNullable<AuditEvent['source']>;
 
 export type PushApplyRequest = components['schemas']['PushApplyRequest'];
 export type PushApplyReply = components['schemas']['PushApplyReply'];
@@ -164,6 +171,7 @@ export const keeperApi = {
           sid: q.sid,
           status: q.status,
           started_after: q.started_after,
+          module: q.module,
           offset: q.offset,
           limit: q.limit,
         },
@@ -171,6 +179,22 @@ export const keeperApi = {
     // 200 → ErrandResult, 202 → ErrandAccepted. По status различаем без HTTP-кода.
     get: (errandId: string) =>
       apiGet<ErrandResult | ErrandAccepted>(`/v1/errands/${encodeURIComponent(errandId)}`),
+  },
+
+  audit: {
+    list: (q: ListAuditQuery = {}) =>
+      apiGet<AuditEventListReply>('/v1/audit', {
+        query: {
+          type: q.type,
+          source: q.source,
+          archon_aid: q.archon_aid,
+          correlation_id: q.correlation_id,
+          started_after: q.started_after,
+          started_before: q.started_before,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
   },
 
   push: {
@@ -181,6 +205,18 @@ export const keeperApi = {
   },
 
   operators: {
+    // 200 → OperatorListReply (paged + auth_method/revoked фильтры).
+    list: (q: ListOperatorsQuery = {}) =>
+      apiGet<OperatorListReply>('/v1/operators', {
+        query: {
+          auth_method: q.auth_method,
+          revoked: q.revoked,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+    // 200 → Operator (detail).
+    get: (aid: string) => apiGet<Operator>(`/v1/operators/${encodeURIComponent(aid)}`),
     // 201 → OperatorCreateReply (включая jwt — отдаётся один раз).
     create: (body: OperatorCreateRequest) =>
       apiSend<OperatorCreateReply>('/v1/operators', 'POST', { body }),
@@ -213,6 +249,29 @@ export interface ListErrandsQuery {
   sid?: string;
   status?: ErrandStatus;
   started_after?: string;
+  // Multi-value `?module=X&module=Y` — exact-match OR (openapi commit 157ee27).
+  module?: string[];
+  offset?: number;
+  limit?: number;
+}
+
+export interface ListAuditQuery {
+  // Multi-value type/source — exact-match OR.
+  type?: string[];
+  source?: AuditEventSource[];
+  archon_aid?: string;
+  correlation_id?: string;
+  // RFC3339, обе границы включающие (см. openapi.yaml).
+  started_after?: string;
+  started_before?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ListOperatorsQuery {
+  auth_method?: OperatorAuthMethod;
+  // Default server-side = false (только активные). true — включая revoked.
+  revoked?: boolean;
   offset?: number;
   limit?: number;
 }

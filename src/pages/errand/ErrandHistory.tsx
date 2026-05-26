@@ -122,31 +122,39 @@ function FullView({ errand, onClose }: { errand: ErrandResult; onClose: () => vo
   );
 }
 
+// CSV ("core.cmd.shell, core.exec.run") → exact-match массив. Multi-value
+// `?module=X&module=Y` server-side OR (openapi commit 157ee27).
+function parseModuleCsv(input: string): string[] {
+  return input
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
 export function ErrandHistory() {
   const [sid, setSid] = useState('');
-  const [moduleFilter, setModuleFilter] = useState('');
+  const [moduleCsv, setModuleCsv] = useState('');
   const [status, setStatus] = useState<ErrandStatus | ''>('');
   const [startedAfter, setStartedAfter] = useState('');
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<ErrandResult | null>(null);
 
   const limit = 50;
+  const modules = parseModuleCsv(moduleCsv);
   const q = useQuery({
-    queryKey: ['errands.list', { sid, status, startedAfter, offset }],
+    queryKey: ['errands.list', { sid, status, startedAfter, modules, offset }],
     queryFn: () =>
       keeperApi.errands.list({
         sid: sid || undefined,
         status: status || undefined,
         started_after: startedAfter || undefined,
+        module: modules.length ? modules : undefined,
         offset,
         limit,
       }),
   });
 
-  // module-фильтр клиентский: openapi не поддерживает ?module=.
-  const items = (q.data?.items ?? []).filter((e) =>
-    moduleFilter ? (e.module ?? '').includes(moduleFilter) : true,
-  );
+  const items = q.data?.items ?? [];
   const total = q.data?.total ?? 0;
 
   return (
@@ -170,13 +178,13 @@ export function ErrandHistory() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Module (substring)</div>
+          <div className={styles.metaKey}>Module (CSV, exact-match OR)</div>
           <input
             type="text"
-            value={moduleFilter}
-            onChange={(e) => setModuleFilter(e.target.value)}
-            placeholder="core.cmd"
-            style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)' }}
+            value={moduleCsv}
+            onChange={(e) => { setModuleCsv(e.target.value); setOffset(0); }}
+            placeholder="core.cmd.shell, core.exec.run"
+            style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)', minWidth: 260 }}
           />
         </label>
         <label>

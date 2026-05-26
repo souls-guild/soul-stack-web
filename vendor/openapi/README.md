@@ -1,13 +1,28 @@
 # Vendored OpenAPI
 
-Sync from core-repo: github.com/co-cy/soul-stack (commit `36c719d`, 2026-05-26).
+Sync from core-repo: github.com/co-cy/soul-stack (commit `157ee27`, 2026-05-26).
 Manual sync via cp; future — published artifact (ADR-035 отложенное).
 
 При update — `cp core-repo/docs/keeper/openapi.yaml vendor/openapi/keeper.yaml && npm run gen:api`.
 
+## Iteration 3 (2026-05-26): API gaps round 2 закрыты
+
+Из commit `157ee27` (core):
+
+- `GET /v1/audit` — paged audit-events с фильтрами (multi-value type/source,
+  archon_aid, correlation_id, started_after/before).
+- `GET /v1/operators` — list Архонтов (фильтры auth_method, revoked,
+  пагинация).
+- `GET /v1/operators/{aid}` — detail Архонта.
+- `?module=` multi-value фильтр для `GET /v1/errands`
+  (style: form, explode: true — exact-match OR).
+
+UI iteration 3 закрывает placeholder-ы `/audit`, `/archons`, `/archons/:aid` и
+переводит ErrandHistory module-фильтр на server-side.
+
 ## Iteration 2 (2026-05-26): новые endpoint-ы
 
-Из commit `36c719d` Errand E4 и предшествующих:
+Из commit `36c719d` (Errand E4 и предшествующие):
 
 - `POST /v1/souls/{sid}/exec` — Errand exec (sync 200 / async 202).
 - `GET /v1/errands`, `GET /v1/errands/{errand_id}` — Errand history + poll.
@@ -17,8 +32,5 @@ Manual sync via cp; future — published artifact (ADR-035 отложенное)
 
 ## Known gaps
 
-- **Нет `GET /v1/operators` (list)** — endpoint не выставлен в OpenAPI. UI
-  `/archons` рендерит форму create-нового и форму revoke/issue-token по AID;
-  таблицы существующих архонтов нет (нечего читать).
-- **Нет `GET /v1/audit` или эквивалента** — audit-trail в OpenAPI не выставлен.
-  UI `/audit` рендерит placeholder с TODO.
+Все gap-ы iteration 1/2 закрыты в iteration 3 (commit core `157ee27`).
+Текущий status — sync clean.

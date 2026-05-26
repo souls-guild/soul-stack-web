@@ -9,6 +9,34 @@ Parity-аналог: **SaltStack ↔ salt-manager**, **OpenStack ↔ Horizon**,
 Извлечён 2026-05-26 из `soul-stack/ui/` scaffold (5 страниц, 7 тестов,
 lint+build зелёные на момент выноса).
 
+## What's new (Iteration 3, 2026-05-26)
+
+Sync OpenAPI from core commit `157ee27` (API gaps round 2).
+Закрыты все placeholder-страницы iteration 2:
+
+- `GET /v1/audit` — multi-value type/source + archon_aid/correlation_id +
+  started_after/before + пагинация.
+- `GET /v1/operators` — list Архонтов (auth_method/revoked фильтры + пагинация).
+- `GET /v1/operators/{aid}` — detail Архонта.
+- `?module=` multi-value server-side фильтр для `/v1/errands` (заменил
+  client-side substring iteration 2).
+
+Страницы:
+
+- `/audit` — реальный viewer: фильтры (type CSV, source toggle-кнопки,
+  archon_aid, correlation_id, started_after/before datetime-local, limit) +
+  expandable cards с payload JsonViewer (truncation > 64KB) + pagination +
+  color-coding badge по source.
+- `/archons` — таблица существующих + auth_method/revoked фильтры + clickable
+  AID → detail + per-row Issue-token / Revoke (disabled для revoked).
+  Forms «Создать» и JwtReveal сохранены; отдельные секции «Issue» и «Revoke»
+  убраны — теперь действия per-row из таблицы.
+- `/archons/:aid` — реальный detail с tabs **Info** (meta + metadata JsonViewer)
+  / **Activity** (deep-link на `/audit?archon_aid=<aid>`).
+- `/errand/history` — module-фильтр server-side (CSV → multi-value `?module=`).
+
+Тесты: 20 → 26.
+
 ## What's new (Iteration 2, 2026-05-26)
 
 Sync OpenAPI from core commit `36c719d` (Errand E4 + предшествующие).
@@ -81,9 +109,6 @@ generated, в `.gitignore`.
   Текущий UX — paste JWT.
 - `GET /v1/souls/{sid}/history` нет в core — вкладка History в
   SoulDetail показывает TODO.
-- `GET /v1/audit` нет в core — `/audit` рендерит placeholder.
-- `GET /v1/operators` (list) нет в core — `/archons` без таблицы
-  существующих, только create/issue/revoke по AID.
 - `?coven_any=` для incarnations (multi-OR) — пост-MVP в core.
 
 SPA-фронтенд Keeper Operator API. Отдельный артефакт (Variant B), не embedded
@@ -154,9 +179,9 @@ re-export-ит схемы через `components['schemas']['…']`.
 | `/incarnations/:name` | Detail: вкладки State / Spec / History / Drift (кнопка check-drift + DriftReport). |
 | `/souls` | Список: sid / status / transport / covens / last_seen_at. Фильтры status + transport + covens (server-side, CSV OR). |
 | `/souls/:sid` | Detail: вкладки Overview / Soulprint (typed_facts ADR-018) / History (TODO). |
-| `/audit` | Placeholder (endpoint `GET /v1/audit` отсутствует в OpenAPI). |
-| `/archons` | Create / Issue-token / Revoke формы для Архонтов; `GET /v1/operators` отсутствует, таблицы нет. |
-| `/archons/:aid` | Placeholder (нет `GET /v1/operators/{aid}` в OpenAPI). |
+| `/audit` | Лента audit-events (фильтры type/source/archon/correlation/период) + expandable cards с payload JsonViewer + pagination. |
+| `/archons` | Таблица Архонтов (auth_method/revoked фильтры) + Create + per-row Issue-token / Revoke; clickable AID → detail. |
+| `/archons/:aid` | Detail: tabs Info (meta+metadata) / Activity (deep-link на audit). |
 | `/push` | Push apply form → 202 → poll → per-host summary. |
 | `/errand/exec` | Errand exec form (sync 200 / async 202 + poll). |
 | `/errand/history` | Список Errand-ов с фильтрами + modal full-view. |
