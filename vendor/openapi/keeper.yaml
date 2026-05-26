@@ -899,6 +899,146 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/souls/{sid}/exec:
+    post:
+      tags: [Errand]
+      operationId: ErrandExec
+      summary: Запустить Errand на Soul (pull-ad-hoc exec одиночного модуля).
+      description: |
+        Permission: errand.run; selector host=<sid>. ADR-033.
+        Sync-первичный flow с server-cap 30s: 200 + ErrandResult если терминал
+        получен до cap; иначе 202 + {errand_id} + Location: /v1/errands/{errand_id},
+        продолжение в background-горутине до полного timeout_seconds (max 300s).
+        Errand НЕ мутирует incarnation.state. Whitelist модулей: жёсткий список
+        core.cmd.shell / core.exec.run, либо marker-интерфейс ErrandReadSafe в
+        sdk/module/. Проверка на Soul-side (defense-in-depth) → MODULE_NOT_ALLOWED.
+      parameters:
+        - $ref: '#/components/parameters/SidPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrandRunRequest'
+      responses:
+        '200':
+          description: Errand завершился синхронно (терминал получен до server-cap).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandResult'
+        '202':
+          description: |
+            Async-эскалация: server-cap 30s превышен, Errand продолжает выполняться.
+            Location-header — URL для polling-а. Финальный результат — GET /v1/errands/{errand_id}.
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL для polling-а финального результата.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandAccepted'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/errands:
+    get:
+      tags: [Errand]
+      operationId: ListErrands
+      summary: Список Errand-ов (фильтр + пагинация).
+      description: |
+        Permission: errand.list. Read-only, без audit.
+        Фильтры (опционально): sid (FQDN), status, started_after (RFC3339).
+        Пагинация — стандартная (offset/limit). Per-row RBAC-фильтрация по
+        host=/coven= — slice E5 (сейчас bare-permission).
+      parameters:
+        - in: query
+          name: sid
+          required: false
+          schema:
+            type: string
+          description: FQDN целевого Soul.
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+            enum: [running, success, failed, timed_out, cancelled, module_not_allowed]
+          description: Терминальный или running статус.
+        - in: query
+          name: started_after
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Фильтр по началу (started_at > value).
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: Список Errand-ов под фильтром.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/errands/{errand_id}:
+    get:
+      tags: [Errand]
+      operationId: GetErrand
+      summary: Состояние одного Errand-а.
+      description: |
+        Permission: errand.list. Read-only. 200 + ErrandResult — терминал;
+        202 + {status:"running"} — Errand ещё выполняется (async-poll).
+      parameters:
+        - in: path
+          name: errand_id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID Errand-а.
+      responses:
+        '200':
+          description: Терминальное состояние Errand-а.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandResult'
+        '202':
+          description: Errand ещё running, повторите запрос позже.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandAccepted'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/plugins/sigils:
     post:
       tags: [Plugin]
@@ -3535,6 +3675,133 @@ components:
             Форма: {hosts: [{sid, status, error?}], total, success_count, fail_count}.
             Для cancelled (Reaper orphan-purge) — дополнительно orphan_purged: true + reason.
       required: [apply_id, inventory_sids, destiny_ref, cleanup_stale, status, started_at]
+
+    ErrandRunRequest:
+      type: object
+      description: |
+        POST /v1/souls/{sid}/exec body (ADR-033). Содержит fully-qualified
+        имя модуля, input + опц. timeout/dry_run. input проходит
+        input-validation (input_schema модуля) и CEL-render-фазу
+        (templating.md) на Keeper-side ДО отправки Soul-у.
+      properties:
+        module:
+          type: string
+          description: |
+            Fully-qualified `<ns>.<name>.<state>`. Допускаются только
+            `core.cmd.shell` / `core.exec.run` либо модули, реализующие
+            ErrandReadSafe (default-deny на Soul-side).
+        input:
+          type: object
+          additionalProperties: true
+          description: Input для модуля (валидируется против input_schema).
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+          description: |
+            Полный timeout Errand-а. Server-cap для sync-ответа — 30s
+            (если timeout > 30s и Errand не завершился за 30s, handler
+            отдаёт 202 + Location, выполнение продолжается).
+        dry_run:
+          type: boolean
+          default: false
+          description: |
+            true — только для модулей с PlanReadSafe; для verb-модулей
+            (shell/exec) → 400 errand_dry_run_unsupported (slice E3).
+      required: [module]
+
+    ErrandAccepted:
+      type: object
+      description: |
+        202-body при async-эскалации `POST /v1/souls/{sid}/exec` либо при
+        `GET /v1/errands/{errand_id}` пока строка ещё running.
+      properties:
+        errand_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        status:
+          type: string
+          enum: [running]
+      required: [errand_id, status]
+
+    ErrandResult:
+      type: object
+      description: |
+        Финальное состояние Errand-а (ADR-033). Симметрично push_runs JSON-
+        форме, но БЕЗ state_changes/inventory: Errand single-host, не
+        мутирует incarnation.state. stdout/stderr cap-нуты до 64 KiB и
+        маскированы общим secret-masking на keeper-side write-path-е.
+      properties:
+        errand_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        sid:
+          type: string
+        module:
+          type: string
+        status:
+          type: string
+          enum: [running, success, failed, timed_out, cancelled, module_not_allowed]
+        exit_code:
+          type: integer
+          format: int32
+          description: Для shell/exec; null для read-safe-модулей без exit-кода.
+        stdout:
+          type: string
+          description: Captured stdout (cap 64 KiB, маскированный). Опционально.
+        stderr:
+          type: string
+          description: Captured stderr (cap 64 KiB, маскированный). Опционально.
+        stdout_truncated:
+          type: boolean
+          description: true — stdout превысил cap, обрезан.
+        stderr_truncated:
+          type: boolean
+          description: true — stderr превысил cap, обрезан.
+        duration_ms:
+          type: integer
+          format: int64
+          description: Длительность Errand-а на Soul-side.
+        error_message:
+          type: string
+          description: |
+            Маскированная причина для failed/timed_out/module_not_allowed.
+            Для success — пусто.
+        output:
+          type: object
+          additionalProperties: true
+          description: |
+            Структурный output read-safe-модулей. Для shell/exec — null.
+        started_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          description: Отсутствует пока status=running.
+      required: [errand_id, sid, module, status, started_by_aid, started_at]
+
+    ErrandListReply:
+      type: object
+      description: |
+        GET /v1/errands paged-list. items — ErrandResult[] (включая running);
+        offset/limit/total — стандартная сквозная пагинация.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrandResult'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
 
     PushCleanupRequest:
       type: object

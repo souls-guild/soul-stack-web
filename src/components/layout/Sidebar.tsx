@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Boxes, Users, ScrollText } from 'lucide-react';
+import { Boxes, Users, ScrollText, FileText, Upload, Terminal } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
@@ -7,6 +7,8 @@ interface NavItem {
   label: string;
   icon: typeof Boxes;
   disabled?: boolean;
+  // Если задан — link активен и при префиксе (для вложенных подвкладок).
+  matchPrefix?: string;
 }
 
 const FLEET: NavItem[] = [
@@ -15,7 +17,11 @@ const FLEET: NavItem[] = [
 ];
 
 const OPS: NavItem[] = [
-  { to: '/audit', label: 'Audit', icon: ScrollText, disabled: true },
+  { to: '/audit', label: 'Audit', icon: FileText },
+  { to: '/archons', label: 'Archons', icon: Users },
+  { to: '/push', label: 'Push', icon: Upload },
+  { to: '/errand/exec', label: 'Errand · exec', icon: Terminal, matchPrefix: '/errand/exec' },
+  { to: '/errand/history', label: 'Errand · history', icon: ScrollText, matchPrefix: '/errand/history' },
 ];
 
 function Item({ item }: { item: NavItem }) {

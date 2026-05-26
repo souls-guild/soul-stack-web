@@ -4,7 +4,8 @@
 // types.gen.ts в .gitignore — сгенерится локально; до первого `npm run gen:api`
 // узкая часть типов продублирована вручную (минимальный fallback).
 
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, ApiError } from './client';
+import { tokenStore } from './tokenStore';
 import type { components } from './types.gen';
 
 // --- Re-export из generated openapi (источник правды) ---
@@ -32,6 +33,21 @@ export type SoulprintCpuFacts = components['schemas']['SoulprintCpuFacts'];
 export type SoulprintMemoryFacts = components['schemas']['SoulprintMemoryFacts'];
 export type SoulprintNetworkFacts = components['schemas']['SoulprintNetworkFacts'];
 export type SoulprintNetworkInterface = components['schemas']['SoulprintNetworkInterface'];
+
+export type OperatorCreateRequest = components['schemas']['OperatorCreateRequest'];
+export type OperatorCreateReply = components['schemas']['OperatorCreateReply'];
+export type OperatorRevokeRequest = components['schemas']['OperatorRevokeRequest'];
+export type IssueTokenReply = components['schemas']['IssueTokenReply'];
+
+export type PushApplyRequest = components['schemas']['PushApplyRequest'];
+export type PushApplyReply = components['schemas']['PushApplyReply'];
+export type PushApplyView = components['schemas']['PushApplyView'];
+
+export type ErrandRunRequest = components['schemas']['ErrandRunRequest'];
+export type ErrandAccepted = components['schemas']['ErrandAccepted'];
+export type ErrandResult = components['schemas']['ErrandResult'];
+export type ErrandListReply = components['schemas']['ErrandListReply'];
+export type ErrandStatus = NonNullable<ErrandResult['status']>;
 
 // --- Public-thrown error для случая GetSoulprint → 410 «не приходил». ---
 
@@ -116,5 +132,87 @@ export const keeperApi = {
         throw err;
       }
     },
+    // POST /v1/souls/{sid}/exec. 200 → ErrandResult (sync), 202 → ErrandAccepted (async).
+    // Возвращаем discriminated union — caller сам решает, polling или render.
+    exec: async (
+      sid: string,
+      body: ErrandRunRequest,
+    ): Promise<{ kind: 'sync'; result: ErrandResult } | { kind: 'async'; accepted: ErrandAccepted }> => {
+      const res = await fetch(`/v1/souls/${encodeURIComponent(sid)}/exec`, {
+        method: 'POST',
+        headers: buildAuthHeaders(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        let problem: { type?: string; title?: string; detail?: string } = {};
+        try { problem = await res.json(); } catch { /* empty */ }
+        if (res.status === 401) tokenStoreClear();
+        throw new ApiError(res.status, problem.type ?? 'about:blank', problem.title ?? res.statusText, problem.detail ?? '');
+      }
+      const payload = (await res.json()) as ErrandResult | ErrandAccepted;
+      if (res.status === 202) {
+        return { kind: 'async', accepted: payload as ErrandAccepted };
+      }
+      return { kind: 'sync', result: payload as ErrandResult };
+    },
+  },
+
+  errands: {
+    list: (q: ListErrandsQuery = {}) =>
+      apiGet<ErrandListReply>('/v1/errands', {
+        query: {
+          sid: q.sid,
+          status: q.status,
+          started_after: q.started_after,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+    // 200 → ErrandResult, 202 → ErrandAccepted. По status различаем без HTTP-кода.
+    get: (errandId: string) =>
+      apiGet<ErrandResult | ErrandAccepted>(`/v1/errands/${encodeURIComponent(errandId)}`),
+  },
+
+  push: {
+    // 202 → PushApplyReply.
+    apply: (body: PushApplyRequest) =>
+      apiSend<PushApplyReply>('/v1/push/apply', 'POST', { body }),
+    get: (applyId: string) => apiGet<PushApplyView>(`/v1/push/${encodeURIComponent(applyId)}`),
+  },
+
+  operators: {
+    // 201 → OperatorCreateReply (включая jwt — отдаётся один раз).
+    create: (body: OperatorCreateRequest) =>
+      apiSend<OperatorCreateReply>('/v1/operators', 'POST', { body }),
+    // 204 — body не возвращается.
+    revoke: (aid: string, body: OperatorRevokeRequest = {}) =>
+      apiSend<void>(`/v1/operators/${encodeURIComponent(aid)}/revoke`, 'POST', { body }),
+    // 200 → IssueTokenReply (jwt отдаётся один раз).
+    issueToken: (aid: string) =>
+      apiSend<IssueTokenReply>(`/v1/operators/${encodeURIComponent(aid)}/issue-token`, 'POST'),
   },
 };
+
+// --- helper-ы для discriminated union 200/202 на /v1/souls/{sid}/exec ---
+
+function buildAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+  const token = tokenStore.get();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+function tokenStoreClear(): void {
+  tokenStore.clear();
+}
+
+export interface ListErrandsQuery {
+  sid?: string;
+  status?: ErrandStatus;
+  started_after?: string;
+  offset?: number;
+  limit?: number;
+}

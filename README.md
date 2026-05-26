@@ -9,6 +9,35 @@ Parity-аналог: **SaltStack ↔ salt-manager**, **OpenStack ↔ Horizon**,
 Извлечён 2026-05-26 из `soul-stack/ui/` scaffold (5 страниц, 7 тестов,
 lint+build зелёные на момент выноса).
 
+## What's new (Iteration 2, 2026-05-26)
+
+Sync OpenAPI from core commit `36c719d` (Errand E4 + предшествующие).
+Подключение к свежим endpoint-ам:
+
+- `POST /v1/souls/{sid}/exec` — Errand sync (200) / async (202 + poll).
+- `GET /v1/errands`, `GET /v1/errands/{errand_id}` — Errand history + poll.
+- `POST /v1/push/apply`, `GET /v1/push/{apply_id}` — push-прогон по SSH.
+- `POST /v1/operators`, `POST /v1/operators/{aid}/revoke`,
+  `POST /v1/operators/{aid}/issue-token` — Archon admin.
+
+Страницы (4 новых slot-а в Sidebar):
+
+- `/audit` — placeholder, `GET /v1/audit` ещё не выставлен в OpenAPI.
+- `/archons` — create-форма (показывает выданный JWT один раз),
+  issue-token-форма, revoke-форма с confirmation. `GET /v1/operators`
+  отсутствует — таблицы существующих Архонтов нет.
+- `/archons/:aid` — placeholder для будущего GET-by-aid.
+- `/push` — форма push-apply (inventory + destiny_ref + ssh_provider +
+  JSON-input + cleanup_stale) → 202 → polling до терминала → per-host
+  summary-таблица.
+- `/errand/exec` — форма Errand-а (sid + module datalist + JSON-input +
+  timeout + dry_run). 200 sync → render; 202 async → polling до терминала.
+  stdout/stderr в collapsible `<details>` с truncation-marker.
+- `/errand/history` — list с фильтрами (sid / module-substring / status /
+  started_after) + pagination + modal «View full» с полным stdout/stderr.
+
+Тесты: 12 → 20.
+
 ## What's new (Iteration 1, 2026-05-26)
 
 Подключение к свежим endpoint-ам core (commit 549be43):
@@ -52,7 +81,9 @@ generated, в `.gitignore`.
   Текущий UX — paste JWT.
 - `GET /v1/souls/{sid}/history` нет в core — вкладка History в
   SoulDetail показывает TODO.
-- Audit-log viewer — отложен (нет endpoint).
+- `GET /v1/audit` нет в core — `/audit` рендерит placeholder.
+- `GET /v1/operators` (list) нет в core — `/archons` без таблицы
+  существующих, только create/issue/revoke по AID.
 - `?coven_any=` для incarnations (multi-OR) — пост-MVP в core.
 
 SPA-фронтенд Keeper Operator API. Отдельный артефакт (Variant B), не embedded
@@ -123,15 +154,17 @@ re-export-ит схемы через `components['schemas']['…']`.
 | `/incarnations/:name` | Detail: вкладки State / Spec / History / Drift (кнопка check-drift + DriftReport). |
 | `/souls` | Список: sid / status / transport / covens / last_seen_at. Фильтры status + transport + covens (server-side, CSV OR). |
 | `/souls/:sid` | Detail: вкладки Overview / Soulprint (typed_facts ADR-018) / History (TODO). |
-
-Сайдбар: пункт «Audit» — placeholder (disabled).
+| `/audit` | Placeholder (endpoint `GET /v1/audit` отсутствует в OpenAPI). |
+| `/archons` | Create / Issue-token / Revoke формы для Архонтов; `GET /v1/operators` отсутствует, таблицы нет. |
+| `/archons/:aid` | Placeholder (нет `GET /v1/operators/{aid}` в OpenAPI). |
+| `/push` | Push apply form → 202 → poll → per-host summary. |
+| `/errand/exec` | Errand exec form (sync 200 / async 202 + poll). |
+| `/errand/history` | Список Errand-ов с фильтрами + modal full-view. |
 
 ## TODO (out of pilot, не делаем здесь)
 
 - Полный CRUD: создание incarnation / создание Soul / coven-assign UI / role-management.
 - `/applies/:id` страница live-следящая за apply (требует SSE-endpoint).
-- Audit-log viewer.
-- Push-операции (`POST /v1/push/apply`).
 - Bulk-actions (выбор N incarnation-ов / N Souls).
 - Темизация: ручной toggle theme. CSS-переменные уже готовы
   (`[data-theme="dark"]` на `<html>`).
