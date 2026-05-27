@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
 import { IncarnationDetail } from '../pages/incarnations/IncarnationDetail';
@@ -43,6 +44,16 @@ describe('IncarnationDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'redis-prod' })).toBeInTheDocument();
     });
+    // Default tab — Overview, видим Spec-секцию.
+    expect(screen.getByRole('heading', { name: 'Spec' })).toBeInTheDocument();
+
+    // Action-bar для status=ready.
+    expect(screen.getByRole('button', { name: /Run Scenario/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Destroy/i })).toBeInTheDocument();
+
+    // Переключаемся на State и видим JSON state.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'State' }));
     expect(screen.getByText(/incarnation\.state/i)).toBeInTheDocument();
   });
 });

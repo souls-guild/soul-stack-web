@@ -2,12 +2,15 @@ import { NavLink } from 'react-router-dom';
 import {
   Boxes,
   Users,
-  ScrollText,
   FileText,
   Upload,
   Terminal,
   Package,
+  Puzzle,
   ShieldCheck,
+  Eye,
+  Scroll,
+  Zap,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -26,6 +29,7 @@ const FLEET: NavItem[] = [
   { to: '/incarnations', label: 'Incarnations', icon: Boxes },
   { to: '/souls', label: 'Souls', icon: Users },
   { to: '/services', label: 'Services', icon: Package },
+  { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
 ];
 
 const OPS: NavItem[] = [
@@ -33,8 +37,13 @@ const OPS: NavItem[] = [
   { to: '/archons', label: 'Archons', icon: Users },
   { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
   { to: '/push', label: 'Push', icon: Upload },
-  { to: '/errand/exec', label: 'Errand · exec', icon: Terminal, matchPrefix: '/errand/exec' },
-  { to: '/errand/history', label: 'Errand · history', icon: ScrollText, matchPrefix: '/errand/history' },
+  { to: '/errands', label: 'Errands', icon: Terminal, matchPrefix: '/errands' },
+];
+
+const ORACLE: NavItem[] = [
+  { to: '/vigils', label: 'Vigils', icon: Eye, matchPrefix: '/vigils' },
+  { to: '/decrees', label: 'Decrees', icon: Scroll, matchPrefix: '/decrees' },
+  { to: '/oracle/fires', label: 'Oracle fires', icon: Zap, matchPrefix: '/oracle' },
 ];
 
 interface ItemProps {
@@ -91,6 +100,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       ))}
       {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Операции</div>}
       {OPS.map((it) => (
+        <Item key={it.to} item={it} collapsed={collapsed} />
+      ))}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Oracle</div>}
+      {ORACLE.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
       <button

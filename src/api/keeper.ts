@@ -22,6 +22,16 @@ export type IncarnationListReply = components['schemas']['IncarnationListReply']
 export type StateHistoryEntry = components['schemas']['StateHistoryEntry'];
 export type IncarnationHistoryReply = components['schemas']['IncarnationHistoryReply'];
 export type DriftReport = components['schemas']['DriftReport'];
+export type IncarnationCreateRequest = components['schemas']['IncarnationCreateRequest'];
+export type IncarnationCreateReply = components['schemas']['IncarnationCreateReply'];
+export type IncarnationRunRequest = components['schemas']['IncarnationRunRequest'];
+export type IncarnationRunReply = components['schemas']['IncarnationRunReply'];
+export type IncarnationUnlockRequest = components['schemas']['IncarnationUnlockRequest'];
+export type IncarnationUnlockReply = components['schemas']['IncarnationUnlockReply'];
+export type IncarnationUpgradeRequest = components['schemas']['IncarnationUpgradeRequest'];
+export type IncarnationUpgradeReply = components['schemas']['IncarnationUpgradeReply'];
+export type IncarnationDestroyReply = components['schemas']['IncarnationDestroyReply'];
+export type IncarnationCheckDriftRequest = components['schemas']['IncarnationCheckDriftRequest'];
 
 export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
@@ -67,6 +77,19 @@ export type ServiceListReply = components['schemas']['ServiceListReply'];
 export type ServiceRegisterRequest = components['schemas']['ServiceRegisterRequest'];
 export type ServiceUpdateRequest = components['schemas']['ServiceUpdateRequest'];
 
+// Oracle: Vigil (Soul-side проверка beacons) + Decree (reactor-правило). ADR-030.
+export type VigilCreateRequest = components['schemas']['VigilCreateRequest'];
+export type VigilView = components['schemas']['VigilView'];
+export type VigilListReply = components['schemas']['VigilListReply'];
+export type DecreeCreateRequest = components['schemas']['DecreeCreateRequest'];
+export type DecreeView = components['schemas']['DecreeView'];
+export type DecreeListReply = components['schemas']['DecreeListReply'];
+
+export type PluginSigilView = components['schemas']['PluginSigilView'];
+export type PluginSigilListReply = components['schemas']['PluginSigilListReply'];
+export type PluginSigilAllowRequest = components['schemas']['PluginSigilAllowRequest'];
+export type PluginSigilAllowReply = components['schemas']['PluginSigilAllowReply'];
+
 // --- Public-thrown error для случая GetSoulprint → 410 «не приходил». ---
 
 export class SoulprintNotReceivedError extends Error {
@@ -111,12 +134,44 @@ export const keeperApi = {
       }),
     get: (name: string) =>
       apiGet<IncarnationGetReply>(`/v1/incarnations/${encodeURIComponent(name)}`),
+    create: (body: IncarnationCreateRequest) =>
+      apiSend<IncarnationCreateReply>('/v1/incarnations', 'POST', { body }),
+    runScenario: (name: string, scenario: string, body: IncarnationRunRequest = {}) =>
+      apiSend<IncarnationRunReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/scenarios/${encodeURIComponent(scenario)}`,
+        'POST',
+        { body },
+      ),
     history: (name: string, q: { offset?: number; limit?: number } = {}) =>
       apiGet<IncarnationHistoryReply>(`/v1/incarnations/${encodeURIComponent(name)}/history`, {
         query: { offset: q.offset, limit: q.limit },
       }),
-    checkDrift: (name: string) =>
-      apiSend<DriftReport>(`/v1/incarnations/${encodeURIComponent(name)}/check-drift`, 'POST'),
+    checkDrift: (name: string, body: IncarnationCheckDriftRequest = {}) =>
+      apiSend<DriftReport>(
+        `/v1/incarnations/${encodeURIComponent(name)}/check-drift`,
+        'POST',
+        { body },
+      ),
+    unlock: (name: string, body: IncarnationUnlockRequest) =>
+      apiSend<IncarnationUnlockReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/unlock`,
+        'POST',
+        { body },
+      ),
+    upgrade: (name: string, body: IncarnationUpgradeRequest) =>
+      apiSend<IncarnationUpgradeReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/upgrade`,
+        'POST',
+        { body },
+      ),
+    // DELETE /v1/incarnations/{name}?allow_destroy=<bool>. allow_destroy=true →
+    // снос без teardown (force), false → штатный через scenario `destroy`.
+    destroy: (name: string, allowDestroy: boolean) =>
+      apiSend<IncarnationDestroyReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}`,
+        'DELETE',
+        { query: { allow_destroy: allowDestroy } },
+      ),
   },
 
   souls: {
@@ -267,7 +322,58 @@ export const keeperApi = {
     deregister: (name: string) =>
       apiSend<void>(`/v1/services/${encodeURIComponent(name)}`, 'DELETE'),
   },
+
+  // Oracle: Vigil-реестр (Soul-side проверки beacons). ADR-030.
+  vigils: {
+    list: (q: ListPagedQuery = {}) =>
+      apiGet<VigilListReply>('/v1/vigils', {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+    get: (name: string) =>
+      apiGet<VigilView>(`/v1/vigils/${encodeURIComponent(name)}`),
+    create: (body: VigilCreateRequest) =>
+      apiSend<VigilView>('/v1/vigils', 'POST', { body }),
+    delete: (name: string) =>
+      apiSend<void>(`/v1/vigils/${encodeURIComponent(name)}`, 'DELETE'),
+  },
+
+  // Oracle: Decree-реестр (reactor-правила). ADR-030.
+  decrees: {
+    list: (q: ListPagedQuery = {}) =>
+      apiGet<DecreeListReply>('/v1/decrees', {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+    get: (name: string) =>
+      apiGet<DecreeView>(`/v1/decrees/${encodeURIComponent(name)}`),
+    create: (body: DecreeCreateRequest) =>
+      apiSend<DecreeView>('/v1/decrees', 'POST', { body }),
+    delete: (name: string) =>
+      apiSend<void>(`/v1/decrees/${encodeURIComponent(name)}`, 'DELETE'),
+  },
+
+  // Sigil-allow-list плагинов (ADR-026, вариант C). Полный путь записи — (namespace, name, ref).
+  plugins: {
+    sigils: {
+      // 200 → PluginSigilListReply. Только активные допуски, новые первыми.
+      list: () => apiGet<PluginSigilListReply>('/v1/plugins/sigils'),
+      // 201 → PluginSigilAllowReply. Keeper читает бинарь/manifest из локального
+      // кеша host-а по (namespace, name); sha256 считается Keeper-ом, не клиентом.
+      allow: (body: PluginSigilAllowRequest) =>
+        apiSend<PluginSigilAllowReply>('/v1/plugins/sigils', 'POST', { body }),
+      // 204 — мягкая ревокация. ref — одиночный path-сегмент (tag-ref вида v1.2.3).
+      revoke: (namespace: string, name: string, ref: string) =>
+        apiSend<void>(
+          `/v1/plugins/sigils/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/${encodeURIComponent(ref)}`,
+          'DELETE',
+        ),
+    },
+  },
 };
+
+export interface ListPagedQuery {
+  offset?: number;
+  limit?: number;
+}
 
 // --- helper-ы для discriminated union 200/202 на /v1/souls/{sid}/exec ---
 

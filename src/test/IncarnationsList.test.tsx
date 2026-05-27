@@ -52,8 +52,9 @@ describe('IncarnationsList', () => {
 
     expect(screen.getByRole('heading', { name: /Incarnations/i })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText('redis-prod')).toBeInTheDocument();
-      expect(screen.getByText('postgres-stage')).toBeInTheDocument();
+      // Link на incarnation — единственный role=link с этим именем (имя same as coven-tag → badge не link).
+      expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
     });
   });
 

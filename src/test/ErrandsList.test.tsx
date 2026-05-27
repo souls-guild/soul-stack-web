@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
-import { ErrandHistory } from '../pages/errand/ErrandHistory';
+import { ErrandsList } from '../pages/errands/ErrandsList';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-describe('ErrandHistory', () => {
+describe('ErrandsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
@@ -28,6 +28,7 @@ describe('ErrandHistory', () => {
               stdout: 'ok',
               started_by_aid: 'archon-alice',
               started_at: '2026-05-26T10:00:00Z',
+              finished_at: '2026-05-26T10:00:00Z',
             },
             {
               errand_id: '01HZAA0000000000000000000E',
@@ -38,6 +39,7 @@ describe('ErrandHistory', () => {
               duration_ms: 10,
               started_by_aid: 'archon-bob',
               started_at: '2026-05-26T10:01:00Z',
+              finished_at: '2026-05-26T10:01:00Z',
             },
           ],
           offset: 0,
@@ -47,11 +49,14 @@ describe('ErrandHistory', () => {
       },
     ]);
 
-    renderWithProviders(<ErrandHistory />, '/errand/history');
+    renderWithProviders(<ErrandsList />, '/errands');
     await waitFor(() => {
       expect(screen.getByText('host01')).toBeInTheDocument();
       expect(screen.getByText('host02')).toBeInTheDocument();
     });
+    // Link на detail (берём первый из двух).
+    const links = screen.getAllByText(/01HZAA0000/);
+    expect(links[0].closest('a')?.getAttribute('href')).toMatch(/\/errands\/01HZAA/);
   });
 
   it('module CSV-фильтр уходит в query как multi-value ?module=', async () => {
@@ -63,14 +68,13 @@ describe('ErrandHistory', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     }) as typeof fetch;
-    renderWithProviders(<ErrandHistory />, '/errand/history');
+    renderWithProviders(<ErrandsList />, '/errands');
     const user = userEvent.setup();
     await user.type(
       screen.getByPlaceholderText(/core.cmd.shell, core.exec.run/i),
       'core.cmd.shell,core.exec.run',
     );
     await waitFor(() => {
-      // Multi-value `?module=X&module=Y` — оба параметра в URL.
       expect(lastUrl).toMatch(/module=core\.cmd\.shell/);
       expect(lastUrl).toMatch(/module=core\.exec\.run/);
     });

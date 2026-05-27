@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { keeperApi, type IncarnationStatus } from '../../api/keeper';
-import { Badge, Dot } from '../../components/primitives';
+import { Box, Plus } from 'lucide-react';
+import { keeperApi, type IncarnationGetReply, type IncarnationStatus } from '../../api/keeper';
+import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import styles from '../common.module.css';
@@ -18,10 +19,10 @@ const INCARNATION_STATUSES: IncarnationStatus[] = [
   'destroy_failed',
 ];
 
-// Конвенция coven-метки в openapi.yaml: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
-// (lowercase, дефис как разделитель). Сверяем заранее, чтобы не отправлять
-// 422 на Keeper.
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+type SortKey = 'created_at' | 'name' | 'status';
+type SortDir = 'asc' | 'desc';
 
 function formatTimeAgo(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -34,36 +35,137 @@ function formatTimeAgo(iso: string | null | undefined): string {
   return `${Math.floor(deltaSec / 86_400)}d назад`;
 }
 
+function sortItems(items: IncarnationGetReply[], key: SortKey, dir: SortDir): IncarnationGetReply[] {
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...items].sort((a, b) => {
+    let av: string;
+    let bv: string;
+    switch (key) {
+      case 'name':
+        av = a.name;
+        bv = b.name;
+        break;
+      case 'status':
+        av = a.status;
+        bv = b.status;
+        break;
+      default:
+        av = a.created_at;
+        bv = b.created_at;
+    }
+    if (av < bv) return -1 * sign;
+    if (av > bv) return 1 * sign;
+    return 0;
+  });
+}
+
 export function IncarnationsList() {
+  const [search, setSearch] = useState('');
+  const [serviceFilter, setServiceFilter] = useState<string>('');
   const [status, setStatus] = useState<IncarnationStatus | ''>('');
   const [coven, setCoven] = useState<string>('');
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const trimmedCoven = coven.trim();
   const covenValid = trimmedCoven === '' || COVEN_PATTERN.test(trimmedCoven);
   const effectiveCoven = covenValid && trimmedCoven !== '' ? trimmedCoven : undefined;
 
+  const services = useQuery({
+    queryKey: ['services.list'],
+    queryFn: () => keeperApi.services.list(),
+  });
+
   const q = useQuery({
-    queryKey: ['incarnations', { status, coven: effectiveCoven }],
+    queryKey: ['incarnations', { service: serviceFilter, status, coven: effectiveCoven }],
     queryFn: () =>
       keeperApi.incarnations.list({
+        service: serviceFilter || undefined,
         status: status || undefined,
         coven: effectiveCoven,
-        limit: 100,
+        limit: 200,
       }),
     enabled: covenValid,
   });
 
-  const items = q.data?.items ?? [];
+  const filtered = useMemo(() => {
+    const items = q.data?.items ?? [];
+    const term = search.trim().toLowerCase();
+    const base = term ? items.filter((it) => it.name.toLowerCase().includes(term)) : items;
+    return sortItems(base, sortKey, sortDir);
+  }, [q.data, search, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'created_at' ? 'desc' : 'asc');
+    }
+  }
+
+  function sortArrow(key: SortKey) {
+    if (sortKey !== key) return '';
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  }
+
+  const serviceItems = services.data?.items ?? [];
 
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Incarnations</h1>
+          <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Box size={22} /> Incarnations
+          </h1>
+        </div>
+        <div>
+          <Link to="/incarnations/new">
+            <Button variant="primary">
+              <Plus size={14} /> Create
+            </Button>
+          </Link>
         </div>
       </div>
 
       <div className={styles.filters}>
+        <label>
+          <div className={styles.metaKey}>Search by name</div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="redis / postgres / …"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          />
+        </label>
+        <label>
+          <div className={styles.metaKey}>Service</div>
+          <select
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+            style={{
+              padding: '8px 10px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            <option value="">— все —</option>
+            {serviceItems.map((s) => (
+              <option key={s.name} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           <div className={styles.metaKey}>Status</div>
           <select
@@ -108,26 +210,39 @@ export function IncarnationsList() {
         </div>
       ) : null}
 
-      {q.data && items.length === 0 ? (
+      {q.data && filtered.length === 0 ? (
         <div className={styles.empty}>
-          Incarnation-ов под фильтр не найдено. Создаются через scenario `create` сервиса (см. <code className="mono">keeper.incarnation.create</code>).
+          Incarnation-ов под фильтр не найдено. Нажмите <strong>Create</strong>, чтобы запустить scenario{' '}
+          <code className="mono">create</code> выбранного сервиса.
         </div>
       ) : null}
 
-      {items.length > 0 ? (
+      {filtered.length > 0 ? (
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Name</th>
+              <th>
+                <button type="button" onClick={() => toggleSort('name')} style={{ all: 'unset', cursor: 'pointer' }}>
+                  Name{sortArrow('name')}
+                </button>
+              </th>
               <th>Service</th>
-              <th>Status</th>
-              <th>Last drift check</th>
-              <th>Updated</th>
+              <th>
+                <button type="button" onClick={() => toggleSort('status')} style={{ all: 'unset', cursor: 'pointer' }}>
+                  Status{sortArrow('status')}
+                </button>
+              </th>
               <th>Covens</th>
+              <th>
+                <button type="button" onClick={() => toggleSort('created_at')} style={{ all: 'unset', cursor: 'pointer' }}>
+                  Created{sortArrow('created_at')}
+                </button>
+              </th>
+              <th>Last drift check</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
+            {filtered.map((row) => (
               <tr key={row.name}>
                 <td>
                   <Link to={`/incarnations/${encodeURIComponent(row.name)}`}>{row.name}</Link>
@@ -142,9 +257,17 @@ export function IncarnationsList() {
                     <Badge tone={incarnationTone(row.status)}>{row.status}</Badge>
                   </span>
                 </td>
+                <td className="mono">
+                  {row.covens.length > 0 ? (
+                    <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+                      {row.covens.map((c) => (
+                        <Badge key={c} tone="muted">{c}</Badge>
+                      ))}
+                    </span>
+                  ) : '—'}
+                </td>
+                <td className="mono" title={row.created_at}>{formatTimeAgo(row.created_at)}</td>
                 <td className="mono">{formatTimeAgo(row.last_drift_check_at)}</td>
-                <td className="mono">{formatTimeAgo(row.updated_at)}</td>
-                <td className="mono">{row.covens.join(', ') || '—'}</td>
               </tr>
             ))}
           </tbody>
