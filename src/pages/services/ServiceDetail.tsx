@@ -199,8 +199,8 @@ export function ServiceDetail() {
             <div className={styles.empty}>
               Каталог сценариев пока не выставлен (endpoint{' '}
               <code className="mono">GET /v1/services/{row.name}/scenarios</code> вернул{' '}
-              {(scenarios.error as ApiError).status}). Запускать сценарии — через UI вкладку
-              «Run Scenario» на странице incarnation.
+              {(scenarios.error as ApiError).status}). Запускать сценарии — через{' '}
+              <Link to="/run?workload=scenario">Run Wizard</Link>.
             </div>
           ) : null}
           {scenarios.error && !scenarioUnavailable ? (

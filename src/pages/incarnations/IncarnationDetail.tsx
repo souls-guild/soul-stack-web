@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -17,7 +17,6 @@ import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type DriftReport } from '../../api/keeper';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { ApiError } from '../../api/client';
-import { RunScenarioForm } from './RunScenarioForm';
 import { UnlockModal } from './UnlockModal';
 import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
@@ -27,10 +26,11 @@ import { StateTab } from './StateTab';
 import { SchemaTab } from './SchemaTab';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'hosts' | 'run' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
+type Tab = 'overview' | 'hosts' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
 
 export function IncarnationDetail() {
   const { name = '' } = useParams<{ name: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('overview');
   const [drift, setDrift] = useState<DriftReport | null>(null);
@@ -124,7 +124,18 @@ export function IncarnationDetail() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {isReady ? (
               <>
-                <Button variant="primary" onClick={() => setTab('run')} title="Run scenario">
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    const params = new URLSearchParams({
+                      workload: 'scenario',
+                      service: row.service,
+                      incarnation: row.name,
+                    });
+                    navigate(`/run?${params.toString()}`);
+                  }}
+                  title="Run scenario via Run Wizard"
+                >
                   <Play size={14} /> Run Scenario
                 </Button>
                 <Button
@@ -191,9 +202,6 @@ export function IncarnationDetail() {
         </button>
         <button type="button" role="tab" aria-selected={tab === 'hosts'} className={`${styles.tab} ${tab === 'hosts' ? styles.tabActive : ''}`} onClick={() => setTab('hosts')}>
           Hosts
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'run'} className={`${styles.tab} ${tab === 'run' ? styles.tabActive : ''}`} onClick={() => setTab('run')}>
-          Run scenario
         </button>
         <button type="button" role="tab" aria-selected={tab === 'history'} className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`} onClick={() => setTab('history')}>
           <HistoryIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />History
@@ -286,17 +294,6 @@ export function IncarnationDetail() {
 
       {tab === 'hosts' ? (
         <HostsTab incarnationName={row.name} spec={row.spec ?? null} state={row.state ?? null} />
-      ) : null}
-
-      {tab === 'run' ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Run scenario</h2>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>
-            POST <code className="mono">/v1/incarnations/{row.name}/scenarios/{'{scenario}'}</code> — async,
-            ответ <code className="mono">202</code> + <code className="mono">apply_id</code>.
-          </p>
-          <RunScenarioForm incarnationName={row.name} serviceName={row.service} />
-        </section>
       ) : null}
 
       {tab === 'history' ? (

@@ -112,6 +112,24 @@
   font-size: 13px;
 }
 
+.deprecationBanner {
+  padding: var(--s-3) var(--s-4);
+  background: color-mix(in srgb, var(--warn, #b58900) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn, #b58900) 30%, var(--border));
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.deprecationBanner a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.deprecationBanner a:hover {
+  text-decoration: underline;
+}
+
 .statusCell {
   display: inline-flex;
   align-items: center;

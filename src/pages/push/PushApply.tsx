@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { keeperApi, type PushApplyView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
@@ -106,6 +107,12 @@ export function PushApply() {
           <h1 className={styles.title}>Push apply</h1>
           <div className={styles.crumbs}>SSH-прогон Destiny без агента</div>
         </div>
+      </div>
+
+      <div className={styles.deprecationBanner} role="note" aria-label="Deprecation notice">
+        Страница скрыта из навигации. Используйте{' '}
+        <Link to="/run?workload=push">Run Wizard</Link>{' '}
+        для запуска push-прогонов. Прямой URL сохранён для backward-compat ссылок.
       </div>
 
       <section className={styles.section} aria-label="Параметры прогона">

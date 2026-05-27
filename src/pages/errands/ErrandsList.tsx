@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Terminal } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 import {
   keeperApi,
   type ErrandStatus,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge, Button } from '../../components/primitives';
+import { Badge } from '../../components/primitives';
 import styles from '../common.module.css';
 
 const STATUSES: ErrandStatus[] = [
@@ -78,15 +78,7 @@ export function ErrandsList() {
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Errands
           </h1>
-          <div className={styles.crumbs}>журнал ad-hoc прогонов</div>
-        </div>
-        <div>
-          <Link to="/errands/new" style={{ textDecoration: 'none' }}>
-            <Button variant="primary">
-              <Plus size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />
-              New Errand
-            </Button>
-          </Link>
+          <div className={styles.crumbs}>журнал ad-hoc прогонов — запуск через <Link to="/run?workload=command">Run Wizard</Link></div>
         </div>
       </div>
 
@@ -160,8 +152,8 @@ export function ErrandsList() {
       {q.data && items.length === 0 ? (
         <div className={styles.empty}>
           Errand-ов под фильтр не найдено.{' '}
-          <Link to="/errands/new" style={{ color: 'var(--accent)' }}>
-            Запустить новый
+          <Link to="/run?workload=command" style={{ color: 'var(--accent)' }}>
+            Запустить новый через Run Wizard
           </Link>
           .
         </div>

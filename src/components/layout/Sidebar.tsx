@@ -4,7 +4,6 @@ import {
   Boxes,
   Users,
   FileText,
-  Upload,
   Terminal,
   Package,
   Puzzle,
@@ -21,6 +20,14 @@ import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
 import { HelpModal } from './HelpModal';
 import styles from './Sidebar.module.css';
 
+// Sidebar — primary navigation.
+//
+// UX-pattern: один entry-point для запуска работы (/run Wizard),
+// остальные pages — read-only views (registry / history / audit).
+//
+// Routes /errands/new + /push сохранены как hidden для
+// backward-compat-ссылок (deprecated, см. PM-decision 2026-05-27).
+
 interface NavItem {
   to: string;
   label: string;
@@ -34,19 +41,13 @@ const PRIMARY: NavItem[] = [
   { to: '/run', label: 'Run', icon: Play, matchPrefix: '/run' },
 ];
 
-const FLEET: NavItem[] = [
+const REGISTRY: NavItem[] = [
+  { to: '/archons', label: 'Operators', icon: Users, matchPrefix: '/archons' },
+  { to: '/services', label: 'Services', icon: Package },
   { to: '/incarnations', label: 'Incarnations', icon: Boxes },
   { to: '/souls', label: 'Souls', icon: Users },
-  { to: '/services', label: 'Services', icon: Package },
   { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
-];
-
-const OPS: NavItem[] = [
-  { to: '/audit', label: 'Audit', icon: FileText },
-  { to: '/archons', label: 'Archons', icon: Users },
   { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
-  { to: '/push', label: 'Push', icon: Upload },
-  { to: '/errands', label: 'Errands', icon: Terminal, matchPrefix: '/errands' },
 ];
 
 const ORACLE: NavItem[] = [
@@ -59,6 +60,11 @@ const HISTORY: NavItem[] = [
   { to: '/tides', label: 'Tides', icon: Waves, matchPrefix: '/tides' },
   { to: '/errand-runs', label: 'Errand runs', icon: Terminal, matchPrefix: '/errand-runs' },
   { to: '/push-runs', label: 'Push runs', icon: Send, matchPrefix: '/push-runs' },
+  { to: '/errands', label: 'Errands', icon: Terminal, matchPrefix: '/errands' },
+];
+
+const BOTTOM: NavItem[] = [
+  { to: '/audit', label: 'Audit log', icon: FileText },
 ];
 
 interface ItemProps {
@@ -136,11 +142,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
       {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Реестр</div>}
-      {FLEET.map((it) => (
-        <Item key={it.to} item={it} collapsed={collapsed} />
-      ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Операции</div>}
-      {OPS.map((it) => (
+      {REGISTRY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
       {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Oracle</div>}
@@ -154,6 +156,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <div className={styles.bottom}>
         <div className={styles.divider} aria-hidden="true" />
+        {BOTTOM.map((it) => (
+          <Item key={it.to} item={it} collapsed={collapsed} />
+        ))}
         <button
           type="button"
           className={`${styles.link} ${styles.helpBtn}`}

@@ -34,9 +34,34 @@ function renderWizardWithRoutes(initialPath = '/run') {
   );
 }
 
+interface ScenarioStubProperty {
+  type?: string;
+  required?: boolean;
+  description?: string;
+  default?: unknown;
+}
+interface ScenarioStubEntry {
+  name: string;
+  description?: string;
+  input_schema?: Record<string, ScenarioStubProperty>;
+}
+interface FetchStubOpts {
+  serviceName?: string;
+  scenarios?: ScenarioStubEntry[];
+  incarnationName?: string;
+}
+
 // Универсальный fetch-stub: пишет последний POST-body в `posted`, возвращает success
 // для известных POST-эндпоинтов и пустой list для GET-ов (souls/services/incarnations).
-function setupFetchStub(): { posted: { url: string; body: unknown } | null } {
+function setupFetchStub(
+  opts: FetchStubOpts = {},
+): { posted: { url: string; body: unknown } | null } {
+  const serviceName = opts.serviceName ?? 'redis';
+  const scenarios: ScenarioStubEntry[] = opts.scenarios ?? [
+    { name: 'create', description: 'init', input_schema: {} },
+    { name: 'restart', description: 'restart workers', input_schema: {} },
+  ];
+  const incarnationName = opts.incarnationName ?? 'redis-prod';
   const ref: { posted: { url: string; body: unknown } | null } = { posted: null };
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -74,7 +99,7 @@ function setupFetchStub(): { posted: { url: string; body: unknown } | null } {
     if (url.includes('/v1/services?') || url.endsWith('/v1/services')) {
       return new Response(
         JSON.stringify({
-          items: [{ name: 'redis', ref: 'main', source: { type: 'git', url: 'git@x' } }],
+          items: [{ name: serviceName, ref: 'main', source: { type: 'git', url: 'git@x' } }],
           offset: 0,
           limit: 50,
           total: 1,
@@ -82,16 +107,9 @@ function setupFetchStub(): { posted: { url: string; body: unknown } | null } {
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
-    if (url.includes('/v1/services/redis/scenarios')) {
+    if (url.includes(`/v1/services/${serviceName}/scenarios`)) {
       return new Response(
-        JSON.stringify({
-          service: 'redis',
-          ref: 'main',
-          scenarios: [
-            { name: 'create', description: 'init', input_schema: {} },
-            { name: 'restart', description: 'restart workers', input_schema: {} },
-          ],
-        }),
+        JSON.stringify({ service: serviceName, ref: 'main', scenarios }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
@@ -99,7 +117,7 @@ function setupFetchStub(): { posted: { url: string; body: unknown } | null } {
       return new Response(
         JSON.stringify({
           items: [
-            { name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' },
+            { name: incarnationName, service: serviceName, service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' },
           ],
           offset: 0,
           limit: 50,
@@ -245,6 +263,62 @@ describe('RunWizard', () => {
     expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/redis-prod\/scenarios\/restart$/);
     const body = stub.posted?.body as { input: Record<string, unknown> };
     expect(body.input).toEqual({});
+  });
+
+  it('Step 2 Scenario per-field input: greeting рендерится, ввод доходит до submit-body.input', async () => {
+    const stub = setupFetchStub({
+      serviceName: 'hello-world',
+      incarnationName: 'hello-prod',
+      scenarios: [
+        {
+          name: 'create',
+          description: 'create hello',
+          input_schema: {
+            greeting: { type: 'string', required: true, description: 'greet text' },
+          },
+        },
+      ],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Step 1 → Step 2 Scenario (default workload).
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'hello-world');
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: /create/ })).toBeInTheDocument(),
+    );
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'create');
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Existing incarnation/)).toBeInTheDocument(),
+    );
+    await user.selectOptions(screen.getByLabelText(/Existing incarnation/), 'hello-prod');
+
+    // Per-field форма должна появиться (по input_schema scenario `create`).
+    await waitFor(() =>
+      expect(screen.getByText(/Input \(поля scenario/)).toBeInTheDocument(),
+    );
+    const greetingInput = await screen.findByRole('textbox', { name: '' }).catch(() => null);
+    // ScenarioInputFields рендерит <label><span>greeting *</span><input/></label> —
+    // ищем через label-text «greeting *».
+    const greetingLabel = await screen.findByText(/^greeting \*?$/);
+    const greetingField = greetingLabel.parentElement?.querySelector('input') as HTMLInputElement;
+    expect(greetingField).toBeTruthy();
+    void greetingInput;
+
+    await user.type(greetingField, 'hello world');
+    expect(greetingField.value).toBe('hello world');
+
+    // Step 2 → 3 → 4 → submit.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+
+    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/hello-prod\/scenarios\/create$/);
+    const body = stub.posted?.body as { input: Record<string, unknown> };
+    expect(body.input).toEqual({ greeting: 'hello world' });
   });
 
   it('Submit Command → POST /v1/errand-runs → redirect /errand-runs/:id', async () => {

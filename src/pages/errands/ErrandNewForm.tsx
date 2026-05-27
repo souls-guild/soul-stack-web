@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useForm,
   useFieldArray,
@@ -97,6 +97,12 @@ export function ErrandNewForm() {
           </h1>
           <div className={styles.crumbs}>pull ad-hoc запуск одного модуля на Soul</div>
         </div>
+      </div>
+
+      <div className={styles.deprecationBanner} role="note" aria-label="Deprecation notice">
+        Страница скрыта из навигации. Используйте{' '}
+        <Link to="/run?workload=command">Run Wizard</Link>{' '}
+        для запуска ad-hoc команд (поддерживает multi-target). Прямой URL сохранён для backward-compat ссылок.
       </div>
 
       <section className={styles.section} aria-label="Module">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, Upload } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
@@ -82,16 +82,29 @@ interface OptionsState {
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
+// Pre-fill из query-string: /run?workload=scenario&service=<svc>&incarnation=<name>.
+// Используется при переходе с IncarnationDetail (Run Scenario button) и при
+// прямых ссылках из ErrandsList/PushApply (deprecated entry-points).
+function pickWorkloadFromQuery(raw: string | null): Workload {
+  if (raw === 'command' || raw === 'push' || raw === 'scenario') return raw;
+  return 'scenario';
+}
+
 export function RunWizard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const initialWorkload = pickWorkloadFromQuery(searchParams.get('workload'));
+  const initialService = searchParams.get('service') ?? '';
+  const initialIncarnation = searchParams.get('incarnation') ?? '';
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [workload, setWorkload] = useState<Workload>('scenario');
+  const [workload, setWorkload] = useState<Workload>(initialWorkload);
 
   const [scenarioState, setScenarioState] = useState<ScenarioStateValues>({
-    service: '',
+    service: initialService,
     scenario: '',
-    incarnation: '',
+    incarnation: initialIncarnation,
     incarnationMode: 'existing',
     newIncarnationName: '',
     newIncarnationCovens: [],
@@ -345,12 +358,6 @@ export function RunWizard() {
         </div>
       </div>
 
-      <div style={{ marginTop: 'var(--s-4)', fontSize: 12, color: 'var(--text-faint)' }}>
-        Также доступны прямые страницы:{' '}
-        <Link to="/incarnations/new">/incarnations/new</Link> ·{' '}
-        <Link to="/errands/new">/errands/new</Link> ·{' '}
-        <Link to="/push">/push</Link>.
-      </div>
     </div>
   );
 }
