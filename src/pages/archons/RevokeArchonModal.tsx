@@ -76,9 +76,10 @@ export function RevokeArchonModal({ aid, open, onClose, onSuccess }: Props) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 'var(--s-4)' }}>
         <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5 }}>
           Архонт <code className="mono">{aid}</code> будет помечен как отозванный
-          (<code className="mono">operators.revoked_at = now()</code>). Активные JWT-токены
-          продолжат работать до своего <code className="mono">exp</code>; новые токены
-          выпустить нельзя.
+          (<code className="mono">operators.revoked_at = now()</code>). Все его JWT-токены
+          перестанут работать <strong>мгновенно</strong> (через cluster-wide
+          rebuild RBAC-snapshot, окно &lt; 10 секунд при потере pub/sub-сообщения).
+          Новые токены выпустить нельзя.
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span className={styles.metaKey}>Reason (optional, для audit)</span>
