@@ -218,7 +218,7 @@ export function IncarnationDetail() {
             POST <code className="mono">/v1/incarnations/{row.name}/scenarios/{'{scenario}'}</code> — async,
             ответ <code className="mono">202</code> + <code className="mono">apply_id</code>.
           </p>
-          <RunScenarioForm incarnationName={row.name} />
+          <RunScenarioForm incarnationName={row.name} serviceName={row.service} />
         </section>
       ) : null}
 
@@ -301,6 +301,7 @@ export function IncarnationDetail() {
       <UpgradeModal
         open={upgradeOpen}
         incarnationName={row.name}
+        serviceName={row.service}
         currentRef={row.service_version}
         onClose={() => setUpgradeOpen(false)}
       />

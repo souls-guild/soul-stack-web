@@ -3,15 +3,18 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge, Dot } from '../../components/primitives';
+import { Badge, Button, Dot, Modal } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
+import { useServiceRefs } from './refs';
+import type { ServiceScenarioInfo } from '../../api/keeper';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'incarnations';
+type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs';
 
 export function ServiceDetail() {
   const { name = '' } = useParams<{ name: string }>();
   const [tab, setTab] = useState<Tab>('overview');
+  const [yamlScenario, setYamlScenario] = useState<ServiceScenarioInfo | null>(null);
 
   const detail = useQuery({
     queryKey: ['service', name],
@@ -25,6 +28,15 @@ export function ServiceDetail() {
     enabled: Boolean(name) && tab === 'incarnations',
   });
 
+  const scenarios = useQuery({
+    queryKey: ['service.scenarios', name],
+    queryFn: () => keeperApi.services.listScenarios(name),
+    enabled: Boolean(name) && tab === 'scenarios',
+    retry: false,
+  });
+
+  const refs = useServiceRefs(name, tab === 'refs');
+
   if (detail.isLoading) return <div className={styles.loading}>Загружаем…</div>;
   if (detail.error) {
     return (
@@ -37,6 +49,9 @@ export function ServiceDetail() {
   }
   const row = detail.data;
   if (!row) return <div className={styles.empty}>Service не найден.</div>;
+
+  const scenarioUnavailable = scenarios.error instanceof ApiError &&
+    (scenarios.error.status === 404 || scenarios.error.status === 501 || scenarios.error.status >= 500);
 
   return (
     <div className={styles.page}>
@@ -93,6 +108,24 @@ export function ServiceDetail() {
         >
           Incarnations
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'scenarios'}
+          className={`${styles.tab} ${tab === 'scenarios' ? styles.tabActive : ''}`}
+          onClick={() => setTab('scenarios')}
+        >
+          Scenarios
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'refs'}
+          className={`${styles.tab} ${tab === 'refs' ? styles.tabActive : ''}`}
+          onClick={() => setTab('refs')}
+        >
+          Refs
+        </button>
       </div>
 
       {tab === 'overview' ? (
@@ -101,9 +134,8 @@ export function ServiceDetail() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Scenarios этого сервиса доступны через git-репо <span className="mono">{row.git}</span> на ref
             <span className="mono"> {row.ref}</span> (каталог <span className="mono">scenario/</span>).
-            REST-каталог scenario пока не выставлен; запускать сценарии — через{' '}
-            <code className="mono">POST /v1/incarnations</code> и{' '}
-            <code className="mono">POST /v1/incarnations/&#123;name&#125;/scenarios/&#123;scenario&#125;</code>.
+            Просмотреть каталог — таб <span className="mono">Scenarios</span>; git-tags/branches — таб{' '}
+            <span className="mono">Refs</span>.
           </div>
         </section>
       ) : null}
@@ -158,6 +190,168 @@ export function ServiceDetail() {
           ) : null}
         </section>
       ) : null}
+
+      {tab === 'scenarios' ? (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Scenarios каталог</h2>
+          {scenarios.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+          {scenarioUnavailable ? (
+            <div className={styles.empty}>
+              Каталог сценариев пока не выставлен (endpoint{' '}
+              <code className="mono">GET /v1/services/{row.name}/scenarios</code> вернул{' '}
+              {(scenarios.error as ApiError).status}). Запускать сценарии — через UI вкладку
+              «Run Scenario» на странице incarnation.
+            </div>
+          ) : null}
+          {scenarios.error && !scenarioUnavailable ? (
+            <div className={styles.errorBox}>
+              {scenarios.error instanceof ApiError
+                ? `Ошибка ${scenarios.error.status}: ${scenarios.error.message}`
+                : String(scenarios.error)}
+            </div>
+          ) : null}
+          {scenarios.data && scenarios.data.items.length === 0 ? (
+            <div className={styles.empty}>В каталоге пока нет сценариев.</div>
+          ) : null}
+          {scenarios.data && scenarios.data.items.length > 0 ? (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th>Input fields</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scenarios.data.items.map((s) => (
+                  <tr key={s.name}>
+                    <td className="mono">{s.name}</td>
+                    <td>{s.description ?? '—'}</td>
+                    <td className="mono" style={{ fontSize: 12 }}>
+                      {scenarioInputSummary(s)}
+                    </td>
+                    <td style={{ display: 'flex', gap: 8 }}>
+                      <Link
+                        to={`/incarnations/new?service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
+                      >
+                        <Button type="button" variant="secondary">Use in incarnation</Button>
+                      </Link>
+                      <Button type="button" variant="ghost" onClick={() => setYamlScenario(s)}>
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </section>
+      ) : null}
+
+      {tab === 'refs' ? (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Git refs</h2>
+          {refs.loading ? <div className={styles.loading}>Загружаем…</div> : null}
+          {refs.unavailable ? (
+            <div className={styles.empty}>
+              Каталог refs недоступен (endpoint{' '}
+              <code className="mono">GET /v1/services/{row.name}/refs</code> не отвечает или
+              не существует). Используйте текущий{' '}
+              <span className="mono">{row.ref}</span> или укажите ref вручную при upgrade.
+            </div>
+          ) : null}
+          {refs.error ? <div className={styles.errorBox}>{refs.error}</div> : null}
+          {!refs.loading && !refs.unavailable && !refs.error ? (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Commit</th>
+                  <th>Default</th>
+                </tr>
+              </thead>
+              <tbody>
+                {refs.tags.map((r) => (
+                  <tr key={`tag/${r.name}`}>
+                    <td className="mono">{r.name}</td>
+                    <td>
+                      <Badge tone="info">tag</Badge>
+                    </td>
+                    <td className="mono" style={{ fontSize: 12 }}>
+                      {r.commit ?? '—'}
+                    </td>
+                    <td>{r.is_default ? <Badge tone="ok">default</Badge> : '—'}</td>
+                  </tr>
+                ))}
+                {refs.branches.map((r) => (
+                  <tr key={`branch/${r.name}`}>
+                    <td className="mono">{r.name}</td>
+                    <td>
+                      <Badge tone="muted">branch</Badge>
+                    </td>
+                    <td className="mono" style={{ fontSize: 12 }}>
+                      {r.commit ?? '—'}
+                    </td>
+                    <td>{r.is_default ? <Badge tone="ok">default</Badge> : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+          {!refs.loading && !refs.unavailable && refs.tags.length === 0 && refs.branches.length === 0 ? (
+            <div className={styles.empty}>В git-репо нет ни tags, ни branches.</div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {yamlScenario ? (
+        <Modal
+          open={true}
+          title={`scenario: ${yamlScenario.name}`}
+          onClose={() => setYamlScenario(null)}
+          wide
+        >
+          {yamlScenario.description ? (
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
+              {yamlScenario.description}
+            </p>
+          ) : null}
+          {yamlScenario.input_schema ? (
+            <>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+                input_schema
+              </div>
+              <pre
+                style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  padding: 12,
+                  fontSize: 12,
+                  fontFamily: 'var(--font-mono)',
+                  overflow: 'auto',
+                  maxHeight: 480,
+                }}
+              >
+                {JSON.stringify(yamlScenario.input_schema, null, 2)}
+              </pre>
+            </>
+          ) : (
+            <div className={styles.empty}>У сценария нет input_schema.</div>
+          )}
+        </Modal>
+      ) : null}
     </div>
   );
+}
+
+function scenarioInputSummary(s: ServiceScenarioInfo): string {
+  const props = s.input_schema?.properties;
+  if (!props) return '—';
+  const names = Object.keys(props);
+  if (names.length === 0) return '—';
+  if (names.length <= 4) return names.join(', ');
+  return `${names.slice(0, 4).join(', ')}, +${names.length - 4}`;
 }

@@ -1,29 +1,35 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { useServiceRefs } from '../services/refs';
 import { upgradeSchema, type UpgradeFormValues } from './schemas';
 import styles from '../common.module.css';
 
 interface Props {
   open: boolean;
   incarnationName: string;
+  serviceName: string;
   currentRef: string;
   onClose: () => void;
 }
 
-export function UpgradeModal({ open, incarnationName, currentRef, onClose }: Props) {
+export function UpgradeModal({ open, incarnationName, serviceName, currentRef, onClose }: Props) {
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [applyId, setApplyId] = useState<string | null>(null);
+
+  // Тянем refs только когда modal открыт — не плодим лишних запросов.
+  const refs = useServiceRefs(serviceName, open);
 
   const {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<UpgradeFormValues>({
     resolver: zodResolver(upgradeSchema),
@@ -48,6 +54,9 @@ export function UpgradeModal({ open, incarnationName, currentRef, onClose }: Pro
     reset();
     onClose();
   }
+
+  const useDropdown =
+    !refs.unavailable && (refs.tags.length > 0 || refs.branches.length > 0);
 
   return (
     <Modal
@@ -80,14 +89,79 @@ export function UpgradeModal({ open, incarnationName, currentRef, onClose }: Pro
         Запускает миграцию state (ADR-019) + переключает service_version одной PG-транзакцией.
         Текущая привязка: <span className="mono">{currentRef}</span>.
       </p>
-      <Input
-        label="To version (git-ref)"
-        placeholder="v3.0.0 / main / abcdef0"
-        mono
-        aria-invalid={errors.to_version ? 'true' : undefined}
-        error={errors.to_version?.message}
-        {...register('to_version')}
-      />
+      {useDropdown ? (
+        <Controller
+          control={control}
+          name="to_version"
+          render={({ field }) => (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>To version (git-ref)</span>
+              <select
+                value={field.value}
+                onChange={(e) => field.onChange(e.target.value)}
+                onBlur={field.onBlur}
+                disabled={refs.loading}
+                aria-invalid={errors.to_version ? 'true' : undefined}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius)',
+                  border: `1px solid ${errors.to_version ? 'var(--danger)' : 'var(--border)'}`,
+                  background: 'var(--surface)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                }}
+              >
+                <option value="">— выберите ref —</option>
+                {refs.tags.length > 0 ? (
+                  <optgroup label="tags">
+                    {refs.tags.map((r) => (
+                      <option key={`tag/${r.name}`} value={r.name}>
+                        {r.name}
+                        {r.is_default ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {refs.branches.length > 0 ? (
+                  <optgroup label="branches">
+                    {refs.branches.map((r) => (
+                      <option key={`branch/${r.name}`} value={r.name}>
+                        {r.name}
+                        {r.is_default ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </select>
+              {errors.to_version ? (
+                <span style={{ color: 'var(--danger)', fontSize: 12 }}>
+                  {errors.to_version.message}
+                </span>
+              ) : (
+                <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+                  Источник — <code className="mono">GET /v1/services/{serviceName}/refs</code>.
+                </span>
+              )}
+            </label>
+          )}
+        />
+      ) : (
+        <Input
+          label="To version (git-ref)"
+          placeholder="v3.0.0 / main / abcdef0"
+          mono
+          aria-invalid={errors.to_version ? 'true' : undefined}
+          error={errors.to_version?.message}
+          hint={
+            refs.loading
+              ? 'Загружаем refs…'
+              : refs.unavailable
+                ? 'Каталог refs недоступен, имя вводится вручную.'
+                : refs.error ?? undefined
+          }
+          {...register('to_version')}
+        />
+      )}
       {applyId ? (
         <div
           style={{

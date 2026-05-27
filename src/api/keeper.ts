@@ -81,6 +81,43 @@ export type ServiceListReply = components['schemas']['ServiceListReply'];
 export type ServiceRegisterRequest = components['schemas']['ServiceRegisterRequest'];
 export type ServiceUpdateRequest = components['schemas']['ServiceUpdateRequest'];
 
+// Refs / scenarios endpoints ещё не зафиксированы в openapi (фиксируется параллельно
+// в backend-slice-е). Локальные типы — узкий контракт, использующийся UI;
+// graceful-degraded при 404/501.
+export interface ServiceRefInfo {
+  name: string;
+  type: 'tag' | 'branch';
+  commit?: string;
+  is_default?: boolean;
+}
+export interface ServiceRefListReply {
+  items: ServiceRefInfo[];
+}
+
+// input_schema — JSON-Schema-подмножество. UI рендерит простые типы (string/integer/
+// number/boolean) per-field; иначе fallback на JSON textarea.
+export interface ScenarioInputSchema {
+  type?: string;
+  properties?: Record<string, ScenarioInputSchemaProperty>;
+  required?: string[];
+  [key: string]: unknown;
+}
+export interface ScenarioInputSchemaProperty {
+  type?: string;
+  description?: string;
+  default?: unknown;
+  enum?: unknown[];
+  [key: string]: unknown;
+}
+export interface ServiceScenarioInfo {
+  name: string;
+  description?: string;
+  input_schema?: ScenarioInputSchema;
+}
+export interface ServiceScenarioListReply {
+  items: ServiceScenarioInfo[];
+}
+
 // Oracle: Vigil (Soul-side проверка beacons) + Decree (reactor-правило). ADR-030.
 export type VigilCreateRequest = components['schemas']['VigilCreateRequest'];
 export type VigilView = components['schemas']['VigilView'];
@@ -338,6 +375,17 @@ export const keeperApi = {
       apiSend<ServiceView>(`/v1/services/${encodeURIComponent(name)}`, 'PATCH', { body }),
     deregister: (name: string) =>
       apiSend<void>(`/v1/services/${encodeURIComponent(name)}`, 'DELETE'),
+    // GET /v1/services/{name}/refs — git tags + branches. Endpoint опционален
+    // (фиксируется backend-slice-ом параллельно); UI graceful-degraded на 404/501.
+    listRefs: (name: string) =>
+      apiGet<ServiceRefListReply>(`/v1/services/${encodeURIComponent(name)}/refs`),
+    // GET /v1/services/{name}/scenarios[?ref=...] — каталог сценариев по git-ref.
+    // Если ref не указан — service.ref. Endpoint опционален (см. listRefs).
+    listScenarios: (name: string, ref?: string) =>
+      apiGet<ServiceScenarioListReply>(
+        `/v1/services/${encodeURIComponent(name)}/scenarios`,
+        { query: { ref } },
+      ),
   },
 
   // Oracle: Vigil-реестр (Soul-side проверки beacons). ADR-030.
