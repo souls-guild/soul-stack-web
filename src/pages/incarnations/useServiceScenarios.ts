@@ -38,6 +38,6 @@ export function useServiceScenarios(serviceName: string | undefined): ScenariosQ
             : String(q.error),
       };
     }
-    return { loading: false, unavailable: false, items: q.data?.items ?? [], error: null };
+    return { loading: false, unavailable: false, items: q.data?.scenarios ?? [], error: null };
   }, [serviceName, q.isLoading, q.error, q.data]);
 }

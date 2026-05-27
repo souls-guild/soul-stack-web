@@ -1,17 +1,23 @@
 import type { ScenarioInputSchema, ScenarioInputSchemaProperty } from '../../api/keeper';
 
-// Минимальный per-field JSON-Schema контракт: string/integer/number/boolean.
+// Минимальный per-field контракт: string/integer/number/boolean.
 // Любой непростой тип (array/object/oneOf/…) → caller рисует JSON-textarea fallback.
 // Это сознательно ограниченный form-builder, не perfect.
+//
+// Backend-shape input_schema — flat-map `{ field: { type, description?, required? } }`,
+// НЕ JSON-Schema-обёртка `{ type: 'object', properties: {...} }`.
 
 export type ScenarioFieldValue = string | number | boolean | undefined;
 export type ScenarioFieldsState = Record<string, ScenarioFieldValue>;
 
-export function isSupportedInputSchema(schema: ScenarioInputSchema | undefined): boolean {
-  if (!schema) return false;
-  if (schema.type !== 'object') return false;
-  if (!schema.properties || Object.keys(schema.properties).length === 0) return false;
-  for (const prop of Object.values(schema.properties)) {
+export function isSupportedInputSchema(
+  schema: ScenarioInputSchema | undefined | null,
+): boolean {
+  if (!schema || typeof schema !== 'object') return false;
+  const entries = Object.entries(schema);
+  if (entries.length === 0) return false;
+  for (const [, prop] of entries) {
+    if (!prop || typeof prop !== 'object') return false;
     if (!isSimpleType(prop)) return false;
   }
   return true;
@@ -28,8 +34,7 @@ function isSimpleType(prop: ScenarioInputSchemaProperty): boolean {
 
 export function defaultsFromSchema(schema: ScenarioInputSchema): ScenarioFieldsState {
   const out: ScenarioFieldsState = {};
-  if (!schema.properties) return out;
-  for (const [key, prop] of Object.entries(schema.properties)) {
+  for (const [key, prop] of Object.entries(schema)) {
     if (prop.default !== undefined) {
       out[key] = prop.default as ScenarioFieldValue;
     } else if (prop.type === 'boolean') {
@@ -47,8 +52,7 @@ export function serializeFields(
   state: ScenarioFieldsState,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  if (!schema.properties) return out;
-  for (const [key, prop] of Object.entries(schema.properties)) {
+  for (const [key, prop] of Object.entries(schema)) {
     const raw = state[key];
     if (raw === undefined || raw === '') continue;
     if (prop.type === 'integer') {

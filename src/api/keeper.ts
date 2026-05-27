@@ -100,28 +100,32 @@ export interface ServiceRefListReply {
   items: ServiceRefInfo[];
 }
 
-// input_schema — JSON-Schema-подмножество. UI рендерит простые типы (string/integer/
-// number/boolean) per-field; иначе fallback на JSON textarea.
-export interface ScenarioInputSchema {
-  type?: string;
-  properties?: Record<string, ScenarioInputSchemaProperty>;
-  required?: string[];
-  [key: string]: unknown;
-}
+// input_schema — flat-map field→property (НЕ JSON-Schema-обёртка `{type:'object',properties}`).
+// Каждое property несёт собственный `required: boolean` (per-field, не top-level массив).
+// UI рендерит простые типы (string/integer/number/boolean) per-field; составные
+// (array/object/oneOf/…) → fallback на JSON textarea.
 export interface ScenarioInputSchemaProperty {
   type?: string;
   description?: string;
+  required?: boolean;
   default?: unknown;
   enum?: unknown[];
   [key: string]: unknown;
 }
+export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
+
 export interface ServiceScenarioInfo {
   name: string;
+  // Backend отдаёт `scenario/<name>/main.yml` — read-only справочно.
+  path?: string;
   description?: string;
   input_schema?: ScenarioInputSchema;
 }
+// Backend-shape: `{ service, ref, scenarios: [...] }` (НЕ `{ items: [...] }`).
 export interface ServiceScenarioListReply {
-  items: ServiceScenarioInfo[];
+  service?: string;
+  ref?: string;
+  scenarios: ServiceScenarioInfo[];
 }
 
 // Oracle: Vigil (Soul-side проверка beacons) + Decree (reactor-правило). ADR-030.

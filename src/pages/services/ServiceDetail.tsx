@@ -210,10 +210,10 @@ export function ServiceDetail() {
                 : String(scenarios.error)}
             </div>
           ) : null}
-          {scenarios.data && scenarios.data.items.length === 0 ? (
+          {scenarios.data && (scenarios.data.scenarios?.length ?? 0) === 0 ? (
             <div className={styles.empty}>В каталоге пока нет сценариев.</div>
           ) : null}
-          {scenarios.data && scenarios.data.items.length > 0 ? (
+          {scenarios.data && (scenarios.data.scenarios?.length ?? 0) > 0 ? (
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -224,7 +224,7 @@ export function ServiceDetail() {
                 </tr>
               </thead>
               <tbody>
-                {scenarios.data.items.map((s) => (
+                {scenarios.data.scenarios.map((s) => (
                   <tr key={s.name}>
                     <td className="mono">{s.name}</td>
                     <td>{s.description ?? '—'}</td>
@@ -348,9 +348,10 @@ export function ServiceDetail() {
 }
 
 function scenarioInputSummary(s: ServiceScenarioInfo): string {
-  const props = s.input_schema?.properties;
-  if (!props) return '—';
-  const names = Object.keys(props);
+  // input_schema — flat-map field→property; имена полей = ключи map.
+  const schema = s.input_schema;
+  if (!schema || typeof schema !== 'object') return '—';
+  const names = Object.keys(schema);
   if (names.length === 0) return '—';
   if (names.length <= 4) return names.join(', ');
   return `${names.slice(0, 4).join(', ')}, +${names.length - 4}`;

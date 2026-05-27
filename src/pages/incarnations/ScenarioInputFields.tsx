@@ -8,16 +8,16 @@ interface Props {
 }
 
 export function ScenarioInputFields({ schema, value, onChange }: Props) {
-  if (!schema.properties) return null;
-  const required = new Set(schema.required ?? []);
+  const entries = Object.entries(schema ?? {});
+  if (entries.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {Object.entries(schema.properties).map(([key, prop]) => (
+      {entries.map(([key, prop]) => (
         <ScenarioInputOneField
           key={key}
           name={key}
-          required={required.has(key)}
+          required={Boolean(prop.required)}
           prop={prop}
           value={value[key]}
           onChange={(v) => onChange({ ...value, [key]: v })}
