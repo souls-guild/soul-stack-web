@@ -21,7 +21,7 @@ function prettyError(err: unknown): string {
     if (err.status === 409) {
       return (
         'Нельзя отозвать последнего Архонта с *-permission ' +
-        '(self-lockout-защита, ADR-013). Создайте другого cluster-admin сначала.'
+        '(self-lockout-защита). Создайте другого cluster-admin сначала.'
       );
     }
     if (err.status === 404) return 'Архонт не найден.';

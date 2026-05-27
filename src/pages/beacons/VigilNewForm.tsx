@@ -281,7 +281,7 @@ export function VigilNewForm() {
             <a href="/vigils" onClick={(e) => { e.preventDefault(); nav('/vigils'); }}>vigils</a> / new
           </div>
           <h1 className={styles.title}>New Vigil</h1>
-          <div className={styles.crumbs}>Создать Soul-side проверку beacons (ADR-030)</div>
+          <div className={styles.crumbs}>Создать Soul-side проверку beacons</div>
         </div>
       </div>
 

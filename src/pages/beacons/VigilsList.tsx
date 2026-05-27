@@ -49,7 +49,7 @@ export function VigilsList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Vigils</h1>
-          <div className={styles.crumbs}>Soul-side проверки beacons (ADR-030)</div>
+          <div className={styles.crumbs}>Soul-side проверки beacons</div>
         </div>
         <Link to="/vigils/new">
           <Button variant="primary">+ New Vigil</Button>

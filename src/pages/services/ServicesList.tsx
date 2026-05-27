@@ -31,7 +31,7 @@ export function ServicesList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Services</h1>
-          <div className={styles.crumbs}>реестр Service-ов (git+ref, ADR-007)</div>
+          <div className={styles.crumbs}>реестр Service-ов (git+ref)</div>
         </div>
       </div>
 

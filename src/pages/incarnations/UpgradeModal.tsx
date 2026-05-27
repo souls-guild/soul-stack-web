@@ -86,7 +86,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
       }
     >
       <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-        Запускает миграцию state (ADR-019) + переключает service_version одной PG-транзакцией.
+        Запускает миграцию state + переключает service_version одной PG-транзакцией.
         Текущая привязка: <span className="mono">{currentRef}</span>.
       </p>
       {useDropdown ? (

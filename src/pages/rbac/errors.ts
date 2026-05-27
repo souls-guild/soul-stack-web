@@ -9,7 +9,7 @@ export function prettyRbacError(err: unknown): string {
       const d = (err.detail || '').toLowerCase();
       if (t.includes('lock-out') || d.includes('lock') || d.includes('admin')) {
         return (
-          'Нельзя оставить кластер без `*`-админа (self-lockout-защита, ADR-013/014). ' +
+          'Нельзя оставить кластер без `*`-админа (self-lockout-защита). ' +
           'Сначала назначьте другого оператора с cluster-admin / *.'
         );
       }

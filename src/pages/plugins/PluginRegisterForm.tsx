@@ -101,7 +101,7 @@ export function PluginRegisterForm() {
           <Stamp size={22} /> Допустить плагин в Sigil-allow-list
         </h1>
         <div className={styles.crumbs}>
-          ADR-026 вариант C: Keeper читает бинарь + manifest из локального кеша
+          Keeper читает бинарь + manifest из локального кеша
           host-а по <code className="mono">(namespace, name)</code> (single-slot),
           сам считает sha256 и подписывает блок Sigil-а. Клиент НЕ передаёт хеш
           или подпись. <code className="mono">ref</code> — operator-asserted метка

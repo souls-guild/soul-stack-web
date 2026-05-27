@@ -95,7 +95,7 @@ export function ErrandNewForm() {
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Run Errand
           </h1>
-          <div className={styles.crumbs}>pull ad-hoc запуск одного модуля на Soul (ADR-033)</div>
+          <div className={styles.crumbs}>pull ad-hoc запуск одного модуля на Soul</div>
         </div>
       </div>
 

@@ -15,17 +15,17 @@ const KIND_INFO: Record<string, { title: string; summary: string }> = {
   mod: {
     title: 'soul_module / soul_beacon',
     summary:
-      'Destiny-шаги (Apply on Soul). Сюда же relay beacon-плагины (pull-monitor для Vigil-checks, ADR-030).',
+      'Destiny-шаги (Apply on Soul). Сюда же relay beacon-плагины (pull-monitor для Vigil-проверок).',
   },
   cloud: {
     title: 'cloud_driver',
     summary:
-      'CreateVM / DestroyVM. Вызывается keeper-side через core.cloud.provisioned (ADR-017).',
+      'CreateVM / DestroyVM. Вызывается keeper-side через core.cloud.provisioned.',
   },
   ssh: {
     title: 'ssh_provider',
     summary:
-      'SSH-key-source для keeper.push (push-доставка без агента, ADR-004).',
+      'SSH-key-source для keeper.push (push-доставка без агента).',
   },
 };
 
@@ -223,7 +223,7 @@ export function PluginDetail() {
           <section className={styles.section} aria-label="sha256">
             <h2 className={styles.sectionTitle}>SHA-256 бинаря</h2>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-              Хеш Keeper посчитал сам по локальному кешу host-а (вариант C ADR-026).
+              Хеш Keeper посчитал сам по локальному кешу host-а.
               Authority целостности — sha256 + подпись Keeper-а (а не git-tag-ref).
             </p>
             <Sha256Block sha256={row.sha256} />
@@ -278,7 +278,7 @@ export function PluginDetail() {
             Что значит plugin-kind
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-            Namespace плагина определяет, как Keeper его исполняет. Полная карта (ADR-026 / ADR-017 / ADR-030):
+            Namespace плагина определяет, как Keeper его исполняет:
           </p>
           <ul style={{ fontSize: 13, lineHeight: 1.6, paddingLeft: 18 }}>
             {Object.entries(KIND_INFO).map(([ns, info]) => (

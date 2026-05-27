@@ -28,7 +28,7 @@ export function DecreesList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Decrees</h1>
-          <div className={styles.crumbs}>Oracle-reactor правила (ADR-030)</div>
+          <div className={styles.crumbs}>Oracle-reactor правила</div>
         </div>
         <Link to="/decrees/new">
           <Button variant="primary">+ New Decree</Button>

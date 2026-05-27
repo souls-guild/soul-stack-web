@@ -69,8 +69,8 @@ export function HostsTab({ incarnationName, spec }: Props) {
     <section className={styles.section}>
       <h2 className={styles.sectionTitle}>Declared hosts (spec.hosts)</h2>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Декларированный список хостов из <code className="mono">incarnation.spec.hosts[]</code>{' '}
-        (ADR-008). Read-only: API сейчас не предоставляет endpoint для редактирования
+        Декларированный список хостов из <code className="mono">incarnation.spec.hosts[]</code>.
+        Read-only: API сейчас не предоставляет endpoint для редактирования
         <code className="mono"> spec.hosts</code> после создания incarnation.
       </p>
 

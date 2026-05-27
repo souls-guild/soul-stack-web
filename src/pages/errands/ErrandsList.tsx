@@ -78,7 +78,7 @@ export function ErrandsList() {
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Errands
           </h1>
-          <div className={styles.crumbs}>журнал ad-hoc прогонов (ADR-033)</div>
+          <div className={styles.crumbs}>журнал ad-hoc прогонов</div>
         </div>
         <div>
           <Link to="/errands/new" style={{ textDecoration: 'none' }}>

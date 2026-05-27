@@ -55,7 +55,7 @@ export function PluginsList() {
             <Puzzle size={22} /> Plugins
           </h1>
           <div className={styles.crumbs}>
-            Sigil-allow-list плагинов (ADR-026, вариант C — Keeper считает sha256
+            Sigil-allow-list плагинов (Keeper считает sha256
             сам по локальному кешу host-а)
           </div>
         </div>

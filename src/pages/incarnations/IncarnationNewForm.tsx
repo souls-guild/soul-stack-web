@@ -177,7 +177,7 @@ export function IncarnationNewForm() {
 
         <div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-            Covens (declared environment-теги, ADR-008)
+            Covens (declared environment-теги)
           </div>
           <Controller
             control={control}

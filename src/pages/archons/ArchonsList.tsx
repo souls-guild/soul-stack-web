@@ -356,7 +356,7 @@ export function ArchonsList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Archons</h1>
-          <div className={styles.crumbs}>операторы кластера (ADR-013/014)</div>
+          <div className={styles.crumbs}>операторы кластера</div>
         </div>
       </div>
 

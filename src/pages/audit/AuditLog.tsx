@@ -190,7 +190,7 @@ export function AuditLog() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Audit</h1>
-          <div className={styles.crumbs}>трейл операторских действий (ADR-022)</div>
+          <div className={styles.crumbs}>трейл операторских действий</div>
         </div>
       </div>
 

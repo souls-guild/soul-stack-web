@@ -12,7 +12,7 @@ export function OracleFiresList() {
         <div>
           <h1 className={styles.title}>Oracle fires</h1>
           <div className={styles.crumbs}>
-            История срабатываний Decree-ов (ADR-030)
+            История срабатываний Decree-ов
           </div>
         </div>
       </div>
