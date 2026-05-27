@@ -73,7 +73,7 @@ describe('ArchonsList', () => {
     expect(link).toHaveAttribute('href', '/archons/archon-alice');
   });
 
-  it('фильтры auth_method + include-revoked попадают в query', async () => {
+  it('фильтры auth_method + hide-revoked попадают в query', async () => {
     let lastUrl = '';
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -85,11 +85,51 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText(/Auth method/i), 'jwt');
-    await user.click(screen.getByLabelText(/Включая revoked/i));
+    // Default: Hide revoked = ON → revoked param НЕ передаётся (server-default
+    // = только активные). Снимаем чекбокс — должен появиться revoked=true.
+    await user.click(screen.getByLabelText(/Hide revoked/i));
     await waitFor(() => {
       expect(lastUrl).toMatch(/auth_method=jwt/);
       expect(lastUrl).toMatch(/revoked=true/);
     });
+  });
+
+  it('Hide revoked default ON: revoked-Архонт скрыт + counter X of Y', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+    });
+    // archon-old (revoked_at != null) — скрыт по умолчанию.
+    expect(screen.queryByRole('link', { name: 'archon-old' })).not.toBeInTheDocument();
+    // Counter: видимых 2, всего 3.
+    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/Showing 2 of 3/);
+  });
+
+  it('Hide revoked OFF: revoked-Архонт виден с red chip + Revoke disabled', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByLabelText(/Hide revoked/i));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
+    });
+    // Chip «revoked» рядом с aid.
+    expect(screen.getByText('revoked')).toBeInTheDocument();
+    // Revoke и Issue token для archon-old (последний в таблице) — disabled.
+    const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
+    expect(revokeButtons[revokeButtons.length - 1]).toBeDisabled();
+    const issueButtons = screen.getAllByRole('button', { name: /Issue token/ });
+    expect(issueButtons[issueButtons.length - 1]).toBeDisabled();
+    // Counter: 3 of 3.
+    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/Showing 3 of 3/);
   });
 
   it('per-row Revoke через Modal → POST /v1/operators/{aid}/revoke', async () => {
@@ -113,11 +153,12 @@ describe('ArchonsList', () => {
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(3);
+      // Hide revoked default ON → archon-old отфильтрован, видимы 2 строки.
+      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(2);
     });
     const user = userEvent.setup();
     const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
-    // archon-old (3-я строка) — disabled (revoked); кликаем по archon-alice (idx=1).
+    // bootstrap (idx=0), archon-alice (idx=1).
     await user.click(revokeButtons[1]);
     // Modal должен открыться с заголовком, содержащим AID.
     await waitFor(() => {
@@ -164,7 +205,8 @@ describe('ArchonsList', () => {
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(3);
+      // Hide revoked default ON → 2 видимых строки (bootstrap, alice).
+      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(2);
     });
     const user = userEvent.setup();
     const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });

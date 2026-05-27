@@ -611,7 +611,13 @@ paths:
       summary: Запустить scenario против incarnation.
       description: |
         Permission: incarnation.run. MCP-tool: keeper.incarnation.run.
-        Async-операция, 202 + apply_id.
+        Async-операция, 202.
+
+        Classic single-run (без `wave`) — 202 + `apply_id` (`IncarnationRunReply`).
+        Tide-режим (с `wave`, ADR-040) — 202 + `tide_id` + сводка
+        (`IncarnationRunTideReply`); per-Surge apply_run-ы живут под `tide_id` в
+        `apply_runs.tide_id`. Опт-поля `target`/`concurrency` допустимы только в
+        паре с `wave` (Tide-активатор).
       parameters:
         - $ref: '#/components/parameters/IncarnationNamePath'
         - name: scenario
@@ -628,11 +634,13 @@ paths:
               $ref: '#/components/schemas/IncarnationRunRequest'
       responses:
         '202':
-          description: Запуск scenario принят.
+          description: Запуск scenario принят (classic single-run или Tide-режим).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IncarnationRunReply'
+                oneOf:
+                  - $ref: '#/components/schemas/IncarnationRunReply'
+                  - $ref: '#/components/schemas/IncarnationRunTideReply'
         '400': { $ref: '#/components/responses/Problem400' }
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
@@ -763,6 +771,118 @@ paths:
         '404': { $ref: '#/components/responses/Problem404' }
         '409': { $ref: '#/components/responses/Problem409' }
         '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/tides:
+    get:
+      tags: [Tide]
+      operationId: ListIncarnationTides
+      summary: Список Tide-прогонов под incarnation (ADR-040 W-4).
+      description: |
+        Permission: incarnation.history (parity GET /history — read о
+        runtime-состоянии прогонов incarnation; отдельный `tide.read` perm
+        не вводится до запроса оператора, ADR-040 § RBAC reuse).
+        Сортировка `started_at DESC` (свежие первыми).
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+          description: Опциональный фильтр по статусу Tide.
+      responses:
+        '200':
+          description: Страница Tide-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TideListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/tides:
+    get:
+      tags: [Tide]
+      operationId: ListTides
+      summary: Глобальный список Tide-прогонов (UI-4 Tide-runs page).
+      description: |
+        Permission: incarnation.history (parity с per-incarnation
+        `GET /v1/incarnations/{name}/tides`). Глобальный list поверх всех
+        incarnation-ов, сортировка `started_at DESC` (свежие первыми).
+
+        Для per-incarnation-scope (RBAC через `coven=`/`service=`) использовать
+        `GET /v1/incarnations/{name}/tides`.
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: status
+          in: query
+          required: false
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+          description: |
+            Multi-value-фильтр по статусу Tide (повторяющийся `?status=`-параметр).
+            Несколько значений объединяются через OR. Невалидное значение → 422.
+        - name: incarnation
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9-]{0,62}$'
+          description: Exact-match-фильтр по incarnation_name.
+      responses:
+        '200':
+          description: Страница Tide-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TideListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/tides/{tide_id}:
+    get:
+      tags: [Tide]
+      operationId: GetTide
+      summary: Snapshot одного Tide-прогона (ADR-040 W-4).
+      description: |
+        Permission: incarnation.history (parity GET /history). UI делает
+        client-side polling до появления нативного progress-SSE-эндпоинта
+        (отложено, см. ADR-040 open Q «Tide-progress SSE для UI»).
+      parameters:
+        - name: tide_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID Tide.
+      responses:
+        '200':
+          description: Snapshot Tide.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tide'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
         '500': { $ref: '#/components/responses/Problem500' }
 
   # /v1/auth/login — TODO ADR-amendment к ADR-014 (см. open question
@@ -1038,6 +1158,44 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/souls/{sid}/ssh-target:
+    put:
+      tags: [Soul]
+      operationId: UpdateSoulSshTarget
+      summary: Обновить per-host SSH-реквизиты push-flow.
+      description: |
+        ADR-032 amendment 2026-05-26 (S7-1): souls.ssh_target jsonb — canonical
+        источник per-host SSH-реквизитов push-flow. keeper.yml::push.targets[]
+        — legacy fallback под флагом push.allow_legacy_push_targets (1-release
+        WARN deprecation window).
+
+        Permission: soul.ssh-target-update; selector host=<sid>. MCP-tool:
+        keeper.soul.ssh-target.update (3-сегментное имя, паттерн
+        keeper.sigil.key.<verb> ↔ permission sigil.key-<verb>). Body несёт
+        полный набор полей; partial-update не поддерживается (write-NULL для
+        снятия target-а — отдельный DELETE-роут, не S7-1).
+      parameters:
+        - $ref: '#/components/parameters/SidPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SoulSshTargetRequest'
+      responses:
+        '200':
+          description: Snapshot сохранённой записи ssh_target.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulSshTargetReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/souls/{sid}/exec:
     post:
       tags: [Errand]
@@ -1187,6 +1345,37 @@ paths:
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Errand]
+      operationId: CancelErrand
+      summary: Отменить in-flight Errand (slice E5, ADR-033).
+      description: |
+        Permission: errand.cancel. Best-effort: Keeper отправляет CancelErrand
+        Soul-у через EventStream-канал, Soul-side errandrunner отменяет ctx
+        активной Run-горутины → возвращает ErrandResult{CANCELLED} тем же
+        каналом, Keeper переводит строку errands в status=cancelled через
+        applybus-receiver. 204 — сигнал отправлен (финальный статус видно
+        через GET /v1/errands/{errand_id}). 409 — Errand уже в терминальном
+        статусе (нечего отменять). 404 — errand_id не найден ИЛИ целевой
+        Soul не подключён к кластеру (cancel-сигнал не доставлен; строка
+        останется running до Reaper timed_out).
+      parameters:
+        - in: path
+          name: errand_id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID Errand-а.
+      responses:
+        '204':
+          description: Cancel-сигнал отправлен Soul-у. Финальный статус — GET /v1/errands/{errand_id}.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
@@ -1482,6 +1671,71 @@ paths:
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
         '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/services/{name}/refs:
+    get:
+      tags: [Service]
+      operationId: ListServiceRefs
+      summary: Список git-tag-ов и branch-ей Service-а.
+      description: |
+        Permission: service.list. Возвращает доступные git-ref-ы remote-
+        репозитория Service-а (tags + branches с commit-hash-ом и пометкой
+        дефолтной ветки) для UI Upgrade-modal dropdown. Кеш на стороне Keeper-а
+        — TTL 60s (per-Keeper, не cluster-wide). Tags сортируются semver desc
+        (валидный semver выше lex; pre-release ниже release); branches —
+        default first, остальные lex asc. Read-only, без audit. 502 bad-gateway
+        — внешний git-источник не ответил (DNS / auth / неподдерживаемая схема).
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+      responses:
+        '200':
+          description: Список ref-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRefsListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+        '502': { $ref: '#/components/responses/Problem502' }
+
+  /v1/services/{name}/scenarios:
+    get:
+      tags: [Service]
+      operationId: ListServiceScenarios
+      summary: Список scenario из git-репо Service-а.
+      description: |
+        Permission: service.list. Возвращает список scenario-метаданных из
+        материализованного снапшота git-репо Service-а (`scenario/<name>/main.yml`)
+        для UI Run-modal dropdown «Choose scenario». Параметр `?ref=<git-ref>`
+        опционален: по умолчанию используется ref из реестра Service-а; UI может
+        переопределить, чтобы посмотреть scenario конкретной версии до Upgrade.
+        Сортировка alphabetical asc. Невалидный YAML / отсутствующий `main.yml`
+        в одной из scenario-папок не ломает listing остальных (partial-success).
+        Кеш на стороне Keeper-а — TTL 60s, ключ (name, ref). Read-only, без
+        audit. 502 bad-gateway — loader упал (git-clone / парсинг манифеста).
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+        - in: query
+          name: ref
+          required: false
+          schema: { type: string }
+          description: |
+            git-ref для проверки. Если не задан — берётся ref из реестра
+            Service-а.
+      responses:
+        '200':
+          description: Список scenario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceScenariosListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+        '502': { $ref: '#/components/responses/Problem502' }
 
   /v1/augur/omens:
     post:
@@ -1894,6 +2148,52 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/push-runs:
+    get:
+      tags: [Push]
+      operationId: ListPushRuns
+      summary: Глобальный список push-прогонов (UI-4 Push-runs page).
+      description: |
+        Permission: incarnation.history (push — это history-info, parity
+        с tide-list; отдельная permission `push.list` не вводится до
+        запроса оператора). Сортировка `started_at DESC` (свежие первыми).
+
+        Per-id detail (с полным `summary.hosts[]`) — `GET /v1/push/{apply_id}`.
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - name: status
+          in: query
+          required: false
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [pending, running, success, partial_failed, failed, cancelled]
+          description: |
+            Multi-value-фильтр по статусу push-прогона (повторяющийся
+            `?status=`-параметр). Несколько значений объединяются через OR.
+            Невалидное значение → 422.
+        - name: ssh_provider
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Exact-match-фильтр по push_runs.ssh_provider.
+      responses:
+        '200':
+          description: Страница push-прогонов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushRunListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/push/cleanup:
     post:
       tags: [Push]
@@ -1975,6 +2275,125 @@ paths:
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/push-providers:
+    post:
+      tags: [PushProvider]
+      operationId: CreatePushProvider
+      summary: Создать запись Push-Provider-а (env-payload params SSH-плагина).
+      description: |
+        ADR-032 amendment 2026-05-26, S7-2. Long-term canon вместо
+        keeper.yml::push.providers[] (pilot S6 / S7-1). Sensitive params
+        (secret_id/token/password/private_key) ОБЯЗАНЫ быть vault-refs
+        (vault:<path>). После commit-а — cluster-wide invalidate через Redis
+        pub/sub `push-providers:changed`. Permission: push-provider.create.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushProviderCreateRequest'
+      responses:
+        '201':
+          description: Запись создана.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushProvider'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [PushProvider]
+      operationId: ListPushProviders
+      summary: Перечислить Push-Provider-ов.
+      description: Permission push-provider.list. Сортировка updated_at DESC.
+      parameters:
+        - in: query
+          name: name_pattern
+          schema:
+            type: string
+          description: LIKE-форма префикса имени (например, vault%).
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница списка.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushProviderListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/push-providers/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,62}$'
+    get:
+      tags: [PushProvider]
+      operationId: GetPushProvider
+      summary: Прочитать одну запись Push-Provider-а.
+      description: Permission push-provider.read.
+      responses:
+        '200':
+          description: Запись.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushProvider'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    put:
+      tags: [PushProvider]
+      operationId: UpdatePushProvider
+      summary: Заменить params Push-Provider-а (replace-семантика).
+      description: |
+        Permission push-provider.update. Sensitive-инвариант тот же, что у create.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushProviderUpdateRequest'
+      responses:
+        '200':
+          description: Обновлённая запись.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushProvider'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [PushProvider]
+      operationId: DeletePushProvider
+      summary: Удалить запись Push-Provider-а.
+      description: Permission push-provider.delete.
+      responses:
+        '204':
+          description: Удалено.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
@@ -2169,6 +2588,14 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
+    Problem502:
+      description: |
+        Bad gateway — upstream-ресурс (внешний git, …) недоступен или вернул
+        ошибку. Keeper исправен, проблема за его пределами.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
 
   schemas:
     HealthStatus:
@@ -2303,6 +2730,18 @@ components:
         display_name:
           type: string
           description: Человекочитаемое имя для UI/аудита.
+        roles:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9-]*$'
+          description: |
+            Опциональный список ролей, которые надо приатачить новому Архонту
+            в той же транзакции с INSERT operator-а (UX-fix: онбординг одним
+            API-вызовом вместо двух — create + grant). Любая ошибка
+            (несуществующая роль, FK-violation) → rollback, оператор НЕ
+            создаётся. Пустой/опущенный — старое поведение без grant-ов.
+            Идемпотентно: дубль в массиве — no-op (ON CONFLICT DO NOTHING).
       required: [aid, display_name]
 
     OperatorCreateReply:
@@ -2323,6 +2762,13 @@ components:
           type: string
           pattern: '^archon-[a-z0-9-]{1,62}$'
           description: AID Архонта, выполнившего запрос (из JWT.sub).
+        roles:
+          type: array
+          items:
+            type: string
+          description: |
+            Actually-granted-роли (порядок входа). Пусто/опущено, если caller
+            не передавал roles в запросе.
         jwt:
           type: string
           description: |
@@ -2646,6 +3092,101 @@ components:
           items:
             $ref: '#/components/schemas/ServiceView'
       required: [items]
+
+    GitRef:
+      type: object
+      description: |
+        Одна запись git-ref-листинга remote-репозитория Service-а (tag либо
+        branch). Используется в UI Upgrade-modal dropdown.
+      properties:
+        name:
+          type: string
+          description: Голое имя ref-а ('v2.0.0' / 'main'), без 'refs/'-префикса.
+        type:
+          type: string
+          enum: [tag, branch]
+          description: Тип ref-а.
+        commit:
+          type: string
+          description: Полный sha1 commit-а, на который указывает ref.
+        is_default:
+          type: boolean
+          description: |
+            true только для дефолтной ветки remote-а (HEAD-symref) или для
+            main/master при fallback-е, если HEAD-symref не получен. У tag-ов
+            всегда отсутствует/false.
+      required: [name, type, commit]
+
+    ServiceRefsListReply:
+      type: object
+      description: |
+        Ответ `GET /v1/services/{name}/refs`: список git-tag-ов + branch-ей
+        remote-репозитория Service-а. Сортировка: tags — semver desc (валидный
+        semver выше lex; pre-release ниже release), затем branches — default
+        first, остальные lex asc.
+      properties:
+        service:
+          type: string
+          description: Имя Service-а (дубль path-параметра для удобства клиента).
+        refs:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitRef'
+      required: [service, refs]
+
+    Scenario:
+      type: object
+      description: |
+        Метаданные одного scenario из материализованного снапшота git-репо
+        Service-а (`scenario/<name>/main.yml`). Лёгкая проекция top-level полей
+        scenario.yml для UI dropdown «Choose scenario» — handler-у не нужны ни
+        tasks, ни state_changes, ни orchestration-дельта. Имя берётся из имени
+        директории, не из top-level `name:` (директория — надёжный источник).
+      properties:
+        name:
+          type: string
+          description: Имя scenario (имя поддиректории `scenario/<name>/`).
+        path:
+          type: string
+          description: |
+            Относительный путь к main.yml внутри снапшота
+            (`scenario/<name>/main.yml`).
+        description:
+          type: string
+          description: top-level `description:` scenario (если задан).
+        input_schema:
+          type: object
+          additionalProperties: true
+          description: |
+            top-level `input_schema:` (нормативное имя) или `input:` (fallback)
+            scenario, в исходной YAML-форме. UI рендерит из этого форму ввода.
+        tags:
+          type: array
+          items: { type: string }
+          description: top-level `tags:` scenario (если заданы).
+      required: [name, path]
+
+    ServiceScenariosListReply:
+      type: object
+      description: |
+        Ответ `GET /v1/services/{name}/scenarios`: список scenario из git-репо
+        Service-а на конкретном ref-е. Сортировка scenarios — alphabetical asc.
+        Невалидный YAML / отсутствующий main.yml в одной из scenario-папок не
+        ломает listing остальных (partial-success).
+      properties:
+        service:
+          type: string
+          description: Имя Service-а (дубль path-параметра).
+        ref:
+          type: string
+          description: |
+            git-ref, на котором составлен listing (значение query-параметра
+            либо ref из реестра Service-а, если query не задан).
+        scenarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Scenario'
+      required: [service, ref, scenarios]
 
     OmenCreateRequest:
       type: object
@@ -3161,9 +3702,50 @@ components:
           type: object
           additionalProperties: true
           description: Input scenario.
+        target:
+          type: object
+          additionalProperties: false
+          description: >-
+            Tide invocation-time target-override (ADR-040). AND-merge со
+            scenario on:/where: — только сужение, не расширение. Только в Tide-
+            режиме (требует `wave`).
+          properties:
+            coven:
+              type: array
+              items:
+                type: string
+                pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+              description: Дополнительные Coven-метки фильтра.
+            where:
+              type: string
+              maxLength: 4096
+              description: CEL-предикат per-host.
+        wave:
+          type: object
+          additionalProperties: false
+          required: [size]
+          description: >-
+            Tide invocation-time wave config (ADR-040). Наличие активирует
+            Tide-режим (возвращается `tide_id`).
+          properties:
+            size:
+              type: integer
+              minimum: 1
+              description: Souls per Surge.
+            on_failure:
+              type: string
+              enum: [abort, continue]
+              description: Поведение orchestrator-а при failed Surge. Default — abort.
+        concurrency:
+          type: integer
+          minimum: 1
+          description: >-
+            Tide invocation-time concurrency-override (ADR-040). REPLACE
+            scenario `serial:`. Только в Tide-режиме (требует `wave`).
 
     IncarnationRunReply:
       type: object
+      description: Classic single-run reply (без `wave`-поля).
       properties:
         apply_id:
           type: string
@@ -3173,6 +3755,170 @@ components:
         scenario:
           type: string
       required: [apply_id, incarnation, scenario]
+
+    IncarnationRunTideReply:
+      type: object
+      description: Tide-режим reply (с `wave`-полем, ADR-040 W-3).
+      properties:
+        tide_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID Tide-прогона.
+        incarnation:
+          type: string
+        scenario:
+          type: string
+        scope_size:
+          type: integer
+          description: Размер snapshot SID[] (target_resolved_souls).
+        wave_size:
+          type: integer
+          description: Souls per Surge (echo).
+        surges_planned:
+          type: integer
+          description: ceil(scope_size / wave_size) — число запланированных Surge-волн.
+        failure_policy:
+          type: string
+          enum: [abort, continue]
+          description: Эффективный on_surge_failure (echo, default abort).
+      required: [tide_id, incarnation, scenario, scope_size, wave_size, surges_planned, failure_policy]
+
+    Tide:
+      type: object
+      description: |
+        Snapshot одного Tide-прогона (ADR-040 W-4). Поля snake_case, parity с
+        `tides`-строкой в PG. `scope_size = len(target_resolved_souls)` — UI
+        видит размер раскинутого target-а без 3–5 МБ JSON-массива SID[]
+        (snapshot SID[] наружу не отдаётся: get-эндпоинт MVP-форматный).
+      properties:
+        tide_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        incarnation_name:
+          type: string
+        scenario_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+        total_surges:
+          type: integer
+          description: Запланированное число Surge-волн (`ceil(scope_size / surge_size)`).
+        current_surge_index:
+          type: integer
+          description: |
+            1-based номер текущей Surge (0 = ничего не запущено / Tide pending).
+        surge_size:
+          type: integer
+          description: Souls per Surge (echo wave.size).
+        scope_size:
+          type: integer
+          description: Размер snapshot SID[] (target_resolved_souls).
+        on_surge_failure:
+          type: string
+          enum: [abort, continue]
+        target_coven_override:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          description: Эхо `target.coven` invocation-time-override-а; отсутствует, если не задавался.
+        target_where_override:
+          type: string
+          description: Эхо `target.where` invocation-time-override-а; отсутствует, если не задавался.
+        concurrency_override:
+          type: integer
+          minimum: 1
+          description: Эхо REPLACE-override scenario `serial:`; отсутствует, если не задавался.
+        current_apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID head apply_run-а текущей Surge; отсутствует, если Tide pending.
+        attempt:
+          type: integer
+          description: |
+            Сколько раз Tide подбирался TideWorker-ом (инкремент при reclaim
+            Reaper-правилом `reclaim_tides`).
+        started_by_aid:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          description: Время финализации (NULL для pending/running).
+        summary:
+          $ref: '#/components/schemas/TideSummary'
+      required:
+        - tide_id
+        - incarnation_name
+        - scenario_name
+        - status
+        - total_surges
+        - current_surge_index
+        - surge_size
+        - scope_size
+        - on_surge_failure
+        - attempt
+        - started_by_aid
+        - started_at
+
+    TideSummary:
+      type: object
+      description: Агрегированный итог прогона; пишется TideWorker-ом при финализации Tide.
+      properties:
+        surges:
+          type: array
+          items:
+            $ref: '#/components/schemas/TideSurgeRecord'
+      required: [surges]
+
+    TideSurgeRecord:
+      type: object
+      description: Итог одного Surge-а внутри Tide.
+      properties:
+        surge_index:
+          type: integer
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        terminal:
+          type: string
+          description: |
+            Терминальный статус apply_run-а Surge-волны (success/failed/
+            cancelled/orphaned/no_match), строкой ради forward-compat.
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        failed_souls:
+          type: integer
+          description: Число failed-Soul-ов внутри Surge; 0 — отсутствует в JSON (omitempty).
+        state_commit_error:
+          type: string
+          description: |
+            Per-Surge state-commit-ошибка (ADR-009 §7, ADR-040 amendment).
+            Соул-ы прошли, но коммит state не выполнен. Отсутствует, если коммит ок.
+      required: [surge_index, apply_id, terminal, started_at, finished_at]
+
+    TideListReply:
+      type: object
+      description: Страница Tide-прогонов (ADR-040 W-4).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tide'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
 
     IncarnationGetReply:
       type: object
@@ -3558,6 +4304,111 @@ components:
           format: date-time
       required: [sid, bootstrap_token, expires_at]
 
+    SoulSshTarget:
+      type: object
+      description: |
+        Per-host SSH-реквизиты push-flow (ADR-032 amendment 2026-05-26 S7-1 +
+        amendment 2026-05-27 P2 W-1). Хранится в souls.ssh_target jsonb;
+        читается PGFallbackTargetResolver перед SshDispatcher.SendApply.
+      properties:
+        ssh_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          description: TCP-порт SSH-сервера на хосте.
+        ssh_user:
+          type: string
+          minLength: 1
+          description: SSH-пользователь, под которым Keeper открывает сессию.
+        soul_path:
+          type: string
+          pattern: '^/.+'
+          description: |
+            Абсолютный путь к soul-бинарю на хосте (соул-агент уже установлен
+            до push-а либо доставляется Deliverer-ом с sha256-кешем).
+        ssh_provider:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,62}$'
+          description: |
+            Optional per-SID explicit SshProvider plugin name (P2 W-1
+            multi-provider routing, Level 1). Когда задано — побеждает над
+            coven_default / cluster_default. Пусто / отсутствует → routing
+            идёт через push.coven_default_providers / push.cluster_default_provider.
+      required: [ssh_port, ssh_user, soul_path]
+
+    SoulSshTargetRequest:
+      $ref: '#/components/schemas/SoulSshTarget'
+
+    SoulSshTargetReply:
+      type: object
+      description: Snapshot сохранённой ssh_target-записи после PUT.
+      properties:
+        sid:
+          type: string
+        ssh_target:
+          $ref: '#/components/schemas/SoulSshTarget'
+      required: [sid, ssh_target]
+
+    PushProvider:
+      type: object
+      description: |
+        Запись реестра push_providers (ADR-032 amendment 2026-05-26, S7-2).
+        Per-provider env-payload params SSH-плагина push-flow; key params —
+        opaque-форма самого плагина (vault_addr/role/proxy_addr/…). Sensitive
+        ключи (secret_id/token/password/private_key) обязаны быть vault-refs.
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,62}$'
+          description: Имя плагина (= plugins.ssh_providers[].name).
+        params:
+          type: object
+          description: Opaque params; sensitive — vault-refs.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+        updated_by_aid:
+          type: string
+          nullable: true
+      required: [name, params, created_at, updated_at, created_by_aid]
+
+    PushProviderCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z][a-z0-9-]{0,62}$'
+        params:
+          type: object
+      required: [name]
+
+    PushProviderUpdateRequest:
+      type: object
+      properties:
+        params:
+          type: object
+      required: [params]
+
+    PushProviderListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PushProvider'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
     SoulListReply:
       type: object
       properties:
@@ -3886,6 +4737,78 @@ components:
           type: string
           pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
       required: [apply_id]
+
+    PushRunListReply:
+      type: object
+      description: |
+        Страница push-прогонов (UI-4 Push-runs page). Возвращается
+        GET /v1/push-runs. Compact-форма entry: вырезаны тяжёлые поля
+        `input` и `summary.hosts[]`, остались агрегированные `summary_counts`.
+        Полная запись с per-host исходами — через GET /v1/push/{apply_id}.
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PushRunListEntry'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
+    PushRunListEntry:
+      type: object
+      description: |
+        Compact-форма строки push_runs для list-эндпоинта. summary редуцирован
+        до агрегированных counts (`summary_counts`); полный массив hosts[]
+        живёт только в detail-эндпоинте GET /v1/push/{apply_id}.
+      properties:
+        apply_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        inventory_sids:
+          type: array
+          items:
+            type: string
+        destiny_ref:
+          type: string
+          description: '<name>@<ref> запроса.'
+        ssh_provider:
+          type: string
+        cleanup_stale:
+          type: boolean
+        status:
+          type: string
+          enum: [pending, running, success, partial_failed, failed, cancelled]
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          description: Отсутствует пока статус pending/running.
+        started_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        summary_counts:
+          $ref: '#/components/schemas/PushSummaryCounts'
+      required: [apply_id, inventory_sids, destiny_ref, cleanup_stale, status, started_at]
+
+    PushSummaryCounts:
+      type: object
+      description: |
+        Агрегированные counts из push_runs.summary jsonb. Все поля опциональны
+        (omitempty): pending/running прогоны не имеют summary; для терминальных
+        статусов orchestrator (pushorch.summarize) пишет всю тройку.
+      properties:
+        total:
+          type: integer
+        success_count:
+          type: integer
+        fail_count:
+          type: integer
 
     PushApplyView:
       type: object

@@ -12,6 +12,8 @@ import {
   Eye,
   Scroll,
   Zap,
+  Waves,
+  Send,
   HelpCircle,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
@@ -46,6 +48,11 @@ const ORACLE: NavItem[] = [
   { to: '/vigils', label: 'Vigils', icon: Eye, matchPrefix: '/vigils' },
   { to: '/decrees', label: 'Decrees', icon: Scroll, matchPrefix: '/decrees' },
   { to: '/oracle/fires', label: 'Oracle fires', icon: Zap, matchPrefix: '/oracle' },
+];
+
+const HISTORY: NavItem[] = [
+  { to: '/tides', label: 'Tides', icon: Waves, matchPrefix: '/tides' },
+  { to: '/push-runs', label: 'Push runs', icon: Send, matchPrefix: '/push-runs' },
 ];
 
 interface ItemProps {
@@ -129,6 +136,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       ))}
       {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Oracle</div>}
       {ORACLE.map((it) => (
+        <Item key={it.to} item={it} collapsed={collapsed} />
+      ))}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>История прогонов</div>}
+      {HISTORY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
 

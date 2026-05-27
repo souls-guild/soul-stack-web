@@ -69,6 +69,17 @@ export type AuditEventSource = NonNullable<AuditEvent['source']>;
 export type PushApplyRequest = components['schemas']['PushApplyRequest'];
 export type PushApplyReply = components['schemas']['PushApplyReply'];
 export type PushApplyView = components['schemas']['PushApplyView'];
+export type PushRunListReply = components['schemas']['PushRunListReply'];
+export type PushRunListEntry = components['schemas']['PushRunListEntry'];
+export type PushSummaryCounts = components['schemas']['PushSummaryCounts'];
+export type PushRunStatus = NonNullable<PushRunListEntry['status']>;
+
+// Tide-runs (ADR-040 W-4). UI-страницы /tides и /tides/:id.
+export type Tide = components['schemas']['Tide'];
+export type TideListReply = components['schemas']['TideListReply'];
+export type TideSummary = components['schemas']['TideSummary'];
+export type TideSurgeRecord = components['schemas']['TideSurgeRecord'];
+export type TideStatus = NonNullable<Tide['status']>;
 
 export type ErrandRunRequest = components['schemas']['ErrandRunRequest'];
 export type ErrandAccepted = components['schemas']['ErrandAccepted'];
@@ -334,6 +345,42 @@ export const keeperApi = {
     get: (applyId: string) => apiGet<PushApplyView>(`/v1/push/${encodeURIComponent(applyId)}`),
   },
 
+  // Push-runs глобальный list (UI-4, openapi commit 795ceba). Compact-форма entry
+  // с summary_counts; per-host hosts[] — через push.get(apply_id).
+  pushRuns: {
+    list: (q: ListPushRunsQuery = {}) =>
+      apiGet<PushRunListReply>('/v1/push-runs', {
+        query: {
+          status: q.status,
+          ssh_provider: q.ssh_provider,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+  },
+
+  // Tide-runs (ADR-040 W-4). Глобальный list + detail-snapshot.
+  // Per-incarnation list живёт под incarnations.listTides.
+  tides: {
+    list: (q: ListTidesQuery = {}) =>
+      apiGet<TideListReply>('/v1/tides', {
+        query: {
+          status: q.status,
+          incarnation: q.incarnation,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+    get: (tideId: string) => apiGet<Tide>(`/v1/tides/${encodeURIComponent(tideId)}`),
+    listByIncarnation: (name: string, q: ListByIncarnationTidesQuery = {}) =>
+      apiGet<TideListReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/tides`,
+        {
+          query: { status: q.status, offset: q.offset, limit: q.limit },
+        },
+      ),
+  },
+
   operators: {
     // 200 → OperatorListReply (paged + auth_method/revoked фильтры).
     list: (q: ListOperatorsQuery = {}) =>
@@ -493,6 +540,28 @@ export interface ListOperatorsQuery {
   auth_method?: OperatorAuthMethod;
   // Default server-side = false (только активные). true — включая revoked.
   revoked?: boolean;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ListTidesQuery {
+  // Multi-value `?status=` — exact-match OR (openapi commit 795ceba).
+  status?: TideStatus[];
+  incarnation?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ListByIncarnationTidesQuery {
+  status?: TideStatus;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ListPushRunsQuery {
+  // Multi-value `?status=` — exact-match OR.
+  status?: PushRunStatus[];
+  ssh_provider?: string;
   offset?: number;
   limit?: number;
 }

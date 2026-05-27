@@ -29,6 +29,10 @@ import { DecreesList } from './pages/beacons/DecreesList';
 import { DecreeDetail } from './pages/beacons/DecreeDetail';
 import { DecreeNewForm } from './pages/beacons/DecreeNewForm';
 import { OracleFiresList } from './pages/beacons/OracleFiresList';
+import { TidesList } from './pages/tides/TidesList';
+import { TideDetail } from './pages/tides/TideDetail';
+import { PushRunsList } from './pages/pushRuns/PushRunsList';
+import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +88,10 @@ export function App() {
             <Route path="/decrees/new" element={<Protected><DecreeNewForm /></Protected>} />
             <Route path="/decrees/:name" element={<Protected><DecreeDetail /></Protected>} />
             <Route path="/oracle/fires" element={<Protected><OracleFiresList /></Protected>} />
+            <Route path="/tides" element={<Protected><TidesList /></Protected>} />
+            <Route path="/tides/:id" element={<Protected><TideDetail /></Protected>} />
+            <Route path="/push-runs" element={<Protected><PushRunsList /></Protected>} />
+            <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

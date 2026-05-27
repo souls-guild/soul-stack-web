@@ -219,7 +219,10 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
           return (
             <tr key={op.aid}>
               <td>
-                <Link to={`/archons/${encodeURIComponent(op.aid)}`}>{op.aid}</Link>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Link to={`/archons/${encodeURIComponent(op.aid)}`}>{op.aid}</Link>
+                  {revoked ? <Badge tone="danger">revoked</Badge> : null}
+                </span>
               </td>
               <td>{op.display_name}</td>
               <td><Badge tone={authMethodTone(op.auth_method)}>{op.auth_method}</Badge></td>
@@ -294,17 +297,21 @@ export function ArchonsList() {
   );
 
   const [authMethod, setAuthMethod] = useState<OperatorAuthMethod | ''>('');
-  const [includeRevoked, setIncludeRevoked] = useState(false);
+  // Default ON: revoked-Архонты не маячат в списке. Снять чекбокс — показать всех
+  // (включая revoked, с красным chip и disabled-action-кнопками).
+  const [hideRevoked, setHideRevoked] = useState(true);
   const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
   const [revokingAid, setRevokingAid] = useState<string | null>(null);
 
   const list = useQuery({
-    queryKey: ['operators.list', { authMethod, includeRevoked, limit, offset }],
+    queryKey: ['operators.list', { authMethod, hideRevoked, limit, offset }],
     queryFn: () =>
       keeperApi.operators.list({
         auth_method: authMethod || undefined,
-        revoked: includeRevoked || undefined,
+        // hideRevoked=true → не запрашиваем revoked (API default = только активные).
+        // hideRevoked=false → revoked=true, чтобы backend вернул и отозванных.
+        revoked: hideRevoked ? undefined : true,
         limit,
         offset,
       }),
@@ -348,8 +355,13 @@ export function ArchonsList() {
 
   const aidNewValid = AID_PATTERN.test(aidNew);
 
-  const items = list.data?.items ?? [];
+  const rawItems = list.data?.items ?? [];
+  // Belt-and-suspenders: даже если backend вернёт revoked в выдаче, при включённом
+  // фильтре их не показываем. Y в счётчике = total из API (включая то, что
+  // отфильтровано клиентом), X = реально видимые после client-side фильтра.
+  const items = hideRevoked ? rawItems.filter((op) => !op.revoked_at) : rawItems;
   const total = list.data?.total ?? 0;
+  const visibleCount = items.length;
 
   return (
     <div className={styles.page}>
@@ -436,11 +448,11 @@ export function ArchonsList() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={styles.metaKey}>Включая revoked</span>
+            <span className={styles.metaKey}>Hide revoked</span>
             <input
               type="checkbox"
-              checked={includeRevoked}
-              onChange={(e) => { setIncludeRevoked(e.target.checked); setOffset(0); }}
+              checked={hideRevoked}
+              onChange={(e) => { setHideRevoked(e.target.checked); setOffset(0); }}
               style={{ width: 18, height: 18, accentColor: 'var(--accent)' }}
             />
           </label>
@@ -456,6 +468,15 @@ export function ArchonsList() {
             />
           </label>
         </div>
+
+        {list.data ? (
+          <div
+            aria-label="счётчик архонтов"
+            style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
+          >
+            Showing {visibleCount} of {total}
+          </div>
+        ) : null}
 
         {list.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
         {list.error ? (
