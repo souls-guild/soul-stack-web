@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type OperatorAuthMethod } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge } from '../../components/primitives';
+import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
+import { RevokeArchonModal } from './RevokeArchonModal';
 import styles from '../common.module.css';
 
 type Tab = 'info' | 'activity';
@@ -26,6 +27,7 @@ function authMethodTone(m: OperatorAuthMethod | string | undefined):
 export function ArchonDetail() {
   const { aid = '' } = useParams<{ aid: string }>();
   const [tab, setTab] = useState<Tab>('info');
+  const [revokeOpen, setRevokeOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ['operator', aid],
@@ -65,6 +67,11 @@ export function ArchonDetail() {
               {revoked ? <Badge tone="danger">revoked</Badge> : <Badge tone="ok">active</Badge>}
             </div>
           </div>
+          {!revoked ? (
+            <Button variant="danger" onClick={() => setRevokeOpen(true)}>
+              Revoke
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -117,6 +124,12 @@ export function ArchonDetail() {
           </section>
         </>
       ) : null}
+
+      <RevokeArchonModal
+        aid={op.aid}
+        open={revokeOpen}
+        onClose={() => setRevokeOpen(false)}
+      />
 
       {tab === 'activity' ? (
         <section className={styles.section} aria-label="activity">

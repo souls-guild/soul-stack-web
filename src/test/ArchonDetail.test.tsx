@@ -75,6 +75,72 @@ describe('ArchonDetail', () => {
     expect(screen.getByText(/metadata пустой/i)).toBeInTheDocument();
   });
 
+  it('Revoke-кнопка отсутствует для уже-отозванного Архонта', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/operators/archon-old',
+        body: {
+          aid: 'archon-old',
+          display_name: 'Old',
+          auth_method: 'jwt',
+          created_at: '2026-04-01T00:00:00Z',
+          created_by_aid: 'archon-bootstrap',
+          revoked_at: '2026-05-20T00:00:00Z',
+          bootstrap_initial: false,
+          metadata: {},
+        },
+      },
+    ]);
+    renderWithProviders(withParamRoute(), '/archons/archon-old');
+    await waitFor(() => {
+      expect(screen.getByText('revoked')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: /^Revoke$/ })).not.toBeInTheDocument();
+  });
+
+  it('Revoke-flow: клик на Revoke → Modal → POST /v1/operators/archon-alice/revoke', async () => {
+    const calls: Array<{ url: string; method: string }> = [];
+    const detailBody = {
+      aid: 'archon-alice',
+      display_name: 'Alice',
+      auth_method: 'jwt',
+      created_at: '2026-05-10T10:00:00Z',
+      created_by_aid: 'archon-bootstrap',
+      revoked_at: null,
+      bootstrap_initial: false,
+      metadata: {},
+    };
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      calls.push({ url, method });
+      if (url === '/v1/operators/archon-alice' && method === 'GET') {
+        return new Response(JSON.stringify(detailBody), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url === '/v1/operators/archon-alice/revoke' && method === 'POST') {
+        return new Response('', { status: 204 });
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Alice/i })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Revoke$/ }));
+    expect(await screen.findByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Отозвать$/ }));
+    await waitFor(() => {
+      expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
+    });
+  });
+
   it('Activity-tab показывает link на /audit?archon_aid=<aid>', async () => {
     installFetchMock([
       {

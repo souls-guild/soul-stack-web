@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -92,12 +92,13 @@ describe('ArchonsList', () => {
     });
   });
 
-  it('per-row Revoke с confirm → POST /v1/operators/{aid}/revoke', async () => {
-    const calls: Array<{ url: string; method: string }> = [];
+  it('per-row Revoke через Modal → POST /v1/operators/{aid}/revoke', async () => {
+    const calls: Array<{ url: string; method: string; body: string | null }> = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
-      calls.push({ url, method });
+      const body = typeof init?.body === 'string' ? init.body : null;
+      calls.push({ url, method, body });
       if (url.startsWith('/v1/operators') && method === 'GET') {
         return new Response(JSON.stringify(SAMPLE_LIST), {
           status: 200,
@@ -110,7 +111,56 @@ describe('ArchonsList', () => {
       return new Response('{}', { status: 599 });
     }) as typeof fetch;
 
-    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('test reason');
+    renderWithProviders(<ArchonsList />, '/archons');
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(3);
+    });
+    const user = userEvent.setup();
+    const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
+    // archon-old (3-я строка) — disabled (revoked); кликаем по archon-alice (idx=1).
+    await user.click(revokeButtons[1]);
+    // Modal должен открыться с заголовком, содержащим AID.
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
+    });
+    // Внутри Modal вводим reason и submit.
+    const textarea = screen.getByPlaceholderText(/уход сотрудника/i);
+    await user.type(textarea, 'компрометация ключа');
+    await user.click(screen.getByRole('button', { name: /^Отозвать$/ }));
+    await waitFor(() => {
+      expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
+    });
+    // Body содержит reason без поля aid (path-param — авторитет).
+    const revokeCall = calls.find((c) => c.url === '/v1/operators/archon-alice/revoke');
+    expect(revokeCall?.body).toContain('компрометация ключа');
+  });
+
+  it('Revoke 409 (last cluster-admin) — pretty-error в Modal, Modal не закрывается', async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (url.startsWith('/v1/operators') && method === 'GET') {
+        return new Response(JSON.stringify(SAMPLE_LIST), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.match(/\/v1\/operators\/.+\/revoke/) && method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            type: 'https://soul-stack.io/errors/last-cluster-admin',
+            title: 'Conflict',
+            status: 409,
+            detail: 'would lock out cluster',
+          }),
+          {
+            status: 409,
+            headers: { 'Content-Type': 'application/problem+json' },
+          },
+        );
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
@@ -118,14 +168,11 @@ describe('ArchonsList', () => {
     });
     const user = userEvent.setup();
     const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
-    // archon-old (3-я строка) — disabled (revoked); archon-bootstrap и archon-alice — активны.
     await user.click(revokeButtons[1]);
-    await waitFor(() => {
-      expect(calls.some((c) => c.method === 'POST' && /\/revoke$/.test(c.url))).toBe(true);
-    });
-    // URL revoke содержит правильный AID (archon-alice — вторая строка в SAMPLE_LIST).
-    expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke')).toBe(true);
-    promptSpy.mockRestore();
+    await user.click(await screen.findByRole('button', { name: /^Отозвать$/ }));
+    // Pretty-error виден в Modal; Modal не закрывается.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/last-?cluster-?admin|self-lockout|последнего/i);
+    expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
   });
 
   it('Create — POST /v1/operators возвращает jwt, рендерит JwtReveal', async () => {

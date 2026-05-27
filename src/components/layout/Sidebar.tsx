@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Boxes,
@@ -11,8 +12,10 @@ import {
   Eye,
   Scroll,
   Zap,
+  HelpCircle,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
+import { HelpModal } from './HelpModal';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
@@ -87,6 +90,7 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const [helpOpen, setHelpOpen] = useState(false);
   return (
     <nav
       className={collapsed ? `${styles.sidebar} ${styles.collapsed}` : styles.sidebar}
@@ -94,6 +98,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       data-collapsed={collapsed ? 'true' : 'false'}
     >
       <div className={styles.toggleRow}>
+        {collapsed ? (
+          <div className={styles.logoMarkOnly} aria-label="Soul Stack" title="Soul Stack">
+            <Boxes size={16} />
+          </div>
+        ) : (
+          <div className={styles.logo} aria-label="Soul Stack">
+            <span className={styles.logoMark}><Boxes size={16} /></span>
+            <span className={styles.logoText}>Soul Stack</span>
+          </div>
+        )}
         <button
           type="button"
           className={styles.toggle}
@@ -117,6 +131,23 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {ORACLE.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
+
+      <div className={styles.bottom}>
+        <div className={styles.divider} aria-hidden="true" />
+        <button
+          type="button"
+          className={`${styles.link} ${styles.helpBtn}`}
+          onClick={() => setHelpOpen(true)}
+          title={collapsed ? 'Помощь' : undefined}
+          aria-label="Помощь"
+        >
+          <span className={styles.icon}>
+            <HelpCircle size={16} />
+          </span>
+          {collapsed ? null : <span className={styles.label}>Помощь</span>}
+        </button>
+      </div>
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </nav>
   );
 }

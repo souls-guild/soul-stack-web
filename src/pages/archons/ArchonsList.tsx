@@ -10,6 +10,7 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Input } from '../../components/primitives';
+import { RevokeArchonModal } from './RevokeArchonModal';
 import styles from '../common.module.css';
 
 // AID-валидатор симметричен openapi pattern '^archon-[a-z0-9-]{1,62}$'.
@@ -174,6 +175,7 @@ export function ArchonsList() {
   const [includeRevoked, setIncludeRevoked] = useState(false);
   const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
+  const [revokingAid, setRevokingAid] = useState<string | null>(null);
 
   const list = useQuery({
     queryKey: ['operators.list', { authMethod, includeRevoked, limit, offset }],
@@ -203,21 +205,7 @@ export function ArchonsList() {
     },
   });
 
-  const revokeMut = useMutation({
-    mutationFn: ({ aid, reason }: { aid: string; reason?: string }) =>
-      keeperApi.operators.revoke(aid, { aid, reason }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['operators.list'] });
-    },
-  });
-
   const aidNewValid = AID_PATTERN.test(aidNew);
-
-  function handleRevokeClick(aid: string) {
-    const reason = window.prompt(`Отозвать ${aid}? Активные JWT работают до exp.\nReason (optional):`);
-    if (reason === null) return; // отмена
-    revokeMut.mutate({ aid, reason: reason || undefined });
-  }
 
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
@@ -323,7 +311,7 @@ export function ArchonsList() {
             <ArchonsTable
               items={items}
               onIssue={(aid) => issueMut.mutate(aid)}
-              onRevoke={handleRevokeClick}
+              onRevoke={(aid) => setRevokingAid(aid)}
             />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
               <button
@@ -352,14 +340,15 @@ export function ArchonsList() {
               : String(issueMut.error)}
           </div>
         ) : null}
-        {revokeMut.error ? (
-          <div className={styles.errorBox}>
-            {revokeMut.error instanceof ApiError
-              ? `Ошибка ${revokeMut.error.status}: ${revokeMut.error.message}`
-              : String(revokeMut.error)}
-          </div>
-        ) : null}
       </section>
+
+      {revokingAid ? (
+        <RevokeArchonModal
+          aid={revokingAid}
+          open={true}
+          onClose={() => setRevokingAid(null)}
+        />
+      ) : null}
     </div>
   );
 }

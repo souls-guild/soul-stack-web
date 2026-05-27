@@ -11,9 +11,10 @@ import { RunScenarioForm } from './RunScenarioForm';
 import { UnlockModal } from './UnlockModal';
 import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
+import { HostsTab } from './HostsTab';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'run' | 'history' | 'drift' | 'state';
+type Tab = 'overview' | 'hosts' | 'run' | 'history' | 'drift' | 'state';
 
 export function IncarnationDetail() {
   const { name = '' } = useParams<{ name: string }>();
@@ -144,6 +145,9 @@ export function IncarnationDetail() {
         <button type="button" role="tab" aria-selected={tab === 'overview'} className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
           Overview
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'hosts'} className={`${styles.tab} ${tab === 'hosts' ? styles.tabActive : ''}`} onClick={() => setTab('hosts')}>
+          Hosts
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'run'} className={`${styles.tab} ${tab === 'run' ? styles.tabActive : ''}`} onClick={() => setTab('run')}>
           Run scenario
         </button>
@@ -162,6 +166,27 @@ export function IncarnationDetail() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Spec</h2>
           <JsonViewer value={row.spec ?? null} emptyLabel="spec не задан" />
+          <div style={{ marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => setTab('hosts')}
+              style={{
+                background: 'transparent',
+                border: 0,
+                padding: 0,
+                color: 'var(--accent)',
+                fontFamily: 'inherit',
+                fontSize: 12.5,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Connected souls на этой incarnation →
+            </button>
+            <span style={{ color: 'var(--text-faint)', fontSize: 12, marginLeft: 8 }}>
+              соответствие с реальностью можно проверить через probe-scenario
+            </span>
+          </div>
           {row.status_details ? (
             <>
               <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>Status details</h2>
@@ -180,6 +205,10 @@ export function IncarnationDetail() {
             </>
           ) : null}
         </section>
+      ) : null}
+
+      {tab === 'hosts' ? (
+        <HostsTab incarnationName={row.name} spec={row.spec ?? null} />
       ) : null}
 
       {tab === 'run' ? (
