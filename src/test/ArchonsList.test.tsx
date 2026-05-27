@@ -217,4 +217,243 @@ describe('ArchonsList', () => {
     expect(screen.getAllByText(/pattern/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
   });
+
+  // --- Multi-select ролей (extended payload {aid, display_name, roles[]}) ---
+
+  const SAMPLE_ROLES = {
+    items: [
+      { name: 'cluster-admin', description: 'root', builtin: true, permissions: ['*'], operators: [] },
+      { name: 'ops-viewer', description: 'read-only', builtin: false, permissions: ['*.read'], operators: [] },
+      { name: 'release-engineer', description: 'release', builtin: false, permissions: ['incarnation.*'], operators: [] },
+    ],
+  };
+
+  it('TestCreateArchon_WithRoles_SendsRolesInPayload', async () => {
+    const calls: Array<{ url: string; method: string; body: string | null }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : null;
+      calls.push({ url, method, body });
+      if (url.startsWith('/v1/operators') && method === 'GET') {
+        return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/v1/roles') && method === 'GET') {
+        return new Response(JSON.stringify(SAMPLE_ROLES), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url === '/v1/operators' && method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            aid: 'archon-alice',
+            display_name: 'Alice',
+            created_at: '2026-05-27T10:00:00Z',
+            created_by_aid: 'archon-bob',
+            jwt: 'eyJ.payload.sig',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
+
+    // Ждём, пока select наполнится опциями.
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
+    });
+    const rolesSelect = screen.getByRole('combobox', { name: /добавить роль/i });
+    await user.selectOptions(rolesSelect, 'ops-viewer');
+    await user.selectOptions(rolesSelect, 'release-engineer');
+
+    // Chips появились.
+    expect(screen.getByText('ops-viewer')).toBeInTheDocument();
+    expect(screen.getByText('release-engineer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Создать/i }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url === '/v1/operators' && c.method === 'POST');
+      expect(post).toBeDefined();
+      const parsed = JSON.parse(post!.body ?? '{}') as { roles?: string[] };
+      expect(parsed.roles).toEqual(['ops-viewer', 'release-engineer']);
+    });
+  });
+
+  it('TestCreateArchon_NoRoles_OK', async () => {
+    const calls: Array<{ url: string; method: string; body: string | null }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : null;
+      calls.push({ url, method, body });
+      if (url.startsWith('/v1/operators') && method === 'GET') {
+        return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/v1/roles') && method === 'GET') {
+        return new Response(JSON.stringify(SAMPLE_ROLES), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url === '/v1/operators' && method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            aid: 'archon-alice',
+            display_name: 'Alice',
+            created_at: '2026-05-27T10:00:00Z',
+            created_by_aid: 'archon-bob',
+            jwt: 'eyJ.payload.sig',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
+    await user.click(screen.getByRole('button', { name: /Создать/i }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url === '/v1/operators' && c.method === 'POST');
+      expect(post).toBeDefined();
+      const parsed = JSON.parse(post!.body ?? '{}') as { roles?: string[] };
+      // Без выбора — поле либо отсутствует, либо пустой массив (мы не отправляем roles, если пусто).
+      expect(parsed.roles === undefined || parsed.roles.length === 0).toBe(true);
+    });
+  });
+
+  it('TestCreateArchon_UnknownRole_422', async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (url.startsWith('/v1/operators') && method === 'GET') {
+        return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/v1/roles') && method === 'GET') {
+        return new Response(JSON.stringify(SAMPLE_ROLES), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url === '/v1/operators' && method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            type: 'https://soul-stack.io/errors/validation-failed',
+            title: 'Unprocessable Entity',
+            status: 422,
+            detail: 'unknown role: ops-viewer',
+          }),
+          { status: 422, headers: { 'Content-Type': 'application/problem+json' } },
+        );
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
+    });
+    await user.selectOptions(screen.getByRole('combobox', { name: /добавить роль/i }), 'ops-viewer');
+    await user.click(screen.getByRole('button', { name: /Создать/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/422/);
+    expect(alert).toHaveTextContent(/unknown role|validation/i);
+  });
+
+  it('Backend без поддержки roles (404 на extended payload) — graceful degradation', async () => {
+    let postCount = 0;
+    const postBodies: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : null;
+      if (url.startsWith('/v1/operators') && method === 'GET') {
+        return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/v1/roles') && method === 'GET') {
+        return new Response(JSON.stringify(SAMPLE_ROLES), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url === '/v1/operators' && method === 'POST') {
+        postCount += 1;
+        postBodies.push(body ?? '');
+        // Первый POST — с roles[] — backend ещё не поддерживает: 404.
+        if (postCount === 1) {
+          return new Response(
+            JSON.stringify({
+              type: 'https://soul-stack.io/errors/not-found',
+              title: 'Not Found',
+              status: 404,
+              detail: 'roles[] field not supported',
+            }),
+            { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
+          );
+        }
+        // Второй POST — fallback без roles[] — 201.
+        return new Response(
+          JSON.stringify({
+            aid: 'archon-alice',
+            display_name: 'Alice',
+            created_at: '2026-05-27T10:00:00Z',
+            created_by_aid: 'archon-bob',
+            jwt: 'eyJ.payload.sig',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
+    });
+    await user.selectOptions(screen.getByRole('combobox', { name: /добавить роль/i }), 'ops-viewer');
+    await user.click(screen.getByRole('button', { name: /Создать/i }));
+
+    // JWT отрисован — Архонт всё-таки создан.
+    await waitFor(() => {
+      expect(screen.getByText(/JWT выпущен/i)).toBeInTheDocument();
+    });
+    // Было два POST: с roles и без.
+    expect(postCount).toBe(2);
+    expect(JSON.parse(postBodies[0])).toHaveProperty('roles');
+    expect(JSON.parse(postBodies[1]).roles).toBeUndefined();
+    // Подсказка пользователю про unsupported.
+    expect(screen.getByRole('status')).toHaveTextContent(/backend не поддерживает/i);
+  });
 });

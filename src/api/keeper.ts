@@ -48,7 +48,13 @@ export type SoulprintMemoryFacts = components['schemas']['SoulprintMemoryFacts']
 export type SoulprintNetworkFacts = components['schemas']['SoulprintNetworkFacts'];
 export type SoulprintNetworkInterface = components['schemas']['SoulprintNetworkInterface'];
 
-export type OperatorCreateRequest = components['schemas']['OperatorCreateRequest'];
+// Расширение OperatorCreateRequest: опциональное `roles[]` — список имён ролей,
+// в которые сразу зачислить нового Архонта. Поле появилось в backend slice
+// «create-with-roles»; до его доезда сервер игнорирует поле (200), либо отвечает
+// 404/501 на extended endpoint — UI деградирует к создаванию без ролей.
+export type OperatorCreateRequest = components['schemas']['OperatorCreateRequest'] & {
+  roles?: string[];
+};
 export type OperatorCreateReply = components['schemas']['OperatorCreateReply'];
 export type OperatorRevokeRequest = components['schemas']['OperatorRevokeRequest'];
 export type IssueTokenReply = components['schemas']['IssueTokenReply'];

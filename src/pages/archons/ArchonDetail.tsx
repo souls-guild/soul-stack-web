@@ -35,6 +35,17 @@ export function ArchonDetail() {
     enabled: Boolean(aid),
   });
 
+  // Каталог ролей кластера — для секции «Roles» в info-табе. Membership
+  // выводится из role.operators.includes(aid), та же логика, что в
+  // RbacPage::MembersTab — RBAC остаётся источником правды.
+  const rolesQ = useQuery({
+    queryKey: ['rbac.roles'],
+    queryFn: () => keeperApi.roles.list(),
+    enabled: Boolean(aid),
+    staleTime: 30_000,
+  });
+  const memberRoles = (rolesQ.data?.items ?? []).filter((r) => r.operators.includes(aid));
+
   if (q.isLoading) return <div className={styles.loading}>Загружаем…</div>;
   if (q.error) {
     return (
@@ -114,6 +125,38 @@ export function ArchonDetail() {
             <span className={styles.metaKey}>Bootstrap initial</span>
             <span className={styles.metaVal}>{op.bootstrap_initial ? 'true' : 'false'}</span>
           </div>
+          <section className={styles.section} aria-label="roles">
+            <h2 className={styles.sectionTitle}>Roles</h2>
+            {rolesQ.isLoading ? (
+              <div className={styles.loading}>Загружаем…</div>
+            ) : memberRoles.length === 0 ? (
+              <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
+                Архонт не состоит ни в одной роли. Назначьте через RBAC → Operator assignments.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {memberRoles.map((r) => (
+                  <span
+                    key={r.name}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 8px',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-pill)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                    }}
+                  >
+                    {r.name}
+                    {r.builtin ? <Badge tone="info">builtin</Badge> : null}
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
           <section className={styles.section} aria-label="metadata">
             <h2 className={styles.sectionTitle}>Metadata</h2>
             {hasMetadata ? (

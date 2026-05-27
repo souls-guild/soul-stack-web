@@ -1,20 +1,20 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import {
   keeperApi,
   type OperatorCreateReply,
   type IssueTokenReply,
   type OperatorAuthMethod,
   type Operator,
+  type RoleView,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Input } from '../../components/primitives';
 import { RevokeArchonModal } from './RevokeArchonModal';
+import { AID_PATTERN } from './schemas';
 import styles from '../common.module.css';
-
-// AID-валидатор симметричен openapi pattern '^archon-[a-z0-9-]{1,62}$'.
-const AID_PATTERN = /^archon-[a-z0-9-]{1,62}$/;
 
 const AUTH_METHODS: OperatorAuthMethod[] = ['jwt', 'mtls', 'combined'];
 
@@ -85,6 +85,112 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
         <Button variant="ghost" onClick={onClose}>Закрыть</Button>
       </div>
     </div>
+  );
+}
+
+// Multi-select ролей: select-добавление + chips для уже выбранных. Каталог
+// ролей подгружается из /v1/roles; если ручка недоступна — disabled+hint.
+function RolesPicker({
+  roles,
+  selected,
+  onChange,
+  disabled,
+  error,
+}: {
+  roles: RoleView[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  disabled?: boolean;
+  error?: string;
+}) {
+  const remaining = roles.filter((r) => !selected.includes(r.name));
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 280 }}>
+      <span className={styles.metaKey}>Roles (optional)</span>
+      <div
+        aria-label="выбранные роли"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 6,
+          padding: 6,
+          border: `1px solid ${error ? 'var(--danger)' : 'var(--border)'}`,
+          borderRadius: 'var(--radius)',
+          background: 'var(--surface)',
+          minHeight: 38,
+          alignItems: 'center',
+        }}
+      >
+        {selected.map((rn) => (
+          <span
+            key={`chip-${rn}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 6px 2px 8px',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-pill)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+            }}
+          >
+            {rn}
+            <button
+              type="button"
+              aria-label={`убрать роль ${rn}`}
+              onClick={() => onChange(selected.filter((x) => x !== rn))}
+              style={{
+                border: 0,
+                background: 'transparent',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                padding: 0,
+                display: 'inline-flex',
+              }}
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+        <select
+          aria-label="добавить роль"
+          value=""
+          disabled={disabled || remaining.length === 0}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v) onChange([...selected, v]);
+          }}
+          style={{
+            flex: 1,
+            minWidth: 140,
+            border: 0,
+            outline: 'none',
+            background: 'transparent',
+            color: 'var(--text)',
+            fontSize: 13,
+            padding: '4px 6px',
+          }}
+        >
+          <option value="" key="__placeholder">
+            {disabled
+              ? '— роли недоступны —'
+              : remaining.length === 0
+                ? '— все роли выбраны —'
+                : '— добавить роль —'}
+          </option>
+          {remaining.map((r) => (
+            <option key={`role-${r.name}`} value={r.name}>
+              {r.name}{r.builtin ? ' (builtin)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+      {error ? (
+        <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span>
+      ) : null}
+    </label>
   );
 }
 
@@ -169,7 +275,23 @@ export function ArchonsList() {
 
   const [aidNew, setAidNew] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  // Подсказка: backend отверг roles[] (404/501) — Архонт всё равно создался без ролей.
+  const [rolesUnsupported, setRolesUnsupported] = useState(false);
   const [revealed, setRevealed] = useState<{ jwt: string; expiresAt?: string } | null>(null);
+
+  // Каталог ролей кластера — для multi-select. Если ручка недоступна,
+  // показываем подсказку, что выбор ролей сейчас не работает.
+  const rolesQ = useQuery({
+    queryKey: ['rbac.roles'],
+    queryFn: () => keeperApi.roles.list(),
+    staleTime: 30_000,
+  });
+  // Защита от malformed-ответа (нет items / item без name) — UI не падает,
+  // просто получает пустой каталог.
+  const availableRoles: RoleView[] = (rolesQ.data?.items ?? []).filter(
+    (r): r is RoleView => typeof r?.name === 'string' && r.name.length > 0,
+  );
 
   const [authMethod, setAuthMethod] = useState<OperatorAuthMethod | ''>('');
   const [includeRevoked, setIncludeRevoked] = useState(false);
@@ -189,11 +311,30 @@ export function ArchonsList() {
   });
 
   const createMut = useMutation({
-    mutationFn: () => keeperApi.operators.create({ aid: aidNew, display_name: displayName }),
+    mutationFn: async (): Promise<OperatorCreateReply> => {
+      const base = { aid: aidNew, display_name: displayName };
+      // Если оператор выбрал роли — пробуем с extended payload. Backend без
+      // поддержки create-with-roles может ответить 404/501 на extended-форму:
+      // в этом случае создаём без ролей и выставляем флаг unsupported.
+      if (selectedRoles.length > 0) {
+        try {
+          return await keeperApi.operators.create({ ...base, roles: selectedRoles });
+        } catch (e) {
+          if (e instanceof ApiError && (e.status === 404 || e.status === 501)) {
+            const reply = await keeperApi.operators.create(base);
+            setRolesUnsupported(true);
+            return reply;
+          }
+          throw e;
+        }
+      }
+      return keeperApi.operators.create(base);
+    },
     onSuccess: (reply: OperatorCreateReply) => {
       setRevealed({ jwt: reply.jwt });
       setAidNew('');
       setDisplayName('');
+      setSelectedRoles([]);
       qc.invalidateQueries({ queryKey: ['operators.list'] });
     },
   });
@@ -240,21 +381,42 @@ export function ArchonsList() {
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Alice Ops"
           />
+          <RolesPicker
+            roles={availableRoles}
+            selected={selectedRoles}
+            onChange={setSelectedRoles}
+            disabled={rolesQ.isLoading || Boolean(rolesQ.error)}
+            error={rolesQ.error ? 'не удалось загрузить роли' : undefined}
+          />
           <div style={{ alignSelf: 'flex-end' }}>
             <Button
               variant="primary"
               disabled={!aidNewValid || !displayName || createMut.isPending}
-              onClick={() => createMut.mutate()}
+              onClick={() => { setRolesUnsupported(false); createMut.mutate(); }}
             >
               {createMut.isPending ? 'Создаём…' : 'Создать'}
             </Button>
           </div>
         </div>
         {createMut.error ? (
-          <div className={styles.errorBox}>
+          <div className={styles.errorBox} role="alert">
             {createMut.error instanceof ApiError
               ? `Ошибка ${createMut.error.status}: ${createMut.error.message}`
               : String(createMut.error)}
+          </div>
+        ) : null}
+        {rolesUnsupported ? (
+          <div
+            className={styles.errorBox}
+            role="status"
+            style={{
+              borderColor: 'var(--warn, #b07f00)',
+              background: 'color-mix(in srgb, var(--warn, #b07f00) 10%, var(--surface))',
+              color: 'var(--text)',
+            }}
+          >
+            backend не поддерживает create-with-roles — Архонт создан без ролей,
+            назначьте их во вкладке RBAC → Operator assignments.
           </div>
         ) : null}
       </section>
