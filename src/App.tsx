@@ -33,6 +33,9 @@ import { TidesList } from './pages/tides/TidesList';
 import { TideDetail } from './pages/tides/TideDetail';
 import { PushRunsList } from './pages/pushRuns/PushRunsList';
 import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
+import { RunWizard } from './pages/run/RunWizard';
+import { ErrandRunsList } from './pages/errandRuns/ErrandRunsList';
+import { ErrandRunDetail } from './pages/errandRuns/ErrandRunDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +95,9 @@ export function App() {
             <Route path="/tides/:id" element={<Protected><TideDetail /></Protected>} />
             <Route path="/push-runs" element={<Protected><PushRunsList /></Protected>} />
             <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
+            <Route path="/run" element={<Protected><RunWizard /></Protected>} />
+            <Route path="/errand-runs" element={<Protected><ErrandRunsList /></Protected>} />
+            <Route path="/errand-runs/:id" element={<Protected><ErrandRunDetail /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

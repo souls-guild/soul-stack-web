@@ -26,6 +26,10 @@ export type IncarnationCreateRequest = components['schemas']['IncarnationCreateR
 export type IncarnationCreateReply = components['schemas']['IncarnationCreateReply'];
 export type IncarnationRunRequest = components['schemas']['IncarnationRunRequest'];
 export type IncarnationRunReply = components['schemas']['IncarnationRunReply'];
+// Tide-режим reply (с `wave`-полем, ADR-040 W-3). API возвращает один из двух
+// shape-ов по наличию `wave` в request.
+export type IncarnationRunTideReply = components['schemas']['IncarnationRunTideReply'];
+export type IncarnationRunAnyReply = IncarnationRunReply | IncarnationRunTideReply;
 export type IncarnationUnlockRequest = components['schemas']['IncarnationUnlockRequest'];
 export type IncarnationUnlockReply = components['schemas']['IncarnationUnlockReply'];
 export type IncarnationUpgradeRequest = components['schemas']['IncarnationUpgradeRequest'];
@@ -86,6 +90,77 @@ export type ErrandAccepted = components['schemas']['ErrandAccepted'];
 export type ErrandResult = components['schemas']['ErrandResult'];
 export type ErrandListReply = components['schemas']['ErrandListReply'];
 export type ErrandStatus = NonNullable<ErrandResult['status']>;
+
+// Multi-target Errand (ErrandRun) — slice 2026-05-27 W1, openapi ещё не закоммичен.
+// Узкие локальные типы; backend-shape согласован в delegation-ТЗ.
+export type ErrandRunStatus = 'pending' | 'running' | 'success' | 'partial_failed' | 'failed' | 'cancelled';
+export type ErrandRunOnFailure = 'abort' | 'continue';
+
+export interface ErrandRunTarget {
+  sids?: string[];
+  coven?: string[];
+  where?: string;
+}
+
+export interface ErrandRunCreateRequest {
+  module: string;
+  input?: Record<string, unknown>;
+  timeout_seconds?: number;
+  target: ErrandRunTarget;
+  concurrency?: number;
+  on_failure?: ErrandRunOnFailure;
+}
+
+export interface ErrandRunPerHostSummary {
+  sid: string;
+  status: ErrandStatus;
+  errand_id?: string;
+  error_code?: string;
+}
+
+export interface ErrandRunView {
+  errand_run_id: string;
+  module: string;
+  status: ErrandRunStatus;
+  scope_size: number;
+  current_done?: number;
+  concurrency: number;
+  on_failure: ErrandRunOnFailure;
+  target: ErrandRunTarget;
+  started_by_aid?: string;
+  started_at: string;
+  finished_at?: string;
+  summary?: {
+    hosts?: ErrandRunPerHostSummary[];
+    counts?: { total: number; success: number; failed: number };
+  };
+}
+
+export interface ErrandRunListEntry {
+  errand_run_id: string;
+  module: string;
+  status: ErrandRunStatus;
+  scope_size: number;
+  current_done?: number;
+  started_at: string;
+  finished_at?: string;
+  target_preview?: string;
+}
+
+export interface ErrandRunListReply {
+  items: ErrandRunListEntry[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
+export interface ErrandRunCreateReply {
+  errand_run_id: string;
+}
+
+// Push-providers (ADR-032 amendment 2026-05-26, S7-2). Узкие алиасы.
+export type PushProvider = components['schemas']['PushProvider'];
+export type PushProviderListReply = components['schemas']['PushProviderListReply'];
 
 export type RoleView = components['schemas']['RoleView'];
 export type RoleListReply = components['schemas']['RoleListReply'];
@@ -198,8 +273,12 @@ export const keeperApi = {
       apiGet<IncarnationGetReply>(`/v1/incarnations/${encodeURIComponent(name)}`),
     create: (body: IncarnationCreateRequest) =>
       apiSend<IncarnationCreateReply>('/v1/incarnations', 'POST', { body }),
+    // Поведение API: при наличии `wave` в request возвращается IncarnationRunTideReply,
+    // иначе — classic IncarnationRunReply. Caller, использующий wave, должен сам сделать
+    // type-narrowing по присутствию `tide_id`. Существующий /incarnations/:name → RunScenarioForm
+    // вызывает БЕЗ wave и продолжает работать как было.
     runScenario: (name: string, scenario: string, body: IncarnationRunRequest = {}) =>
-      apiSend<IncarnationRunReply>(
+      apiSend<IncarnationRunReply & Partial<IncarnationRunTideReply>>(
         `/v1/incarnations/${encodeURIComponent(name)}/scenarios/${encodeURIComponent(scenario)}`,
         'POST',
         { body },
@@ -473,6 +552,39 @@ export const keeperApi = {
       apiSend<void>(`/v1/decrees/${encodeURIComponent(name)}`, 'DELETE'),
   },
 
+  // Multi-target Errand-прогон. Slice W1 (2026-05-27).
+  // SSE-stream — EventSource на `/v1/errand-runs/:id/events`; fallback на polling если backend ещё не отдаёт SSE.
+  errandRuns: {
+    create: (body: ErrandRunCreateRequest) =>
+      apiSend<ErrandRunCreateReply>('/v1/errand-runs', 'POST', { body }),
+    list: (q: ListErrandRunsQuery = {}) =>
+      apiGet<ErrandRunListReply>('/v1/errand-runs', {
+        query: {
+          status: q.status,
+          module: q.module,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+    get: (errandRunId: string) =>
+      apiGet<ErrandRunView>(`/v1/errand-runs/${encodeURIComponent(errandRunId)}`),
+    cancel: (errandRunId: string) =>
+      apiSend<void>(`/v1/errand-runs/${encodeURIComponent(errandRunId)}`, 'DELETE'),
+    // EventSource нативно отправляет JWT через ?token=… либо headers (в браузерных EventSource
+    // нативно нет custom-headers). Backend SSE-роут ожидается с Bearer-cookie / query-token;
+    // detail-page деградирует к polling, если EventSource fails.
+    events: (errandRunId: string): EventSource =>
+      new EventSource(`/v1/errand-runs/${encodeURIComponent(errandRunId)}/events`),
+  },
+
+  // Push-providers registry (ADR-032 amendment 2026-05-26, S7-2). Используется в /run Step 2 (Push).
+  pushProviders: {
+    list: (q: ListPagedQuery = {}) =>
+      apiGet<PushProviderListReply>('/v1/push-providers', {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+  },
+
   // Sigil-allow-list плагинов (ADR-026, вариант C). Полный путь записи — (namespace, name, ref).
   plugins: {
     sigils: {
@@ -562,6 +674,14 @@ export interface ListPushRunsQuery {
   // Multi-value `?status=` — exact-match OR.
   status?: PushRunStatus[];
   ssh_provider?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ListErrandRunsQuery {
+  // Multi-value `?status=` / `?module=` — exact-match OR.
+  status?: ErrandRunStatus[];
+  module?: string[];
   offset?: number;
   limit?: number;
 }

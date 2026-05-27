@@ -14,6 +14,7 @@ import {
   Zap,
   Waves,
   Send,
+  Play,
   HelpCircle,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
@@ -28,6 +29,10 @@ interface NavItem {
   // Если задан — link активен и при префиксе (для вложенных подвкладок).
   matchPrefix?: string;
 }
+
+const PRIMARY: NavItem[] = [
+  { to: '/run', label: 'Run', icon: Play, matchPrefix: '/run' },
+];
 
 const FLEET: NavItem[] = [
   { to: '/incarnations', label: 'Incarnations', icon: Boxes },
@@ -52,6 +57,7 @@ const ORACLE: NavItem[] = [
 
 const HISTORY: NavItem[] = [
   { to: '/tides', label: 'Tides', icon: Waves, matchPrefix: '/tides' },
+  { to: '/errand-runs', label: 'Errand runs', icon: Terminal, matchPrefix: '/errand-runs' },
   { to: '/push-runs', label: 'Push runs', icon: Send, matchPrefix: '/push-runs' },
 ];
 
@@ -126,7 +132,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <SidebarToggleIcon size={18} collapsed={collapsed} />
         </button>
       </div>
-      {collapsed ? null : <div className={styles.group}>Реестр</div>}
+      {PRIMARY.map((it) => (
+        <Item key={it.to} item={it} collapsed={collapsed} />
+      ))}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Реестр</div>}
       {FLEET.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
