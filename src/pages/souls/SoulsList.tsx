@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Shield } from 'lucide-react';
-import { keeperApi, type SoulListEntry, type SoulStatus, type SoulTransport } from '../../api/keeper';
+import { Search, Shield } from 'lucide-react';
+import { keeperApi, SoulprintNotReceivedError, type SoulListEntry, type SoulStatus, type SoulTransport, type SoulprintReadReply } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { CovenAssignModal } from './CovenAssignModal';
+import { applyFilter, parseSoulprintFilter } from './soulprintFilter';
 import styles from '../common.module.css';
 
 const SOUL_STATUSES: SoulStatus[] = ['pending', 'connected', 'disconnected', 'expired'];
@@ -71,6 +72,7 @@ export function SoulsList() {
   const [transport, setTransport] = useState<SoulTransport | ''>('');
   const [coven, setCoven] = useState<string>('');
   const [search, setSearch] = useState('');
+  const [soulprintQuery, setSoulprintQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>('last_seen_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -90,8 +92,14 @@ export function SoulsList() {
       }),
   });
 
-  // Server-side: status/transport/coven. Client-side: search (contains) + sort.
-  const visible = useMemo<SoulListEntry[]>(() => {
+  // Парсинг DSL soulprint-фильтра. Невалидные токены показываем inline-warn,
+  // в фильтрацию идут только валидные правила.
+  const parsedSoulprint = useMemo(() => parseSoulprintFilter(soulprintQuery), [soulprintQuery]);
+  const soulprintRules = parsedSoulprint.rules;
+  const soulprintFilterActive = soulprintRules.length > 0;
+
+  // Stage 1: server-side фильтры уже применены в q.data. Client-side SID-search + sort.
+  const prefiltered = useMemo<SoulListEntry[]>(() => {
     if (!q.data) return [];
     const needle = search.trim().toLowerCase();
     const filtered = needle
@@ -99,6 +107,43 @@ export function SoulsList() {
       : q.data.items;
     return sortItems(filtered, sortKey, sortDir);
   }, [q.data, search, sortKey, sortDir]);
+
+  // Stage 2: lazy fetch soulprint для каждого SID, только если soulprint-фильтр активен.
+  // 410 (soulprint не получен) → null, ошибка → null, чтобы хост был исключён,
+  // а не падал весь стейт. Cache 60s — соответствует ТЗ.
+  const soulprintQueries = useQueries({
+    queries: prefiltered.map((row) => ({
+      queryKey: ['soulprint', row.sid] as const,
+      queryFn: async (): Promise<SoulprintReadReply | null> => {
+        try {
+          return await keeperApi.souls.getSoulprint(row.sid);
+        } catch (err) {
+          if (err instanceof SoulprintNotReceivedError) return null;
+          throw err;
+        }
+      },
+      enabled: soulprintFilterActive,
+      staleTime: 60_000,
+      retry: false,
+    })),
+  });
+
+  const soulprintLoading =
+    soulprintFilterActive && soulprintQueries.some((res) => res.isLoading);
+
+  // Stage 3: применение soulprint-правил. Если правил нет — отдаём prefiltered as-is.
+  const visible = useMemo<SoulListEntry[]>(() => {
+    if (!soulprintFilterActive) return prefiltered;
+    const out: SoulListEntry[] = [];
+    for (let i = 0; i < prefiltered.length; i++) {
+      const sp = soulprintQueries[i]?.data;
+      if (!sp || !sp.typed_facts) continue;
+      if (applyFilter(sp.typed_facts, soulprintRules)) {
+        out.push(prefiltered[i]);
+      }
+    }
+    return out;
+  }, [prefiltered, soulprintFilterActive, soulprintQueries, soulprintRules]);
 
   // selected чистим от исчезнувших SID-ов после смены фильтра (UX-аккуратность).
   const visibleSidSet = useMemo(() => new Set(visible.map((it) => it.sid)), [visible]);
@@ -179,6 +224,47 @@ export function SoulsList() {
             }}
           />
         </label>
+        <label style={{ flex: '1 1 320px', minWidth: 280 }}>
+          <div className={styles.metaKey}>Soulprint search</div>
+          <div style={{ position: 'relative' }}>
+            <Search
+              size={14}
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)',
+                pointerEvents: 'none',
+              }}
+            />
+            <input
+              type="text"
+              value={soulprintQuery}
+              onChange={(e) => setSoulprintQuery(e.target.value)}
+              placeholder="os.family=debian & memory.total_mb>=4096"
+              aria-label="search soulprint"
+              aria-invalid={parsedSoulprint.invalid.length > 0 ? 'true' : undefined}
+              style={{
+                padding: '8px 10px 8px 30px',
+                width: '100%',
+                borderRadius: 'var(--radius)',
+                border: `1px solid ${parsedSoulprint.invalid.length > 0 ? 'var(--danger)' : 'var(--border)'}`,
+                background: 'var(--surface)',
+                fontFamily: 'var(--font-mono)',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <span style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4, display: 'block' }}>
+            paths: os.* / kernel.* / cpu.* / memory.* / network.* — ops: = != &gt;= &lt;= ~ ; wildcard *
+          </span>
+          {parsedSoulprint.invalid.length > 0 ? (
+            <span style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4, display: 'block' }}>
+              Не распознано: {parsedSoulprint.invalid.join(', ')}
+            </span>
+          ) : null}
+        </label>
         <label>
           <div className={styles.metaKey}>Status</div>
           <select
@@ -230,6 +316,14 @@ export function SoulsList() {
         </label>
       </div>
 
+      {soulprintFilterActive ? (
+        <div className={styles.metaKey} aria-live="polite">
+          {soulprintLoading
+            ? `Загружаем soulprints (${prefiltered.length})…`
+            : `Matched ${visible.length} of ${prefiltered.length}`}
+        </div>
+      ) : null}
+
       {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
@@ -237,11 +331,15 @@ export function SoulsList() {
         </div>
       ) : null}
 
-      {q.data && visible.length === 0 ? (
+      {q.data && visible.length === 0 && !soulprintLoading ? (
         <div className={styles.empty}>
-          {search ? 'Под search-фильтр ничего не нашлось.' : (
-            <>Souls под фильтр не найдено. Регистрируются через <code className="mono">keeper.soul.create</code>.</>
-          )}
+          {soulprintFilterActive
+            ? 'Под soulprint-фильтр ничего не подошло (либо у хостов нет соответствующих фактов).'
+            : search
+              ? 'Под search-фильтр ничего не нашлось.'
+              : (
+                <>Souls под фильтр не найдено. Регистрируются через <code className="mono">keeper.soul.create</code>.</>
+              )}
         </div>
       ) : null}
 
