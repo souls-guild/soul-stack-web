@@ -16,6 +16,7 @@ import {
   serializeFields,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
+import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder';
 import {
   incarnationCreateSchema,
   type IncarnationCreateFormInput,
@@ -85,6 +86,13 @@ export function IncarnationNewForm() {
     }
   }, [usePerField, selectedScenarioName, supportedSchema]);
 
+  // Состояние DynamicInputBuilder — используется когда scenario без typed schema.
+  // Сбрасывается при смене scenario (как и `fields`).
+  const [dynamicInput, setDynamicInput] = useState<Record<string, unknown>>({});
+  useEffect(() => {
+    setDynamicInput({});
+  }, [selectedScenarioName]);
+
   const createMu = useMutation({
     mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown> }) =>
       keeperApi.incarnations.create(body),
@@ -103,7 +111,7 @@ export function IncarnationNewForm() {
     const input =
       usePerField && supportedSchema
         ? serializeFields(supportedSchema, fields)
-        : values.inputJson;
+        : dynamicInput;
     createMu.mutate({
       name: values.name,
       service: values.service,
@@ -243,36 +251,20 @@ export function IncarnationNewForm() {
             ) : null}
           </div>
         ) : (
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Input scenario create (JSON-объект)
-            </span>
-            <textarea
-              placeholder='{}'
-              rows={8}
-              spellCheck={false}
-              {...register('inputJson')}
-              aria-invalid={errors.inputJson ? 'true' : undefined}
-              style={{
-                padding: 10,
-                borderRadius: 'var(--radius)',
-                border: `1px solid ${errors.inputJson ? 'var(--danger)' : 'var(--border)'}`,
-                background: 'var(--surface)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12.5,
-                resize: 'vertical',
-                minHeight: 120,
-              }}
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
+              Input scenario create (динамический form-builder)
+            </div>
+            <DynamicInputBuilder
+              value={dynamicInput}
+              onChange={setDynamicInput}
+              ariaLabel="Scenario create input fields"
             />
-            {errors.inputJson ? (
-              <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.inputJson.message}</span>
-            ) : (
-              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-                Передаётся как <code className="mono">input</code> в <code className="mono">scenario create</code>.
-                Пустое = <code className="mono">{'{}'}</code>.
-              </span>
-            )}
-          </label>
+            <span style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 6, display: 'block' }}>
+              Передаётся как <code className="mono">input</code> в <code className="mono">scenario create</code>.
+              Пусто = <code className="mono">{'{}'}</code>.
+            </span>
+          </div>
         )}
 
         {serverError ? <div className={styles.errorBox}>{serverError}</div> : null}

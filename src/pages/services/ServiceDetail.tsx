@@ -233,6 +233,12 @@ export function ServiceDetail() {
                     </td>
                     <td style={{ display: 'flex', gap: 8 }}>
                       <Link
+                        to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
+                        aria-label={`Run scenario ${s.name}`}
+                      >
+                        <Button type="button" variant="primary">Run this scenario</Button>
+                      </Link>
+                      <Link
                         to={`/incarnations/new?service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
                       >
                         <Button type="button" variant="secondary">Use in incarnation</Button>

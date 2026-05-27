@@ -24,10 +24,13 @@ import {
   EMPTY_TARGET_SPEC,
   describeTarget,
   hasAnyTarget,
+  queryHasTargetParams,
+  specFromQueryParams,
   translateTarget,
   type TargetMode,
   type TargetSpec,
 } from './targetTranslator';
+import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
 
@@ -57,19 +60,28 @@ interface ScenarioStateValues {
   newIncarnationName: string;
   newIncarnationCovens: string[];
   fields: ScenarioFieldsState;
-  inputJson: string;
+  // Используется только когда scenario без typed input_schema — DynamicInputBuilder.
+  inputObj: Record<string, unknown>;
 }
 
+// Module — кортеж known core-модулей + произвольный custom.
+type CommandModuleKind = 'core.cmd.shell' | 'core.exec.run' | 'custom';
+
 interface CommandStateValues {
-  module: 'core.cmd.shell' | 'core.exec.run';
+  moduleKind: CommandModuleKind;
+  // Для CommandModuleKind === 'custom' — имя custom-модуля.
+  customModule: string;
+  // shell/exec — cmd; для custom не используется.
   cmd: string;
   timeoutSeconds: number;
+  // Для CommandModuleKind === 'custom' — динамический input-объект.
+  customInput: Record<string, unknown>;
 }
 
 interface PushStateValues {
   destiny: string;
   sshProvider: string;
-  inputJson: string;
+  inputObj: Record<string, unknown>;
 }
 
 interface OptionsState {
@@ -85,9 +97,19 @@ const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 // Pre-fill из query-string: /run?workload=scenario&service=<svc>&incarnation=<name>.
 // Используется при переходе с IncarnationDetail (Run Scenario button) и при
 // прямых ссылках из ErrandsList/PushApply (deprecated entry-points).
+// Дополнительные query-keys (bulk-run actions со списочных страниц):
+//   target_sids / target_coven / target_glob / target_regex / target_where
+//   scenario / module / cmd
+// см. specFromQueryParams / queryHasTargetParams в targetTranslator.ts.
 function pickWorkloadFromQuery(raw: string | null): Workload {
   if (raw === 'command' || raw === 'push' || raw === 'scenario') return raw;
   return 'scenario';
+}
+
+function pickInitialCommandModule(raw: string | null): CommandModuleKind {
+  if (raw === 'core.exec.run') return 'core.exec.run';
+  if (raw === 'core.cmd.shell' || raw === null) return 'core.cmd.shell';
+  return 'custom';
 }
 
 export function RunWizard() {
@@ -97,34 +119,66 @@ export function RunWizard() {
   const initialWorkload = pickWorkloadFromQuery(searchParams.get('workload'));
   const initialService = searchParams.get('service') ?? '';
   const initialIncarnation = searchParams.get('incarnation') ?? '';
+  const initialScenario = searchParams.get('scenario') ?? '';
+  const initialModuleParam = searchParams.get('module');
+  const initialCmd = searchParams.get('cmd') ?? '';
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  // Pre-fill target из query — bulk-run actions с list-страниц передают сюда
+  // через ?target_sids / ?target_coven / ?target_glob / ?target_regex / ?target_where.
+  const initialTargetSpec = useMemo<TargetSpec>(
+    () => specFromQueryParams(searchParams),
+    // searchParams читаем один раз на mount; никакого remount при изменении.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const hasTargetFromQuery = useMemo(
+    () => queryHasTargetParams(searchParams),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // Если в URL уже всё нужное для Step 2 — открываем Wizard сразу на Step 3.
+  const initialStep = useMemo<1 | 2 | 3 | 4>(() => {
+    if (!hasTargetFromQuery) return 1;
+    if (initialWorkload === 'command' && initialCmd.trim().length > 0) return 3;
+    if (initialWorkload === 'scenario' && initialService && initialScenario && initialIncarnation) return 3;
+    return 1;
+  }, [hasTargetFromQuery, initialWorkload, initialCmd, initialService, initialScenario, initialIncarnation]);
+
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialStep);
   const [workload, setWorkload] = useState<Workload>(initialWorkload);
 
   const [scenarioState, setScenarioState] = useState<ScenarioStateValues>({
     service: initialService,
-    scenario: '',
+    scenario: initialScenario,
     incarnation: initialIncarnation,
     incarnationMode: 'existing',
     newIncarnationName: '',
     newIncarnationCovens: [],
     fields: {},
-    inputJson: '',
+    inputObj: {},
   });
 
   const [commandState, setCommandState] = useState<CommandStateValues>({
-    module: 'core.cmd.shell',
-    cmd: '',
+    moduleKind: pickInitialCommandModule(initialModuleParam),
+    customModule:
+      initialModuleParam && initialModuleParam !== 'core.cmd.shell' && initialModuleParam !== 'core.exec.run'
+        ? initialModuleParam
+        : '',
+    cmd: initialCmd,
     timeoutSeconds: 30,
+    customInput: {},
   });
 
   const [pushState, setPushState] = useState<PushStateValues>({
     destiny: '',
     sshProvider: '',
-    inputJson: '',
+    inputObj: {},
   });
 
-  const [targetSpec, setTargetSpec] = useState<TargetSpec>(EMPTY_TARGET_SPEC);
+  const [targetSpec, setTargetSpec] = useState<TargetSpec>(
+    hasTargetFromQuery ? initialTargetSpec : EMPTY_TARGET_SPEC,
+  );
 
   const [options, setOptions] = useState<OptionsState>({
     waveSize: '',
@@ -150,7 +204,12 @@ export function RunWizard() {
       if (scenarioState.incarnationMode === 'existing') return Boolean(scenarioState.incarnation);
       return NAME_REGEX.test(scenarioState.newIncarnationName);
     }
-    if (workload === 'command') return commandState.cmd.trim().length > 0;
+    if (workload === 'command') {
+      if (commandState.moduleKind === 'custom') {
+        return commandState.customModule.trim().length > 0;
+      }
+      return commandState.cmd.trim().length > 0;
+    }
     // push
     return pushState.destiny.trim().length > 0;
   }, [workload, scenarioState, commandState, pushState]);
@@ -200,7 +259,7 @@ export function RunWizard() {
     const inputObj =
       usePerField && inputSchema
         ? serializeFields(inputSchema, scenarioState.fields)
-        : parseJsonObject(scenarioState.inputJson, 'input');
+        : scenarioState.inputObj;
 
     // Create new incarnation (если выбрано) — отдельный POST до runScenario.
     if (scenarioState.incarnationMode === 'create') {
@@ -261,9 +320,13 @@ export function RunWizard() {
   async function submitCommand(): Promise<string> {
     const tr = translateTarget(targetSpec);
     const c = parseIntOrEmpty(options.concurrency);
+    const moduleName =
+      commandState.moduleKind === 'custom' ? commandState.customModule : commandState.moduleKind;
+    const input =
+      commandState.moduleKind === 'custom' ? commandState.customInput : { cmd: commandState.cmd };
     const reply = await keeperApi.errandRuns.create({
-      module: commandState.module,
-      input: { cmd: commandState.cmd },
+      module: moduleName,
+      input,
       timeout_seconds: commandState.timeoutSeconds > 0 ? commandState.timeoutSeconds : undefined,
       target: tr.target,
       concurrency: c && c > 0 ? c : 50,
@@ -274,11 +337,10 @@ export function RunWizard() {
 
   async function submitPush(): Promise<string> {
     const tr = translateTarget(targetSpec);
-    const inputObj = parseJsonObject(pushState.inputJson, 'input');
     const reply = await keeperApi.push.apply({
       inventory: tr.target.sids ?? [],
       destiny: pushState.destiny,
-      input: inputObj,
+      input: pushState.inputObj,
       ssh_provider: pushState.sshProvider || undefined,
       cleanup_stale_versions: false,
     });
@@ -496,7 +558,7 @@ function Step2Scenario({
           </select>
           {scenariosQ.unavailable ? (
             <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-              scenario-каталог не предоставлен сервером — JSON input fallback.
+              scenario-каталог не предоставлен сервером — dynamic input form fallback.
             </span>
           ) : null}
         </label>
@@ -594,17 +656,16 @@ function Step2Scenario({
               ) : null}
             </div>
           ) : (
-            <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>Input (JSON-объект)</span>
-              <textarea
-                className={styles.field}
-                rows={6}
-                spellCheck={false}
-                value={value.inputJson}
-                onChange={(e) => onChange({ ...value, inputJson: e.target.value })}
-                placeholder="{}"
+            <div>
+              <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
+                Input (динамический form-builder без input_schema)
+              </div>
+              <DynamicInputBuilder
+                value={value.inputObj}
+                onChange={(next) => onChange({ ...value, inputObj: next })}
+                ariaLabel="Scenario input fields"
               />
-            </label>
+            </div>
           )}
         </>
       ) : null}
@@ -619,33 +680,63 @@ function Step2Command({
   value: CommandStateValues;
   onChange: (next: CommandStateValues) => void;
 }) {
+  const isCustom = value.moduleKind === 'custom';
   return (
     <>
       <label className={styles.fieldRow}>
         <span className={styles.fieldLabel}>Module</span>
         <select
           className={styles.field}
-          value={value.module}
-          onChange={(e) => onChange({ ...value, module: e.target.value as CommandStateValues['module'] })}
+          value={value.moduleKind}
+          onChange={(e) =>
+            onChange({ ...value, moduleKind: e.target.value as CommandStateValues['moduleKind'] })
+          }
           aria-label="Module"
         >
           <option value="core.cmd.shell">core.cmd.shell</option>
           <option value="core.exec.run">core.exec.run</option>
+          <option value="custom">— custom module —</option>
         </select>
       </label>
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>
-          {value.module === 'core.cmd.shell' ? 'Command (sh -c)' : 'Binary + args (одной строкой)'}
-        </span>
-        <textarea
-          className={styles.field}
-          rows={4}
-          value={value.cmd}
-          onChange={(e) => onChange({ ...value, cmd: e.target.value })}
-          placeholder={value.module === 'core.cmd.shell' ? 'uptime && df -h' : '/usr/bin/uptime'}
-          aria-label="Command"
-        />
-      </label>
+      {isCustom ? (
+        <>
+          <label className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>Module name</span>
+            <input
+              type="text"
+              className={styles.field}
+              value={value.customModule}
+              onChange={(e) => onChange({ ...value, customModule: e.target.value })}
+              placeholder="core.http.probe"
+              aria-label="Custom module name"
+            />
+          </label>
+          <div>
+            <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
+              Input
+            </div>
+            <DynamicInputBuilder
+              value={value.customInput}
+              onChange={(next) => onChange({ ...value, customInput: next })}
+              ariaLabel="Custom module input fields"
+            />
+          </div>
+        </>
+      ) : (
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>
+            {value.moduleKind === 'core.cmd.shell' ? 'Command (sh -c)' : 'Binary + args (одной строкой)'}
+          </span>
+          <textarea
+            className={styles.field}
+            rows={4}
+            value={value.cmd}
+            onChange={(e) => onChange({ ...value, cmd: e.target.value })}
+            placeholder={value.moduleKind === 'core.cmd.shell' ? 'uptime && df -h' : '/usr/bin/uptime'}
+            aria-label="Command"
+          />
+        </label>
+      )}
       <label className={styles.fieldRow}>
         <span className={styles.fieldLabel}>Timeout (s)</span>
         <input
@@ -716,16 +807,16 @@ function Step2Push({
           />
         )}
       </label>
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>Input (JSON-объект)</span>
-        <textarea
-          className={styles.field}
-          rows={4}
-          value={value.inputJson}
-          onChange={(e) => onChange({ ...value, inputJson: e.target.value })}
-          placeholder="{}"
+      <div>
+        <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
+          Input
+        </div>
+        <DynamicInputBuilder
+          value={value.inputObj}
+          onChange={(next) => onChange({ ...value, inputObj: next })}
+          ariaLabel="Push input fields"
         />
-      </label>
+      </div>
     </>
   );
 }
@@ -1033,19 +1124,4 @@ function parseIntOrEmpty(s: string): number | undefined {
   if (!t) return undefined;
   const n = parseInt(t, 10);
   return Number.isNaN(n) ? undefined : n;
-}
-
-function parseJsonObject(raw: string, label: string): Record<string, unknown> {
-  const t = raw.trim();
-  if (!t) return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(t);
-  } catch (e) {
-    throw new Error(`${label}: invalid JSON: ${e instanceof Error ? e.message : 'parse error'}`);
-  }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`${label}: должен быть JSON-object`);
-  }
-  return parsed as Record<string, unknown>;
 }

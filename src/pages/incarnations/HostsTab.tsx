@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Server } from 'lucide-react';
-import { Badge, Dot } from '../../components/primitives';
+import { Play, Server } from 'lucide-react';
+import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type SoulListEntry } from '../../api/keeper';
 import { soulDot, soulTone } from '../../components/status';
@@ -127,9 +127,28 @@ export function HostsTab({ incarnationName, spec, state }: Props) {
         </table>
       )}
 
-      <h2 className={styles.sectionTitle} style={{ marginTop: 16 }}>
-        Connected souls
-      </h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: 16,
+          gap: 12,
+        }}
+      >
+        <h2 className={styles.sectionTitle} style={{ margin: 0 }}>
+          Connected souls
+        </h2>
+        <Link
+          to={`/run?workload=command&target_coven=${encodeURIComponent(incarnationName)}`}
+          aria-label="Run command on these hosts"
+        >
+          <Button type="button" variant="primary">
+            <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            Run command on these hosts
+          </Button>
+        </Link>
+      </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
         Souls с <code className="mono">coven = {incarnationName}</code>. Соответствие с
         реальностью (declared ↔ connected) можно проверить через probe-scenario; это

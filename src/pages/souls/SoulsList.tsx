@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { Search, Shield } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Play, Search, Shield } from 'lucide-react';
 import { keeperApi, SoulprintNotReceivedError, type SoulListEntry, type SoulStatus, type SoulTransport, type SoulprintReadReply } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { CovenAssignModal } from './CovenAssignModal';
 import { applyFilter, parseSoulprintFilter } from './soulprintFilter';
+import { filtersToCEL } from '../run/targetTranslator';
 import styles from '../common.module.css';
 
 const SOUL_STATUSES: SoulStatus[] = ['pending', 'connected', 'disconnected', 'expired'];
@@ -68,6 +69,7 @@ function sortItems(items: SoulListEntry[], key: SortKey, dir: SortDir): SoulList
 }
 
 export function SoulsList() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<SoulStatus | ''>('');
   const [transport, setTransport] = useState<SoulTransport | ''>('');
   const [coven, setCoven] = useState<string>('');
@@ -186,6 +188,29 @@ export function SoulsList() {
   const allChecked = visible.length > 0 && effectiveSelected.size === visible.length;
   const someChecked = effectiveSelected.size > 0 && !allChecked;
 
+  // Сборка CEL-фрагмента из активных фильтров для «Run on filtered» action-кнопки.
+  // Если ни один фильтр не активен — кнопка disabled (запуск «на весь флот»
+  // считаем явным risk-action и не предлагаем одним кликом).
+  const filteredWhereCEL = useMemo(() => {
+    return filtersToCEL({
+      status: status || undefined,
+      transport: transport || undefined,
+      covens: covenFilter,
+      soulprintRules: soulprintRules.length > 0 ? soulprintRules : undefined,
+      sidSearch: search.trim() || undefined,
+    });
+  }, [status, transport, covenFilter, soulprintRules, search]);
+
+  function bulkRunOnSelected() {
+    if (effectiveSelected.size === 0) return;
+    const sids = Array.from(effectiveSelected).join(',');
+    navigate(`/run?workload=command&target_sids=${encodeURIComponent(sids)}`);
+  }
+  function runOnFiltered() {
+    if (!filteredWhereCEL) return;
+    navigate(`/run?workload=command&target_where=${encodeURIComponent(filteredWhereCEL)}`);
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -193,6 +218,16 @@ export function SoulsList() {
           <h1 className={styles.title}>Souls</h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={effectiveSelected.size === 0}
+            onClick={bulkRunOnSelected}
+            aria-label="Bulk Run on selected"
+          >
+            <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            Run on {effectiveSelected.size > 0 ? `${effectiveSelected.size} ` : ''}selected
+          </Button>
           <Button
             type="button"
             variant="primary"
@@ -323,6 +358,22 @@ export function SoulsList() {
             : `Matched ${visible.length} of ${prefiltered.length}`}
         </div>
       ) : null}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={!filteredWhereCEL}
+          onClick={runOnFiltered}
+          aria-label="Run on filtered souls"
+          title={filteredWhereCEL
+            ? `Pre-fill Wizard target_where: ${filteredWhereCEL}`
+            : 'Активируйте хотя бы один фильтр'}
+        >
+          <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+          Run on filtered{visible.length > 0 ? ` (${visible.length} souls)` : ''}
+        </Button>
+      </div>
 
       {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
       {q.error ? (

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -319,6 +319,136 @@ describe('RunWizard', () => {
     expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/hello-prod\/scenarios\/create$/);
     const body = stub.posted?.body as { input: Record<string, unknown> };
     expect(body.input).toEqual({ greeting: 'hello world' });
+  });
+
+  it('Pre-fill target_sids → Step 3, mode=sids, selected={a,b}', async () => {
+    setupFetchStub();
+    renderWizardWithRoutes('/run?workload=command&cmd=uptime&target_sids=host-a,host-b');
+    // Wizard должен открыться сразу на Step 3.
+    await waitFor(() => expect(screen.getByText(/Режимы/)).toBeInTheDocument());
+    // Mode chip 'sids' активен.
+    const sidsChip = screen.getByRole('button', { name: 'sids' });
+    expect(sidsChip.getAttribute('aria-pressed')).toBe('true');
+    // describeTarget показывает «2 SID».
+    expect(screen.getByLabelText('Target preview').textContent).toContain('2 SID');
+  });
+
+  it('Pre-fill target_coven → Step 3, mode=coven с метками', async () => {
+    setupFetchStub();
+    renderWizardWithRoutes('/run?workload=command&cmd=uptime&target_coven=prod,db');
+    await waitFor(() => expect(screen.getByText(/Режимы/)).toBeInTheDocument());
+    const covenChip = screen.getByRole('button', { name: 'coven' });
+    expect(covenChip.getAttribute('aria-pressed')).toBe('true');
+    // Coven chips отрисованы.
+    expect(screen.getByLabelText('Target preview').textContent).toMatch(/coven=\[prod,db\]/);
+  });
+
+  it('Pre-fill cmd → Step 2 Command pre-filled (без target — остаёмся на Step 1)', async () => {
+    setupFetchStub();
+    renderWizardWithRoutes('/run?workload=command&cmd=uptime');
+    // Без target_* остаёмся на Step 1.
+    expect(screen.getByLabelText('Command')).toBeChecked();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // На Step 2 Command-textarea pre-filled.
+    await waitFor(() => expect(screen.getByLabelText('Command')).toHaveValue('uptime'));
+  });
+
+  it('Pre-fill target_where + cmd → сразу Step 3 с CEL-предикатом', async () => {
+    setupFetchStub();
+    const cel = 'soulprint.self.os.family == "debian"';
+    renderWizardWithRoutes(
+      `/run?workload=command&cmd=uptime&target_where=${encodeURIComponent(cel)}`,
+    );
+    await waitFor(() => expect(screen.getByText(/Режимы/)).toBeInTheDocument());
+    const celChip = screen.getByRole('button', { name: 'cel_where' });
+    expect(celChip.getAttribute('aria-pressed')).toBe('true');
+    expect((screen.getByLabelText('CEL where') as HTMLTextAreaElement).value).toBe(cel);
+  });
+
+  it('Step 2 Scenario без input_schema → DynamicInputBuilder, добавленные поля попадают в POST.input', async () => {
+    const stub = setupFetchStub({
+      serviceName: 'redis',
+      incarnationName: 'redis-prod',
+      // scenario.input_schema = undefined → fallback на DynamicInputBuilder.
+      scenarios: [{ name: 'restart', description: 'restart workers' }],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Step 1 → Step 2.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument(),
+    );
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Existing incarnation/)).toBeInTheDocument(),
+    );
+    await user.selectOptions(screen.getByLabelText(/Existing incarnation/), 'redis-prod');
+
+    // DynamicInputBuilder показывается (нет input_schema).
+    await waitFor(() =>
+      expect(screen.getByLabelText('Scenario input fields')).toBeInTheDocument(),
+    );
+    // Добавляем поле через "Add first field".
+    await user.click(screen.getByRole('button', { name: /Add first field/i }));
+    const keyInput = screen.getByRole('textbox', { name: /field key/i });
+    const valueInput = screen.getByRole('textbox', { name: /field value/i });
+    fireEvent.change(keyInput, { target: { value: 'shard' } });
+    fireEvent.change(valueInput, { target: { value: 'primary' } });
+
+    // Step 2 → 3 → 4 → submit.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as { input: Record<string, unknown> };
+    expect(body.input).toEqual({ shard: 'primary' });
+  });
+
+  it('Step 2 Command custom-module → DynamicInputBuilder + POST.module/input', async () => {
+    const stub = setupFetchStub();
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+
+    // Переключаем module на custom.
+    await user.selectOptions(screen.getByLabelText('Module'), 'custom');
+    await user.type(screen.getByLabelText('Custom module name'), 'core.http.probe');
+
+    // DynamicInputBuilder появился. Добавляем поле url=https://example.com.
+    await waitFor(() =>
+      expect(screen.getByLabelText('Custom module input fields')).toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: /Add first field/i }));
+    const keyInput = screen.getByRole('textbox', { name: /field key/i });
+    const valueInput = screen.getByRole('textbox', { name: /field value/i });
+    fireEvent.change(keyInput, { target: { value: 'url' } });
+    fireEvent.change(valueInput, { target: { value: 'https://example.com' } });
+
+    // Step 2 → 3 (нужен target для command).
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: 'coven', pressed: false }));
+    const covenChip = screen.getByLabelText('Coven labels');
+    const covenInput = covenChip.querySelector('input') as HTMLInputElement;
+    await user.type(covenInput, 'prod ');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as {
+      module: string;
+      input: Record<string, unknown>;
+      target: { coven: string[] };
+    };
+    expect(body.module).toBe('core.http.probe');
+    expect(body.input).toEqual({ url: 'https://example.com' });
+    expect(body.target.coven).toEqual(['prod']);
   });
 
   it('Submit Command → POST /v1/errand-runs → redirect /errand-runs/:id', async () => {

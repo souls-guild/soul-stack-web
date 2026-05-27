@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes, MemoryRouter, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render } from '@testing-library/react';
+import type { ReactNode } from 'react';
+
+function RunLandingStub() {
+  const loc = useLocation();
+  return (
+    <div data-testid="run-landing">
+      <span data-testid="run-search">{loc.search}</span>
+    </div>
+  );
+}
 import { renderWithProviders } from './renderWithProviders';
 import { SoulsList } from '../pages/souls/SoulsList';
 import {
@@ -10,6 +23,30 @@ import {
 } from '../pages/souls/soulprintFilter';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
+
+// Хелпер с маршрутами для bulk-run тестов: SoulsList + landing-stub /run.
+function renderSoulsListWithRun() {
+  const qc = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false, staleTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  function Wrap({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/souls']}>{children}</MemoryRouter>
+      </QueryClientProvider>
+    );
+  }
+  return render(
+    <Routes>
+      <Route path="/souls" element={<SoulsList />} />
+      <Route path="/run" element={<RunLandingStub />} />
+    </Routes>,
+    { wrapper: Wrap },
+  );
+}
 
 describe('SoulsList', () => {
   beforeEach(() => {
@@ -47,6 +84,67 @@ describe('SoulsList', () => {
     // 'connected' встречается и в <option> select-фильтра, и в Badge —
     // поэтому матчим все вхождения и убеждаемся, что Badge отрендерился.
     expect(screen.getAllByText('connected').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Bulk Run on selected: navigate /run?target_sids=<csv>', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/souls',
+        body: {
+          items: [
+            {
+              sid: 'host01.example.com',
+              transport: 'agent',
+              status: 'connected',
+              covens: ['prod'],
+              registered_at: '2026-05-01T00:00:00Z',
+            },
+            {
+              sid: 'host02.example.com',
+              transport: 'agent',
+              status: 'connected',
+              covens: ['prod'],
+              registered_at: '2026-05-01T00:00:00Z',
+            },
+          ],
+          offset: 0,
+          limit: 200,
+          total: 2,
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    renderSoulsListWithRun();
+
+    await waitFor(() => {
+      expect(screen.getByText('host01.example.com')).toBeInTheDocument();
+      expect(screen.getByText('host02.example.com')).toBeInTheDocument();
+    });
+
+    // Bulk Run кнопка должна быть disabled до выбора.
+    const runBtn = screen.getByRole('button', { name: /Bulk Run on selected/ });
+    expect(runBtn).toBeDisabled();
+
+    // Выбираем оба host-а через row-checkbox.
+    await user.click(screen.getByLabelText('выбрать host01.example.com'));
+    await user.click(screen.getByLabelText('выбрать host02.example.com'));
+
+    // Counter в кнопке.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Bulk Run on selected/ })).not.toBeDisabled(),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Bulk Run on selected/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('run-landing')).toBeInTheDocument();
+    });
+    const search = screen.getByTestId('run-search').textContent ?? '';
+    expect(search).toContain('workload=command');
+    expect(search).toContain('target_sids=');
+    // CSV допускает как `host01,host02`, так и URL-encoded запятую.
+    expect(decodeURIComponent(search)).toMatch(/target_sids=host0[12]\.example\.com,host0[12]\.example\.com/);
   });
 
   it('soulprint-filter: lazy fetch + client-side фильтрация по фактам', async () => {
