@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { ThemeToggle } from './ThemeToggle';
 import styles from './Topbar.module.css';
 
 function initialsOf(aid: string): string {
@@ -43,6 +44,7 @@ export function Topbar() {
         <span className={styles.sub}>Keeper UI</span>
       </div>
       <div className={styles.right}>
+        <ThemeToggle />
         {identity ? (
           <div className={styles.menu} ref={menuRef}>
             <button

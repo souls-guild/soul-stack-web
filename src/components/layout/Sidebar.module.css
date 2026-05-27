@@ -3,6 +3,12 @@
   flex-direction: column;
   gap: var(--s-1);
   padding: 0 var(--s-3);
+  height: 100%;
+}
+
+.sidebar.collapsed {
+  padding: 0 var(--s-2);
+  align-items: stretch;
 }
 
 .group {
@@ -14,6 +20,12 @@
   padding: var(--s-3) var(--s-3) var(--s-2);
 }
 
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--s-2) var(--s-1);
+}
+
 .link {
   display: flex;
   align-items: center;
@@ -23,6 +35,11 @@
   color: var(--text);
   text-decoration: none;
   font-size: 13px;
+}
+
+.collapsed .link {
+  justify-content: center;
+  padding: 8px;
 }
 
 .link:hover {
@@ -48,8 +65,45 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .linkActive .icon {
   color: var(--accent);
+}
+
+.label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toggle {
+  margin-top: auto;
+  margin-bottom: var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.collapsed .toggle {
+  justify-content: center;
+  padding: 8px;
+}
+
+.toggle:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.toggleLabel {
+  white-space: nowrap;
 }

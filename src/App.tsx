@@ -14,6 +14,9 @@ import { ArchonDetail } from './pages/archons/ArchonDetail';
 import { PushApply } from './pages/push/PushApply';
 import { ErrandExec } from './pages/errand/ErrandExec';
 import { ErrandHistory } from './pages/errand/ErrandHistory';
+import { RbacPage } from './pages/rbac/RbacPage';
+import { ServicesList } from './pages/services/ServicesList';
+import { ServiceDetail } from './pages/services/ServiceDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +55,9 @@ export function App() {
             <Route path="/errand" element={<Navigate to="/errand/exec" replace />} />
             <Route path="/errand/exec" element={<Protected><ErrandExec /></Protected>} />
             <Route path="/errand/history" element={<Protected><ErrandHistory /></Protected>} />
+            <Route path="/rbac" element={<Protected><RbacPage /></Protected>} />
+            <Route path="/services" element={<Protected><ServicesList /></Protected>} />
+            <Route path="/services/:name" element={<Protected><ServiceDetail /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

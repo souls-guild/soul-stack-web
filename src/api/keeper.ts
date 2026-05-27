@@ -56,6 +56,17 @@ export type ErrandResult = components['schemas']['ErrandResult'];
 export type ErrandListReply = components['schemas']['ErrandListReply'];
 export type ErrandStatus = NonNullable<ErrandResult['status']>;
 
+export type RoleView = components['schemas']['RoleView'];
+export type RoleListReply = components['schemas']['RoleListReply'];
+export type RoleCreateRequest = components['schemas']['RoleCreateRequest'];
+export type RolePermissionsUpdateRequest = components['schemas']['RolePermissionsUpdateRequest'];
+export type GrantOperatorRequest = components['schemas']['GrantOperatorRequest'];
+
+export type ServiceView = components['schemas']['ServiceView'];
+export type ServiceListReply = components['schemas']['ServiceListReply'];
+export type ServiceRegisterRequest = components['schemas']['ServiceRegisterRequest'];
+export type ServiceUpdateRequest = components['schemas']['ServiceUpdateRequest'];
+
 // --- Public-thrown error для случая GetSoulprint → 410 «не приходил». ---
 
 export class SoulprintNotReceivedError extends Error {
@@ -226,6 +237,35 @@ export const keeperApi = {
     // 200 → IssueTokenReply (jwt отдаётся один раз).
     issueToken: (aid: string) =>
       apiSend<IssueTokenReply>(`/v1/operators/${encodeURIComponent(aid)}/issue-token`, 'POST'),
+  },
+
+  roles: {
+    list: () => apiGet<RoleListReply>('/v1/roles'),
+    create: (body: RoleCreateRequest) =>
+      apiSend<void>('/v1/roles', 'POST', { body }),
+    delete: (name: string) =>
+      apiSend<void>(`/v1/roles/${encodeURIComponent(name)}`, 'DELETE'),
+    updatePermissions: (name: string, body: RolePermissionsUpdateRequest) =>
+      apiSend<void>(`/v1/roles/${encodeURIComponent(name)}/permissions`, 'PATCH', { body }),
+    grantOperator: (name: string, body: GrantOperatorRequest) =>
+      apiSend<void>(`/v1/roles/${encodeURIComponent(name)}/operators`, 'POST', { body }),
+    revokeOperator: (name: string, aid: string) =>
+      apiSend<void>(
+        `/v1/roles/${encodeURIComponent(name)}/operators/${encodeURIComponent(aid)}`,
+        'DELETE',
+      ),
+  },
+
+  services: {
+    list: () => apiGet<ServiceListReply>('/v1/services'),
+    get: (name: string) =>
+      apiGet<ServiceView>(`/v1/services/${encodeURIComponent(name)}`),
+    register: (body: ServiceRegisterRequest) =>
+      apiSend<ServiceView>('/v1/services', 'POST', { body }),
+    update: (name: string, body: ServiceUpdateRequest) =>
+      apiSend<ServiceView>(`/v1/services/${encodeURIComponent(name)}`, 'PATCH', { body }),
+    deregister: (name: string) =>
+      apiSend<void>(`/v1/services/${encodeURIComponent(name)}`, 'DELETE'),
   },
 };
 
