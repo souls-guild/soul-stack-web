@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUp, History as HistoryIcon, Lock, Play, Search, Trash } from 'lucide-react';
+import {
+  Activity,
+  ArrowUp,
+  FileText,
+  History as HistoryIcon,
+  Layers,
+  Lock,
+  Play,
+  Search,
+  Trash,
+} from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type DriftReport } from '../../api/keeper';
@@ -12,9 +22,12 @@ import { UnlockModal } from './UnlockModal';
 import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
 import { HostsTab } from './HostsTab';
+import { SpecTab } from './SpecTab';
+import { StateTab } from './StateTab';
+import { SchemaTab } from './SchemaTab';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'hosts' | 'run' | 'history' | 'drift' | 'state';
+type Tab = 'overview' | 'hosts' | 'run' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
 
 export function IncarnationDetail() {
   const { name = '' } = useParams<{ name: string }>();
@@ -50,6 +63,28 @@ export function IncarnationDetail() {
       setDriftError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
     },
   });
+
+  // Summary-агрегат для Overview: считаем поля spec/state, declared/runtime hosts.
+  // Зовём useMemo безусловно (хук не должен сидеть под if), значения берём через `?.`.
+  const summary = useMemo(() => {
+    const row = detail.data;
+    const spec = (row?.spec ?? null) as Record<string, unknown> | null;
+    const state = (row?.state ?? null) as Record<string, unknown> | null;
+    const specKeys = spec && typeof spec === 'object' ? Object.keys(spec).length : 0;
+    const stateKeys = state && typeof state === 'object' ? Object.keys(state).length : 0;
+    let declaredHosts = 0;
+    if (spec && Array.isArray((spec as Record<string, unknown>).hosts)) {
+      declaredHosts = ((spec as Record<string, unknown>).hosts as unknown[]).length;
+    }
+    let runtimeHosts = 0;
+    if (state && typeof state === 'object') {
+      const hosts = (state as Record<string, unknown>).hosts;
+      if (hosts && typeof hosts === 'object' && !Array.isArray(hosts)) {
+        runtimeHosts = Object.keys(hosts as Record<string, unknown>).length;
+      }
+    }
+    return { specKeys, stateKeys, declaredHosts, runtimeHosts };
+  }, [detail.data]);
 
   if (detail.isLoading) return <div className={styles.loading}>Загружаем…</div>;
   if (detail.error) {
@@ -145,6 +180,15 @@ export function IncarnationDetail() {
         <button type="button" role="tab" aria-selected={tab === 'overview'} className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
           Overview
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'spec'} className={`${styles.tab} ${tab === 'spec' ? styles.tabActive : ''}`} onClick={() => setTab('spec')}>
+          <FileText size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />Spec
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'state'} className={`${styles.tab} ${tab === 'state' ? styles.tabActive : ''}`} onClick={() => setTab('state')}>
+          <Activity size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />State
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'schema'} className={`${styles.tab} ${tab === 'schema' ? styles.tabActive : ''}`} onClick={() => setTab('schema')}>
+          <Layers size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />Schema
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'hosts'} className={`${styles.tab} ${tab === 'hosts' ? styles.tabActive : ''}`} onClick={() => setTab('hosts')}>
           Hosts
         </button>
@@ -157,36 +201,55 @@ export function IncarnationDetail() {
         <button type="button" role="tab" aria-selected={tab === 'drift'} className={`${styles.tab} ${tab === 'drift' ? styles.tabActive : ''}`} onClick={() => setTab('drift')}>
           Drift Check
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'state'} className={`${styles.tab} ${tab === 'state' ? styles.tabActive : ''}`} onClick={() => setTab('state')}>
-          State
-        </button>
       </div>
 
       {tab === 'overview' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Spec</h2>
-          <JsonViewer value={row.spec ?? null} emptyLabel="spec не задан" />
-          <div style={{ marginTop: 4 }}>
-            <button
-              type="button"
-              onClick={() => setTab('hosts')}
-              style={{
-                background: 'transparent',
-                border: 0,
-                padding: 0,
-                color: 'var(--accent)',
-                fontFamily: 'inherit',
-                fontSize: 12.5,
-                cursor: 'pointer',
-                textDecoration: 'underline',
-              }}
-            >
-              Connected souls на этой incarnation →
+          <h2 className={styles.sectionTitle}>Data summary</h2>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+            Где искать параметры incarnation: <strong>Spec</strong> — что задекларировал
+            оператор, <strong>State</strong> — что система знает после apply-прогонов,
+            <strong> Schema</strong> — версия структуры state, <strong>Hosts</strong> —
+            declared + connected + per-host runtime data.
+          </p>
+          <div className={styles.summaryGrid}>
+            <button type="button" className={styles.summaryCard} onClick={() => setTab('spec')}>
+              <span className={styles.summaryCardLabel}>
+                <FileText size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+                Spec
+              </span>
+              <span className={styles.summaryCardValue}>
+                {summary.specKeys} {summary.specKeys === 1 ? 'поле' : 'полей'}
+              </span>
+              <span className={styles.summaryCardHint}>declared by operator</span>
             </button>
-            <span style={{ color: 'var(--text-faint)', fontSize: 12, marginLeft: 8 }}>
-              соответствие с реальностью можно проверить через probe-scenario
-            </span>
+            <button type="button" className={styles.summaryCard} onClick={() => setTab('state')}>
+              <span className={styles.summaryCardLabel}>
+                <Activity size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+                State
+              </span>
+              <span className={styles.summaryCardValue}>
+                {summary.stateKeys} {summary.stateKeys === 1 ? 'поле' : 'полей'}
+              </span>
+              <span className={styles.summaryCardHint}>runtime после apply</span>
+            </button>
+            <button type="button" className={styles.summaryCard} onClick={() => setTab('schema')}>
+              <span className={styles.summaryCardLabel}>
+                <Layers size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+                Schema
+              </span>
+              <span className={styles.summaryCardValue}>v{row.state_schema_version}</span>
+              <span className={styles.summaryCardHint}>state_schema_version</span>
+            </button>
+            <button type="button" className={styles.summaryCard} onClick={() => setTab('hosts')}>
+              <span className={styles.summaryCardLabel}>Hosts</span>
+              <span className={styles.summaryCardValue}>
+                {summary.declaredHosts} declared · {summary.runtimeHosts} runtime
+              </span>
+              <span className={styles.summaryCardHint}>+ connected souls по coven</span>
+            </button>
           </div>
+
           {row.status_details ? (
             <>
               <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>Status details</h2>
@@ -207,8 +270,22 @@ export function IncarnationDetail() {
         </section>
       ) : null}
 
+      {tab === 'spec' ? <SpecTab spec={row.spec ?? null} /> : null}
+
+      {tab === 'state' ? (
+        <StateTab state={row.state ?? null} stateSchemaVersion={row.state_schema_version} />
+      ) : null}
+
+      {tab === 'schema' ? (
+        <SchemaTab
+          serviceName={row.service}
+          serviceVersion={row.service_version}
+          stateSchemaVersion={row.state_schema_version}
+        />
+      ) : null}
+
       {tab === 'hosts' ? (
-        <HostsTab incarnationName={row.name} spec={row.spec ?? null} />
+        <HostsTab incarnationName={row.name} spec={row.spec ?? null} state={row.state ?? null} />
       ) : null}
 
       {tab === 'run' ? (
@@ -287,13 +364,6 @@ export function IncarnationDetail() {
               <JsonViewer value={drift} />
             </>
           ) : null}
-        </section>
-      ) : null}
-
-      {tab === 'state' ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>incarnation.state (read-only)</h2>
-          <JsonViewer value={row.state ?? null} emptyLabel="state пустой" />
         </section>
       ) : null}
 

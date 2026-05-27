@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Server } from 'lucide-react';
 import { Badge, Dot } from '../../components/primitives';
+import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type SoulListEntry } from '../../api/keeper';
 import { soulDot, soulTone } from '../../components/status';
 import styles from '../common.module.css';
@@ -48,13 +50,35 @@ function extractDeclaredHosts(spec: Record<string, unknown> | null | undefined):
   return out;
 }
 
+// Per-host runtime data — convention: scenario может писать per-host state в
+// incarnation.state.hosts[<sid>] = {...}. Поле не обязательное; если scenario
+// его не использует — секция показывает empty state.
+function extractRuntimeHosts(
+  state: Record<string, unknown> | null | undefined,
+): Array<{ sid: string; role: string | null; data: Record<string, unknown> }> {
+  if (!state || typeof state !== 'object') return [];
+  const hosts = (state as Record<string, unknown>).hosts;
+  if (!hosts || typeof hosts !== 'object' || Array.isArray(hosts)) return [];
+  const out: Array<{ sid: string; role: string | null; data: Record<string, unknown> }> = [];
+  for (const [sid, payload] of Object.entries(hosts as Record<string, unknown>)) {
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const data = payload as Record<string, unknown>;
+      const role = typeof data.role === 'string' ? data.role : null;
+      out.push({ sid, role, data });
+    }
+  }
+  return out;
+}
+
 interface Props {
   incarnationName: string;
   spec: Record<string, unknown> | null | undefined;
+  state: Record<string, unknown> | null | undefined;
 }
 
-export function HostsTab({ incarnationName, spec }: Props) {
+export function HostsTab({ incarnationName, spec, state }: Props) {
   const declared = extractDeclaredHosts(spec);
+  const runtimeHosts = extractRuntimeHosts(state);
 
   // Connected souls — фильтруем souls по coven=incarnation.name.
   // Это derived view, не authoritative-список; реальное соответствие проверяется
@@ -152,6 +176,45 @@ export function HostsTab({ incarnationName, spec }: Props) {
           </tbody>
         </table>
       ) : null}
+
+      <h2 className={styles.sectionTitle} style={{ marginTop: 16 }}>
+        <Server size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+        Per-host runtime data
+      </h2>
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+        Per-host подсекция <code className="mono">incarnation.state.hosts[&lt;sid&gt;]</code> —
+        convention: scenario записывает per-host state в эту секцию (role, pid, users
+        и т.д.). Если scenario не использует convention — секция будет пустой.
+      </p>
+      {runtimeHosts.length === 0 ? (
+        <div className={styles.empty}>
+          В <code className="mono">state.hosts</code> нет данных — либо не было apply,
+          либо scenario не пишет per-host state.
+        </div>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>SID</th>
+              <th>Role</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runtimeHosts.map((h) => (
+              <tr key={h.sid}>
+                <td className="mono" style={{ verticalAlign: 'top' }}>
+                  <Link to={`/souls/${encodeURIComponent(h.sid)}`}>{h.sid}</Link>
+                </td>
+                <td className="mono" style={{ verticalAlign: 'top' }}>{h.role ?? '—'}</td>
+                <td>
+                  <JsonViewer value={h.data} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </section>
   );
 }
