@@ -28,26 +28,28 @@ const envPairSchema = z.object({
 });
 
 // core.cmd.shell — командная строка в /bin/sh -c.
+// Имена полей (cmd/cwd) — те, что реально шлются в API; UI-label-ы могут быть
+// человекочитаемыми («Command» / «Working dir»), см. ErrandNewForm.tsx.
 export const shellSchema = z.object({
   module: z.literal('core.cmd.shell'),
   sid: sidSchema,
-  command: z.string().min(1, 'команда обязательна'),
+  cmd: z.string().min(1, 'команда обязательна'),
   timeout_seconds: timeoutSchema.default(30),
-  working_dir: z.string().optional(),
+  cwd: z.string().optional(),
   env: z.array(envPairSchema).optional(),
   dry_run: z.boolean().default(false),
 });
 export type ShellInput = z.infer<typeof shellSchema>;
 
-// core.exec.run — argv-форма (без shell).
+// core.exec.run — argv-форма (без shell). API ждёт `cmd` — путь к бинарю.
 export const execSchema = z.object({
   module: z.literal('core.exec.run'),
   sid: sidSchema,
-  binary: z.string().min(1, 'бинарь обязателен'),
+  cmd: z.string().min(1, 'бинарь обязателен'),
   // args — текстарea с line-per-arg; парсим в массив строк.
   args_raw: z.string().default(''),
   timeout_seconds: timeoutSchema.default(30),
-  working_dir: z.string().optional(),
+  cwd: z.string().optional(),
   env: z.array(envPairSchema).optional(),
   dry_run: z.boolean().default(false),
 });
@@ -98,22 +100,24 @@ export function isKnownModule(m: string): m is KnownModule {
 }
 
 // Маппинг формы → ErrandRunRequest.input (Record<string, unknown>).
+// Имена параметров строго те, что ждёт core-модуль на стороне Soul:
+// см. soul/internal/coremod/cmd/cmd.go и .../exec/exec.go.
 export function shellToInput(v: ShellInput): Record<string, unknown> {
-  const out: Record<string, unknown> = { command: v.command };
-  if (v.working_dir) out.working_dir = v.working_dir;
+  const out: Record<string, unknown> = { cmd: v.cmd };
+  if (v.cwd) out.cwd = v.cwd;
   const env = envPairsToRecord(v.env);
   if (env) out.env = env;
   return out;
 }
 
 export function execToInput(v: ExecInput): Record<string, unknown> {
-  const out: Record<string, unknown> = { binary: v.binary };
+  const out: Record<string, unknown> = { cmd: v.cmd };
   const args = v.args_raw
     .split('\n')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   if (args.length) out.args = args;
-  if (v.working_dir) out.working_dir = v.working_dir;
+  if (v.cwd) out.cwd = v.cwd;
   const env = envPairsToRecord(v.env);
   if (env) out.env = env;
   return out;

@@ -93,7 +93,7 @@ describe('ErrandNewForm', () => {
     });
     expect(postedBody).toMatchObject({
       module: 'core.cmd.shell',
-      input: { command: 'uptime' },
+      input: { cmd: 'uptime' },
     });
   });
 

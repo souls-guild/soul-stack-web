@@ -11,9 +11,8 @@ import {
   Eye,
   Scroll,
   Zap,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
+import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
@@ -94,6 +93,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       aria-label="Основная навигация"
       data-collapsed={collapsed ? 'true' : 'false'}
     >
+      <div className={styles.toggleRow}>
+        <button
+          type="button"
+          className={styles.toggle}
+          onClick={onToggle}
+          aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Развернуть' : 'Свернуть'}
+        >
+          <SidebarToggleIcon size={18} collapsed={collapsed} />
+        </button>
+      </div>
       {collapsed ? null : <div className={styles.group}>Реестр</div>}
       {FLEET.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
@@ -106,17 +117,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {ORACLE.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      <button
-        type="button"
-        className={styles.toggle}
-        onClick={onToggle}
-        aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
-        aria-expanded={!collapsed}
-        title={collapsed ? 'Развернуть' : 'Свернуть'}
-      >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        {collapsed ? null : <span className={styles.toggleLabel}>Свернуть</span>}
-      </button>
     </nav>
   );
 }

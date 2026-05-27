@@ -78,32 +78,34 @@
   text-overflow: ellipsis;
 }
 
-.toggle {
-  margin-top: auto;
-  margin-bottom: var(--s-3);
+/* Контейнер кнопки collapse — сверху сайдбара.
+   В expanded — кнопка выравнивается справа над nav-items.
+   В collapsed — кнопка центрирована, занимает всю ширину «полоски». */
+.toggleRow {
   display: flex;
+  justify-content: flex-end;
+  padding: var(--s-2) 0;
+}
+
+.collapsed .toggleRow {
+  justify-content: center;
+}
+
+.toggle {
+  display: inline-flex;
   align-items: center;
-  gap: var(--s-2);
-  padding: 8px 10px;
+  justify-content: center;
+  padding: 6px;
   border-radius: var(--radius);
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 12px;
   cursor: pointer;
   font-family: inherit;
-}
-
-.collapsed .toggle {
-  justify-content: center;
-  padding: 8px;
+  line-height: 0;
 }
 
 .toggle:hover {
   color: var(--text);
   background: var(--surface-2);
-}
-
-.toggleLabel {
-  white-space: nowrap;
 }

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { keeperApi, type SoulStatus, type SoulTransport } from '../../api/keeper';
-import { Badge, Dot } from '../../components/primitives';
+import { Shield } from 'lucide-react';
+import { keeperApi, type SoulListEntry, type SoulStatus, type SoulTransport } from '../../api/keeper';
+import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
+import { CovenAssignModal } from './CovenAssignModal';
 import styles from '../common.module.css';
 
 const SOUL_STATUSES: SoulStatus[] = ['pending', 'connected', 'disconnected', 'expired'];
@@ -12,6 +14,9 @@ const SOUL_TRANSPORTS: SoulTransport[] = ['agent', 'ssh'];
 
 // Конвенция coven-метки (openapi.yaml): lowercase, цифры, дефис-разделитель.
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+type SortKey = 'last_seen_at' | 'sid' | 'status';
+type SortDir = 'asc' | 'desc';
 
 function formatTimeAgo(iso: string | undefined): string {
   if (!iso) return '—';
@@ -41,10 +46,35 @@ function parseCovens(input: string): { valid: string[]; invalid: string[] } {
   return { valid, invalid };
 }
 
+// Сортировка по двум ключам с явной обработкой undefined у last_seen_at.
+function sortItems(items: SoulListEntry[], key: SortKey, dir: SortDir): SoulListEntry[] {
+  const arr = [...items];
+  arr.sort((a, b) => {
+    let cmp = 0;
+    if (key === 'sid') {
+      cmp = a.sid.localeCompare(b.sid);
+    } else if (key === 'status') {
+      cmp = a.status.localeCompare(b.status);
+    } else {
+      // last_seen_at: undefined → бесконечность давно (sort to bottom для desc).
+      const ta = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+      const tb = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+      cmp = ta - tb;
+    }
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  return arr;
+}
+
 export function SoulsList() {
   const [status, setStatus] = useState<SoulStatus | ''>('');
   const [transport, setTransport] = useState<SoulTransport | ''>('');
   const [coven, setCoven] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>('last_seen_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const parsed = useMemo(() => parseCovens(coven), [coven]);
   const covenFilter = parsed.valid.length > 0 ? parsed.valid : undefined;
@@ -60,15 +90,95 @@ export function SoulsList() {
       }),
   });
 
+  // Server-side: status/transport/coven. Client-side: search (contains) + sort.
+  const visible = useMemo<SoulListEntry[]>(() => {
+    if (!q.data) return [];
+    const needle = search.trim().toLowerCase();
+    const filtered = needle
+      ? q.data.items.filter((it) => it.sid.toLowerCase().includes(needle))
+      : q.data.items;
+    return sortItems(filtered, sortKey, sortDir);
+  }, [q.data, search, sortKey, sortDir]);
+
+  // selected чистим от исчезнувших SID-ов после смены фильтра (UX-аккуратность).
+  const visibleSidSet = useMemo(() => new Set(visible.map((it) => it.sid)), [visible]);
+  const effectiveSelected = useMemo(() => {
+    const out = new Set<string>();
+    for (const sid of selected) if (visibleSidSet.has(sid)) out.add(sid);
+    return out;
+  }, [selected, visibleSidSet]);
+
+  function toggle(sid: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  }
+  function toggleAll() {
+    if (effectiveSelected.size === visible.length && visible.length > 0) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(visible.map((it) => it.sid)));
+    }
+  }
+
+  function clickSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'last_seen_at' ? 'desc' : 'asc');
+    }
+  }
+
+  function sortGlyph(key: SortKey): string {
+    if (sortKey !== key) return '';
+    return sortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+
+  const allChecked = visible.length > 0 && effectiveSelected.size === visible.length;
+  const someChecked = effectiveSelected.size > 0 && !allChecked;
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Souls</h1>
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={effectiveSelected.size === 0}
+            onClick={() => setBulkOpen(true)}
+          >
+            <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            Bulk: Assign Coven{effectiveSelected.size > 0 ? ` (${effectiveSelected.size})` : ''}
+          </Button>
+        </div>
       </div>
 
       <div className={styles.filters}>
+        <label>
+          <div className={styles.metaKey}>Search SID (contains)</div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="host01"
+            aria-label="search SID"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              fontFamily: 'var(--font-mono)',
+              minWidth: 200,
+            }}
+          />
+        </label>
         <label>
           <div className={styles.metaKey}>Status</div>
           <select
@@ -127,27 +237,70 @@ export function SoulsList() {
         </div>
       ) : null}
 
-      {q.data && q.data.items.length === 0 ? (
+      {q.data && visible.length === 0 ? (
         <div className={styles.empty}>
-          Souls под фильтр не найдено. Регистрируются через <code className="mono">keeper.soul.create</code>.
+          {search ? 'Под search-фильтр ничего не нашлось.' : (
+            <>Souls под фильтр не найдено. Регистрируются через <code className="mono">keeper.soul.create</code>.</>
+          )}
         </div>
       ) : null}
 
-      {q.data && q.data.items.length > 0 ? (
+      {q.data && visible.length > 0 ? (
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>SID</th>
-              <th>Status</th>
+              <th style={{ width: 32 }}>
+                <input
+                  type="checkbox"
+                  aria-label="выбрать все"
+                  checked={allChecked}
+                  ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                  onChange={toggleAll}
+                />
+              </th>
+              <th>
+                <button
+                  type="button"
+                  onClick={() => clickSort('sid')}
+                  style={{ background: 'transparent', border: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                >
+                  SID{sortGlyph('sid')}
+                </button>
+              </th>
+              <th>
+                <button
+                  type="button"
+                  onClick={() => clickSort('status')}
+                  style={{ background: 'transparent', border: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                >
+                  Status{sortGlyph('status')}
+                </button>
+              </th>
               <th>Transport</th>
               <th>Covens</th>
-              <th>Last seen</th>
+              <th>
+                <button
+                  type="button"
+                  onClick={() => clickSort('last_seen_at')}
+                  style={{ background: 'transparent', border: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+                >
+                  Last seen{sortGlyph('last_seen_at')}
+                </button>
+              </th>
               <th>Registered</th>
             </tr>
           </thead>
           <tbody>
-            {q.data.items.map((row) => (
+            {visible.map((row) => (
               <tr key={row.sid}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`выбрать ${row.sid}`}
+                    checked={effectiveSelected.has(row.sid)}
+                    onChange={() => toggle(row.sid)}
+                  />
+                </td>
                 <td>
                   <Link to={`/souls/${encodeURIComponent(row.sid)}`}>{row.sid}</Link>
                 </td>
@@ -166,6 +319,12 @@ export function SoulsList() {
           </tbody>
         </table>
       ) : null}
+
+      <CovenAssignModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        variant={{ kind: 'bulk', sids: [...effectiveSelected] }}
+      />
     </div>
   );
 }

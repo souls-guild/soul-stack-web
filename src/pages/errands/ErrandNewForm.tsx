@@ -387,9 +387,9 @@ function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Com
     defaultValues: {
       module: 'core.cmd.shell',
       sid: prefilledSid,
-      command: '',
+      cmd: '',
       timeout_seconds: 30,
-      working_dir: '',
+      cwd: '',
       env: [],
       dry_run: false,
     },
@@ -423,21 +423,25 @@ function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Com
         <textarea
           rows={4}
           placeholder="uptime && df -h"
-          aria-invalid={errors.command ? 'true' : undefined}
-          {...register('command')}
+          aria-invalid={errors.cmd ? 'true' : undefined}
+          {...register('cmd')}
           style={{
             ...textareaStyle,
-            border: errors.command ? '1px solid var(--danger)' : '1px solid var(--border)',
+            border: errors.cmd ? '1px solid var(--danger)' : '1px solid var(--border)',
           }}
         />
-        {errors.command ? (
-          <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.command.message}</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+          параметр шлётся как <code>cmd</code> в API
+        </span>
+        {errors.cmd ? (
+          <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.cmd.message}</span>
         ) : null}
       </label>
       <Input
         label="Working dir (опционально)"
         placeholder="/var/tmp"
-        {...register('working_dir')}
+        hint="параметр шлётся как cwd в API"
+        {...register('cwd')}
         mono
       />
       <EnvFields<ShellInput>
@@ -464,10 +468,10 @@ function ExecForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Comm
     defaultValues: {
       module: 'core.exec.run',
       sid: prefilledSid,
-      binary: '',
+      cmd: '',
       args_raw: '',
       timeout_seconds: 30,
-      working_dir: '',
+      cwd: '',
       env: [],
       dry_run: false,
     },
@@ -499,9 +503,10 @@ function ExecForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Comm
       <Input
         label="Binary (абсолютный путь)"
         placeholder="/usr/bin/uptime"
-        aria-invalid={errors.binary ? 'true' : undefined}
-        {...register('binary')}
-        error={errors.binary?.message}
+        aria-invalid={errors.cmd ? 'true' : undefined}
+        {...register('cmd')}
+        error={errors.cmd?.message}
+        hint="параметр шлётся как cmd в API"
         mono
       />
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -512,11 +517,15 @@ function ExecForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Comm
           {...register('args_raw')}
           style={textareaStyle}
         />
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+          параметр шлётся как <code>args</code> в API
+        </span>
       </label>
       <Input
         label="Working dir (опционально)"
         placeholder="/var/tmp"
-        {...register('working_dir')}
+        hint="параметр шлётся как cwd в API"
+        {...register('cwd')}
         mono
       />
       <EnvFields<ExecInput>

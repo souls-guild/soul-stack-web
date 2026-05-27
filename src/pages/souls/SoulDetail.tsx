@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Badge, Dot } from '../../components/primitives';
+import { Key, Shield, Terminal } from 'lucide-react';
+import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import {
   keeperApi,
@@ -9,6 +10,8 @@ import {
   type SoulprintNetworkInterface,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { IssueTokenModal } from './IssueTokenModal';
+import { CovenAssignModal } from './CovenAssignModal';
 import styles from '../common.module.css';
 
 type Tab = 'overview' | 'soulprint' | 'history';
@@ -30,6 +33,8 @@ function skewWarning(collectedAt?: string, receivedAt?: string): string | null {
 export function SoulDetail() {
   const { sid = '' } = useParams<{ sid: string }>();
   const [tab, setTab] = useState<Tab>('overview');
+  const [tokenOpen, setTokenOpen] = useState(false);
+  const [covenOpen, setCovenOpen] = useState(false);
 
   const soulQ = useQuery({
     queryKey: ['soul', sid],
@@ -79,8 +84,33 @@ export function SoulDetail() {
               <Badge tone="muted">{row.transport}</Badge>
             </div>
           </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {row.transport === 'agent' ? (
+              <Button type="button" variant="secondary" onClick={() => setTokenOpen(true)}>
+                <Key size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                Issue Token
+              </Button>
+            ) : null}
+            <Link to={`/errands/new?sid=${encodeURIComponent(row.sid)}`}>
+              <Button type="button" variant="secondary">
+                <Terminal size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                Run Errand
+              </Button>
+            </Link>
+            <Button type="button" variant="secondary" onClick={() => setCovenOpen(true)}>
+              <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+              Coven assignment
+            </Button>
+          </div>
         </div>
       </div>
+
+      <IssueTokenModal open={tokenOpen} sid={row.sid} onClose={() => setTokenOpen(false)} />
+      <CovenAssignModal
+        open={covenOpen}
+        onClose={() => setCovenOpen(false)}
+        variant={{ kind: 'single', sid: row.sid, currentCovens: row.covens ?? [] }}
+      />
 
       <div className={styles.tabs} role="tablist">
         <button
@@ -131,6 +161,22 @@ export function SoulDetail() {
             <span className={styles.metaKey}>Last seen by KID</span>
             <span className={styles.metaVal}>{row.last_seen_by_kid ?? '—'}</span>
           </div>
+          {row.transport === 'ssh' ? (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 'var(--s-3) var(--s-4)',
+                background: 'var(--surface)',
+                border: '1px dashed var(--border)',
+                borderRadius: 'var(--radius)',
+                fontSize: 12.5,
+                color: 'var(--text-muted)',
+              }}
+            >
+              SSH target editing — TBD endpoint <code className="mono">/v1/souls/{'{sid}'}/ssh-target</code>
+              {' '}отсутствует в API.
+            </div>
+          ) : null}
         </section>
       ) : null}
 

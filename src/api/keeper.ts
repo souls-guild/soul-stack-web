@@ -36,6 +36,10 @@ export type IncarnationCheckDriftRequest = components['schemas']['IncarnationChe
 export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
 export type SoulprintReadReply = components['schemas']['SoulprintReadReply'];
+export type SoulIssueTokenReply = components['schemas']['SoulIssueTokenReply'];
+export type SoulCovenAssignRequest = components['schemas']['SoulCovenAssignRequest'];
+export type SoulCovenAssignReply = components['schemas']['SoulCovenAssignReply'];
+export type SoulCovenAssignSelector = components['schemas']['SoulCovenAssignSelector'];
 export type SoulprintFacts = components['schemas']['SoulprintFacts'];
 export type SoulprintOsFacts = components['schemas']['SoulprintOsFacts'];
 export type SoulprintKernelFacts = components['schemas']['SoulprintKernelFacts'];
@@ -205,6 +209,19 @@ export const keeperApi = {
         throw err;
       }
     },
+    // POST /v1/souls/{sid}/issue-token?force=<bool>. 200 → SoulIssueTokenReply.
+    // plain bootstrap_token отдаётся один раз. 409 при активном без force=true,
+    // 422 при transport: ssh.
+    issueToken: (sid: string, force = false) =>
+      apiSend<SoulIssueTokenReply>(
+        `/v1/souls/${encodeURIComponent(sid)}/issue-token`,
+        'POST',
+        { query: { force } },
+      ),
+    // POST /v1/souls/coven. Bulk coven-assign: mode=append/remove (label) или
+    // mode=replace (labels). Чанкинг с per-чанк commit — status=completed|partial.
+    bulkAssignCoven: (body: SoulCovenAssignRequest) =>
+      apiSend<SoulCovenAssignReply>('/v1/souls/coven', 'POST', { body }),
     // POST /v1/souls/{sid}/exec. 200 → ErrandResult (sync), 202 → ErrandAccepted (async).
     // Возвращаем discriminated union — caller сам решает, polling или render.
     exec: async (
