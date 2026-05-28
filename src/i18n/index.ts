@@ -1,16 +1,16 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import HttpBackend from 'i18next-http-backend';
 
-// i18n Soul Stack UI.
-// Языки: ru (default + fallback) / en. Выбор хранится в localStorage('lang').
-// Имена сущностей (Archon / Keeper / Souls / Coven / Tide / …) НЕ переводятся —
-// они либо хардкод English в JSX, либо identical в обоих locale.
-//
-// Ресурсы грузятся автоматически из locales/<lang>/<namespace>.json через
-// import.meta.glob (Vite eager). Чтобы добавить namespace — просто положи пару
-// файлов locales/ru/<ns>.json + locales/en/<ns>.json; init подхватит сам,
-// править этот файл не нужно. Это позволяет наполнять разные namespace-файлы
-// параллельно без конфликтов в одном JSON.
+// i18n Soul Stack UI — hybrid lazy-load.
+// Default-язык ru — bundled inline (мгновенный первый рендер, без мигания):
+// eager-glob грузит только locales/ru/<ns>.json в JS-бандл.
+// Остальные языки (en + будущие) — static-файлы public/locales/<lang>/<ns>.json,
+// фетчатся через i18next-http-backend ТОЛЬКО при переключении на язык; в бандл
+// не попадают. Добавить язык: положить public/locales/<lang>/*.json + код в
+// SUPPORTED_LANGS. Добавить ключ: ru в src/i18n/locales/ru/<ns>.json + en в
+// public/locales/en/<ns>.json (оба обязательны, ns-key-sync тест проверяет).
+// Список namespace выводится из ru-файлов — добавление ns не требует правки тут.
 
 export const SUPPORTED_LANGS = ['ru', 'en'] as const;
 export type Lang = (typeof SUPPORTED_LANGS)[number];
@@ -18,26 +18,23 @@ export type Lang = (typeof SUPPORTED_LANGS)[number];
 export const DEFAULT_LANG: Lang = 'ru';
 export const LANG_STORAGE_KEY = 'lang';
 
-// Авто-сбор ресурсов из locales/<lang>/<ns>.json.
-const localeModules = import.meta.glob('./locales/*/*.json', { eager: true });
+// Inline-ресурсы default-языка (только ru) — bundled.
+const ruModules = import.meta.glob('./locales/ru/*.json', { eager: true });
 
-type Resources = Record<string, Record<string, object>>;
+type NsBundle = Record<string, object>;
 
-function buildResources(): { resources: Resources; namespaces: string[] } {
-  const resources: Resources = {};
-  const nsSet = new Set<string>();
-  for (const [path, mod] of Object.entries(localeModules)) {
-    const m = path.match(/\.\/locales\/([^/]+)\/([^/]+)\.json$/);
+function buildRuInline(): { ruBundle: NsBundle; namespaces: string[] } {
+  const ruBundle: NsBundle = {};
+  for (const [path, mod] of Object.entries(ruModules)) {
+    const m = path.match(/\.\/locales\/ru\/([^/]+)\.json$/);
     if (!m) continue;
-    const [, lang, ns] = m;
-    const data = (mod as { default?: object }).default ?? (mod as object);
-    (resources[lang] ??= {})[ns] = data;
-    nsSet.add(ns);
+    const [, ns] = m;
+    ruBundle[ns] = (mod as { default?: object }).default ?? (mod as object);
   }
-  return { resources, namespaces: [...nsSet].sort() };
+  return { ruBundle, namespaces: Object.keys(ruBundle).sort() };
 }
 
-const { resources, namespaces } = buildResources();
+const { ruBundle, namespaces } = buildRuInline();
 
 function detectLang(): Lang {
   if (typeof window === 'undefined') return DEFAULT_LANG;
@@ -50,25 +47,35 @@ function detectLang(): Lang {
   return DEFAULT_LANG;
 }
 
-i18n.use(initReactI18next).init({
-  resources,
-  lng: detectLang(),
-  fallbackLng: DEFAULT_LANG,
-  ns: namespaces,
-  defaultNS: 'common',
-  interpolation: {
-    escapeValue: false, // React сам экранирует.
-  },
-  returnNull: false,
-});
+i18n
+  .use(HttpBackend)
+  .use(initReactI18next)
+  .init({
+    resources: { ru: ruBundle }, // default inline, остальные языки — backend.
+    partialBundledLanguages: true, // позволяет миксовать inline + http-backend.
+    lng: detectLang(),
+    fallbackLng: DEFAULT_LANG,
+    ns: namespaces,
+    defaultNS: 'common',
+    backend: {
+      loadPath: '/locales/{{lng}}/{{ns}}.json',
+    },
+    interpolation: {
+      escapeValue: false, // React сам экранирует.
+    },
+    returnNull: false,
+  });
 
-export function changeLang(lng: Lang): void {
+// Переключение языка. Для non-default (en+) i18next-http-backend async-загрузит
+// namespace по HTTP; до резолва i18next держит текущие строки (мигания/краша нет).
+// Возвращает промис загрузки — LangToggle использует его для disabled-состояния.
+export function changeLang(lng: Lang): Promise<unknown> {
   try {
     window.localStorage.setItem(LANG_STORAGE_KEY, lng);
   } catch {
     // ignore
   }
-  void i18n.changeLanguage(lng);
+  return i18n.changeLanguage(lng);
 }
 
 export default i18n;

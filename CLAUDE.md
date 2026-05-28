@@ -130,14 +130,24 @@ src/
 5. **JWT auth** — Bearer token в Authorization header (через AuthProvider).
    EventSource browser-native НЕ передаёт Authorization → SSE-endpoints требуют
    query-token или cookie-auth (backend follow-up).
-6. **i18n / язык UI (react-i18next + переключатель RU/EN):**
-   - Библиотека: `react-i18next` + `i18next`. Init — `src/i18n/index.ts`
-     (импортируется в `src/main.tsx` и в `src/test/setup.ts`). Языки: `ru`
-     (default + fallback) / `en`; выбор хранится в `localStorage('lang')`.
-   - Локали: `src/i18n/locales/ru.json` + `en.json`. Namespace-структура:
-     `common` (кнопки/действия), `forms` (поля/hint/валидация/titles),
-     `errors` (pretty-error сообщения), `pages` (page-prose, empty-states,
-     confirm-диалоги).
+6. **i18n / язык UI (react-i18next + переключатель RU/EN, hybrid lazy-load):**
+   - Библиотека: `react-i18next` + `i18next` + `i18next-http-backend`. Init —
+     `src/i18n/index.ts` (импортируется в `src/main.tsx` и в `src/test/setup.ts`).
+     Языки: `ru` (default + fallback) / `en`; выбор — `localStorage('lang')`.
+   - **Архитектура hybrid lazy-load** (много языков без раздувания JS-бандла):
+     - **Default `ru` — bundled inline:** живёт в `src/i18n/locales/ru/<ns>.json`,
+       eager-glob грузит ТОЛЬКО ru в JS-бандл → мгновенный первый рендер, без
+       мигания. Список namespace выводится из ru-файлов.
+     - **`en` + будущие — static в `public/locales/<lang>/<ns>.json`:** фетчатся
+       по HTTP через `i18next-http-backend` (`loadPath: /locales/{{lng}}/{{ns}}.json`)
+       ТОЛЬКО при переключении на язык. В JS-бандл НЕ попадают (после build —
+       `dist/locales/<lang>/`, не в JS-чанке). `partialBundledLanguages: true`
+       миксует inline-ru + backend.
+   - **Добавить язык:** положить `public/locales/<lang>/*.json` + добавить код в
+     `SUPPORTED_LANGS` (для тоггла). Ребилд локалей НЕ нужен (для не-default).
+   - Namespace-структура (одинакова в ru/en): `common` (кнопки/действия),
+     `forms` (поля/hint/валидация/titles), `errors` (pretty-error),
+     `pages` (page-prose, empty-states, confirm-диалоги).
    - **Доступ к ключу:** `const { t } = useTranslation();` затем `t('create')`
      (default-ns `common`) или с явным ns через двоеточие — `t('errors:generic')`,
      `t('forms:addHostTitle', { name })`, `t('pages:noRoles')`.
@@ -146,7 +156,9 @@ src/
      глобальный инстанс: `import i18n from '../../i18n'; const t = i18n.t.bind(i18n);`.
    - **Switcher:** `src/components/layout/LangToggle.tsx` (RU | EN), смонтирован
      в `Topbar.tsx` рядом с `ThemeToggle`. Переключение — `changeLang(lng)` из
-     `src/i18n` (persist + `i18n.changeLanguage`).
+     `src/i18n` (persist + `i18n.changeLanguage`, возвращает Promise загрузки ns).
+     На время async-загрузки non-default языка кнопки `disabled` (защита от
+     двойного клика); до резолва i18next держит текущие строки — мигания/краша нет.
    - **Правило перевода:**
      - **Меняются от языка** (ru/en ключи): кнопки/действия, hint/описания,
        ошибки, empty-states, confirm-тексты, loading/«нет данных».
@@ -160,9 +172,10 @@ src/
        строк («Register» / «Issue token» / «Showing N of M») значение в `ru.json`
        и `en.json` одинаковое English — так тест `i18n.test.tsx` проверяет
        синхронность ключей и неизменность.
-   - **Добавить ключ:** дописать в **оба** файла (`ru.json` + `en.json`) под
-     нужным namespace; ключ только в одном locale ловится тестом «ключи ru и en
-     синхронизированы».
+   - **Добавить ключ:** дописать в **оба** файла — ru в
+     `src/i18n/locales/ru/<ns>.json` + en в `public/locales/en/<ns>.json` (оба
+     обязательны). Ключ только в одном locale ловится ns-key-sync тестом
+     (`src/test/i18n.test.tsx` читает en из `public/locales/en` через fs).
    - **Тесты на locale-зависимый текст:** матчить по `data-testid` (устойчиво к
      языку), а не по строке кнопки. Существующие тесты матчат ru как default-вывод
      (`src/test/setup.ts` сбрасывает язык на `ru` после каждого теста).
