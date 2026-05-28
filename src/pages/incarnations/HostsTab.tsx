@@ -1,28 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Play, Server } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Play, Plus, Server, Trash2 } from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type SoulListEntry } from '../../api/keeper';
 import { soulDot, soulTone } from '../../components/status';
+import { ApiError } from '../../api/client';
+import { AddHostModal } from './AddHostModal';
 import styles from '../common.module.css';
 
 // Hosts-вкладка для IncarnationDetail.
 //
 // Источники данных:
-//   1. incarnation.spec.hosts[] — declared-список оператора (ADR-008). Сейчас:
-//      - GET /v1/incarnations/{name} возвращает spec как opaque jsonb (Record<string,unknown>);
-//      - POST /v1/incarnations НЕ принимает spec.hosts (только name/service/covens/input);
-//      - PATCH/PUT endpoint-а для spec нет.
-//      Поэтому вкладка отображает spec.hosts[] read-only, если оператор как-то его
-//      туда положил (например, через service-уровневый scenario create input).
+//   1. incarnation.spec.hosts[] — declared-список оператора (ADR-008). Editing
+//      через PATCH /v1/incarnations/{name}/hosts (mode=append/remove). Add host —
+//      модалка AddHostModal (select SID из реестра souls + опц. role); Remove —
+//      per-row кнопка. spec приходит как opaque jsonb (Record<string,unknown>),
+//      hosts[] извлекаем руками (extractDeclaredHosts).
 //   2. Connected souls — derived view: souls с coven=incarnation.name (см. ADR-008,
 //      incarnation.name — корневая Coven-метка).
-//
-// BACKLOG: spec.hosts editing требует backend endpoint вида
-//   PUT /v1/incarnations/{name}/hosts  (или PATCH /v1/incarnations/{name} с body.spec.hosts).
-// До появления этого endpoint-а Add/Remove Host UI не реализован — кнопки сейчас
-// бы вели в никуда.
 
 interface DeclaredHost {
   sid: string;
@@ -74,11 +71,20 @@ interface Props {
   incarnationName: string;
   spec: Record<string, unknown> | null | undefined;
   state: Record<string, unknown> | null | undefined;
+  // Статус incarnation: editing spec.hosts заблокировано при destroying/destroy_failed
+  // (backend вернёт 409). UI прячет кнопки заранее.
+  status?: string;
 }
 
-export function HostsTab({ incarnationName, spec, state }: Props) {
+export function HostsTab({ incarnationName, spec, state, status }: Props) {
+  const qc = useQueryClient();
   const declared = extractDeclaredHosts(spec);
   const runtimeHosts = extractRuntimeHosts(state);
+  const [addOpen, setAddOpen] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  // Editing spec.hosts недоступно при сносе — backend вернёт 409. Прячем UI заранее.
+  const editingBlocked = status === 'destroying' || status === 'destroy_failed';
 
   // Connected souls — фильтруем souls по coven=incarnation.name.
   // Это derived view, не authoritative-список; реальное соответствие проверяется
@@ -89,20 +95,62 @@ export function HostsTab({ incarnationName, spec, state }: Props) {
     enabled: Boolean(incarnationName),
   });
 
+  const removeMu = useMutation({
+    mutationFn: (sid: string) =>
+      keeperApi.incarnations.updateHosts(incarnationName, {
+        mode: 'remove',
+        hosts: [{ sid }],
+      }),
+    onSuccess: () => {
+      setRemoveError(null);
+      qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
+      qc.invalidateQueries({ queryKey: ['incarnation-souls', incarnationName] });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        if (err.status === 409) setRemoveError('Incarnation в состоянии destroying — правка spec.hosts невозможна.');
+        else if (err.status === 404) setRemoveError('Incarnation не найдена.');
+        else setRemoveError(`Ошибка ${err.status}: ${err.message}`);
+      } else {
+        setRemoveError(String(err));
+      }
+    },
+  });
+
+  const declaredSids = declared?.map((h) => h.sid) ?? [];
+
   return (
     <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>Declared hosts (spec.hosts)</h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <h2 className={styles.sectionTitle} style={{ margin: 0 }}>
+          Declared hosts (spec.hosts)
+        </h2>
+        {editingBlocked ? null : (
+          <Button type="button" variant="secondary" onClick={() => setAddOpen(true)}>
+            <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            Add host
+          </Button>
+        )}
+      </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Декларированный список хостов из <code className="mono">incarnation.spec.hosts[]</code>.
-        Read-only: API сейчас не предоставляет endpoint для редактирования
-        <code className="mono"> spec.hosts</code> после создания incarnation.
+        Декларированный список хостов из <code className="mono">incarnation.spec.hosts[]</code>{' '}
+        (ADR-008). Source of truth для bootstrap-create и topology resolver-а.
       </p>
+
+      {removeError ? <div className={styles.errorBox}>{removeError}</div> : null}
 
       {declared === null || declared.length === 0 ? (
         <div className={styles.empty}>
           <code className="mono">spec.hosts</code> не задан. Volatile-роль определяется
           probe-шагом в сценарии (<code className="mono">core.exec.run</code> + <code className="mono">register:</code>{' '}
-          + <code className="mono">where:</code>).
+          + <code className="mono">where:</code>). Добавьте хост кнопкой «Add host».
         </div>
       ) : (
         <table className={styles.table}>
@@ -111,6 +159,7 @@ export function HostsTab({ incarnationName, spec, state }: Props) {
               <th>SID</th>
               <th>Role</th>
               <th>Coven</th>
+              {editingBlocked ? null : <th style={{ width: 1 }} />}
             </tr>
           </thead>
           <tbody>
@@ -121,11 +170,32 @@ export function HostsTab({ incarnationName, spec, state }: Props) {
                 </td>
                 <td className="mono">{h.role ?? '—'}</td>
                 <td className="mono">{h.coven ?? '—'}</td>
+                {editingBlocked ? null : (
+                  <td>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeMu.mutate(h.sid)}
+                      disabled={removeMu.isPending && removeMu.variables === h.sid}
+                      aria-label={`Remove host ${h.sid}`}
+                      title="Удалить из declared-списка"
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
+      <AddHostModal
+        open={addOpen}
+        incarnationName={incarnationName}
+        existingSids={declaredSids}
+        onClose={() => setAddOpen(false)}
+      />
 
       <div
         style={{

@@ -14,6 +14,7 @@ import {
   Waves,
   Send,
   Play,
+  Activity,
   HelpCircle,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
@@ -57,6 +58,7 @@ const ORACLE: NavItem[] = [
 ];
 
 const HISTORY: NavItem[] = [
+  { to: '/runs', label: 'All runs', icon: Activity, matchPrefix: '/runs' },
   { to: '/tides', label: 'Tides', icon: Waves, matchPrefix: '/tides' },
   { to: '/errand-runs', label: 'Errand runs', icon: Terminal, matchPrefix: '/errand-runs' },
   { to: '/push-runs', label: 'Push runs', icon: Send, matchPrefix: '/push-runs' },

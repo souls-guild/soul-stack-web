@@ -173,6 +173,15 @@ export type ServiceListReply = components['schemas']['ServiceListReply'];
 export type ServiceRegisterRequest = components['schemas']['ServiceRegisterRequest'];
 export type ServiceUpdateRequest = components['schemas']['ServiceUpdateRequest'];
 
+// state_schema-метаданные сервиса (UI Schema explorer). GET /v1/services/{name}/state-schema.
+export type ServiceStateSchemaReply = components['schemas']['ServiceStateSchemaReply'];
+export type StateSchemaMigration = components['schemas']['StateSchemaMigration'];
+
+// Hosts-editing (PATCH /v1/incarnations/{name}/hosts).
+export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
+export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
+export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
+
 // Refs / scenarios endpoints ещё не зафиксированы в openapi (фиксируется параллельно
 // в backend-slice-е). Локальные типы — узкий контракт, использующийся UI;
 // graceful-degraded при 404/501.
@@ -312,6 +321,15 @@ export const keeperApi = {
         `/v1/incarnations/${encodeURIComponent(name)}`,
         'DELETE',
         { query: { allow_destroy: allowDestroy } },
+      ),
+    // PATCH /v1/incarnations/{name}/hosts — правка declared spec.hosts[] (ADR-008).
+    // mode=replace|append|remove. 200 → обновлённый incarnation. 422 unknown-SID,
+    // 409 destroying/destroy_failed, 404 нет incarnation.
+    updateHosts: (name: string, body: IncarnationUpdateHostsRequest) =>
+      apiSend<IncarnationGetReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/hosts`,
+        'PATCH',
+        { body },
       ),
   },
 
@@ -520,6 +538,14 @@ export const keeperApi = {
     listScenarios: (name: string, ref?: string) =>
       apiGet<ServiceScenarioListReply>(
         `/v1/services/${encodeURIComponent(name)}/scenarios`,
+        { query: { ref } },
+      ),
+    // GET /v1/services/{name}/state-schema[?ref=...] — state_schema-метаданные
+    // (текущая state_schema_version + опц. декларация schema + список миграций).
+    // Endpoint опционален для старых деплоев Keeper — UI graceful-degraded на 404/501.
+    getStateSchema: (name: string, ref?: string) =>
+      apiGet<ServiceStateSchemaReply>(
+        `/v1/services/${encodeURIComponent(name)}/state-schema`,
         { query: { ref } },
       ),
   },

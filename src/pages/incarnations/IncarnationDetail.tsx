@@ -293,7 +293,12 @@ export function IncarnationDetail() {
       ) : null}
 
       {tab === 'hosts' ? (
-        <HostsTab incarnationName={row.name} spec={row.spec ?? null} state={row.state ?? null} />
+        <HostsTab
+          incarnationName={row.name}
+          spec={row.spec ?? null}
+          state={row.state ?? null}
+          status={row.status}
+        />
       ) : null}
 
       {tab === 'history' ? (

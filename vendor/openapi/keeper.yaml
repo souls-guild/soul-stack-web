@@ -773,6 +773,56 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/incarnations/{name}/hosts:
+    patch:
+      tags: [Incarnation]
+      operationId: UpdateIncarnationHosts
+      summary: Править declared `spec.hosts[]` (UI Hosts editing, ADR-008).
+      description: |
+        Permission: incarnation.update. MCP-tool: keeper.incarnation.hosts.update.
+
+        Три mode-семантики над declared `spec.hosts[]`:
+          - `replace` — полная замена списка переданным набором (включая пустой).
+          - `append`  — добавить переданные hosts; при совпадении SID role
+                        существующей записи обновляется (insert-or-update).
+          - `remove`  — удалить записи с указанными SID-ами (`role` в payload
+                        игнорируется).
+
+        SID-ы валидируются на существование в реестре `souls` (single batch-
+        SELECT, не per-host); неизвестные SID → 422. `role` — опциональна,
+        формат `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` (kebab-case, 1..63 символа) или
+        пустая (ADR-008 допускает null для хостов вне declared-spec).
+        Атомарность — одна PG-транзакция SELECT FOR UPDATE → guard статуса →
+        souls-validate → UPDATE spec.
+
+        Статус `destroying` / `destroy_failed` → 409 (правка spec бессмысленна
+        при сносе); остальные статусы (включая `applying`) — допустимы (spec —
+        declared-вход следующего прогона, не текущего).
+
+        Audit `incarnation.hosts_updated` (`source: api`/`mcp`, archon = JWT.sub).
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IncarnationUpdateHostsRequest'
+      responses:
+        '200':
+          description: Обновлённый incarnation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncarnationGetReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/incarnations/{name}/tides:
     get:
       tags: [Tide]
@@ -1379,6 +1429,185 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/errand-runs:
+    post:
+      tags: [ErrandRun]
+      operationId: CreateErrandRun
+      summary: Создать ErrandRun — multi-target обвязку над Errand (ADR-041).
+      description: |
+        Permission: errand.run (reuse, ADR-041(9) — без новых RBAC-permissions).
+        Резолв `target` → SID[]-snapshot (AND-merge sids/coven/where; security
+        invariant ADR-040: invocation сужает scope, не расширяет). Fan-out
+        per-host под semaphore-cap concurrency (default 50, max 500). Async-by-
+        default: 202 + errand_run_id + Location; прогресс — polling GET либо
+        SSE-канал /events. Whitelist модулей enforced Soul-side per-Errand.
+        Audit: errand_run.invoked (source=api).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrandRunCreateRequest'
+      responses:
+        '202':
+          description: ErrandRun создан в статусе pending. ErrandRunWorker подберёт через claim-loop.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandRunCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [ErrandRun]
+      operationId: ListErrandRuns
+      summary: Список ErrandRun-ов (фильтр + пагинация).
+      description: |
+        Permission: errand.list. Sort started_at DESC.
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+          style: form
+          explode: true
+          description: Multi-value `?status=X&status=Y`; OR-семантика.
+        - in: query
+          name: module
+          required: false
+          schema:
+            type: string
+          description: Exact-match по module.
+        - in: query
+          name: started_after
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Фильтр по началу (started_at > value).
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+      responses:
+        '200':
+          description: Страница ErrandRun-ов под фильтром.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandRunListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/errand-runs/{id}:
+    get:
+      tags: [ErrandRun]
+      operationId: GetErrandRun
+      summary: Snapshot одного ErrandRun.
+      description: |
+        Permission: errand.list. Для running-row — текущий current_done без
+        summary; для терминала — Summary с per-SID ref-ами.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID ErrandRun-а.
+      responses:
+        '200':
+          description: Snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandRun'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [ErrandRun]
+      operationId: CancelErrandRun
+      summary: Отменить ErrandRun (fan-out CancelErrand на все running, ADR-041(12)).
+      description: |
+        Permission: errand.run (reuse). Fan-out CancelErrand на все running
+        дочерние Errand-ы (parity ADR-033 slice E5). 202 + status=cancelling.
+        Audit: errand_run.cancelled (source=api, archon_aid=JWT.sub).
+        409 — ErrandRun уже в терминальном статусе.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      responses:
+        '202':
+          description: Cancel-signal fan-out отправлен (best-effort, per-Errand).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrandRunCancelReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/errand-runs/{id}/events:
+    get:
+      tags: [ErrandRun]
+      operationId: StreamErrandRunEvents
+      summary: SSE live-progress ErrandRun (ADR-041, E6-4).
+      description: |
+        Permission: errand.run. Server-Sent Events stream: `event:<kind>`
+        фреймы для kind ∈ {errand_run.invoked, errand_run.completed,
+        errand_run.partial_failed, errand_run.failed, errand_run.cancelled}.
+        Stream закрывается на любом terminal-kind. Heartbeat `:keepalive`
+        каждые 30s. Max-lifetime 30 мин (anti-leak; клиент переподключается).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      responses:
+        '200':
+          description: SSE-stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE frames `event: <kind>\nid: <errand_run_id>\ndata: <json>\n\n`.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/plugins/sigils:
     post:
       tags: [Plugin]
@@ -1731,6 +1960,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServiceScenariosListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+        '502': { $ref: '#/components/responses/Problem502' }
+
+  /v1/services/{name}/state-schema:
+    get:
+      tags: [Service]
+      operationId: ListServiceStateSchema
+      summary: state_schema-метаданные сервиса (для UI Schema explorer-а).
+      description: |
+        Permission: service.list. Возвращает state_schema-метаданные сервиса
+        из материализованного снапшота git-репо Service-а:
+        `state_schema_version` (текущая версия структуры `incarnation.state`),
+        опциональная декларация структуры (`service.yml::state_schema:`, MVP
+        подмножество JSON Schema — type/required/properties/items/
+        additionalProperties), и плоский список миграций
+        `migrations/<NNN>_to_<MMM>.yml` (metadata-only: from/to/path; content
+        DSL не парсится). Параметр `?ref=<git-ref>` опционален: по умолчанию
+        используется ref из реестра Service-а. Сортировка миграций — by `to`
+        ASC. Кеш на стороне Keeper-а — TTL 60s, ключ (name, ref). Read-only,
+        без audit. 502 bad-gateway — loader упал (git-clone / парсинг
+        манифеста / scan migrations).
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+        - in: query
+          name: ref
+          required: false
+          schema: { type: string }
+          description: |
+            git-ref для проверки. Если не задан — берётся ref из реестра
+            Service-а.
+      responses:
+        '200':
+          description: state_schema-метаданные.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceStateSchemaReply'
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
@@ -3188,6 +3457,65 @@ components:
             $ref: '#/components/schemas/Scenario'
       required: [service, ref, scenarios]
 
+    StateSchemaMigration:
+      type: object
+      description: |
+        Одна запись цепочки state_schema-миграций (metadata-only): номера
+        версий-источника и -приёмника + относительный путь файла в снапшоте.
+        Content (DSL-операции) НЕ парсится — UI Schema explorer-у нужен только
+        граф `from → to` (грамматику миграции пользователь смотрит в git-репо).
+      properties:
+        from:
+          type: integer
+          description: Версия-источник миграции (`<NNN>` в имени файла).
+        to:
+          type: integer
+          description: Версия-приёмник миграции (`<MMM>` в имени файла).
+        path:
+          type: string
+          description: |
+            Относительный путь файла миграции внутри снапшота
+            (`migrations/<NNN>_to_<MMM>.yml`).
+      required: [from, to, path]
+
+    ServiceStateSchemaReply:
+      type: object
+      description: |
+        Ответ `GET /v1/services/{name}/state-schema`: state_schema-метаданные
+        сервиса на конкретном ref-е. `state_schema_version` — текущая версия
+        структуры `incarnation.state` (monotonic int, ADR-019); `schema` —
+        опциональная декларация структуры из `service.yml::state_schema:`
+        (MVP подмножество JSON Schema; отсутствует — UI трактует как
+        «структура не задекларирована»); `migrations` — плоский список
+        миграций в `migrations/<NNN>_to_<MMM>.yml`, отсортированный по `to`
+        ASC. Content миграций не парсится — только metadata.
+      properties:
+        service:
+          type: string
+          description: Имя Service-а (дубль path-параметра).
+        ref:
+          type: string
+          description: |
+            git-ref, на котором составлен listing (значение query-параметра
+            либо ref из реестра Service-а, если query не задан).
+        state_schema_version:
+          type: integer
+          description: Текущая версия структуры `incarnation.state` (≥1).
+        schema:
+          type: object
+          additionalProperties: true
+          description: |
+            Декларация структуры state из `service.yml::state_schema:`
+            (MVP подмножество JSON Schema draft-07: type / required /
+            properties / items / additionalProperties). Может отсутствовать.
+        migrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/StateSchemaMigration'
+          description: |
+            Найденные шаги цепочки миграций (metadata-only), sorted by `to` ASC.
+      required: [service, ref, state_schema_version, migrations]
+
     OmenCreateRequest:
       type: object
       description: |
@@ -4133,6 +4461,50 @@ components:
           pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
       required: [apply_id]
 
+    IncarnationSpecHost:
+      type: object
+      description: |
+        Одна запись declared `spec.hosts[]` (ADR-008). Source of truth для
+        bootstrap-create + topology resolver-а (`soulprint.hosts[].role`).
+      properties:
+        sid:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9.-]{0,253}$'
+          description: SID хоста (FQDN), обязан существовать в реестре `souls`.
+        role:
+          type: string
+          pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+          maxLength: 63
+          description: |
+            Declared-роль (kebab-case, 1..63 символа). Опциональна — ADR-008
+            допускает null для хостов вне declared-spec. Operator-asserted
+            строка; список не предопределён (master/replica — частые, но не
+            исчерпывающие).
+      required: [sid]
+
+    IncarnationUpdateHostsRequest:
+      type: object
+      description: |
+        Body PATCH /v1/incarnations/{name}/hosts. Три mode-семантики над
+        declared `spec.hosts[]` (ADR-008): replace / append / remove.
+      properties:
+        hosts:
+          type: array
+          items:
+            $ref: '#/components/schemas/IncarnationSpecHost'
+          description: |
+            Список hosts для применения mode-операции. Для `remove` `role`
+            игнорируется (важен только `sid`). Пустой массив legitimate для
+            `replace` (очистить declared-spec).
+        mode:
+          type: string
+          enum: [replace, append, remove]
+          description: |
+            Тип операции над existing `spec.hosts[]`. `replace` — полная замена;
+            `append` — insert-or-update role по SID; `remove` — удалить
+            переданные SID-ы.
+      required: [hosts, mode]
+
     IncarnationCheckDriftRequest:
       type: object
       description: |
@@ -4981,6 +5353,172 @@ components:
         total:
           type: integer
       required: [items, offset, limit, total]
+
+    ErrandRunTarget:
+      type: object
+      description: |
+        Declarative target ErrandRun — invocation-time scope. Минимум одно из
+        sids/coven/where. AND-merge: пересечение фильтров.
+      properties:
+        sids:
+          type: array
+          items:
+            type: string
+          description: Exact-match snapshot SID-ов (`sid = ANY($sids)`).
+        coven:
+          type: array
+          items:
+            type: string
+          description: AND-семантика по `souls.coven` — хост обязан нести ВСЕ метки.
+        where:
+          type: string
+          maxLength: 4096
+          description: CEL-предикат по soulprint.self.*; в MVP сохраняется в `target_origin` без evaluate.
+
+    ErrandRunCreateRequest:
+      type: object
+      description: |
+        Body POST /v1/errand-runs (ADR-041(3)).
+      properties:
+        module:
+          type: string
+          description: Имя core/community модуля для exec (whitelist enforced Soul-side).
+        input:
+          type: object
+          additionalProperties: true
+          description: Module-specific input (jsonb). Vault-refs резолвятся render-фазой Soul.
+        target:
+          $ref: '#/components/schemas/ErrandRunTarget'
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+          description: Per-Errand timeout (default 30s).
+        concurrency:
+          type: integer
+          minimum: 0
+          maximum: 500
+          description: Semaphore-cap fan-out. 0/missing → default 50.
+        on_failure:
+          type: string
+          enum: [continue, abort]
+          description: ADR-041(7). Default — continue.
+      required: [module, target]
+
+    ErrandRunCreateReply:
+      type: object
+      properties:
+        errand_run_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        scope_size:
+          type: integer
+          description: len(target_resolved_souls) после AND-merge.
+        status:
+          type: string
+          enum: [pending]
+        location:
+          type: string
+          description: REST path для get/poll.
+      required: [errand_run_id, scope_size, status, location]
+
+    ErrandRunRef:
+      type: object
+      description: Запись об одном дочернем Errand в Summary.
+      properties:
+        sid:
+          type: string
+        errand_id:
+          type: string
+          description: ULID; пуст, если Spawner упал до создания row (NotConnected).
+        status:
+          type: string
+          description: success | failed | cancelled | timed_out | module_not_allowed.
+        error_code:
+          type: string
+      required: [sid, status]
+
+    ErrandRunSummary:
+      type: object
+      description: Агрегированный итог ErrandRun (jsonb-колонка `summary`).
+      properties:
+        total:
+          type: integer
+        succeeded:
+          type: integer
+        failed:
+          type: integer
+        cancelled:
+          type: integer
+        errands:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrandRunRef'
+      required: [total, succeeded, failed, cancelled, errands]
+
+    ErrandRun:
+      type: object
+      description: |
+        Snapshot ErrandRun. SID-список (target_resolved_souls) НЕ кладётся:
+        scope_size — len; полный список доступен через summary.errands[] для
+        терминалов.
+      properties:
+        errand_run_id:
+          type: string
+        module:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+        scope_size:
+          type: integer
+        current_done:
+          type: integer
+        concurrency:
+          type: integer
+        on_failure:
+          type: string
+        target:
+          $ref: '#/components/schemas/ErrandRunTarget'
+        attempt:
+          type: integer
+        started_by_aid:
+          type: string
+          pattern: '^archon-[a-z0-9-]{1,62}$'
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        summary:
+          $ref: '#/components/schemas/ErrandRunSummary'
+      required: [errand_run_id, module, status, scope_size, current_done, concurrency, on_failure, attempt, started_by_aid, started_at]
+
+    ErrandRunListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrandRun'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
+    ErrandRunCancelReply:
+      type: object
+      properties:
+        errand_run_id:
+          type: string
+        status:
+          type: string
+          enum: [cancelling]
+      required: [errand_run_id, status]
 
     PushCleanupRequest:
       type: object
