@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -140,6 +141,7 @@ function ParamsTypedFields({
 }
 
 export function VigilNewForm() {
+  const { t } = useTranslation();
   const nav = useNavigate();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -413,9 +415,9 @@ export function VigilNewForm() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <Button type="submit" variant="primary" disabled={isSubmitting || create.isPending}>
-            {create.isPending ? 'Создаём…' : 'Create Vigil'}
+            {create.isPending ? t('creating') : t('createVigil')}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => nav('/vigils')}>Отмена</Button>
+          <Button type="button" variant="ghost" onClick={() => nav('/vigils')}>{t('cancel')}</Button>
         </div>
       </form>
     </div>

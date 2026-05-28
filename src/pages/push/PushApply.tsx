@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { keeperApi, type PushApplyView } from '../../api/keeper';
@@ -35,6 +36,7 @@ function readHosts(summary: PushApplyView['summary'] | undefined): HostSummary[]
 }
 
 export function PushApply() {
+  const { t } = useTranslation();
   const [inventoryRaw, setInventoryRaw] = useState('');
   const [destiny, setDestiny] = useState('');
   const [sshProvider, setSshProvider] = useState('');
@@ -185,7 +187,7 @@ export function PushApply() {
         </label>
         <div>
           <Button variant="primary" disabled={submitDisabled} onClick={() => submit.mutate()}>
-            {submit.isPending ? 'Отправляем…' : 'Push apply'}
+            {submit.isPending ? t('sending') : t('pushApply')}
           </Button>
         </div>
         {submit.error ? (

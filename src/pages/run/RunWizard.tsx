@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, Upload } from 'lucide-react';
@@ -113,6 +114,7 @@ function pickInitialCommandModule(raw: string | null): CommandModuleKind {
 }
 
 export function RunWizard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -390,7 +392,7 @@ export function RunWizard() {
 
         <div className={styles.actions}>
           <Button type="button" variant="ghost" onClick={goBack} disabled={step === 1}>
-            <ArrowLeft size={14} /> Назад
+            <ArrowLeft size={14} /> {t('back')}
           </Button>
           {step < 4 ? (
             <Button
@@ -402,7 +404,7 @@ export function RunWizard() {
                 (step === 3 && !canAdvanceFromStep3)
               }
             >
-              Далее <ArrowRight size={14} />
+              {t('next')} <ArrowRight size={14} />
             </Button>
           ) : (
             <Button
@@ -414,7 +416,7 @@ export function RunWizard() {
               }}
               disabled={!canSubmit}
             >
-              <Send size={14} /> {submitMu.isPending ? 'Запускаем…' : 'Запустить'}
+              <Send size={14} /> {submitMu.isPending ? t('running') : t('run')}
             </Button>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +28,7 @@ import styles from '../common.module.css';
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 export function IncarnationNewForm() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -284,10 +286,10 @@ export function IncarnationNewForm() {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <Button type="submit" variant="primary" disabled={isSubmitting || createMu.isPending}>
-            {createMu.isPending ? 'Создаём…' : 'Создать incarnation'}
+            {createMu.isPending ? t('creating') : t('createIncarnation')}
           </Button>
           <Link to="/incarnations">
-            <Button type="button" variant="ghost">Отмена</Button>
+            <Button type="button" variant="ghost">{t('cancel')}</Button>
           </Link>
         </div>
       </form>

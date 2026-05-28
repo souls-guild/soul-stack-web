@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { ThemeToggle } from './ThemeToggle';
+import { LangToggle } from './LangToggle';
 import styles from './Topbar.module.css';
 
 function initialsOf(aid: string): string {
@@ -13,6 +15,7 @@ function initialsOf(aid: string): string {
 }
 
 export function Topbar() {
+  const { t } = useTranslation();
   const { identity, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,6 +47,7 @@ export function Topbar() {
         <span className={styles.sub}>Keeper UI</span>
       </div>
       <div className={styles.right}>
+        <LangToggle />
         <ThemeToggle />
         {identity ? (
           <div className={styles.menu} ref={menuRef}>
@@ -69,7 +73,7 @@ export function Topbar() {
                   ) : null}
                 </div>
                 <button type="button" className={styles.menuItem} onClick={onLogout}>
-                  Выйти
+                  {t('logout')}
                 </button>
               </div>
             ) : null}

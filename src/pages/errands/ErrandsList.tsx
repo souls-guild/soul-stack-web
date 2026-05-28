@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Terminal } from 'lucide-react';
@@ -46,6 +47,7 @@ function parseModuleCsv(input: string): string[] {
 }
 
 export function ErrandsList() {
+  const { t } = useTranslation();
   const [sid, setSid] = useState('');
   const [moduleCsv, setModuleCsv] = useState('');
   const [status, setStatus] = useState<ErrandStatus | ''>('');
@@ -142,18 +144,18 @@ export function ErrandsList() {
         </label>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && items.length === 0 ? (
         <div className={styles.empty}>
-          Errand-ов под фильтр не найдено.{' '}
+          {t('pages:errandsNotFound')}{' '}
           <Link to="/run?workload=command" style={{ color: 'var(--accent)' }}>
-            Запустить новый через Run Wizard
+            {t('runNewViaWizard')}
           </Link>
           .
         </div>

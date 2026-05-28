@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
@@ -33,6 +34,7 @@ function prettyError(err: unknown): string {
 }
 
 export function AddHostModal({ open, incarnationName, existingSids, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [sid, setSid] = useState('');
   const [role, setRole] = useState('');
@@ -75,7 +77,7 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
     setFormError(null);
     setServerError(null);
     if (!sid) {
-      setFormError('Выберите SID хоста.');
+      setFormError(t('errors:selectHostSid'));
       return;
     }
     const r = role.trim();
@@ -89,15 +91,15 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
   return (
     <Modal
       open={open}
-      title={`Add host → ${incarnationName}`}
+      title={t('forms:addHostTitle', { name: incarnationName })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button type="button" variant="primary" onClick={submit} disabled={mu.isPending}>
-            {mu.isPending ? 'Добавляем…' : 'Добавить'}
+            {mu.isPending ? t('adding') : t('add')}
           </Button>
         </>
       }

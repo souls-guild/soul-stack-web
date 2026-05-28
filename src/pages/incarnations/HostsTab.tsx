@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play, Plus, Server, Trash2 } from 'lucide-react';
@@ -77,6 +78,7 @@ interface Props {
 }
 
 export function HostsTab({ incarnationName, spec, state, status }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const declared = extractDeclaredHosts(spec);
   const runtimeHosts = extractRuntimeHosts(state);
@@ -135,7 +137,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         {editingBlocked ? null : (
           <Button type="button" variant="secondary" onClick={() => setAddOpen(true)}>
             <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Add host
+            {t('addHost')}
           </Button>
         )}
       </div>
@@ -178,7 +180,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
                       onClick={() => removeMu.mutate(h.sid)}
                       disabled={removeMu.isPending && removeMu.variables === h.sid}
                       aria-label={`Remove host ${h.sid}`}
-                      title="Удалить из declared-списка"
+                      title={t('pages:removeFromDeclared')}
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -225,7 +227,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         derived view, не authoritative.
       </p>
 
-      {connected.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {connected.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {connected.error ? (
         <div className={styles.errorBox}>
           Не удалось загрузить souls: {String(connected.error)}

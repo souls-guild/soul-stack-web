@@ -130,11 +130,42 @@ src/
 5. **JWT auth** — Bearer token в Authorization header (через AuthProvider).
    EventSource browser-native НЕ передаёт Authorization → SSE-endpoints требуют
    query-token или cookie-auth (backend follow-up).
-6. **i18n / язык UI:**
-   - Structural-лейблы (nav / секции / заголовки страниц / табы / колонки /
-     имена сущностей) — English по словарю Soul Stack (Archon / Keeper /
-     Souls / Coven / Tide / Vigil / Decree / Errand / Sigil).
-   - Free-text (hint / описания / ошибки / help) — русский.
+6. **i18n / язык UI (react-i18next + переключатель RU/EN):**
+   - Библиотека: `react-i18next` + `i18next`. Init — `src/i18n/index.ts`
+     (импортируется в `src/main.tsx` и в `src/test/setup.ts`). Языки: `ru`
+     (default + fallback) / `en`; выбор хранится в `localStorage('lang')`.
+   - Локали: `src/i18n/locales/ru.json` + `en.json`. Namespace-структура:
+     `common` (кнопки/действия), `forms` (поля/hint/валидация/titles),
+     `errors` (pretty-error сообщения), `pages` (page-prose, empty-states,
+     confirm-диалоги).
+   - **Доступ к ключу:** `const { t } = useTranslation();` затем `t('create')`
+     (default-ns `common`) или с явным ns через двоеточие — `t('errors:generic')`,
+     `t('forms:addHostTitle', { name })`, `t('pages:noRoles')`.
+   - **Pure-функции (не-hook)** — error-хелперы (`rbac/errors.ts`,
+     `services/errors.ts`, `RevokeArchonModal.prettyError`) используют
+     глобальный инстанс: `import i18n from '../../i18n'; const t = i18n.t.bind(i18n);`.
+   - **Switcher:** `src/components/layout/LangToggle.tsx` (RU | EN), смонтирован
+     в `Topbar.tsx` рядом с `ThemeToggle`. Переключение — `changeLang(lng)` из
+     `src/i18n` (persist + `i18n.changeLanguage`).
+   - **Правило перевода:**
+     - **Меняются от языка** (ru/en ключи): кнопки/действия, hint/описания,
+       ошибки, empty-states, confirm-тексты, loading/«нет данных».
+     - **НЕ переводятся** (English-identical в обоих locale ИЛИ хардкод English):
+       имена сущностей (Archon / Keeper / Souls / Coven / Tide / Surge / Vigil /
+       Portent / Oracle / Decree / Sigil / Errand / ErrandRun / Acolyte /
+       Service / Incarnation / Soulprint / Plugin / RBAC), structural-лейблы
+       (nav / section headers / page titles / tab names / table column headers),
+       технические идентификаторы (SID / AID / ULID / git-ref / CEL),
+       enum-значения статусов (pending/running/succeeded). Для English-identical
+       строк («Register» / «Issue token» / «Showing N of M») значение в `ru.json`
+       и `en.json` одинаковое English — так тест `i18n.test.tsx` проверяет
+       синхронность ключей и неизменность.
+   - **Добавить ключ:** дописать в **оба** файла (`ru.json` + `en.json`) под
+     нужным namespace; ключ только в одном locale ловится тестом «ключи ru и en
+     синхронизированы».
+   - **Тесты на locale-зависимый текст:** матчить по `data-testid` (устойчиво к
+     языку), а не по строке кнопки. Существующие тесты матчат ru как default-вывод
+     (`src/test/setup.ts` сбрасывает язык на `ru` после каждого теста).
    - НЕ переводить имена сущностей на русский (была ошибка с «Архонты»).
 7. **Zod + React Hook Form** для всех форм.
 8. **TanStack Query** для всех fetch + invalidate на mutate.

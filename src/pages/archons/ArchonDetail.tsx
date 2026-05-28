@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type OperatorAuthMethod } from '../../api/keeper';
 import { ApiError } from '../../api/client';
@@ -25,6 +26,7 @@ function authMethodTone(m: OperatorAuthMethod | string | undefined):
 }
 
 export function ArchonDetail() {
+  const { t } = useTranslation();
   const { aid = '' } = useParams<{ aid: string }>();
   const [tab, setTab] = useState<Tab>('info');
   const [revokeOpen, setRevokeOpen] = useState(false);
@@ -46,16 +48,18 @@ export function ArchonDetail() {
   });
   const memberRoles = (rolesQ.data?.items ?? []).filter((r) => r.operators.includes(aid));
 
-  if (q.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (q.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (q.error) {
     return (
       <div className={styles.errorBox}>
-        {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+        {q.error instanceof ApiError
+          ? t('errors:generic', { status: q.error.status, detail: q.error.message })
+          : String(q.error)}
       </div>
     );
   }
   const op = q.data;
-  if (!op) return <div className={styles.empty}>Архонт не найден.</div>;
+  if (!op) return <div className={styles.empty}>{t('errors:archonNotFound')}</div>;
 
   const revoked = Boolean(op.revoked_at);
   const hasMetadata = op.metadata && Object.keys(op.metadata).length > 0;
@@ -79,8 +83,8 @@ export function ArchonDetail() {
             </div>
           </div>
           {!revoked ? (
-            <Button variant="danger" onClick={() => setRevokeOpen(true)}>
-              Revoke
+            <Button variant="danger" data-testid="revoke-archon" onClick={() => setRevokeOpen(true)}>
+              {t('revoke')}
             </Button>
           ) : null}
         </div>
@@ -128,10 +132,10 @@ export function ArchonDetail() {
           <section className={styles.section} aria-label="roles">
             <h2 className={styles.sectionTitle}>Roles</h2>
             {rolesQ.isLoading ? (
-              <div className={styles.loading}>Загружаем…</div>
+              <div className={styles.loading}>{t('loading')}</div>
             ) : memberRoles.length === 0 ? (
               <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
-                Архонт не состоит ни в одной роли. Назначьте через RBAC → Archon assignments.
+                {t('pages:archonNoRoles')}
               </div>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -162,7 +166,7 @@ export function ArchonDetail() {
             {hasMetadata ? (
               <JsonViewer value={op.metadata} />
             ) : (
-              <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>metadata пустой</div>
+              <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>{t('pages:metadataEmpty')}</div>
             )}
           </section>
         </>
@@ -177,8 +181,7 @@ export function ArchonDetail() {
       {tab === 'activity' ? (
         <section className={styles.section} aria-label="activity">
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-            История действий Архонта в audit-журнале. Открывает <code className="mono">/audit</code>
-            с предустановленным фильтром <code className="mono">archon_aid={op.aid}</code>.
+            {t('pages:archonActivityHint')}
           </p>
           <div>
             <Link

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function DestroyModal({ open, incarnationName, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
       }, 800);
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -61,12 +63,12 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title={`Destroy: ${incarnationName}`}
+      title={t('forms:destroyTitle', { name: incarnationName })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -74,7 +76,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
             disabled={isSubmitting || mu.isPending || Boolean(applyId)}
             onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
           >
-            {mu.isPending ? 'Удаляем…' : 'Destroy'}
+            {mu.isPending ? t('deleting') : t('destroy')}
           </Button>
         </>
       }

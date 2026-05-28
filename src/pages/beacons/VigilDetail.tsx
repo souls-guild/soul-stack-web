@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
@@ -8,6 +9,7 @@ import { JsonViewer } from '../../components/JsonViewer';
 import styles from '../common.module.css';
 
 export function VigilDetail() {
+  const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const qc = useQueryClient();
   const nav = useNavigate();
@@ -26,21 +28,21 @@ export function VigilDetail() {
     },
   });
 
-  if (detail.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (detail.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (detail.error) {
     return (
       <div className={styles.errorBox}>
         {detail.error instanceof ApiError
-          ? `Ошибка ${detail.error.status}: ${detail.error.message}`
+          ? t('errors:generic', { status: detail.error.status, detail: detail.error.message })
           : String(detail.error)}
       </div>
     );
   }
   const v = detail.data;
-  if (!v) return <div className={styles.empty}>Vigil не найден.</div>;
+  if (!v) return <div className={styles.empty}>{t('pages:vigilNotFound')}</div>;
 
   function handleDelete() {
-    if (!window.confirm(`Удалить Vigil ${name}? Decree-ы НЕ каскадятся.`)) return;
+    if (!window.confirm(t('pages:deleteVigilConfirm', { name }))) return;
     deleteMut.mutate();
   }
 
@@ -67,7 +69,7 @@ export function VigilDetail() {
             </div>
           </div>
           <Button variant="ghost" onClick={handleDelete} disabled={deleteMut.isPending}>
-            {deleteMut.isPending ? 'Удаляем…' : 'Delete'}
+            {deleteMut.isPending ? t('deleting') : t('delete')}
           </Button>
         </div>
       </div>

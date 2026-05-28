@@ -124,10 +124,9 @@ describe('ArchonsList', () => {
     // Chip «revoked» рядом с aid.
     expect(screen.getByText('revoked')).toBeInTheDocument();
     // Revoke и Issue token для archon-old (последний в таблице) — disabled.
-    const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
-    expect(revokeButtons[revokeButtons.length - 1]).toBeDisabled();
-    const issueButtons = screen.getAllByRole('button', { name: /Issue token/ });
-    expect(issueButtons[issueButtons.length - 1]).toBeDisabled();
+    // testid устойчив к locale (button-label зависит от выбранного языка).
+    expect(screen.getByTestId('revoke-archon-old')).toBeDisabled();
+    expect(screen.getByTestId('issue-token-archon-old')).toBeDisabled();
     // Counter: 3 of 3.
     expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/Showing 3 of 3/);
   });
@@ -154,12 +153,10 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
       // Hide revoked default ON → archon-old отфильтрован, видимы 2 строки.
-      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(2);
+      expect(screen.getByTestId('revoke-archon-alice')).toBeInTheDocument();
     });
     const user = userEvent.setup();
-    const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
-    // bootstrap (idx=0), archon-alice (idx=1).
-    await user.click(revokeButtons[1]);
+    await user.click(screen.getByTestId('revoke-archon-alice'));
     // Modal должен открыться с заголовком, содержащим AID.
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
@@ -167,7 +164,7 @@ describe('ArchonsList', () => {
     // Внутри Modal вводим reason и submit.
     const textarea = screen.getByPlaceholderText(/уход сотрудника/i);
     await user.type(textarea, 'компрометация ключа');
-    await user.click(screen.getByRole('button', { name: /^Отозвать$/ }));
+    await user.click(screen.getByTestId('revoke-submit'));
     await waitFor(() => {
       expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
     });
@@ -206,12 +203,11 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
       // Hide revoked default ON → 2 видимых строки (bootstrap, alice).
-      expect(screen.getAllByRole('button', { name: /^Revoke$/ }).length).toBe(2);
+      expect(screen.getByTestId('revoke-archon-alice')).toBeInTheDocument();
     });
     const user = userEvent.setup();
-    const revokeButtons = screen.getAllByRole('button', { name: /^Revoke$/ });
-    await user.click(revokeButtons[1]);
-    await user.click(await screen.findByRole('button', { name: /^Отозвать$/ }));
+    await user.click(screen.getByTestId('revoke-archon-alice'));
+    await user.click(await screen.findByTestId('revoke-submit'));
     // Pretty-error виден в Modal; Modal не закрывается.
     expect(await screen.findByRole('alert')).toHaveTextContent(/last-?cluster-?admin|self-lockout|последнего/i);
     expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();

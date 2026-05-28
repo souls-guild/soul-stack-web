@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function UpgradeModal({ open, incarnationName, serviceName, currentRef, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [applyId, setApplyId] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -61,17 +63,17 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
   return (
     <Modal
       open={open}
-      title={`Upgrade: ${incarnationName}`}
+      title={t('forms:upgradeTitle', { name: incarnationName })}
       onClose={close}
       footer={
         applyId ? (
           <Button type="button" variant="primary" onClick={close}>
-            Закрыть
+            {t('close')}
           </Button>
         ) : (
           <>
             <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
-              Отмена
+              {t('cancel')}
             </Button>
             <Button
               type="button"
@@ -79,7 +81,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
               disabled={isSubmitting || mu.isPending}
               onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
             >
-              {mu.isPending ? 'Запускаем…' : 'Upgrade'}
+              {mu.isPending ? t('running') : t('upgrade')}
             </Button>
           </>
         )
@@ -154,9 +156,9 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
           error={errors.to_version?.message}
           hint={
             refs.loading
-              ? 'Загружаем refs…'
+              ? t('forms:refsLoading')
               : refs.unavailable
-                ? 'Каталог refs недоступен, имя вводится вручную.'
+                ? t('forms:refsUnavailable')
                 : refs.error ?? undefined
           }
           {...register('to_version')}

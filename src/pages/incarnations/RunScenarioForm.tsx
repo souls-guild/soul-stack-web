@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function RunScenarioForm({ incarnationName, serviceName }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [reply, setReply] = useState<{ apply_id: string; scenario: string } | null>(null);
@@ -176,7 +178,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
 
       <div style={{ display: 'flex', gap: 10 }}>
         <Button type="submit" variant="primary" disabled={isSubmitting || mu.isPending}>
-          <Play size={14} /> {mu.isPending ? 'Запускаем…' : 'Run scenario'}
+          <Play size={14} /> {mu.isPending ? t('running') : t('runScenario')}
         </Button>
         <Button
           type="button"

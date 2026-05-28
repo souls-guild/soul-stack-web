@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import i18n from '../../i18n';
 import { Modal, Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
@@ -17,21 +19,18 @@ interface Props {
 // Расшифровка серверной 409 «last cluster-admin» в человеческое сообщение.
 // Бэкенд возвращает problem+json с type/title/detail (ADR-013, self-lockout).
 function prettyError(err: unknown): string {
+  const t = i18n.t.bind(i18n);
   if (err instanceof ApiError) {
-    if (err.status === 409) {
-      return (
-        'Нельзя отозвать последнего Архонта с *-permission ' +
-        '(self-lockout-защита). Создайте другого cluster-admin сначала.'
-      );
-    }
-    if (err.status === 404) return 'Архонт не найден.';
-    if (err.status === 403) return 'Недостаточно прав (operator.revoke).';
-    return `Ошибка ${err.status}: ${err.detail || err.message}`;
+    if (err.status === 409) return t('errors:revokeLastAdmin');
+    if (err.status === 404) return t('errors:archonNotFound');
+    if (err.status === 403) return t('errors:revokeForbidden');
+    return t('errors:generic', { status: err.status, detail: err.detail || err.message });
   }
   return String(err);
 }
 
 export function RevokeArchonModal({ aid, open, onClose, onSuccess }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [reason, setReason] = useState('');
 
@@ -56,38 +55,35 @@ export function RevokeArchonModal({ aid, open, onClose, onSuccess }: Props) {
   return (
     <Modal
       open={open}
-      title={`Отозвать ${aid}?`}
+      title={t('forms:revokeArchonTitle', { aid })}
       onClose={handleClose}
       footer={
         <>
           <Button variant="ghost" onClick={handleClose} disabled={mut.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             variant="danger"
+            data-testid="revoke-submit"
             onClick={() => mut.mutate()}
             disabled={mut.isPending}
           >
-            {mut.isPending ? 'Отзываем…' : 'Отозвать'}
+            {mut.isPending ? t('revoking') : t('revoke')}
           </Button>
         </>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 'var(--s-4)' }}>
         <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5 }}>
-          Архонт <code className="mono">{aid}</code> будет помечен как отозванный
-          (<code className="mono">operators.revoked_at = now()</code>). Все его JWT-токены
-          перестанут работать <strong>мгновенно</strong> (через cluster-wide
-          rebuild RBAC-snapshot, окно &lt; 10 секунд при потере pub/sub-сообщения).
-          Новые токены выпустить нельзя.
+          {t('forms:revokeArchonWarn', { aid })}
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={styles.metaKey}>Reason (optional, для audit)</span>
+          <span className={styles.metaKey}>{t('forms:revokeReasonLabel')}</span>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={3}
-            placeholder="например: уход сотрудника / ключ скомпрометирован"
+            placeholder={t('forms:revokeReasonPlaceholder')}
             style={{
               fontFamily: 'inherit',
               fontSize: 13,

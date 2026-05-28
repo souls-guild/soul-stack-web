@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { ChipsInput } from '../incarnations/ChipsInput';
@@ -38,6 +39,7 @@ function validateCoven(v: string): string | null {
 }
 
 export function CovenAssignModal({ open, onClose, variant }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>(variant.kind === 'single' ? 'replace' : 'append');
   const [label, setLabel] = useState('');
@@ -59,7 +61,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
       }
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -76,7 +78,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
     setServerError(null);
     const sids = variant.kind === 'single' ? [variant.sid] : variant.sids;
     if (sids.length === 0) {
-      setServerError('Не выбрано ни одной Soul.');
+      setServerError(t('errors:noSoulSelected'));
       return;
     }
     const base: SoulCovenAssignRequest = {
@@ -89,7 +91,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
     } else {
       const v = label.trim();
       if (!v) {
-        setServerError('Для append/remove задайте одну метку.');
+        setServerError(t('errors:oneLabelForAppendRemove'));
         return;
       }
       const reason = validateCoven(v);
@@ -168,10 +170,10 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button type="button" variant="primary" disabled={mu.isPending} onClick={submit}>
-            {mu.isPending ? 'Применяем…' : 'Применить'}
+            {mu.isPending ? t('applying') : t('apply')}
           </Button>
         </>
       }

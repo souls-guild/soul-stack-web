@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
@@ -12,6 +13,7 @@ function shortCel(s: string | undefined, max = 80): string {
 }
 
 export function DecreesList() {
+  const { t } = useTranslation();
   const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
 
@@ -31,7 +33,7 @@ export function DecreesList() {
           <div className={styles.crumbs}>Oracle-reactor правила</div>
         </div>
         <Link to="/decrees/new">
-          <Button variant="primary">+ New Decree</Button>
+          <Button variant="primary">{t('newDecree')}</Button>
         </Link>
       </div>
 
@@ -55,7 +57,7 @@ export function DecreesList() {
         </label>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
           {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}

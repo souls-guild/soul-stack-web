@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, ShieldPlus, Trash2, UserPlus, X } from 'lucide-react';
 import { keeperApi, type RoleView } from '../../api/keeper';
@@ -21,6 +22,7 @@ interface RolesTabProps {
 }
 
 function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
+  const { t } = useTranslation();
   return (
     <table className={styles.table}>
       <thead>
@@ -45,8 +47,8 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                 <button
                   type="button"
-                  aria-label={`редактировать permissions ${r.name}`}
-                  title={r.builtin ? 'builtin-роль — редактирование запрещено сервером' : 'Edit permissions'}
+                  aria-label={t('forms:ariaEditPermissions', { name: r.name })}
+                  title={r.builtin ? t('pages:builtinEditDenied') : 'Edit permissions'}
                   onClick={() => onEdit(r)}
                   style={iconBtn(false)}
                 >
@@ -54,8 +56,8 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
                 </button>
                 <button
                   type="button"
-                  aria-label={`удалить роль ${r.name}`}
-                  title={r.builtin ? 'builtin-роль — удаление запрещено сервером' : 'Delete role'}
+                  aria-label={t('forms:ariaDeleteRole', { name: r.name })}
+                  title={r.builtin ? t('pages:builtinDeleteDenied') : 'Delete role'}
                   disabled={r.builtin}
                   onClick={() => onDelete(r)}
                   style={iconBtn(true, r.builtin)}
@@ -92,6 +94,7 @@ interface PermissionsTabProps {
 }
 
 function PermissionsTab({ roles, onEdit }: PermissionsTabProps) {
+  const { t } = useTranslation();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-4)' }}>
       {roles.map((r) => (
@@ -103,18 +106,18 @@ function PermissionsTab({ roles, onEdit }: PermissionsTabProps) {
             <Button
               type="button"
               variant="ghost"
-              aria-label={`редактировать permissions ${r.name}`}
+              aria-label={t('forms:ariaEditPermissions', { name: r.name })}
               onClick={() => onEdit(r)}
             >
               <Pencil size={14} style={{ marginRight: 6 }} />
-              Edit
+              {t('edit')}
             </Button>
           </h2>
           {r.description ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{r.description}</div>
           ) : null}
           {r.permissions.length === 0 ? (
-            <div className={styles.empty}>permission-ов нет.</div>
+            <div className={styles.empty}>{t('pages:noPermissions')}</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {r.permissions.map((p) => (
@@ -147,6 +150,7 @@ interface MembersTabProps {
 }
 
 function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -178,7 +182,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
   }, [roles, operators]);
 
   if (byOperator.length === 0) {
-    return <div className={styles.empty}>Архонтов в кластере нет.</div>;
+    return <div className={styles.empty}>{t('pages:noArchons')}</div>;
   }
 
   return (
@@ -246,7 +250,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
-                    aria-label={`назначить роль ${aid}`}
+                    aria-label={t('forms:ariaAssignRole', { aid })}
                     onClick={() => onAssign(aid)}
                     style={iconBtn(false)}
                   >
@@ -264,6 +268,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
 }
 
 export function RbacPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('roles');
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<RoleView | null>(null);
@@ -293,12 +298,12 @@ export function RbacPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>RBAC</h1>
-          <div className={styles.crumbs}>роли, permissions, назначения Archons</div>
+          <div className={styles.crumbs}>{t('pages:rbacCrumbs')}</div>
         </div>
         {tab === 'roles' ? (
           <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
             <ShieldPlus size={14} style={{ marginRight: 6 }} />
-            Create role
+            {t('createRole')}
           </Button>
         ) : null}
       </div>
@@ -333,15 +338,17 @@ export function RbacPage() {
         </button>
       </div>
 
-      {rolesQ.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {rolesQ.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {rolesQ.error ? (
         <div className={styles.errorBox}>
-          {rolesQ.error instanceof ApiError ? `Ошибка ${rolesQ.error.status}: ${rolesQ.error.message}` : String(rolesQ.error)}
+          {rolesQ.error instanceof ApiError
+            ? t('errors:generic', { status: rolesQ.error.status, detail: rolesQ.error.message })
+            : String(rolesQ.error)}
         </div>
       ) : null}
 
       {rolesQ.data && roles.length === 0 ? (
-        <div className={styles.empty}>Ролей в кластере нет. Создайте первую через «Create role».</div>
+        <div className={styles.empty}>{t('pages:noRoles')}</div>
       ) : null}
 
       {roles.length > 0 ? (

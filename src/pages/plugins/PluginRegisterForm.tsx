@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -40,6 +41,7 @@ const NAMESPACE_HINT =
   'mod — soul_module / soul_beacon, cloud — cloud_driver, ssh — ssh_provider';
 
 export function PluginRegisterForm() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [reply, setReply] = useState<PluginSigilAllowReply | null>(null);
@@ -137,7 +139,7 @@ export function PluginRegisterForm() {
           />
           <div style={{ alignSelf: 'flex-end' }}>
             <Button type="submit" variant="primary" disabled={isSubmitting || allowMut.isPending}>
-              {allowMut.isPending ? 'Допускаем…' : 'Допустить'}
+              {allowMut.isPending ? t('allowing') : t('allow')}
             </Button>
           </div>
         </div>

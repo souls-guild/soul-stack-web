@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import {
@@ -34,6 +35,7 @@ function authMethodTone(m: OperatorAuthMethod | string | undefined):
 
 // JWT отдаётся один раз — показываем в modal-блоке с кнопкой copy.
 function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: string; onClose: () => void }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   return (
     <div
@@ -49,7 +51,7 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
         gap: 12,
       }}
     >
-      <strong>JWT выпущен. Скопируйте сейчас — повторно не покажется.</strong>
+      <strong>{t('pages:jwtIssued')}</strong>
       <textarea
         readOnly
         value={jwt}
@@ -80,9 +82,9 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
             }
           }}
         >
-          {copied ? 'Скопировано' : 'Скопировать'}
+          {copied ? t('copied') : t('copy')}
         </Button>
-        <Button variant="ghost" onClick={onClose}>Закрыть</Button>
+        <Button variant="ghost" onClick={onClose}>{t('close')}</Button>
       </div>
     </div>
   );
@@ -199,6 +201,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
   onIssue: (aid: string) => void;
   onRevoke: (aid: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <table className={styles.table}>
       <thead>
@@ -233,9 +236,10 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
               <td>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button
+                    data-testid={`issue-token-${op.aid}`}
                     disabled={revoked}
                     onClick={() => onIssue(op.aid)}
-                    title={revoked ? 'Архонт отозван' : 'Выпустить новый JWT'}
+                    title={revoked ? t('issueTokenDisabled') : t('issueTokenTitle')}
                     style={{
                       padding: '4px 8px',
                       border: '1px solid var(--border)',
@@ -245,12 +249,13 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
                       fontSize: 12,
                     }}
                   >
-                    Issue token
+                    {t('issueToken')}
                   </button>
                   <button
+                    data-testid={`revoke-${op.aid}`}
                     disabled={revoked}
                     onClick={() => onRevoke(op.aid)}
-                    title={revoked ? 'Уже отозван' : 'Отозвать Архонта'}
+                    title={revoked ? t('revokeDisabled') : t('revokeTitle')}
                     style={{
                       padding: '4px 8px',
                       border: '1px solid var(--danger)',
@@ -261,7 +266,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
                       fontSize: 12,
                     }}
                   >
-                    Revoke
+                    {t('revoke')}
                   </button>
                 </div>
               </td>
@@ -274,6 +279,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
 }
 
 export function ArchonsList() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const [aidNew, setAidNew] = useState('');
@@ -409,7 +415,7 @@ export function ArchonsList() {
               disabled={!aidNewValid || !displayNameValid || createMut.isPending}
               onClick={() => { setRolesUnsupported(false); createMut.mutate(); }}
             >
-              {createMut.isPending ? 'Создаём…' : 'Создать'}
+              {createMut.isPending ? t('creating') : t('create')}
             </Button>
           </div>
         </div>
@@ -430,8 +436,7 @@ export function ArchonsList() {
               color: 'var(--text)',
             }}
           >
-            backend не поддерживает create-with-roles — Архонт создан без ролей,
-            назначьте их во вкладке RBAC → Archon assignments.
+            {t('errors:archonCreatedNoRoles')}
           </div>
         ) : null}
       </section>
@@ -477,11 +482,11 @@ export function ArchonsList() {
             aria-label="счётчик архонтов"
             style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
           >
-            Showing {visibleCount} of {total}
+            {t('showing', { shown: visibleCount, total })}
           </div>
         ) : null}
 
-        {list.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+        {list.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
         {list.error ? (
           <div className={styles.errorBox}>
             {list.error instanceof ApiError ? `Ошибка ${list.error.status}: ${list.error.message}` : String(list.error)}
@@ -489,7 +494,7 @@ export function ArchonsList() {
         ) : null}
 
         {list.data && items.length === 0 ? (
-          <div className={styles.empty}>Архонтов под фильтр не найдено.</div>
+          <div className={styles.empty}>{t('errors:archonsNotFound')}</div>
         ) : null}
 
         {items.length > 0 ? (

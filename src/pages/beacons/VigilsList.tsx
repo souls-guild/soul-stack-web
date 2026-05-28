@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VigilView } from '../../api/keeper';
@@ -24,6 +25,7 @@ function subjectCell(v: VigilView): string {
 }
 
 export function VigilsList() {
+  const { t } = useTranslation();
   const [enabledOnly, setEnabledOnly] = useState(false);
   const [checkFilter, setCheckFilter] = useState('');
   const [limit, setLimit] = useState(50);
@@ -52,7 +54,7 @@ export function VigilsList() {
           <div className={styles.crumbs}>Soul-side проверки beacons</div>
         </div>
         <Link to="/vigils/new">
-          <Button variant="primary">+ New Vigil</Button>
+          <Button variant="primary">{t('newVigil')}</Button>
         </Link>
       </div>
 
@@ -105,7 +107,7 @@ export function VigilsList() {
         </label>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
           {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}

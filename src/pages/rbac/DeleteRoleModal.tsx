@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi, type RoleView } from '../../api/keeper';
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function DeleteRoleModal({ open, role, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -35,12 +37,12 @@ export function DeleteRoleModal({ open, role, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title={`Удалить роль: ${role.name}`}
+      title={t('forms:deleteRoleTitle', { name: role.name })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -48,7 +50,7 @@ export function DeleteRoleModal({ open, role, onClose }: Props) {
             disabled={mu.isPending || role.builtin}
             onClick={() => { setServerError(null); mu.mutate(); }}
           >
-            {mu.isPending ? 'Удаляем…' : 'Удалить'}
+            {mu.isPending ? t('deleting') : t('delete')}
           </Button>
         </>
       }

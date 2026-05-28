@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi, type RoleView } from '../../api/keeper';
@@ -18,6 +19,7 @@ interface Props {
 // Сервер 204 на success, идемпотентно. Не показываем роли, в которых
 // оператор уже состоит (фильтр по operators[]).
 export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string>('');
   const [serverError, setServerError] = useState<string | null>(null);
@@ -44,12 +46,12 @@ export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title={`Назначить роль: ${aid}`}
+      title={t('forms:assignRoleTitle', { aid })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -57,7 +59,7 @@ export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
             disabled={mu.isPending || !selected}
             onClick={() => { setServerError(null); mu.mutate(selected); }}
           >
-            {mu.isPending ? 'Назначаем…' : 'Назначить'}
+            {mu.isPending ? t('assigning') : t('assign')}
           </Button>
         </>
       }

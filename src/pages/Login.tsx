@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ interface LocationState {
 }
 
 export function Login() {
+  const { t } = useTranslation();
   const { loginWithToken, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,7 +97,7 @@ export function Login() {
         {serverError ? <div className={styles.error}>{serverError}</div> : null}
         <div className={styles.actions}>
           <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Проверяем…' : 'Войти'}
+            {isSubmitting ? t('loggingIn') : t('login')}
           </Button>
         </div>
       </form>

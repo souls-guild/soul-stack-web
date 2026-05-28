@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Terminal, Ban } from 'lucide-react';
@@ -18,6 +19,7 @@ interface SseEvent {
 }
 
 export function ErrandRunDetail() {
+  const { t } = useTranslation();
   const { id = '' } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -129,7 +131,7 @@ export function ErrandRunDetail() {
             <Badge tone={errandRunStatusTone(view.status)}>{view.status}</Badge>
             {isRunning ? (
               <Button type="button" variant="ghost" onClick={() => setCancelOpen(true)}>
-                <Ban size={14} /> Cancel
+                <Ban size={14} /> {t('cancelShort')}
               </Button>
             ) : null}
           </div>
@@ -288,21 +290,20 @@ export function ErrandRunDetail() {
               gap: 12,
             }}
           >
-            <div style={{ fontWeight: 500 }}>Отменить Errand run?</div>
+            <div style={{ fontWeight: 500 }}>{t('pages:cancelErrandRunTitle')}</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Активные Errand-ы продолжат выполнение до natural completion. Новые Errand-ы
-              из очереди запущены не будут. <span className="mono">{view.errand_run_id}</span>
+              {t('pages:cancelErrandRunHint')} <span className="mono">{view.errand_run_id}</span>
             </div>
             {cancelMu.error ? (
               <div className={styles.errorBox}>
                 {cancelMu.error instanceof ApiError
-                  ? `Ошибка ${cancelMu.error.status}: ${cancelMu.error.message}`
+                  ? t('errors:generic', { status: cancelMu.error.status, detail: cancelMu.error.message })
                   : String(cancelMu.error)}
               </div>
             ) : null}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button type="button" variant="ghost" onClick={() => setCancelOpen(false)}>
-                Закрыть
+                {t('close')}
               </Button>
               <Button
                 type="button"
@@ -310,7 +311,7 @@ export function ErrandRunDetail() {
                 onClick={() => cancelMu.mutate()}
                 disabled={cancelMu.isPending}
               >
-                {cancelMu.isPending ? 'Отменяем…' : 'Отменить'}
+                {cancelMu.isPending ? t('cancelling') : t('cancel2')}
               </Button>
             </div>
           </div>

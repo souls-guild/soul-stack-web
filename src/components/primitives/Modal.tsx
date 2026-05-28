@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
 
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function Modal({ open, title, onClose, children, footer, wide }: Props) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
@@ -40,7 +42,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: Props) {
       >
         <div className={styles.head}>
           <h2 className={styles.title}>{title}</h2>
-          <button type="button" className={styles.close} aria-label="Закрыть" onClick={onClose}>
+          <button type="button" className={styles.close} aria-label={t('close')} onClick={onClose}>
             <X size={16} />
           </button>
         </div>

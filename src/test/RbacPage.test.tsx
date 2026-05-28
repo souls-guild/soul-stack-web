@@ -148,7 +148,7 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /Create role/i }));
+    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
     const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
     const nameInput = within(dialog).getByPlaceholderText('soul-operator');
     await user.type(nameInput, 'log-reader');

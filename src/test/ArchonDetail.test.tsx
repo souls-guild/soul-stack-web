@@ -133,9 +133,9 @@ describe('ArchonDetail', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /^Revoke$/ }));
+    await user.click(screen.getByTestId('revoke-archon'));
     expect(await screen.findByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^Отозвать$/ }));
+    await user.click(screen.getByTestId('revoke-submit'));
     await waitFor(() => {
       expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
     });

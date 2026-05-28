@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Button, Modal } from '../../components/primitives';
@@ -14,6 +15,7 @@ interface Props {
 
 // DELETE /v1/services/{name} — удаляет запись реестра. Git-репо не трогается.
 export function DeregisterServiceModal({ open, service, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -37,12 +39,12 @@ export function DeregisterServiceModal({ open, service, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title={`Deregister service: ${service.name}`}
+      title={t('forms:deregisterServiceTitle', { name: service.name })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -53,7 +55,7 @@ export function DeregisterServiceModal({ open, service, onClose }: Props) {
               mu.mutate();
             }}
           >
-            {mu.isPending ? 'Удаляем…' : 'Deregister'}
+            {mu.isPending ? t('deregistering') : t('deregister')}
           </Button>
         </>
       }

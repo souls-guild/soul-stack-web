@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Scroll, AlertTriangle } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
@@ -8,6 +9,7 @@ import { JsonViewer } from '../../components/JsonViewer';
 import styles from '../common.module.css';
 
 export function DecreeDetail() {
+  const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const qc = useQueryClient();
   const nav = useNavigate();
@@ -26,21 +28,21 @@ export function DecreeDetail() {
     },
   });
 
-  if (detail.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (detail.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (detail.error) {
     return (
       <div className={styles.errorBox}>
         {detail.error instanceof ApiError
-          ? `Ошибка ${detail.error.status}: ${detail.error.message}`
+          ? t('errors:generic', { status: detail.error.status, detail: detail.error.message })
           : String(detail.error)}
       </div>
     );
   }
   const d = detail.data;
-  if (!d) return <div className={styles.empty}>Decree не найден.</div>;
+  if (!d) return <div className={styles.empty}>{t('pages:decreeNotFound')}</div>;
 
   function handleDelete() {
-    if (!window.confirm(`Удалить Decree ${name}? Cooldown-state (oracle_fires) каскадно очистится.`)) return;
+    if (!window.confirm(t('pages:deleteDecreeConfirm', { name }))) return;
     deleteMut.mutate();
   }
 
@@ -65,7 +67,7 @@ export function DecreeDetail() {
             </div>
           </div>
           <Button variant="ghost" onClick={handleDelete} disabled={deleteMut.isPending}>
-            {deleteMut.isPending ? 'Удаляем…' : 'Delete'}
+            {deleteMut.isPending ? t('deleting') : t('delete')}
           </Button>
         </div>
       </div>

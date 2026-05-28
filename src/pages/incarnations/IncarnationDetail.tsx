@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,6 +30,7 @@ import styles from '../common.module.css';
 type Tab = 'overview' | 'hosts' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
 
 export function IncarnationDetail() {
+  const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -134,9 +136,9 @@ export function IncarnationDetail() {
                     });
                     navigate(`/run?${params.toString()}`);
                   }}
-                  title="Run scenario via Run Wizard"
+                  title={t('pages:runScenarioViaWizard')}
                 >
-                  <Play size={14} /> Run Scenario
+                  <Play size={14} /> {t('runScenario')}
                 </Button>
                 <Button
                   variant="secondary"
@@ -144,7 +146,7 @@ export function IncarnationDetail() {
                   disabled={driftMu.isPending}
                   title="Check drift"
                 >
-                  <Search size={14} /> {driftMu.isPending ? 'Сканируем…' : 'Check Drift'}
+                  <Search size={14} /> {driftMu.isPending ? t('scanning') : t('checkDrift')}
                 </Button>
                 <Button variant="secondary" onClick={() => setUpgradeOpen(true)} title="Upgrade">
                   <ArrowUp size={14} /> Upgrade
@@ -343,7 +345,7 @@ export function IncarnationDetail() {
           <h2 className={styles.sectionTitle}>Check drift</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <Button variant="primary" onClick={() => driftMu.mutate()} disabled={driftMu.isPending}>
-              <Search size={14} /> {driftMu.isPending ? 'Сканируем…' : 'Запустить drift-scan'}
+              <Search size={14} /> {driftMu.isPending ? t('scanning') : t('driftScan')}
             </Button>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               POST /v1/incarnations/{row.name}/check-drift

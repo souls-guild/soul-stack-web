@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function RegisterServiceModal({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -58,12 +60,12 @@ export function RegisterServiceModal({ open, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title="Register service"
+      title={t('registerService')}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -74,7 +76,7 @@ export function RegisterServiceModal({ open, onClose }: Props) {
               mu.mutate(v);
             })}
           >
-            {mu.isPending ? 'Регистрируем…' : 'Register'}
+            {mu.isPending ? t('registering') : t('register')}
           </Button>
         </>
       }

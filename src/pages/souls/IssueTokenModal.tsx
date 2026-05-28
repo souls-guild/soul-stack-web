@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
@@ -28,6 +29,7 @@ interface Props {
 // «TTL по умолчанию»). Поле формы сохраняем для UX, но запрос его не несёт;
 // показываем пользователю как hint о серверном дефолте.
 export function IssueTokenModal({ open, sid, onClose }: Props) {
+  const { t } = useTranslation();
   const [serverError, setServerError] = useState<string | null>(null);
   const [issued, setIssued] = useState<SoulIssueTokenReply | null>(null);
   const [copied, setCopied] = useState(false);
@@ -157,12 +159,12 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title={`Issue token: ${sid}`}
+      title={t('forms:issueTokenForSidTitle', { sid })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -170,7 +172,7 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
             disabled={isSubmitting || mu.isPending}
             onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
           >
-            {mu.isPending ? 'Выпускаем…' : 'Issue'}
+            {mu.isPending ? t('issuing') : t('issue')}
           </Button>
         </>
       }

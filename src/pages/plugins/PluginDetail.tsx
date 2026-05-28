@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Award, CheckCircle2, XCircle, Copy, Info } from 'lucide-react';
@@ -30,6 +31,7 @@ const KIND_INFO: Record<string, { title: string; summary: string }> = {
 };
 
 export function PluginDetail() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { namespace = '', name = '', ref = '' } = useParams<{
@@ -150,14 +152,13 @@ export function PluginDetail() {
               disabled={revoked || revokeMut.isPending}
               onClick={() => {
                 const ok = window.confirm(
-                  `Отозвать Sigil-допуск ${row.namespace}/${row.name}@${row.ref}?\n` +
-                    `Бинарь перестанет проходить Sigil-верификацию. Запись остаётся в реестре для аудита.`,
+                  t('pages:revokeSigilConfirm', { sigil: `${row.namespace}/${row.name}@${row.ref}` }),
                 );
                 if (ok) revokeMut.mutate();
               }}
-              title={revoked ? 'Уже отозван' : 'Отозвать допуск'}
+              title={revoked ? t('revokeDisabled') : t('pages:revokeSigilTitle')}
             >
-              {revokeMut.isPending ? 'Отзываем…' : 'Revoke'}
+              {revokeMut.isPending ? t('revoking') : t('revoke')}
             </Button>
           </div>
         </div>

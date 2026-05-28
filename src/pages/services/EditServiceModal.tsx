@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +18,7 @@ interface Props {
 // PATCH /v1/services/{name} — replace-семантика mutable-полей (git/ref/refresh);
 // name — ключ записи, не меняется.
 export function EditServiceModal({ open, onClose, service }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -56,12 +58,12 @@ export function EditServiceModal({ open, onClose, service }: Props) {
   return (
     <Modal
       open={open}
-      title={`Edit service: ${service.name}`}
+      title={t('forms:editServiceTitle', { name: service.name })}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -72,7 +74,7 @@ export function EditServiceModal({ open, onClose, service }: Props) {
               mu.mutate(v);
             })}
           >
-            {mu.isPending ? 'Сохраняем…' : 'Save'}
+            {mu.isPending ? t('saving') : t('save')}
           </Button>
         </>
       }

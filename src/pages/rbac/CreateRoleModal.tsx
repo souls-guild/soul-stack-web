@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function CreateRoleModal({ open, onClose, catalog }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -55,12 +57,12 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
   return (
     <Modal
       open={open}
-      title="Создать роль"
+      title={t('forms:createRoleTitle')}
       onClose={close}
       footer={
         <>
           <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
-            Отмена
+            {t('cancel')}
           </Button>
           <Button
             type="button"
@@ -68,7 +70,7 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
             disabled={isSubmitting || mu.isPending}
             onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
           >
-            {mu.isPending ? 'Создаём…' : 'Создать'}
+            {mu.isPending ? t('creating') : t('create')}
           </Button>
         </>
       }
