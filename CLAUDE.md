@@ -41,7 +41,7 @@ src/
     types.gen.ts       — openapi-typescript codegen (vendor/openapi/keeper.yaml)
   components/
     layout/
-      Sidebar.tsx      — primary nav: Run (top) / Реестр / Oracle / История / Audit / Help
+      Sidebar.tsx      — primary nav: Run (top) / Registry / Oracle / Runs / Audit / Help
       HelpModal.tsx    — внизу sidebar: OpenAPI / MCP / docs links
       Shell.tsx        — collapsible-sidebar wrapper
       Topbar.tsx       — theme-toggle + identity menu
@@ -130,7 +130,12 @@ src/
 5. **JWT auth** — Bearer token в Authorization header (через AuthProvider).
    EventSource browser-native НЕ передаёт Authorization → SSE-endpoints требуют
    query-token или cookie-auth (backend follow-up).
-6. **i18n:** все user-facing строки на русском (label/hint/error).
+6. **i18n / язык UI:**
+   - Structural-лейблы (nav / секции / заголовки страниц / табы / колонки /
+     имена сущностей) — English по словарю Soul Stack (Archon / Keeper /
+     Souls / Coven / Tide / Vigil / Decree / Errand / Sigil).
+   - Free-text (hint / описания / ошибки / help) — русский.
+   - НЕ переводить имена сущностей на русский (была ошибка с «Архонты»).
 7. **Zod + React Hook Form** для всех форм.
 8. **TanStack Query** для всех fetch + invalidate на mutate.
 

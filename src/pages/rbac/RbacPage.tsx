@@ -29,7 +29,7 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
           <th>Builtin</th>
           <th>Description</th>
           <th>Permissions</th>
-          <th>Архонты</th>
+          <th>Archons</th>
           <th></th>
         </tr>
       </thead>
@@ -293,7 +293,7 @@ export function RbacPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>RBAC</h1>
-          <div className={styles.crumbs}>роли, permissions, назначения Архонтов</div>
+          <div className={styles.crumbs}>роли, permissions, назначения Archons</div>
         </div>
         {tab === 'roles' ? (
           <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
@@ -329,7 +329,7 @@ export function RbacPage() {
           className={`${styles.tab} ${tab === 'members' ? styles.tabActive : ''}`}
           onClick={() => setTab('members')}
         >
-          Назначения Архонтов
+          Archon assignments
         </button>
       </div>
 

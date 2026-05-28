@@ -369,8 +369,8 @@ export function ArchonsList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Архонты</h1>
-          <div className={styles.crumbs}>Архонты кластера</div>
+          <h1 className={styles.title}>Archons</h1>
+          <div className={styles.crumbs}>cluster operators</div>
         </div>
       </div>
 
@@ -431,7 +431,7 @@ export function ArchonsList() {
             }}
           >
             backend не поддерживает create-with-roles — Архонт создан без ролей,
-            назначьте их во вкладке RBAC → Назначения Архонтов.
+            назначьте их во вкладке RBAC → Archon assignments.
           </div>
         ) : null}
       </section>

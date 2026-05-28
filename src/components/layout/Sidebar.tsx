@@ -43,7 +43,7 @@ const PRIMARY: NavItem[] = [
 ];
 
 const REGISTRY: NavItem[] = [
-  { to: '/archons', label: 'Архонты', icon: Users, matchPrefix: '/archons' },
+  { to: '/archons', label: 'Archons', icon: Users, matchPrefix: '/archons' },
   { to: '/services', label: 'Services', icon: Package },
   { to: '/incarnations', label: 'Incarnations', icon: Boxes },
   { to: '/souls', label: 'Souls', icon: Users },
@@ -143,7 +143,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {PRIMARY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Реестр</div>}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Registry</div>}
       {REGISTRY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
@@ -151,7 +151,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {ORACLE.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>История прогонов</div>}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Runs</div>}
       {HISTORY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}

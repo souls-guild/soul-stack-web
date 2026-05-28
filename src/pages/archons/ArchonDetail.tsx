@@ -131,7 +131,7 @@ export function ArchonDetail() {
               <div className={styles.loading}>Загружаем…</div>
             ) : memberRoles.length === 0 ? (
               <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
-                Архонт не состоит ни в одной роли. Назначьте через RBAC → Назначения Архонтов.
+                Архонт не состоит ни в одной роли. Назначьте через RBAC → Archon assignments.
               </div>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
