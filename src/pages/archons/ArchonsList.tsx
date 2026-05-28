@@ -354,6 +354,8 @@ export function ArchonsList() {
   });
 
   const aidNewValid = AID_PATTERN.test(aidNew);
+  const displayNameTrimmed = displayName.trim();
+  const displayNameValid = displayNameTrimmed.length >= 1 && displayNameTrimmed.length <= 128;
 
   const rawItems = list.data?.items ?? [];
   // Belt-and-suspenders: даже если backend вернёт revoked в выдаче, при включённом
@@ -367,8 +369,8 @@ export function ArchonsList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Archons</h1>
-          <div className={styles.crumbs}>операторы кластера</div>
+          <h1 className={styles.title}>Архонты</h1>
+          <div className={styles.crumbs}>Архонты кластера</div>
         </div>
       </div>
 
@@ -392,6 +394,7 @@ export function ArchonsList() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Alice Ops"
+            error={displayNameTrimmed.length > 128 ? 'максимум 128 символов' : undefined}
           />
           <RolesPicker
             roles={availableRoles}
@@ -403,7 +406,7 @@ export function ArchonsList() {
           <div style={{ alignSelf: 'flex-end' }}>
             <Button
               variant="primary"
-              disabled={!aidNewValid || !displayName || createMut.isPending}
+              disabled={!aidNewValid || !displayNameValid || createMut.isPending}
               onClick={() => { setRolesUnsupported(false); createMut.mutate(); }}
             >
               {createMut.isPending ? 'Создаём…' : 'Создать'}
@@ -428,7 +431,7 @@ export function ArchonsList() {
             }}
           >
             backend не поддерживает create-with-roles — Архонт создан без ролей,
-            назначьте их во вкладке RBAC → Operator assignments.
+            назначьте их во вкладке RBAC → Назначения Архонтов.
           </div>
         ) : null}
       </section>

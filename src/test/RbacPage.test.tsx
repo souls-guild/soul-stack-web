@@ -119,7 +119,7 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Operator assignments сводит роли по AID', async () => {
+  it('Назначения Архонтов сводит роли по AID', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/roles', body: SAMPLE },
       { method: 'GET', url: '/v1/operators', body: OPERATORS_SAMPLE },
@@ -127,7 +127,7 @@ describe('RbacPage', () => {
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-    await user.click(screen.getByRole('tab', { name: /Operator assignments/i }));
+    await user.click(screen.getByRole('tab', { name: /Назначения Архонтов/i }));
     await waitFor(() => {
       expect(screen.getByText('archon-alice')).toBeInTheDocument();
       expect(screen.getByText('archon-bootstrap')).toBeInTheDocument();
@@ -273,7 +273,7 @@ describe('RbacPage', () => {
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-    await user.click(screen.getByRole('tab', { name: /Operator assignments/i }));
+    await user.click(screen.getByRole('tab', { name: /Назначения Архонтов/i }));
     // Дожидаемся, пока появится archon-bob (у которого ролей нет).
     await waitFor(() => expect(screen.getByText('archon-bob')).toBeInTheDocument());
 
@@ -300,7 +300,7 @@ describe('RbacPage', () => {
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-    await user.click(screen.getByRole('tab', { name: /Operator assignments/i }));
+    await user.click(screen.getByRole('tab', { name: /Назначения Архонтов/i }));
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
 
     // Снимаем archon-alice с soul-operator. Чип с × имеет aria-label

@@ -260,6 +260,32 @@ describe('ArchonsList', () => {
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
   });
 
+  it('пустой display_name блокирует submit, валидный AID', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    // Валидный AID, но display_name пуст → submit disabled.
+    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
+    // Заполнили display_name → submit разблокирован.
+    await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
+    expect(screen.getByRole('button', { name: /Создать/i })).not.toBeDisabled();
+  });
+
+  it('display_name > 128 символов — inline-ошибка + submit disabled', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'x'.repeat(129));
+    expect(screen.getByText(/максимум 128 символов/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
+  });
+
   // --- Multi-select ролей (extended payload {aid, display_name, roles[]}) ---
 
   const SAMPLE_ROLES = {

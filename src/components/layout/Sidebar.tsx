@@ -43,7 +43,7 @@ const PRIMARY: NavItem[] = [
 ];
 
 const REGISTRY: NavItem[] = [
-  { to: '/archons', label: 'Operators', icon: Users, matchPrefix: '/archons' },
+  { to: '/archons', label: 'Архонты', icon: Users, matchPrefix: '/archons' },
   { to: '/services', label: 'Services', icon: Package },
   { to: '/incarnations', label: 'Incarnations', icon: Boxes },
   { to: '/souls', label: 'Souls', icon: Users },
