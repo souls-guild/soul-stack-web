@@ -3,11 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { keeperApi, type ServiceView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { Button } from '../../components/primitives';
+import { RegisterServiceModal } from './RegisterServiceModal';
 import styles from '../common.module.css';
 
 export function ServicesList() {
   const [nameFilter, setNameFilter] = useState('');
   const [refFilter, setRefFilter] = useState('');
+  const [registerOpen, setRegisterOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ['services.list'],
@@ -33,6 +36,9 @@ export function ServicesList() {
           <h1 className={styles.title}>Services</h1>
           <div className={styles.crumbs}>реестр Service-ов (git+ref)</div>
         </div>
+        <Button type="button" variant="primary" onClick={() => setRegisterOpen(true)}>
+          Register service
+        </Button>
       </div>
 
       <div className={styles.filters}>
@@ -110,6 +116,8 @@ export function ServicesList() {
           </tbody>
         </table>
       ) : null}
+
+      <RegisterServiceModal open={registerOpen} onClose={() => setRegisterOpen(false)} />
     </div>
   );
 }

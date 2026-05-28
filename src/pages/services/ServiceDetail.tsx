@@ -6,6 +6,8 @@ import { ApiError } from '../../api/client';
 import { Badge, Button, Dot, Modal } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { useServiceRefs } from './refs';
+import { EditServiceModal } from './EditServiceModal';
+import { DeregisterServiceModal } from './DeregisterServiceModal';
 import type { ServiceScenarioInfo } from '../../api/keeper';
 import styles from '../common.module.css';
 
@@ -15,6 +17,8 @@ export function ServiceDetail() {
   const { name = '' } = useParams<{ name: string }>();
   const [tab, setTab] = useState<Tab>('overview');
   const [yamlScenario, setYamlScenario] = useState<ServiceScenarioInfo | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deregisterOpen, setDeregisterOpen] = useState(false);
 
   const detail = useQuery({
     queryKey: ['service', name],
@@ -68,6 +72,14 @@ export function ServiceDetail() {
               </span>
               {row.refresh ? <Badge tone="info">refresh: {row.refresh}</Badge> : null}
             </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button type="button" variant="secondary" onClick={() => setEditOpen(true)}>
+              Edit
+            </Button>
+            <Button type="button" variant="danger" onClick={() => setDeregisterOpen(true)}>
+              Deregister
+            </Button>
           </div>
         </div>
       </div>
@@ -348,6 +360,13 @@ export function ServiceDetail() {
             <div className={styles.empty}>У сценария нет input_schema.</div>
           )}
         </Modal>
+      ) : null}
+
+      {editOpen ? (
+        <EditServiceModal open={editOpen} service={row} onClose={() => setEditOpen(false)} />
+      ) : null}
+      {deregisterOpen ? (
+        <DeregisterServiceModal open={deregisterOpen} service={row} onClose={() => setDeregisterOpen(false)} />
       ) : null}
     </div>
   );
