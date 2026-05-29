@@ -11,7 +11,7 @@
 //                  имя incarnation есть в его coven[] (incarnation.name — корневой
 //                  Coven-label, ADR-008).
 //   covens       — список Coven-меток; OR внутри.
-//   sidRegex     — RE2-паттерн на SID.
+//   sidRegex     — RE2-паттерн на SID, full-match (anchored `^(?:…)$`, как `grep -x`).
 //   soulprint    — DSL-строка (soulprintFilter.ts), AND внутри.
 
 import type { SoulListEntry, SoulprintFacts } from '../../api/keeper';
@@ -48,11 +48,16 @@ export function needsSoulprint(c: HostCriteria): boolean {
 }
 
 // Скомпилированный SID-regex или null (при пустом / невалидном паттерне).
+//
+// Паттерн — full-match по SID (anchored `^(?:…)$`, семантика `grep -x`): иначе
+// unanchored `x*` ("ноль-или-более x") совпадает с пустой подстрокой в КАЖДОМ
+// SID и таргетит весь флот. Якоримся через non-capturing group, чтобы не
+// сломать чередование верхнего уровня (`a|b` → `^(?:a|b)$`, не `^a|b$`).
 export function compileSidRegex(raw: string): { re: RegExp | null; error: string | null } {
   const r = raw.trim();
   if (!r) return { re: null, error: null };
   try {
-    return { re: new RegExp(r), error: null };
+    return { re: new RegExp(`^(?:${r})$`), error: null };
   } catch (err) {
     return { re: null, error: err instanceof Error ? err.message : String(err) };
   }

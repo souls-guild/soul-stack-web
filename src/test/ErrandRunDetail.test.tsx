@@ -41,9 +41,14 @@ const SAMPLE_VIEW = {
   started_by_aid: 'archon-alice',
   started_at: '2026-05-27T10:00:00Z',
   finished_at: '2026-05-27T10:00:30Z',
+  // Реальная форма ErrandRunSummary: плоские counts + per-host `errands[]`
+  // (НЕ `summary.counts`/`summary.hosts` — это и был баг).
   summary: {
-    counts: { total: 3, success: 3, failed: 0 },
-    hosts: [
+    total: 3,
+    succeeded: 2,
+    failed: 1,
+    cancelled: 0,
+    errands: [
       { sid: 'host01', status: 'success', errand_id: 'errand-001' },
       { sid: 'host02', status: 'success', errand_id: 'errand-002' },
       { sid: 'host03', status: 'failed', error_code: 'TIMEOUT' },
@@ -84,9 +89,19 @@ describe('ErrandRunDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
     });
+    // Per-host таблица рендерится из summary.errands[].
+    const table = screen.getByTestId('errandrun-perhost');
+    expect(table).toBeInTheDocument();
     expect(screen.getByText('host01')).toBeInTheDocument();
     expect(screen.getByText('host03')).toBeInTheDocument();
     expect(screen.getByText('TIMEOUT')).toBeInTheDocument();
+    // Errand ID — линк на /errands/:id.
+    const link = screen.getByRole('link', { name: /errand-001/ });
+    expect(link).toHaveAttribute('href', '/errands/errand-001');
+    // Плоские counts из summary.
+    const counts = screen.getByTestId('errandrun-counts');
+    expect(counts).toHaveTextContent('2');
+    expect(counts).toHaveTextContent('1');
     // Terminal → нет Cancel кнопки.
     expect(screen.queryByRole('button', { name: /Cancel/ })).not.toBeInTheDocument();
   });

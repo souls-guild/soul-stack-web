@@ -21,6 +21,7 @@
   "hostIncarnationsPlaceholder": "redis-prod, redis-stage",
   "sidRegexLabel": "SID regex (RE2)",
   "sidRegexPlaceholder": "^db-[0-9]+",
+  "sidRegexHint": "Full match against the SID (like grep -x). It anchors for you: db-.* matches any SID starting with db-.",
   "soulprintLabel": "Soulprint filter (os.family=debian)",
   "soulprintPlaceholder": "os.family=debian kernel.version=6.*",
   "soulprintUnrecognized": "unrecognized tokens: {{tokens}}",

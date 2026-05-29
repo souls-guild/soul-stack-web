@@ -21,6 +21,7 @@
   "hostIncarnationsPlaceholder": "redis-prod, redis-stage",
   "sidRegexLabel": "SID regex (RE2)",
   "sidRegexPlaceholder": "^db-[0-9]+",
+  "sidRegexHint": "Полное совпадение по SID (как grep -x). Без скобок-якорей: db-.* совпадёт с любым SID, начинающимся на db-.",
   "soulprintLabel": "Soulprint filter (os.family=debian)",
   "soulprintPlaceholder": "os.family=debian kernel.version=6.*",
   "soulprintUnrecognized": "нераспознанные токены: {{tokens}}",

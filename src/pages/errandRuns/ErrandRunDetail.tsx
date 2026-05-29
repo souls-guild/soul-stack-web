@@ -108,10 +108,11 @@ export function ErrandRunDetail() {
   if (!view) return <div className={styles.empty}>{t('runhistory:errandRunNotFound')}</div>;
 
   const isRunning = !ERRAND_RUN_TERMINAL.has(view.status);
-  const total = view.summary?.counts?.total ?? view.scope_size;
-  const done = view.current_done ?? view.summary?.counts?.success ?? 0;
+  const summary = view.summary;
+  const total = summary?.total ?? view.scope_size;
+  const done = view.current_done ?? summary?.succeeded ?? 0;
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  const hosts = view.summary?.hosts ?? [];
+  const hosts = summary?.errands ?? [];
 
   return (
     <div className={styles.page}>
@@ -199,12 +200,27 @@ export function ErrandRunDetail() {
             mode: sseFailed ? 'polling' : 'SSE',
           })}
         </div>
+        {summary ? (
+          <div
+            data-testid="errandrun-counts"
+            style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}
+          >
+            <Badge tone="ok">{t('runhistory:countSucceeded', { n: summary.succeeded })}</Badge>
+            <Badge tone={summary.failed > 0 ? 'danger' : 'muted'}>
+              {t('runhistory:countFailed', { n: summary.failed })}
+            </Badge>
+            <Badge tone={summary.cancelled > 0 ? 'warn' : 'muted'}>
+              {t('runhistory:countCancelled', { n: summary.cancelled })}
+            </Badge>
+          </div>
+        ) : null}
       </section>
 
       <section className={styles.section} aria-label="Per-host Errand summary">
         <h2 className={styles.sectionTitle}>Per-host</h2>
         {hosts.length > 0 ? (
-          <table className={styles.table}>
+          <table className={styles.table} data-testid="errandrun-perhost">
+
             <thead>
               <tr>
                 <th>SID</th>

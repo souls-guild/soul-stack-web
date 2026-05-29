@@ -893,6 +893,7 @@ function Step2CommandHosts({
           placeholder={t('run:sidRegexPlaceholder')}
           aria-label="SID regex"
         />
+        <span className={styles.hint}>{t('run:sidRegexHint')}</span>
         {regexError ? <span className={styles.warn}>{regexError}</span> : null}
       </label>
 

@@ -354,7 +354,9 @@ describe('RunWizard', () => {
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    await user.type(screen.getByLabelText('SID regex'), '^db-');
+    // Full-match (anchored): для префикса нужен `.*`, иначе `db-` совпало бы
+    // только с точной строкой «db-».
+    await user.type(screen.getByLabelText('SID regex'), 'db-.*');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));

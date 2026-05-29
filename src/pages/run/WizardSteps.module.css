@@ -166,3 +166,8 @@
   color: var(--warn, #b87f00);
   font-size: 12px;
 }
+
+.hint {
+  color: var(--text-faint, var(--text-muted));
+  font-size: 12px;
+}

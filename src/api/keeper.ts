@@ -114,11 +114,23 @@ export interface ErrandRunCreateRequest {
   on_failure?: ErrandRunOnFailure;
 }
 
-export interface ErrandRunPerHostSummary {
+// Запись об одном дочернем Errand в Summary (ErrandRunRef). errand_id пуст, если
+// Spawner упал до создания row (NotConnected).
+export interface ErrandRunRef {
   sid: string;
-  status: ErrandStatus;
+  status: string;
   errand_id?: string;
   error_code?: string;
+}
+
+// Агрегированный итог ErrandRun (jsonb-колонка `summary`). counts — плоские
+// поля верхнего уровня, per-host список — `errands[]`.
+export interface ErrandRunSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+  errands: ErrandRunRef[];
 }
 
 export interface ErrandRunView {
@@ -133,10 +145,7 @@ export interface ErrandRunView {
   started_by_aid?: string;
   started_at: string;
   finished_at?: string;
-  summary?: {
-    hosts?: ErrandRunPerHostSummary[];
-    counts?: { total: number; success: number; failed: number };
-  };
+  summary?: ErrandRunSummary;
 }
 
 export interface ErrandRunListEntry {
