@@ -57,12 +57,15 @@ const ORACLE: NavItem[] = [
   { to: '/oracle/fires', label: 'Oracle fires', icon: Zap, matchPrefix: '/oracle' },
 ];
 
+// History-навигация. Основной вход для ad-hoc-команд — ErrandRuns («Command runs»):
+// запуск команды на N хостов (ULID). Per-host Errand — drill-down внутри
+// ErrandRun-detail; standalone /errands оставлен как route (single-host exec log,
+// ссылки с soul/audit), но из верхнего History убран, чтобы вход был однозначным.
 const HISTORY: NavItem[] = [
   { to: '/runs', label: 'All runs', icon: Activity, matchPrefix: '/runs' },
   { to: '/tides', label: 'Tides', icon: Waves, matchPrefix: '/tides' },
-  { to: '/errand-runs', label: 'Errand runs', icon: Terminal, matchPrefix: '/errand-runs' },
+  { to: '/errand-runs', label: 'Command runs', icon: Terminal, matchPrefix: '/errand-runs' },
   { to: '/push-runs', label: 'Push runs', icon: Send, matchPrefix: '/push-runs' },
-  { to: '/errands', label: 'Errands', icon: Terminal, matchPrefix: '/errands' },
 ];
 
 const BOTTOM: NavItem[] = [

@@ -1,13 +1,30 @@
 import { useTranslation } from 'react-i18next';
-import { Activity, Server } from 'lucide-react';
+import { Activity, Server, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { JsonKeyFilter } from '../../components/JsonKeyFilter';
 import { JsonViewer } from '../../components/JsonViewer';
+import { Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
 interface Props {
   state: Record<string, unknown> | null | undefined;
   stateSchemaVersion: number;
+  incarnationName: string;
+}
+
+// Скачивание текущего runtime-state как JSON-файла. Blob + objectURL —
+// без обращения к серверу (данные уже в памяти у клиента).
+function downloadStateJson(name: string, state: Record<string, unknown>, version: number): void {
+  const payload = { incarnation: name, state_schema_version: version, state };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name}-state.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // Tab «Runtime State» — текущая структурированная конфигурация incarnation
@@ -16,7 +33,7 @@ interface Props {
 //
 // Если в state.hosts (object keyed by SID) есть per-host записи — отдельная
 // секция с таблицей.
-export function StateTab({ state, stateSchemaVersion }: Props) {
+export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) {
   const { t } = useTranslation();
   const isEmpty = !state || (typeof state === 'object' && Object.keys(state).length === 0);
 
@@ -42,10 +59,22 @@ export function StateTab({ state, stateSchemaVersion }: Props) {
 
   return (
     <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>
-        <Activity size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
-        Runtime State
-      </h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <h2 className={styles.sectionTitle}>
+          <Activity size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
+          Runtime State
+        </h2>
+        {!isEmpty && state ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => downloadStateJson(incarnationName, state, stateSchemaVersion)}
+            data-testid="state-download-json"
+          >
+            <Download size={14} /> {t('incarnations:stateDownloadJson')}
+          </Button>
+        ) : null}
+      </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
         {t('incarnations:stateSourceLead')} state_schema_version:{' '}
         <span className="mono">{stateSchemaVersion}</span> {t('incarnations:stateSourceTail')}

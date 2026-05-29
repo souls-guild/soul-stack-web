@@ -56,6 +56,20 @@ function Protected({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Default landing — `/runs` (unified feed), с возможностью запомнить иной маршрут
+// в localStorage('landing'). Валидируем сохранённое значение (только known-маршрут),
+// иначе fallback на /runs.
+const KNOWN_LANDINGS = new Set(['/runs', '/incarnations', '/run', '/souls', '/tides']);
+function landingTarget(): string {
+  try {
+    const saved = localStorage.getItem('landing');
+    if (saved && KNOWN_LANDINGS.has(saved)) return saved;
+  } catch {
+    // localStorage недоступен — дефолт.
+  }
+  return '/runs';
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -63,7 +77,7 @@ export function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Navigate to="/incarnations" replace />} />
+            <Route path="/" element={<Navigate to={landingTarget()} replace />} />
             <Route path="/incarnations" element={<Protected><IncarnationsList /></Protected>} />
             <Route path="/incarnations/new" element={<Protected><IncarnationNewForm /></Protected>} />
             <Route path="/incarnations/:name" element={<Protected><IncarnationDetail /></Protected>} />

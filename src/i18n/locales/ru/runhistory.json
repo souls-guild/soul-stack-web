@@ -27,6 +27,7 @@
   "filterSshProviderLabel": "SSH provider",
   "filterStartedAfterLabel": "Started after (RFC3339)",
   "filterStatusSubstringLabel": "Status (substring)",
+  "filterStatusLabel": "Status",
   "feedSectionError": "{{label}}: ошибка {{status}}",
   "filterTypeLabel": "Type",
   "inputJsonLabel": "Input (JSON-object)",

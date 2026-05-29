@@ -53,6 +53,8 @@ tags:
     description: Ротация trust-anchor-ключей подписи Sigil (ADR-026(h), R3).
   - name: Service
     description: Реестр Service-ов service_registry (ADR-028-паттерн RBAC-storage).
+  - name: Module
+    description: Каталог модулей (core registry + активные plugin) для UI Run→Command module-search.
   - name: Augur
     description: Реестры Augur — Omen (внешняя система) и Rite (grant) (ADR-025, augur.md).
   - name: Oracle
@@ -2061,6 +2063,68 @@ paths:
         '500': { $ref: '#/components/responses/Problem500' }
         '502': { $ref: '#/components/responses/Problem502' }
 
+  /v1/modules:
+    get:
+      tags: [Module]
+      operationId: ListModules
+      summary: Каталог доступных модулей (core + активные plugin).
+      description: |
+        Permission: service.list. Каталог модулей для UI Run→Command module-
+        search (замена free-text «custom module»). Два источника:
+        core — статическая doc-таблица (имя/описание/state-ы/errand-safe; params
+        пусты — input-схема core не формализована), plugin — активные (не
+        отозванные) записи plugin_sigils с params из manifest `spec.states[*].
+        input`. Выдача отсортирована по name. Read-only, без audit (паттерн
+        service.list / plugin.list). Опц. фильтр `?errand_safe=true` — только
+        модули с хотя бы одним errand-safe state (для Run→Command whitelist).
+      parameters:
+        - in: query
+          name: errand_safe
+          required: false
+          schema: { type: boolean }
+          description: |
+            При `true` — только модули с хотя бы одним errand-safe state
+            (core.cmd / core.exec / core.http + plugin-модули с marker-ом
+            ErrandReadSafe, ADR-033).
+      responses:
+        '200':
+          description: Каталог модулей.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleCatalogReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/modules/{name}:
+    get:
+      tags: [Module]
+      operationId: GetModule
+      summary: Деталь одного модуля по полному имени.
+      description: |
+        Permission: service.list. Возвращает запись каталога по полному имени
+        без state-суффикса (`core.cmd` / `official.postgres-user`). 404 — модуля
+        нет в каталоге (core-таблица или активные plugin-допуски). Read-only,
+        без audit.
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+          description: Полное имя модуля без state-суффикса (`core.cmd`).
+      responses:
+        '200':
+          description: Запись каталога.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleCatalogItem'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/augur/omens:
     post:
       tags: [Augur]
@@ -3972,6 +4036,67 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PluginSigilView'
+      required: [items]
+
+    ModuleParam:
+      type: object
+      description: |
+        Один параметр модуля. Заполняется только для plugin-модулей (из manifest
+        `spec.states[*].input`); для core пуст (input-схема не формализована).
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Тип значения (string/int/bool/list/map и синонимы input-DSL).
+        required:
+          type: boolean
+        secret:
+          type: boolean
+          description: Значение приходит через vault-ref (manifest secret-флаг).
+        description:
+          type: string
+      required: [name, required]
+
+    ModuleCatalogItem:
+      type: object
+      description: |
+        Запись каталога модулей. name — полное имя без state-суффикса
+        (`core.cmd` / `official.postgres-user`). kind — core | plugin.
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [core, plugin]
+        namespace:
+          type: string
+          description: namespace plugin-модуля; пусто у core.
+        description:
+          type: string
+        states:
+          type: array
+          items: { type: string }
+          description: Допустимые state-/verb-суффиксы (полный адрес — `<name>.<state>`).
+        errand_safe:
+          type: boolean
+          description: |
+            Хотя бы один state модуля безопасен к ad-hoc-вызову через Errand
+            (ADR-033). Для фильтра `?errand_safe=true` в Run→Command.
+        params:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleParam'
+          description: Параметры (из manifest для plugin; пусто для core).
+      required: [name, kind, states, errand_safe, params]
+
+    ModuleCatalogReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleCatalogItem'
       required: [items]
 
     SigilKeyIntroduceRequest:

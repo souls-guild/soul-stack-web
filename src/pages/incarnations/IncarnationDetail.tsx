@@ -282,7 +282,11 @@ export function IncarnationDetail() {
       {tab === 'spec' ? <SpecTab spec={row.spec ?? null} /> : null}
 
       {tab === 'state' ? (
-        <StateTab state={row.state ?? null} stateSchemaVersion={row.state_schema_version} />
+        <StateTab
+          state={row.state ?? null}
+          stateSchemaVersion={row.state_schema_version}
+          incarnationName={row.name}
+        />
       ) : null}
 
       {tab === 'schema' ? (

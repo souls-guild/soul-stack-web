@@ -78,7 +78,7 @@ export function ErrandsList() {
         <div>
           <h1 className={styles.title}>
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
-            Errands
+            Errands — single-host exec log
           </h1>
           <div className={styles.crumbs}>{t('runhistory:errandsCrumbsBefore')}<Link to="/run?workload=command">{t('runhistory:runWizardLink')}</Link></div>
         </div>

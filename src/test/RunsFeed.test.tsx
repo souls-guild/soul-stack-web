@@ -133,14 +133,25 @@ describe('RunsFeed', () => {
     expect(within(dataRows()[0]).getByText('Tide')).toBeInTheDocument();
   });
 
-  it('filter by status substring → только failed', async () => {
+  it('filter by status chip (failed) → только failed-прогон', async () => {
     mockAll();
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('running / failed / succeeded…'), 'failed');
+    await user.click(screen.getByTestId('status-filter-failed'));
     await waitFor(() => expect(dataRows()).toHaveLength(1));
     expect(within(dataRows()[0]).getByText('Errand-run')).toBeInTheDocument();
+  });
+
+  it('multi-select status chips (success+running) → объединение', async () => {
+    mockAll();
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
+    const user = userEvent.setup();
+    // success: push + errand; running: tide → 3 строки (failed errand-run скрыт).
+    await user.click(screen.getByTestId('status-filter-success'));
+    await user.click(screen.getByTestId('status-filter-running'));
+    await waitFor(() => expect(dataRows()).toHaveLength(3));
   });
 
   it('optional-miss (push-runs 404) пропускается, остальные показываются', async () => {

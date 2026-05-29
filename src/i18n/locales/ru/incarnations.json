@@ -118,6 +118,7 @@
   "stateContainsEmpty": "state содержит только пустые объекты.",
   "stateEmpty": "state пуст — incarnation ещё не проходил apply-сценариев, либо сценарии ничего не записали в state.",
   "stateSourceLead": "Source: incarnation.state — записывается scenario-applier-ом после успешных apply-прогонов. Read-only.",
+  "stateDownloadJson": "Скачать JSON",
   "stateSourceTail": "— структура определяется в service.yml (см. вкладку Schema).",
   "title": "Новая incarnation",
   "toVersionRequired": "укажите git-ref целевой версии",

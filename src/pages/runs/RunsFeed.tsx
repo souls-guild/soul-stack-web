@@ -103,10 +103,22 @@ function isOptionalMiss(err: unknown): boolean {
 
 const LIMIT = 50;
 
+// Унифицированные статус-группы для multi-select-фильтра /runs. Каждая группа
+// матчит набор конкретных статусов разных run-типов (success ↔ succeeded,
+// running = любой non-terminal). Пустой набор = без фильтра по статусу.
+type StatusGroup = 'success' | 'failed' | 'running' | 'cancelled';
+const STATUS_GROUP_ORDER: StatusGroup[] = ['success', 'failed', 'running', 'cancelled'];
+const STATUS_GROUP_MATCH: Record<StatusGroup, (status: string) => boolean> = {
+  success: (s) => s === 'success' || s === 'succeeded',
+  failed: (s) => s === 'failed' || s === 'partial_failed' || s === 'timed_out' || s === 'module_not_allowed',
+  running: (s) => isRunning(s),
+  cancelled: (s) => s === 'cancelled',
+};
+
 export function RunsFeed() {
   const { t } = useTranslation();
   const [typeSet, setTypeSet] = useState<Set<RunType>>(new Set());
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusSet, setStatusSet] = useState<Set<StatusGroup>>(new Set());
 
   // 4 параллельных list-запроса. Polling 5s, если в выборке есть running.
   const tidesQ = useQuery({
@@ -213,13 +225,16 @@ export function RunsFeed() {
   }, [tidesQ.data, pushQ.data, errandRunsQ.data, errandsQ.data]);
 
   const filtered = useMemo(() => {
-    const statusNeedle = statusFilter.trim().toLowerCase();
     return allRows.filter((r) => {
       if (typeSet.size > 0 && !typeSet.has(r.type)) return false;
-      if (statusNeedle && !r.status.toLowerCase().includes(statusNeedle)) return false;
+      if (statusSet.size > 0) {
+        // OR между выбранными группами.
+        const ok = Array.from(statusSet).some((g) => STATUS_GROUP_MATCH[g](r.status));
+        if (!ok) return false;
+      }
       return true;
     });
-  }, [allRows, typeSet, statusFilter]);
+  }, [allRows, typeSet, statusSet]);
 
   const anyLoading = tidesQ.isLoading || pushQ.isLoading || errandRunsQ.isLoading || errandsQ.isLoading;
 
@@ -228,6 +243,15 @@ export function RunsFeed() {
       const next = new Set(prev);
       if (next.has(t)) next.delete(t);
       else next.add(t);
+      return next;
+    });
+  }
+
+  function toggleStatus(g: StatusGroup) {
+    setStatusSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
       return next;
     });
   }
@@ -264,16 +288,26 @@ export function RunsFeed() {
             })}
           </div>
         </div>
-        <label>
-          <div className={styles.metaKey}>{t('runhistory:filterStatusSubstringLabel')}</div>
-          <input
-            type="text"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            placeholder="running / failed / succeeded…"
-            style={inputStyle}
-          />
-        </label>
+        <div>
+          <div className={styles.metaKey}>{t('runhistory:filterStatusLabel')}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+            {STATUS_GROUP_ORDER.map((g) => {
+              const active = statusSet.has(g);
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => toggleStatus(g)}
+                  aria-pressed={active}
+                  data-testid={`status-filter-${g}`}
+                  style={chipStyle(active)}
+                >
+                  {g}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {errors.length > 0 ? (
@@ -341,15 +375,6 @@ export function RunsFeed() {
     </div>
   );
 }
-
-const inputStyle = {
-  padding: '8px 10px',
-  borderRadius: 'var(--radius)',
-  border: '1px solid var(--border)',
-  background: 'var(--surface)',
-  fontFamily: 'var(--font-mono)',
-  minWidth: 240,
-} as const;
 
 function chipStyle(active: boolean) {
   return {

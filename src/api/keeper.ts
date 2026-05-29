@@ -243,6 +243,14 @@ export type DecreeCreateRequest = components['schemas']['DecreeCreateRequest'];
 export type DecreeView = components['schemas']['DecreeView'];
 export type DecreeListReply = components['schemas']['DecreeListReply'];
 
+// Module-каталог (GET /v1/modules, commit 530329d). core из coremod-реестра,
+// plugin из активных plugin_sigils + manifest-params. Используется Run→Command
+// module-search (замена free-text «custom module»).
+export type ModuleCatalogItem = components['schemas']['ModuleCatalogItem'];
+export type ModuleCatalogReply = components['schemas']['ModuleCatalogReply'];
+export type ModuleParam = components['schemas']['ModuleParam'];
+export type ModuleKind = NonNullable<ModuleCatalogItem['kind']>;
+
 export type PluginSigilView = components['schemas']['PluginSigilView'];
 export type PluginSigilListReply = components['schemas']['PluginSigilListReply'];
 export type PluginSigilAllowRequest = components['schemas']['PluginSigilAllowRequest'];
@@ -621,6 +629,18 @@ export const keeperApi = {
       new EventSource(`/v1/errand-runs/${encodeURIComponent(errandRunId)}/events`),
   },
 
+  // Module-каталог (commit 530329d). list — для Run→Command module-search;
+  // get — деталь по полному имени (params для авто-формы). Read-only.
+  // Endpoint опционален для старых деплоев Keeper — UI graceful-degraded на 404/501.
+  modules: {
+    list: (q: ListModulesQuery = {}) =>
+      apiGet<ModuleCatalogReply>('/v1/modules', {
+        query: { errand_safe: q.errand_safe },
+      }),
+    get: (name: string) =>
+      apiGet<ModuleCatalogItem>(`/v1/modules/${encodeURIComponent(name)}`),
+  },
+
   // Push-providers registry (ADR-032 amendment 2026-05-26, S7-2). Используется в /run Step 2 (Push).
   pushProviders: {
     list: (q: ListPagedQuery = {}) =>
@@ -737,4 +757,9 @@ export interface ListErrandRunsQuery {
   module?: string[];
   offset?: number;
   limit?: number;
+}
+
+export interface ListModulesQuery {
+  // true — только модули с хотя бы одним errand-safe state (Run→Command whitelist).
+  errand_safe?: boolean;
 }

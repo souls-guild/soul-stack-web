@@ -7,6 +7,9 @@ import { keeperApi } from '../../api/keeper';
 import type {
   ErrandRunOnFailure,
   IncarnationRunRequest,
+  ModuleCatalogItem,
+  ModuleKind,
+  ModuleParam,
   ScenarioInputSchema,
   ServiceScenarioInfo,
   SoulListEntry,
@@ -34,6 +37,8 @@ import {
   type HostCriteria,
 } from './hostSelector';
 import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder';
+import { ModulePicker } from './ModulePicker';
+import { hasParams, paramsToInputSchema } from './moduleParams.helpers';
 import { ChipsInput } from '../incarnations/ChipsInput';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
@@ -69,19 +74,37 @@ interface ScenarioStateValues {
   inputObj: Record<string, unknown>;
 }
 
-// Module — кортеж known core-модулей + произвольный custom.
-type CommandModuleKind = 'core.cmd.shell' | 'core.exec.run' | 'custom';
-
+// Command-модуль выбирается из каталога (GET /v1/modules) через ModulePicker.
+// `moduleName` — имя без state-суффикса (`core.cmd`); `moduleState` — выбранный
+// state (`shell`); полный адрес для submit — `<moduleName>.<moduleState>`.
+//
+// Ветвление формы параметров:
+//   - core cmd/exec (params пусты, errand-safe) → cmd-textarea (как было).
+//   - модуль с params[] → типизированная per-field форма (ScenarioInputFields).
+//   - каталог недоступен (404/501) → free-text имя + DynamicInputBuilder.
 interface CommandStateValues {
-  moduleKind: CommandModuleKind;
-  // Для CommandModuleKind === 'custom' — имя custom-модуля.
-  customModule: string;
-  // shell/exec — cmd; для custom не используется.
+  // Имя выбранного модуля (без state-суффикса), напр. `core.cmd`. Пусто — не выбран.
+  moduleName: string;
+  // Выбранный state модуля (`shell`/`run`/...). Полный адрес — `moduleName.moduleState`.
+  moduleState: string;
+  // Допустимые state-суффиксы выбранного модуля (для dropdown при >1).
+  moduleStates: string[];
+  // core | plugin (из каталога). '' пока ничего не выбрано.
+  moduleKind: ModuleKind | '';
+  // Параметры модуля из каталога (для авто-формы; пусты у core).
+  moduleParams: ModuleParam[];
+  // shell/exec — cmd; для модулей с params не используется.
   cmd: string;
+  // Типизированные значения params-формы (для модулей с params[]).
+  paramFields: ScenarioFieldsState;
   timeoutSeconds: number;
-  // Для CommandModuleKind === 'custom' — динамический input-объект.
+  // Free-text fallback (каталог недоступен): имя модуля + динамический input.
+  customModule: string;
   customInput: Record<string, unknown>;
 }
+
+// «cmd-модули» — core shell/exec: params пусты, форма = cmd-textarea.
+const CMD_FIELD_MODULES = new Set(['core.cmd', 'core.exec']);
 
 interface OptionsState {
   waveSize: string;
@@ -122,10 +145,15 @@ function pickWorkloadFromQuery(raw: string | null): Workload {
   return 'scenario';
 }
 
-function pickInitialCommandModule(raw: string | null): CommandModuleKind {
-  if (raw === 'core.exec.run') return 'core.exec.run';
-  if (raw === 'core.cmd.shell' || raw === null) return 'core.cmd.shell';
-  return 'custom';
+// Разбор query-param `module` (deep-link / bulk-run) на (name, state).
+// Полный адрес `core.cmd.shell` → name=`core.cmd`, state=`shell`. Дефолт —
+// core.cmd.shell. Plugin-модули в формате `official.postgres-user.present` тоже
+// корректно разбиваются (последний сегмент — state).
+function pickInitialCommandModule(raw: string | null): { name: string; state: string } {
+  if (!raw) return { name: 'core.cmd', state: 'shell' };
+  const idx = raw.lastIndexOf('.');
+  if (idx <= 0) return { name: raw, state: '' };
+  return { name: raw.slice(0, idx), state: raw.slice(idx + 1) };
 }
 
 export function RunWizard() {
@@ -187,13 +215,20 @@ export function RunWizard() {
 
   const [commandState, setCommandState] = useState<CommandStateValues>(
     draft?.commandState ?? {
-      moduleKind: pickInitialCommandModule(initialModuleParam),
-      customModule:
-        initialModuleParam && initialModuleParam !== 'core.cmd.shell' && initialModuleParam !== 'core.exec.run'
-          ? initialModuleParam
-          : '',
+      ...(() => {
+        const m = pickInitialCommandModule(initialModuleParam);
+        return {
+          moduleName: m.name,
+          moduleState: m.state,
+          moduleStates: m.state ? [m.state] : [],
+          moduleKind: m.name.startsWith('core.') ? ('core' as const) : (initialModuleParam ? ('' as const) : ('core' as const)),
+          moduleParams: [] as ModuleParam[],
+        };
+      })(),
       cmd: initialCmd,
+      paramFields: {},
       timeoutSeconds: 30,
+      customModule: '',
       customInput: {},
     },
   );
@@ -340,14 +375,27 @@ export function RunWizard() {
     [workload, usePerField, inputSchema, scenarioState.fields],
   );
 
+  // Пустые required params типизированной формы (модули с params[]).
+  const commandMissingRequired = useMemo(() => {
+    if (workload !== 'command' || !hasParams(commandState.moduleParams)) return [];
+    return missingRequiredFields(paramsToInputSchema(commandState.moduleParams), commandState.paramFields);
+  }, [workload, commandState.moduleParams, commandState.paramFields]);
+
   const canAdvanceFromStep3 = useMemo(() => {
     if (workload === 'scenario') {
       return scenarioState.incarnations.length > 0 && scenarioMissingRequired.length === 0;
     }
     // command: Step3 — module+params.
-    if (commandState.moduleKind === 'custom') return commandState.customModule.trim().length > 0;
-    return commandState.cmd.trim().length > 0;
-  }, [workload, scenarioState.incarnations, scenarioMissingRequired, commandState]);
+    // Free-text fallback (каталог недоступен): нужно имя модуля.
+    if (!commandState.moduleName.trim()) return false;
+    // Модуль с params — все required заполнены.
+    if (hasParams(commandState.moduleParams)) return commandMissingRequired.length === 0;
+    // cmd-модули (core.cmd/core.exec) — нужен непустой cmd.
+    if (CMD_FIELD_MODULES.has(commandState.moduleName)) return commandState.cmd.trim().length > 0;
+    // Прочие модули без формализованных params (free-text fallback или core
+    // без cmd-поля) — имени достаточно.
+    return true;
+  }, [workload, scenarioState.incarnations, scenarioMissingRequired, commandState, commandMissingRequired]);
 
   // --- Submit ---
   const submitMu = useMutation({
@@ -423,10 +471,19 @@ export function RunWizard() {
 
   async function submitCommand(): Promise<string> {
     const c = parseIntOrEmpty(options.concurrency);
-    const moduleName =
-      commandState.moduleKind === 'custom' ? commandState.customModule : commandState.moduleKind;
-    const input =
-      commandState.moduleKind === 'custom' ? commandState.customInput : { cmd: commandState.cmd };
+    // Полный адрес модуля — `<name>.<state>` (state опускается, если пуст —
+    // free-text fallback мог не задать его).
+    const moduleName = commandState.moduleState
+      ? `${commandState.moduleName}.${commandState.moduleState}`
+      : commandState.moduleName;
+    let input: Record<string, unknown>;
+    if (hasParams(commandState.moduleParams)) {
+      input = serializeFields(paramsToInputSchema(commandState.moduleParams), commandState.paramFields);
+    } else if (CMD_FIELD_MODULES.has(commandState.moduleName)) {
+      input = { cmd: commandState.cmd };
+    } else {
+      input = commandState.customInput;
+    }
     // UI уже резолвил rich-criteria в явный список SID — шлём sids.
     const reply = await keeperApi.errandRuns.create({
       module: moduleName,
@@ -486,7 +543,11 @@ export function RunWizard() {
           />
         ) : null}
         {step === 3 && workload === 'command' ? (
-          <Step3CommandParams value={commandState} onChange={setCommandState} />
+          <Step3CommandParams
+            value={commandState}
+            onChange={setCommandState}
+            missingRequired={commandMissingRequired}
+          />
         ) : null}
 
         {step === 4 ? (
@@ -942,78 +1003,113 @@ function Step2CommandHosts({
   );
 }
 
-// Step 3 Command: module + params.
+// Step 3 Command: module-search (каталог GET /v1/modules) + типизированная
+// форма params / cmd-поля / free-text fallback.
 function Step3CommandParams({
   value,
   onChange,
+  missingRequired,
 }: {
   value: CommandStateValues;
   onChange: (next: CommandStateValues) => void;
+  missingRequired: string[];
 }) {
   const { t } = useTranslation();
-  const isCustom = value.moduleKind === 'custom';
+  const [catalogUnavailable, setCatalogUnavailable] = useState(false);
+
+  // Выбор модуля из каталога: применяем имя, kind, params и первый state.
+  // Сбрасываем форму (cmd / paramFields), чтобы не нести значения старого модуля.
+  function onSelectModule(item: ModuleCatalogItem) {
+    const states = item.states ?? [];
+    const next: CommandStateValues = {
+      ...value,
+      moduleName: item.name,
+      moduleState: states[0] ?? '',
+      moduleStates: states,
+      moduleKind: item.kind,
+      moduleParams: item.params ?? [],
+      cmd: CMD_FIELD_MODULES.has(item.name) ? value.cmd : '',
+      paramFields: hasParams(item.params) ? defaultsFromSchema(paramsToInputSchema(item.params)) : {},
+    };
+    onChange(next);
+  }
+
+  const showCmdFields = CMD_FIELD_MODULES.has(value.moduleName) && !hasParams(value.moduleParams);
+  const showParamsForm = hasParams(value.moduleParams);
+  const paramsSchema = useMemo(() => paramsToInputSchema(value.moduleParams), [value.moduleParams]);
+  const isShellModule = value.moduleName === 'core.cmd';
+
   return (
     <>
-      <label className={styles.fieldRow}>
+      <div className={styles.fieldRow}>
         <span className={styles.fieldLabel}>Module</span>
-        <select
-          className={styles.field}
-          value={value.moduleKind}
-          onChange={(e) =>
-            onChange({ ...value, moduleKind: e.target.value as CommandStateValues['moduleKind'] })
-          }
-          aria-label="Module"
-        >
-          <option value="core.cmd.shell">core.cmd.shell</option>
-          <option value="core.exec.run">core.exec.run</option>
-          <option value="custom">{t('run:customModuleOption')}</option>
-        </select>
-      </label>
-      {isCustom ? (
-        <>
-          <label className={styles.fieldRow}>
-            <span className={styles.fieldLabel}>{t('run:moduleNameLabel')}</span>
+        {catalogUnavailable ? (
+          <>
             <input
               type="text"
               className={styles.field}
-              value={value.customModule}
-              onChange={(e) => onChange({ ...value, customModule: e.target.value })}
+              value={value.moduleName}
+              onChange={(e) =>
+                onChange({ ...value, moduleName: e.target.value, moduleState: '', moduleStates: [], moduleParams: [] })
+              }
               placeholder={t('run:moduleNamePlaceholder')}
               aria-label="Custom module name"
+              data-testid="module-freetext"
             />
-          </label>
-          <div>
-            <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-              {t('run:inputLabel')}
-            </div>
-            <DynamicInputBuilder
-              value={value.customInput}
-              onChange={(next) => onChange({ ...value, customInput: next })}
-              ariaLabel="Custom module input fields"
-            />
+            <span className={styles.hint}>{t('run:moduleCatalogUnavailable')}</span>
+          </>
+        ) : (
+          <ModulePicker
+            value={value.moduleName}
+            onSelect={onSelectModule}
+            errandSafe
+            onUnavailable={() => setCatalogUnavailable(true)}
+          />
+        )}
+      </div>
+
+      {/* Выбор state, если у модуля их несколько (полный адрес — name.state). */}
+      <CommandStateSelect value={value} onChange={onChange} />
+
+      {showParamsForm ? (
+        <div data-testid="module-params-form">
+          <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
+            {t('run:moduleParamsLabel', { module: value.moduleName })}
           </div>
-        </>
-      ) : (
+          <ScenarioInputFields
+            schema={paramsSchema}
+            value={value.paramFields}
+            onChange={(next) => onChange({ ...value, paramFields: next })}
+            showErrors={missingRequired.length > 0}
+          />
+        </div>
+      ) : showCmdFields ? (
         <label className={styles.fieldRow}>
           <span className={styles.fieldLabel}>
-            {value.moduleKind === 'core.cmd.shell'
-              ? t('run:commandShellLabel')
-              : t('run:commandExecLabel')}
+            {isShellModule ? t('run:commandShellLabel') : t('run:commandExecLabel')}
           </span>
           <textarea
             className={styles.field}
             rows={4}
             value={value.cmd}
             onChange={(e) => onChange({ ...value, cmd: e.target.value })}
-            placeholder={
-              value.moduleKind === 'core.cmd.shell'
-                ? t('run:commandShellPlaceholder')
-                : t('run:commandExecPlaceholder')
-            }
+            placeholder={isShellModule ? t('run:commandShellPlaceholder') : t('run:commandExecPlaceholder')}
             aria-label="Command"
           />
         </label>
-      )}
+      ) : value.moduleName ? (
+        <div data-testid="module-dynamic-input">
+          <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
+            {t('run:inputLabel')}
+          </div>
+          <DynamicInputBuilder
+            value={value.customInput}
+            onChange={(next) => onChange({ ...value, customInput: next })}
+            ariaLabel="Custom module input fields"
+          />
+        </div>
+      ) : null}
+
       <label className={styles.fieldRow}>
         <span className={styles.fieldLabel}>{t('run:timeoutLabel')}</span>
         <input
@@ -1027,6 +1123,38 @@ function Step3CommandParams({
         />
       </label>
     </>
+  );
+}
+
+// Выбор state-суффикса, если у выбранного модуля их несколько (`core.service` —
+// running/stopped/...). При единственном/нулевом state секция скрыта (state
+// уже выставлен onSelectModule). Полный адрес submit-а — `moduleName.moduleState`.
+function CommandStateSelect({
+  value,
+  onChange,
+}: {
+  value: CommandStateValues;
+  onChange: (next: CommandStateValues) => void;
+}) {
+  const { t } = useTranslation();
+  if (value.moduleStates.length < 2) return null;
+  return (
+    <label className={styles.fieldRow}>
+      <span className={styles.fieldLabel}>{t('run:moduleStateLabel')}</span>
+      <select
+        className={styles.field}
+        value={value.moduleState}
+        onChange={(e) => onChange({ ...value, moduleState: e.target.value })}
+        aria-label="Module state"
+        data-testid="module-state-select"
+      >
+        {value.moduleStates.map((s) => (
+          <option key={s} value={s}>
+            {value.moduleName}.{s}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

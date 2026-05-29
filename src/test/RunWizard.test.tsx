@@ -51,6 +51,14 @@ interface SoulStub {
   status?: string;
   transport?: string;
 }
+interface ModuleStub {
+  name: string;
+  kind: 'core' | 'plugin';
+  description?: string;
+  states: string[];
+  errand_safe: boolean;
+  params?: Array<{ name: string; type?: string; required?: boolean; secret?: boolean; description?: string }>;
+}
 interface FetchStubOpts {
   serviceName?: string;
   scenarios?: ScenarioStubEntry[];
@@ -58,7 +66,14 @@ interface FetchStubOpts {
   souls?: SoulStub[];
   // soulprint typed_facts по SID (для soulprint-фильтра).
   soulprints?: Record<string, unknown>;
+  // Каталог модулей (GET /v1/modules). undefined → дефолтные core cmd/exec.
+  modules?: ModuleStub[];
 }
+
+const DEFAULT_MODULES: ModuleStub[] = [
+  { name: 'core.cmd', kind: 'core', description: 'shell command', states: ['shell'], errand_safe: true, params: [] },
+  { name: 'core.exec', kind: 'core', description: 'binary + args', states: ['run'], errand_safe: true, params: [] },
+];
 
 interface CapturedPost {
   url: string;
@@ -76,6 +91,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
   const incarnationNames = opts.incarnationNames ?? ['redis-prod'];
   const souls: SoulStub[] = opts.souls ?? [];
   const soulprints = opts.soulprints ?? {};
+  const modules = opts.modules ?? DEFAULT_MODULES;
   const ref: { posted: CapturedPost | null; posts: CapturedPost[] } = { posted: null, posts: [] };
 
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -127,6 +143,21 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
         limit: 50,
         total: incarnationNames.length,
       });
+    }
+    const moduleDetailMatch = url.match(/\/v1\/modules\/([^/?]+)/);
+    if (moduleDetailMatch) {
+      const name = decodeURIComponent(moduleDetailMatch[1]);
+      const m = modules.find((x) => x.name === name);
+      if (!m) return json({}, 404);
+      return json({ ...m, params: m.params ?? [] });
+    }
+    if (url.includes('/v1/modules')) {
+      const errandSafeOnly = url.includes('errand_safe=true');
+      const items = (errandSafeOnly ? modules.filter((m) => m.errand_safe) : modules).map((m) => ({
+        ...m,
+        params: m.params ?? [],
+      }));
+      return json({ items });
     }
     const soulprintMatch = url.match(/\/v1\/souls\/([^/]+)\/soulprint/);
     if (soulprintMatch) {
@@ -321,9 +352,9 @@ describe('RunWizard', () => {
     // Preview: 2 hosts match.
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
-    // Step 2 → 3 (module/params).
+    // Step 2 → 3 (module/params). Дефолтный модуль core.cmd.shell → cmd-textarea.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Module')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Command')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Command'), 'uptime');
 
     // Step 3 → 4 → submit.
@@ -369,9 +400,23 @@ describe('RunWizard', () => {
     expect(body.target.sids.sort()).toEqual(['db-1.example.com', 'db-2.example.com']);
   });
 
-  it('Command custom-module → DynamicInputBuilder + sids в POST', async () => {
+  it('Command module-search: выбор plugin-модуля из каталога → params-форма → POST', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'host-a.example.com', covens: ['prod'] }],
+      modules: [
+        ...DEFAULT_MODULES,
+        {
+          name: 'official.http',
+          kind: 'plugin',
+          description: 'HTTP probe',
+          states: ['probe'],
+          errand_safe: true,
+          params: [
+            { name: 'url', type: 'string', required: true, description: 'target URL' },
+            { name: 'timeout', type: 'int', required: false },
+          ],
+        },
+      ],
     });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -385,11 +430,59 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // Params: custom module.
-    await waitFor(() => expect(screen.getByLabelText('Module')).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText('Module'), 'custom');
-    await user.type(screen.getByLabelText('Custom module name'), 'core.http.probe');
-    await waitFor(() => expect(screen.getByLabelText('Custom module input fields')).toBeInTheDocument());
+    // Params step: открываем module-picker, ищем и выбираем plugin-модуль из каталога.
+    await waitFor(() => expect(screen.getByTestId('module-picker-control')).toBeInTheDocument());
+    await user.click(screen.getByTestId('module-picker-control'));
+    await user.type(screen.getByTestId('module-picker-search'), 'http');
+    await user.click(await screen.findByTestId('module-option-official.http'));
+
+    // Params-форма по params[]: типизированное поле url (required) + timeout.
+    await waitFor(() => expect(screen.getByTestId('module-params-form')).toBeInTheDocument());
+    const urlLabel = await screen.findByText(/^url \*?$/);
+    const urlField = urlLabel.parentElement?.querySelector('input') as HTMLInputElement;
+    await user.type(urlField, 'https://example.com');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as { module: string; input: Record<string, unknown>; target: { sids: string[] } };
+    // Полный адрес модуля — name.state.
+    expect(body.module).toBe('official.http.probe');
+    expect(body.input).toEqual({ url: 'https://example.com' });
+    expect(body.target.sids).toEqual(['host-a.example.com']);
+  });
+
+  it('Command module-search: каталог недоступен (404) → free-text имя + DynamicInputBuilder', async () => {
+    const stub = setupFetchStub({
+      souls: [{ sid: 'host-a.example.com', covens: ['prod'] }],
+      modules: [], // list вернёт {items:[]}; для 404 подменим ниже
+    });
+    // Переопределяем /v1/modules на 404 (graceful-fallback path).
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/modules')) {
+        return new Response('{}', { status: 404, headers: { 'Content-Type': 'application/json' } });
+      }
+      return prevFetch(input, init);
+    }) as typeof fetch;
+
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    const covenChip = await screen.findByLabelText('Coven labels');
+    await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+
+    // Free-text fallback: вводим имя модуля вручную + dynamic input.
+    const freeText = await screen.findByTestId('module-freetext');
+    await user.clear(freeText);
+    await user.type(freeText, 'core.http.probe');
+    await waitFor(() => expect(screen.getByTestId('module-dynamic-input')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /Add first field/i }));
     fireEvent.change(screen.getByRole('textbox', { name: /field key/i }), { target: { value: 'url' } });
     fireEvent.change(screen.getByRole('textbox', { name: /field value/i }), { target: { value: 'https://example.com' } });
@@ -398,10 +491,10 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
 
-    const body = stub.posted?.body as { module: string; input: Record<string, unknown>; target: { sids: string[] } };
+    const body = stub.posted?.body as { module: string; input: Record<string, unknown> };
+    // free-text без state-сегмента → имя как есть (core.http.probe).
     expect(body.module).toBe('core.http.probe');
     expect(body.input).toEqual({ url: 'https://example.com' });
-    expect(body.target.sids).toEqual(['host-a.example.com']);
   });
 
   it('Command-state переживает переключение workload Command↔Scenario↔Command', async () => {
