@@ -1,6 +1,11 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PermissionResource } from '../../api/keeper';
+import { useQuery } from '@tanstack/react-query';
+import { keeperApi, type PermissionResource } from '../../api/keeper';
+import {
+  parsePermission,
+  buildPermission,
+} from './permissions';
 
 interface Props {
   value: string[];
@@ -9,30 +14,255 @@ interface Props {
   ariaLabel?: string;
 }
 
+// Состояние scope-пикера для одного action.
+interface ScopeState {
+  key: string;
+  value: string;
+}
+
+// Автокомплит-значения по scope-ключу (берём из существующих API).
+function useAutocompleteOptions(scopeKey: string): string[] {
+  const incQ = useQuery({
+    queryKey: ['rbac.scope-ac.incarnations'],
+    queryFn: () => keeperApi.incarnations.list({ limit: 200 }),
+    enabled: scopeKey === 'incarnation',
+    staleTime: 60_000,
+  });
+  const svcQ = useQuery({
+    queryKey: ['rbac.scope-ac.services'],
+    queryFn: () => keeperApi.services.list(),
+    enabled: scopeKey === 'service',
+    staleTime: 60_000,
+  });
+  const soulsQ = useQuery({
+    queryKey: ['rbac.scope-ac.souls'],
+    queryFn: () => keeperApi.souls.list({ limit: 200 }),
+    enabled: scopeKey === 'host',
+    staleTime: 60_000,
+  });
+  // coven — нет прямого endpoint-а; собираем уникальные ковены из /v1/souls.
+  const covenSoulsQ = useQuery({
+    queryKey: ['rbac.scope-ac.covens'],
+    queryFn: () => keeperApi.souls.list({ limit: 500 }),
+    enabled: scopeKey === 'coven',
+    staleTime: 60_000,
+  });
+
+  if (scopeKey === 'incarnation') {
+    return (incQ.data?.items ?? []).map((i) => i.name).filter(Boolean);
+  }
+  if (scopeKey === 'service') {
+    return (svcQ.data?.items ?? []).map((s) => s.name).filter(Boolean);
+  }
+  if (scopeKey === 'host') {
+    return (soulsQ.data?.items ?? []).map((s) => s.sid).filter(Boolean);
+  }
+  if (scopeKey === 'coven') {
+    const all = covenSoulsQ.data?.items ?? [];
+    const uniq = new Set<string>();
+    for (const s of all) {
+      for (const c of s.covens ?? []) uniq.add(c);
+    }
+    return Array.from(uniq).sort();
+  }
+  return [];
+}
+
+// Scope-picker для одного action. Рендерится под чекбоксом когда checked + есть selector_keys.
+function ScopePicker({
+  selectorKeys,
+  scope,
+  onChange,
+}: {
+  selectorKeys: string[];
+  scope: ScopeState | null;
+  onChange: (next: ScopeState | null) => void;
+}) {
+  const { t } = useTranslation();
+  const currentKey = scope?.key ?? '';
+  const options = useAutocompleteOptions(currentKey);
+  const datalistId = useId();
+
+  // Если ключ не выбран — показываем выбор ключа.
+  const handleKeyChange = (k: string) => {
+    if (!k) { onChange(null); return; }
+    onChange({ key: k, value: scope?.value ?? '' });
+  };
+
+  const handleValueChange = (v: string) => {
+    if (!currentKey) return;
+    onChange({ key: currentKey, value: v });
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
+        marginLeft: 22,
+        flexWrap: 'wrap',
+      }}
+    >
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+        {t('admin:rbacScopeLabel')}
+      </span>
+      <select
+        value={currentKey}
+        onChange={(e) => handleKeyChange(e.target.value)}
+        aria-label={t('admin:rbacScopeKeyAria')}
+        style={{
+          fontSize: 12,
+          padding: '2px 6px',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          background: 'var(--surface)',
+          color: 'var(--text)',
+          cursor: 'pointer',
+        }}
+      >
+        <option value="">{t('admin:rbacScopeNone')}</option>
+        {selectorKeys.map((k) => (
+          <option key={k} value={k}>
+            {t(`admin:rbacScopeKey_${k}`, { defaultValue: k })}
+          </option>
+        ))}
+      </select>
+      {currentKey ? (
+        <>
+          <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>=</span>
+          <input
+            type="text"
+            list={options.length > 0 ? datalistId : undefined}
+            value={scope?.value ?? ''}
+            onChange={(e) => handleValueChange(e.target.value)}
+            placeholder={t('admin:rbacScopeValuePlaceholder')}
+            aria-label={t('admin:rbacScopeValueAria', { key: currentKey })}
+            style={{
+              fontSize: 12,
+              padding: '2px 6px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+              minWidth: 120,
+              maxWidth: 220,
+            }}
+          />
+          {options.length > 0 && (
+            <datalist id={datalistId}>
+              {options.map((o) => (
+                <option key={o} value={o} />
+              ))}
+            </datalist>
+          )}
+          {!options.length && (
+            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+              {t('admin:rbacScopeFreeText')}
+            </span>
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+// Бейдж scope для отображения в списке preserved-прав и в catalog-picker.
+function ScopeBadge({ scopeKey, scopeValues }: { scopeKey: string; scopeValues: string[] }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      title={`on ${scopeKey}=${scopeValues.join(',')}`}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 3,
+        padding: '1px 6px',
+        background: 'color-mix(in srgb, var(--accent, #2563eb) 12%, var(--surface))',
+        border: '1px solid color-mix(in srgb, var(--accent, #2563eb) 30%, var(--border))',
+        borderRadius: 'var(--radius-pill)',
+        fontSize: 11,
+        fontFamily: 'var(--font-mono)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {t(`admin:rbacScopeKey_${scopeKey}`, { defaultValue: scopeKey })}={scopeValues.join(',')}
+    </span>
+  );
+}
+
 // Grouped permission-picker по реальному каталогу GET /v1/permissions (ADR-042):
-// resource → actions, оператор отмечает чекбоксы. Полное право = `resource.action`
-// (напр. soul.list, incarnation.run) — раньше тут был free-text input с хардкод-
-// списком, из-за чего слался несуществующий soul.read → unknown_permission.
-// Права из value, которых нет в каталоге (wildcard `*`, `incarnation.*`, legacy),
-// сохраняются read-only чипами, чтобы replace-семантика PATCH их не теряла.
+// resource → actions, оператор отмечает чекбоксы. При наличии selector_keys для
+// action — появляется опциональный scope-пикер (dropdown ключа + input значения).
+// Полное право = `resource.action` или `resource.action on key=value`.
+// Права из value, которых нет в каталоге (wildcard `*`, `incarnation.*`, legacy,
+// scoped-права сохранённые ранее), сохраняются read-only чипами.
 export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props) {
   const { t } = useTranslation();
   const groupId = useId();
 
-  const selected = new Set(value);
-  const catalogPerms = new Set<string>();
-  for (const res of catalog) {
-    for (const act of res.actions) catalogPerms.add(`${res.resource}.${act.action}`);
-  }
-  // Права, которые каталог не покрывает (включая wildcard) — не теряем при save.
-  const preserved = value.filter((p) => !catalogPerms.has(p));
-
-  function toggle(perm: string, on: boolean) {
-    if (on) {
-      if (!selected.has(perm)) onChange([...value, perm]);
-    } else {
-      onChange(value.filter((p) => p !== perm));
+  // scopeStates: Map base-права → текущее состояние scope-пикера.
+  // Инициализируем из value: если право уже scoped — распарсить и показать.
+  const [scopeStates, setScopeStates] = useState<Map<string, ScopeState | null>>(() => {
+    const m = new Map<string, ScopeState | null>();
+    for (const perm of value) {
+      const parsed = parsePermission(perm);
+      if (parsed.scopeKey && parsed.scopeValues) {
+        m.set(parsed.base, { key: parsed.scopeKey, value: parsed.scopeValues.join(',') });
+      }
     }
+    return m;
+  });
+
+  // selected: Set base-прав (без scope-части) — для чекбоксов.
+  const selected = new Set<string>();
+  for (const perm of value) {
+    const { base } = parsePermission(perm);
+    selected.add(base);
+  }
+
+  const catalogBases = new Set<string>();
+  for (const res of catalog) {
+    for (const act of res.actions) catalogBases.add(`${res.resource}.${act.action}`);
+  }
+
+  // Права, которые каталог не покрывает (включая wildcard, scoped-rights) — не теряем при save.
+  const preserved = value.filter((p) => {
+    const { base } = parsePermission(p);
+    return !catalogBases.has(base);
+  });
+
+  // Сборка текущего value из selected + scopeStates.
+  function buildValue(
+    bases: Set<string>,
+    scopes: Map<string, ScopeState | null>,
+    currentPreserved: string[],
+  ): string[] {
+    const result: string[] = [...currentPreserved];
+    for (const base of bases) {
+      const scope = scopes.get(base);
+      if (scope?.key && scope.value.trim()) {
+        result.push(buildPermission({ base, scopeKey: scope.key, scopeValues: [scope.value.trim()] }));
+      } else {
+        result.push(base);
+      }
+    }
+    return result;
+  }
+
+  function toggle(base: string, on: boolean) {
+    const next = new Set(selected);
+    if (on) next.add(base);
+    else { next.delete(base); setScopeStates((prev) => { const m = new Map(prev); m.delete(base); return m; }); }
+    onChange(buildValue(next, scopeStates, preserved));
+  }
+
+  function updateScope(base: string, scope: ScopeState | null) {
+    const next = new Map(scopeStates);
+    next.set(base, scope);
+    setScopeStates(next);
+    onChange(buildValue(selected, next, preserved));
   }
 
   return (
@@ -59,32 +289,50 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
               >
                 {res.resource}
               </legend>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {res.actions.map((act) => {
-                  const perm = `${res.resource}.${act.action}`;
-                  const id = `${groupId}-${perm}`;
+                  const base = `${res.resource}.${act.action}`;
+                  const id = `${groupId}-${base}`;
+                  const isChecked = selected.has(base);
+                  const hasSelectorKeys = (act.selector_keys ?? []).length > 0;
+                  const currentScope = scopeStates.get(base) ?? null;
+
                   return (
-                    <label
-                      key={perm}
-                      htmlFor={id}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 13,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <input
-                        id={id}
-                        type="checkbox"
-                        checked={selected.has(perm)}
-                        onChange={(e) => toggle(perm, e.target.checked)}
-                        style={{ accentColor: 'var(--accent)' }}
-                      />
-                      {perm}
-                    </label>
+                    <div key={base}>
+                      <label
+                        htmlFor={id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 13,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          id={id}
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => toggle(base, e.target.checked)}
+                          style={{ accentColor: 'var(--accent)' }}
+                        />
+                        {base}
+                        {isChecked && currentScope?.key && currentScope.value ? (
+                          <ScopeBadge
+                            scopeKey={currentScope.key}
+                            scopeValues={[currentScope.value]}
+                          />
+                        ) : null}
+                      </label>
+                      {isChecked && hasSelectorKeys ? (
+                        <ScopePicker
+                          selectorKeys={act.selector_keys}
+                          scope={currentScope}
+                          onChange={(s) => updateScope(base, s)}
+                        />
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>
@@ -99,21 +347,30 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
             {t('admin:rbacPermPreserved')}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {preserved.map((perm) => (
-              <span
-                key={perm}
-                className="mono"
-                style={{
-                  padding: '2px 8px',
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  fontSize: 12,
-                }}
-              >
-                {perm}
-              </span>
-            ))}
+            {preserved.map((perm) => {
+              const parsed = parsePermission(perm);
+              return (
+                <span
+                  key={perm}
+                  className="mono"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 8px',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    fontSize: 12,
+                  }}
+                >
+                  {parsed.base}
+                  {parsed.scopeKey && parsed.scopeValues ? (
+                    <ScopeBadge scopeKey={parsed.scopeKey} scopeValues={parsed.scopeValues} />
+                  ) : null}
+                </span>
+              );
+            })}
           </div>
         </div>
       ) : null}

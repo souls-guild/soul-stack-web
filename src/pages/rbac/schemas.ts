@@ -7,10 +7,11 @@ import { z } from 'zod';
 
 const ROLE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-// permission-строка: "*", "namespace.*", "namespace.verb".
+// permission-строка: "*", "namespace.*", "namespace.verb",
+// "namespace.verb on key=value", "namespace.verb on key=v1,v2".
 // Минимальный фильтр — пустую строку и пробелы не пускаем. Битый permission
 // поймает сервер (422 validation-failed), мы его покажем как-есть.
-const PERMISSION = /^[A-Za-z0-9._*-]+$/;
+const PERMISSION = /^[A-Za-z0-9._*-]+( on [a-z]+=\S+)?$/;
 
 // Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
 export const roleCreateSchema = z.object({

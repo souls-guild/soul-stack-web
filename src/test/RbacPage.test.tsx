@@ -101,6 +101,22 @@ function recordingFetch(opts: {
         status: 200, headers: { 'Content-Type': 'application/json' },
       });
     }
+    // Autocomplete endpoints для scope-builder (graceful empty если не нужно).
+    if (url.startsWith('/v1/incarnations') && method === 'GET') {
+      return new Response(JSON.stringify({ items: [], offset: 0, limit: 20, total: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.startsWith('/v1/services') && method === 'GET') {
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.startsWith('/v1/souls') && method === 'GET') {
+      return new Response(JSON.stringify({ items: [], offset: 0, limit: 200, total: 0 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
     if (url.startsWith('/v1/roles') && method === 'GET') {
       return new Response(JSON.stringify(opts.rolesList), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -431,5 +447,96 @@ describe('RbacPage', () => {
       expect(patch).toBeDefined();
       expect(patch!.body).toContain('soul.exec');
     });
+  });
+
+  it('Scope-builder: отмечает incarnation.run без scope → голый "incarnation.run"', async () => {
+    // incarnation.run имеет selector_keys: [] → scope-пикер не показывается.
+    const calls = recordingFetch({
+      rolesList: { items: [{ name: 'test-role', description: '', builtin: false, permissions: [], operators: [] }] },
+    });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('test-role')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
+    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
+    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'scope-test');
+
+    const cb = await within(dialog).findByRole('checkbox', { name: 'incarnation.run' });
+    await user.click(cb);
+    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
+      expect(post).toBeDefined();
+      // Должен быть голый пермишн без " on ..."
+      expect(post!.body).toContain('"incarnation.run"');
+      expect(post!.body).not.toContain(' on ');
+    });
+  });
+
+  it('Scope-builder: soul.list + scope coven=ops → "soul.list on coven=ops"', async () => {
+    // soul.list имеет selector_keys: ['coven', 'sid'] → scope-пикер появляется.
+    const calls = recordingFetch({
+      rolesList: { items: [{ name: 'scoped-role', description: '', builtin: false, permissions: [], operators: [] }] },
+    });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('scoped-role')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
+    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
+    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'scoped-role-x');
+
+    const cb = await within(dialog).findByRole('checkbox', { name: 'soul.list' });
+    await user.click(cb);
+
+    // Выбрать scope-ключ = coven (scope-пикер появляется после checked)
+    const keySelect = await within(dialog).findByRole('combobox', { name: /ключ селектора scope/i });
+    await user.selectOptions(keySelect, 'coven');
+
+    // Ввести значение (input появляется после выбора ключа)
+    const valueInput = await within(dialog).findByRole('textbox', { name: /значение coven/i });
+    await user.type(valueInput, 'ops');
+
+    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
+      expect(post).toBeDefined();
+      expect(post!.body).toContain('soul.list on coven=ops');
+    });
+  });
+
+  it('Scope-builder: парсинг существующего scoped-права роли → checked чекбокс', async () => {
+    // Роль имеет scoped-право — base soul.list есть в каталоге → checked чекбокс.
+    const sample = {
+      items: [
+        {
+          name: 'scoped-role',
+          description: '',
+          builtin: false,
+          permissions: ['soul.list on coven=ops', 'incarnation.run'],
+          operators: [] as string[],
+        },
+      ],
+    };
+    recordingFetch({ rolesList: sample });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('scoped-role')).toBeInTheDocument());
+
+    const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
+    await user.click(editButtons[0]);
+    const dialog = await screen.findByRole('dialog', { name: /Permissions: scoped-role/i });
+
+    // Дожидаемся загрузки каталога — incarnation.run как индикатор (findByRole с timeout).
+    const incRun = await within(dialog).findByRole('checkbox', { name: 'incarnation.run' });
+    expect(incRun).toBeChecked();
+
+    // soul.list on coven=ops — base в каталоге → checked чекбокс.
+    // Accessible name включает scope-badge текст ("soul.list coven=ops"), ищем по regex.
+    const soulList = await within(dialog).findByRole('checkbox', { name: /soul\.list/ });
+    expect(soulList).toBeChecked();
   });
 });
