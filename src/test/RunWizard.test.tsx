@@ -714,6 +714,109 @@ describe('RunWizard', () => {
     expect(stub.posted?.url).not.toContain('dry_run');
   });
 
+  it('Stale-черновик старой формы (без v / без incarnations) → визард грузится на дефолтах без краша', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    // Черновик предыдущей версии формы: нет поля `v`, scenarioState без
+    // `incarnations` (массив добавлен недавно), options без Tide-полей.
+    sessionStorage.setItem(
+      'run-wizard-draft',
+      JSON.stringify({
+        step: 3,
+        workload: 'scenario',
+        scenarioState: { service: 'redis', scenario: 'restart', fields: {}, inputObj: {} },
+        commandState: {},
+        hostCriteria: {},
+        options: { dryRun: false },
+      }),
+    );
+
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Не упали белым экраном: Step 1 отрендерился, дефолт workload=scenario.
+    expect(screen.getByLabelText('Scenario apply')).toBeChecked();
+
+    // Дефолты применились — проходим визард с нуля без ошибок.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+  });
+
+  it('Stale-черновик с incarnations=null → массив страхуется, без краша на .length', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    // Версия совпадает, но массивное поле пришло не-массивом (повреждённый/старый
+    // payload). asArray-страховка должна вернуть [] вместо null.
+    sessionStorage.setItem(
+      'run-wizard-draft',
+      JSON.stringify({
+        v: 2,
+        step: 3,
+        workload: 'scenario',
+        scenarioState: { service: 'redis', scenario: 'restart', incarnations: null, fields: {}, inputObj: {} },
+        commandState: {},
+        hostCriteria: {},
+        options: {},
+      }),
+    );
+
+    renderWizardWithRoutes();
+    // Визард на Step 3 (восстановлен step) без краша на scenarioState.incarnations.length.
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    expect(screen.getByLabelText('redis-prod')).not.toBeChecked();
+  });
+
+  it('Валидный свежий черновик (с v) → state восстанавливается', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
+    sessionStorage.setItem(
+      'run-wizard-draft',
+      JSON.stringify({
+        v: 2,
+        step: 3,
+        workload: 'scenario',
+        scenarioState: {
+          service: 'redis',
+          scenario: 'restart',
+          incarnations: ['redis-prod'],
+          fields: {},
+          inputObj: {},
+        },
+        commandState: {
+          moduleName: 'core.cmd',
+          moduleState: 'shell',
+          moduleStates: ['shell'],
+          moduleKind: 'core',
+          moduleParams: [],
+          cmd: '',
+          paramFields: {},
+          timeoutSeconds: 30,
+          customModule: '',
+          customInput: {},
+        },
+        hostCriteria: { incarnations: [], covens: [], sidRegex: '', soulprint: '' },
+        options: {
+          runMode: 'classic',
+          waveSize: '',
+          concurrency: '50',
+          onFailure: 'abort',
+          targetCoven: '',
+          targetWhere: '',
+          dryRun: false,
+          wait: false,
+        },
+      }),
+    );
+
+    renderWizardWithRoutes();
+    // Восстановлен на Step 3, выбор incarnation сохранён (redis-prod checked).
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    expect(screen.getByLabelText('redis-prod')).toBeChecked();
+    expect(screen.getByLabelText('redis-staging')).not.toBeChecked();
+  });
+
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
     setupFetchStub({ souls: [{ sid: 'host-a.example.com', covens: ['prod'] }] });
     renderWizardWithRoutes('/run?workload=command&target_coven=prod');

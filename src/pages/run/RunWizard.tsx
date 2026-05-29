@@ -129,7 +129,14 @@ const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 // терялся бы). Очищается после успешного submit.
 const DRAFT_KEY = 'run-wizard-draft';
 
+// Версия схемы черновика. Поднимать при любом изменении формы под-state-ов
+// (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
+// версией — старый persisted-state предыдущей формы визарда игнорируется, визард
+// стартует с дефолтов, а не падает на отсутствующем поле.
+const DRAFT_VERSION = 2;
+
 interface WizardDraft {
+  v: number;
   step: 1 | 2 | 3 | 4;
   workload: Workload;
   scenarioState: ScenarioStateValues;
@@ -138,14 +145,58 @@ interface WizardDraft {
   options: OptionsState;
 }
 
+// Дефолты под-state-ов. Используются как база default-merge при восстановлении
+// черновика и как initial-state при отсутствии query-intent/черновика. Любое
+// поле, отсутствующее в загруженном черновике, берётся отсюда (вторая линия
+// защиты от рассинхрона формы, независимая от версионирования).
+const DEFAULT_SCENARIO_STATE: ScenarioStateValues = {
+  service: '',
+  scenario: '',
+  incarnations: [],
+  fields: {},
+  inputObj: {},
+};
+
+const DEFAULT_COMMAND_STATE: CommandStateValues = {
+  moduleName: 'core.cmd',
+  moduleState: 'shell',
+  moduleStates: ['shell'],
+  moduleKind: 'core',
+  moduleParams: [],
+  cmd: '',
+  paramFields: {},
+  timeoutSeconds: 30,
+  customModule: '',
+  customInput: {},
+};
+
+const DEFAULT_OPTIONS: OptionsState = {
+  runMode: 'classic',
+  waveSize: '',
+  concurrency: '50',
+  onFailure: 'abort',
+  targetCoven: '',
+  targetWhere: '',
+  dryRun: false,
+  wait: false,
+};
+
 function loadDraft(): WizardDraft | null {
   try {
     const raw = sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as WizardDraft;
+    const parsed = JSON.parse(raw) as Partial<WizardDraft> | null;
+    // Версия не совпадает (или отсутствует у черновика старой формы) → игнорируем.
+    if (!parsed || parsed.v !== DRAFT_VERSION) return null;
+    return parsed as WizardDraft;
   } catch {
     return null;
   }
+}
+
+// Гарантирует массив: если в черновике пришёл не-массив/undefined — дефолтный [].
+function asArray<T>(value: unknown, fallback: T[]): T[] {
+  return Array.isArray(value) ? (value as T[]) : fallback;
 }
 
 function pickWorkloadFromQuery(raw: string | null): Workload {
@@ -211,51 +262,63 @@ export function RunWizard() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(draft?.step ?? 1);
   const [workload, setWorkload] = useState<Workload>(draft?.workload ?? initialWorkload);
 
-  const [scenarioState, setScenarioState] = useState<ScenarioStateValues>(
-    draft?.scenarioState ?? {
+  // Инициализация под-state-ов: при наличии черновика — default-merge на уровне
+  // под-объекта (новое поле всегда имеет значение из дефолта, если в черновике
+  // его нет), массивные поля дополнительно страхуются по типу через asArray.
+  // Без черновика — initial из query (или дефолты).
+  const [scenarioState, setScenarioState] = useState<ScenarioStateValues>(() => {
+    if (draft) {
+      const d = draft.scenarioState ?? {};
+      return {
+        ...DEFAULT_SCENARIO_STATE,
+        ...d,
+        incarnations: asArray(d.incarnations, DEFAULT_SCENARIO_STATE.incarnations),
+      };
+    }
+    return {
+      ...DEFAULT_SCENARIO_STATE,
       service: initialService,
       scenario: initialScenario,
       incarnations: initialIncarnation ? [initialIncarnation] : [],
-      fields: {},
-      inputObj: {},
-    },
-  );
+    };
+  });
 
-  const [commandState, setCommandState] = useState<CommandStateValues>(
-    draft?.commandState ?? {
-      ...(() => {
-        const m = pickInitialCommandModule(initialModuleParam);
-        return {
-          moduleName: m.name,
-          moduleState: m.state,
-          moduleStates: m.state ? [m.state] : [],
-          moduleKind: m.name.startsWith('core.') ? ('core' as const) : (initialModuleParam ? ('' as const) : ('core' as const)),
-          moduleParams: [] as ModuleParam[],
-        };
-      })(),
+  const [commandState, setCommandState] = useState<CommandStateValues>(() => {
+    if (draft) {
+      const d = draft.commandState ?? {};
+      return {
+        ...DEFAULT_COMMAND_STATE,
+        ...d,
+        moduleStates: asArray(d.moduleStates, DEFAULT_COMMAND_STATE.moduleStates),
+        moduleParams: asArray(d.moduleParams, DEFAULT_COMMAND_STATE.moduleParams),
+      };
+    }
+    const m = pickInitialCommandModule(initialModuleParam);
+    return {
+      ...DEFAULT_COMMAND_STATE,
+      moduleName: m.name,
+      moduleState: m.state,
+      moduleStates: m.state ? [m.state] : [],
+      moduleKind: m.name.startsWith('core.') ? 'core' : initialModuleParam ? '' : 'core',
       cmd: initialCmd,
-      paramFields: {},
-      timeoutSeconds: 30,
-      customModule: '',
-      customInput: {},
-    },
-  );
+    };
+  });
 
-  const [hostCriteria, setHostCriteria] = useState<HostCriteria>(
-    draft?.hostCriteria ?? (hasCriteriaFromQuery ? initialCriteria : EMPTY_HOST_CRITERIA),
-  );
+  const [hostCriteria, setHostCriteria] = useState<HostCriteria>(() => {
+    if (draft) {
+      const d = draft.hostCriteria ?? {};
+      return {
+        ...EMPTY_HOST_CRITERIA,
+        ...d,
+        incarnations: asArray(d.incarnations, EMPTY_HOST_CRITERIA.incarnations),
+        covens: asArray(d.covens, EMPTY_HOST_CRITERIA.covens),
+      };
+    }
+    return hasCriteriaFromQuery ? initialCriteria : EMPTY_HOST_CRITERIA;
+  });
 
-  const [options, setOptions] = useState<OptionsState>(
-    draft?.options ?? {
-      runMode: 'classic',
-      waveSize: '',
-      concurrency: '50',
-      onFailure: 'abort',
-      targetCoven: '',
-      targetWhere: '',
-      dryRun: false,
-      wait: false,
-    },
+  const [options, setOptions] = useState<OptionsState>(() =>
+    draft ? { ...DEFAULT_OPTIONS, ...(draft.options ?? {}) } : DEFAULT_OPTIONS,
   );
 
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -263,7 +326,7 @@ export function RunWizard() {
   // Persist черновика на каждое изменение wizard-state. sessionStorage —
   // переживает навигацию внутри вкладки браузера, чистится при закрытии вкладки.
   useEffect(() => {
-    const payload: WizardDraft = { step, workload, scenarioState, commandState, hostCriteria, options };
+    const payload: WizardDraft = { v: DRAFT_VERSION, step, workload, scenarioState, commandState, hostCriteria, options };
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
     } catch {
