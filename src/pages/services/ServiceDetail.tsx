@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { ExternalLink, Layers } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Dot, Modal } from '../../components/primitives';
@@ -11,9 +12,10 @@ import { EditServiceModal } from './EditServiceModal';
 import { DeregisterServiceModal } from './DeregisterServiceModal';
 import type { ServiceScenarioInfo } from '../../api/keeper';
 import { isReservedScenario } from '../incarnations/reservedScenarios';
+import { extractFields, isSchemaDegraded } from '../incarnations/stateSchema';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs';
+type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs' | 'schema';
 
 export function ServiceDetail() {
   const { t } = useTranslation();
@@ -69,11 +71,13 @@ export function ServiceDetail() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.title}>{row.name}</h1>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8 }}>
-              <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                {row.git}@{row.ref}
-              </span>
-              {row.refresh ? <Badge tone="info">refresh: {row.refresh}</Badge> : null}
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+              <GitRefInline git={row.git} gitRef={row.ref} />
+              {row.refresh ? (
+                <Badge tone="info">{t('admin:svcRefreshOn', { interval: row.refresh })}</Badge>
+              ) : (
+                <Badge tone="muted">{t('admin:svcRefreshOff')}</Badge>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -89,19 +93,35 @@ export function ServiceDetail() {
 
       <div className={styles.meta}>
         <span className={styles.metaKey}>Git</span>
-        <span className={styles.metaVal}>{row.git}</span>
+        <span className={styles.metaVal}>
+          <GitUrl git={row.git} />
+        </span>
         <span className={styles.metaKey}>Ref</span>
-        <span className={styles.metaVal}>{row.ref}</span>
+        <span className={styles.metaVal} data-testid="svc-ref">
+          <span className="mono">{row.ref}</span>
+        </span>
         <span className={styles.metaKey}>Refresh</span>
-        <span className={styles.metaVal}>{row.refresh ?? '—'}</span>
-        <span className={styles.metaKey}>Created by</span>
-        <span className={styles.metaVal}>{row.created_by_aid ?? '—'}</span>
-        <span className={styles.metaKey}>Created at</span>
-        <span className={styles.metaVal}>{row.created_at}</span>
-        <span className={styles.metaKey}>Updated by</span>
-        <span className={styles.metaVal}>{row.updated_by_aid ?? '—'}</span>
-        <span className={styles.metaKey}>Updated at</span>
-        <span className={styles.metaVal}>{row.updated_at}</span>
+        <span className={styles.metaVal}>
+          {row.refresh ? (
+            <Badge tone="info">{t('admin:svcRefreshOn', { interval: row.refresh })}</Badge>
+          ) : (
+            <Badge tone="muted">{t('admin:svcRefreshOff')}</Badge>
+          )}
+        </span>
+        <span className={styles.metaKey}>Created</span>
+        <span className={styles.metaVal} data-testid="svc-created">
+          <span className="mono">{row.created_at}</span>
+          {row.created_by_aid ? (
+            <span style={{ color: 'var(--text-muted)' }}> · {row.created_by_aid}</span>
+          ) : null}
+        </span>
+        <span className={styles.metaKey}>Updated</span>
+        <span className={styles.metaVal} data-testid="svc-updated">
+          <span className="mono">{row.updated_at}</span>
+          {row.updated_by_aid ? (
+            <span style={{ color: 'var(--text-muted)' }}> · {row.updated_by_aid}</span>
+          ) : null}
+        </span>
       </div>
 
       <div className={styles.tabs} role="tablist">
@@ -140,6 +160,15 @@ export function ServiceDetail() {
           onClick={() => setTab('refs')}
         >
           Refs
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'schema'}
+          className={`${styles.tab} ${tab === 'schema' ? styles.tabActive : ''}`}
+          onClick={() => setTab('schema')}
+        >
+          Schema
         </button>
       </div>
 
@@ -334,6 +363,8 @@ export function ServiceDetail() {
         </section>
       ) : null}
 
+      {tab === 'schema' ? <ServiceSchemaTab name={row.name} serviceRef={row.ref} /> : null}
+
       {yamlScenario ? (
         <Modal
           open={true}
@@ -379,6 +410,162 @@ export function ServiceDetail() {
         <DeregisterServiceModal open={deregisterOpen} service={row} onClose={() => setDeregisterOpen(false)} />
       ) : null}
     </div>
+  );
+}
+
+// Кликабельный web-URL git-репо — только для http(s)-источников. git:// / ssh /
+// file:// браузер открыть как ссылку не может → возвращаем null (рендерим mono-текст).
+// `.git`-суффикс отрезаем для чистого repo-href (большинство хостингов редиректят).
+function gitWebUrl(git: string | undefined): string | null {
+  if (!git) return null;
+  if (!/^https?:\/\//i.test(git)) return null;
+  return git.replace(/\.git$/i, '');
+}
+
+// Заголовочная форма git@ref. git кликабелен, если http(s).
+function GitRefInline({ git, gitRef }: { git: string; gitRef: string }) {
+  const href = gitWebUrl(git);
+  return (
+    <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+      {href ? (
+        <a href={href} target="_blank" rel="noreferrer" data-testid="svc-git-link">
+          {git}
+          <ExternalLink size={11} style={{ verticalAlign: '-1px', marginLeft: 3 }} />
+        </a>
+      ) : (
+        git
+      )}
+      @{gitRef}
+    </span>
+  );
+}
+
+function GitUrl({ git }: { git: string }) {
+  const href = gitWebUrl(git);
+  if (!href) return <span className="mono">{git}</span>;
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="mono" data-testid="svc-git-link-meta">
+      {git}
+      <ExternalLink size={11} style={{ verticalAlign: '-1px', marginLeft: 4 }} />
+    </a>
+  );
+}
+
+// Schema-таб сервиса (не incarnation) — state_schema-метаданные на ref сервиса:
+// state_schema_version + опц. декларация структуры state + список миграций.
+// Переиспользует extractFields/isSchemaDegraded из incarnations/SchemaTab.
+// Источник — GET /v1/services/{name}/state-schema?ref=<service.ref>; graceful на 404/501/502.
+function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['service-state-schema', name, serviceRef],
+    queryFn: () => keeperApi.services.getStateSchema(name, serviceRef),
+    enabled: Boolean(name),
+    retry: false,
+  });
+
+  const fields = q.data ? extractFields(q.data.schema as Record<string, unknown> | undefined) : null;
+  const migrations = q.data?.migrations ?? [];
+  const hardError = q.error && !isSchemaDegraded(q.error);
+
+  return (
+    <section className={styles.section} data-testid="svc-schema-section">
+      <h2 className={styles.sectionTitle}>
+        <Layers size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
+        State Schema
+      </h2>
+
+      {q.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
+
+      {q.data ? (
+        <div className={styles.meta}>
+          <span className={styles.metaKey}>Ref</span>
+          <span className={styles.metaVal}>
+            <span className="mono">{q.data.ref ?? serviceRef}</span>
+          </span>
+          <span className={styles.metaKey}>state_schema_version</span>
+          <span className={styles.metaVal}>
+            <span className="mono">{q.data.state_schema_version ?? '—'}</span>
+          </span>
+        </div>
+      ) : null}
+
+      {hardError ? (
+        <div className={styles.errorBox}>
+          {q.error instanceof ApiError
+            ? t('errors:generic', { status: q.error.status, detail: q.error.message })
+            : String(q.error)}
+        </div>
+      ) : null}
+
+      {q.data && fields && fields.length > 0 ? (
+        <>
+          <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
+            {t('admin:svcSchemaStructTitle')}
+          </h3>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Required</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fields.map((f) => (
+                <tr key={f.name}>
+                  <td className="mono">{f.name}</td>
+                  <td className="mono">{f.type}</td>
+                  <td className="mono">{f.required ? t('admin:svcYesShort') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : null}
+
+      {q.data && (!fields || fields.length === 0) ? (
+        <div className={styles.empty}>{t('admin:svcSchemaNotDeclared')}</div>
+      ) : null}
+
+      {q.data ? (
+        <>
+          <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
+            {t('admin:svcSchemaMigrationsTitle')}
+          </h3>
+          {migrations.length === 0 ? (
+            <div className={styles.empty}>{t('admin:svcSchemaMigrationsEmpty')}</div>
+          ) : (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>File</th>
+                </tr>
+              </thead>
+              <tbody>
+                {migrations.map((m) => (
+                  <tr key={m.path}>
+                    <td className="mono">v{m.from}</td>
+                    <td className="mono">v{m.to}</td>
+                    <td className="mono">{m.path}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      ) : null}
+
+      {isSchemaDegraded(q.error) ? (
+        <div className={styles.empty} data-testid="svc-schema-degraded">
+          {t('admin:svcSchemaUnavailable', {
+            status: q.error instanceof ApiError ? q.error.status : '—',
+          })}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

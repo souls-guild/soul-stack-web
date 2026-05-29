@@ -1170,6 +1170,61 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/souls/{sid}/history:
+    get:
+      tags: [Soul]
+      operationId: GetSoulHistory
+      summary: Per-host operation timeline (scenario + errand).
+      description: |
+        Permission: soul.list (тот же read-permission, что GET /v1/souls/{sid}
+        и /soulprint; отдельная `soul.history` не вводится — паттерн
+        one-permission-per-read, rbac.md §Souls). Селектор `host=<sid>`.
+        Агрегирует per-host строки двух источников в единый timeline,
+        отсортированный started_at DESC:
+          - scenario — `apply_runs` (scenario-задача, доехавшая до хоста в
+            рамках scenario-прогона инкарнации; tide_id если прогон шёл волнами
+            Tide, ADR-040);
+          - errand — `errands` (ad-hoc pull-exec одиночного модуля, ADR-033;
+            errand_run_id если Errand — fan-out из multi-target ErrandRun,
+            ADR-041).
+        push_runs пока НЕ включён (per-host данные там в jsonb summary —
+        follow-up).
+      parameters:
+        - $ref: '#/components/parameters/SidPath'
+        - name: type
+          in: query
+          required: false
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [scenario, errand]
+          description: |
+            Фильтр по источнику (multi-value OR, ?type=scenario&type=errand).
+            Пусто — оба источника.
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: RFC3339; вернуть только записи с started_at > value.
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Per-host timeline (paged, started_at DESC).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulHistoryReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/souls/{sid}/issue-token:
     post:
       tags: [Soul]
@@ -4067,9 +4122,11 @@ components:
         concurrency:
           type: integer
           minimum: 1
+          maximum: 500
           description: >-
             Tide invocation-time concurrency-override (ADR-040). REPLACE
             scenario `serial:`. Только в Tide-режиме (требует `wave`).
+            Граница 1..500 (parity errand-runs).
 
     IncarnationRunReply:
       type: object
@@ -4849,6 +4906,67 @@ components:
           description: Keeper-side timestamp приёма стрима.
       required: [sid, typed_facts]
 
+    SoulHistoryReply:
+      type: object
+      description: |
+        `GET /v1/souls/{sid}/history`: per-host operation timeline (scenario
+        apply_runs + ad-hoc errands), merge started_at DESC. Конверт паритетен
+        paged-list (items/offset/limit/total) + top-level `sid` (echo хоста).
+      properties:
+        sid:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SoulHistoryItem'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [sid, items, offset, limit, total]
+
+    SoulHistoryItem:
+      type: object
+      description: |
+        Одна запись per-host timeline. type-дискриминатор источника; поля,
+        специфичные для одного источника, опускаются для другого
+        (incarnation/scenario/tide_id — scenario; module/errand_run_id —
+        errand).
+      properties:
+        type:
+          type: string
+          enum: [scenario, errand]
+        id:
+          type: string
+          description: apply_id (scenario) | errand_id (errand).
+        incarnation:
+          type: string
+          description: scenario-only — инкарнация прогона.
+        scenario:
+          type: string
+          description: scenario-only — имя scenario.
+        module:
+          type: string
+          description: errand-only — fully-qualified модуль exec-а.
+        status:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          description: Опускается, пока запись не терминальна.
+        errand_run_id:
+          type: string
+          description: errand-only back-link на parent ErrandRun (ADR-041).
+        tide_id:
+          type: string
+          description: scenario-only back-link на Tide (ADR-040).
+      required: [type, id, status, started_at]
+
     SoulprintFacts:
       type: object
       description: |
@@ -5391,9 +5509,9 @@ components:
           $ref: '#/components/schemas/ErrandRunTarget'
         timeout_seconds:
           type: integer
-          minimum: 1
+          minimum: 0
           maximum: 300
-          description: Per-Errand timeout (default 30s).
+          description: Per-Errand timeout. 0/missing → per-Errand default (30s).
         concurrency:
           type: integer
           minimum: 0

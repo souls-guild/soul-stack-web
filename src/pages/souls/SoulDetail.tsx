@@ -9,12 +9,18 @@ import { soulDot, soulTone } from '../../components/status';
 import {
   keeperApi,
   SoulprintNotReceivedError,
+  type SoulHistoryItem,
+  type SoulHistoryType,
   type SoulprintNetworkInterface,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { soulHistoryStatusTone, soulHistoryIsRunning } from './status';
 import { IssueTokenModal } from './IssueTokenModal';
 import { CovenAssignModal } from './CovenAssignModal';
 import styles from '../common.module.css';
+
+const HISTORY_LIMIT = 50;
+const HISTORY_TYPES: readonly SoulHistoryType[] = ['scenario', 'errand'];
 
 type Tab = 'overview' | 'soulprint' | 'history';
 
@@ -184,16 +190,224 @@ export function SoulDetail() {
 
       {tab === 'soulprint' ? <SoulprintTab query={soulprintQ} /> : null}
 
-      {tab === 'history' ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>History</h2>
-          <div className={styles.empty}>
-            {t('souls:historyTodoPrefix')}<code className="mono">GET /v1/souls/{'{sid}'}/history</code>{t('souls:historyTodoSuffix')}
-          </div>
-        </section>
-      ) : null}
+      {tab === 'history' ? <SoulHistoryTab sid={row.sid} /> : null}
     </div>
   );
+}
+
+// Per-host timeline (scenario apply_runs + ad-hoc errands), merge started_at DESC.
+// Фильтр по источнику (chip scenario/errand) + offset/limit-пейджинг. Polling 5s,
+// пока в текущей странице есть нетерминальная запись (running/pending).
+function SoulHistoryTab({ sid }: { sid: string }) {
+  const { t } = useTranslation();
+  const [types, setTypes] = useState<Set<SoulHistoryType>>(new Set());
+  const [offset, setOffset] = useState(0);
+
+  const typeFilter = types.size > 0 ? [...types] : undefined;
+
+  const q = useQuery({
+    queryKey: ['soul-history', sid, typeFilter, offset],
+    queryFn: () =>
+      keeperApi.souls.history(sid, { type: typeFilter, offset, limit: HISTORY_LIMIT }),
+    enabled: Boolean(sid),
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.items.some((it) => soulHistoryIsRunning(it.status)) ? 5000 : false,
+  });
+
+  function toggleType(tp: SoulHistoryType) {
+    setTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(tp)) next.delete(tp);
+      else next.add(tp);
+      return next;
+    });
+    setOffset(0);
+  }
+
+  const items = q.data?.items ?? [];
+  const total = q.data?.total ?? 0;
+  const unavailable =
+    q.error instanceof ApiError && (q.error.status === 404 || q.error.status === 501);
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>History</h2>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+        {HISTORY_TYPES.map((tp) => {
+          const active = types.has(tp);
+          return (
+            <button
+              key={tp}
+              type="button"
+              data-testid={`history-filter-${tp}`}
+              onClick={() => toggleType(tp)}
+              aria-pressed={active}
+              style={historyChipStyle(active)}
+            >
+              {tp}
+            </button>
+          );
+        })}
+      </div>
+
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
+
+      {unavailable ? (
+        <div className={styles.empty}>
+          {t('souls:historyUnavailablePrefix')}
+          <code className="mono">GET /v1/souls/{'{sid}'}/history</code>
+          {t('souls:historyUnavailableSuffix', { status: (q.error as ApiError).status })}
+        </div>
+      ) : null}
+
+      {q.error && !unavailable ? (
+        <div className={styles.errorBox}>
+          {q.error instanceof ApiError
+            ? t('errors:generic', { status: q.error.status, detail: q.error.message })
+            : String(q.error)}
+        </div>
+      ) : null}
+
+      {q.data && items.length === 0 ? (
+        <div className={styles.empty}>{t('souls:historyEmpty')}</div>
+      ) : null}
+
+      {items.length > 0 ? (
+        <>
+          <table className={styles.table} data-testid="soul-history-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>ID</th>
+                <th>Incarnation / Module</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>Finished</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <SoulHistoryRow key={`${it.type}-${it.id}`} item={it} />
+              ))}
+            </tbody>
+          </table>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              fontSize: 12.5,
+              color: 'var(--text-muted)',
+            }}
+          >
+            <button
+              type="button"
+              data-testid="history-prev"
+              disabled={offset === 0}
+              onClick={() => setOffset(Math.max(0, offset - HISTORY_LIMIT))}
+              style={historyPagerStyle(offset === 0)}
+            >
+              ← Prev
+            </button>
+            <span>
+              {offset + 1}–{offset + items.length} of {total}
+            </span>
+            <button
+              type="button"
+              data-testid="history-next"
+              disabled={offset + HISTORY_LIMIT >= total}
+              onClick={() => setOffset(offset + HISTORY_LIMIT)}
+              style={historyPagerStyle(offset + HISTORY_LIMIT >= total)}
+            >
+              Next →
+            </button>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+// Ссылка по записи timeline:
+//   scenario → /tides/:tide_id (если прогон шёл волнами Tide) иначе /incarnations/:incarnation;
+//   errand   → /errand-runs/:errand_run_id (fan-out из ErrandRun) иначе /errands/:id.
+function historyLink(item: SoulHistoryItem): string | null {
+  if (item.type === 'scenario') {
+    if (item.tide_id) return `/tides/${encodeURIComponent(item.tide_id)}`;
+    if (item.incarnation) return `/incarnations/${encodeURIComponent(item.incarnation)}`;
+    return null;
+  }
+  if (item.errand_run_id) return `/errand-runs/${encodeURIComponent(item.errand_run_id)}`;
+  if (item.id) return `/errands/${encodeURIComponent(item.id)}`;
+  return null;
+}
+
+function SoulHistoryRow({ item }: { item: SoulHistoryItem }) {
+  const to = historyLink(item);
+  const idLabel = item.id ?? '—';
+  // Вторая колонка: scenario → incarnation/scenario, errand → fully-qualified module.
+  const context =
+    item.type === 'scenario'
+      ? [item.incarnation, item.scenario].filter(Boolean).join(' / ') || '—'
+      : (item.module ?? '—');
+
+  return (
+    <tr>
+      <td>
+        <Badge tone={item.type === 'scenario' ? 'info' : 'muted'}>{item.type}</Badge>
+      </td>
+      <td>
+        {to ? (
+          <Link to={to} title={idLabel}>
+            {idLabel}
+          </Link>
+        ) : (
+          <span className="mono" title={idLabel}>
+            {idLabel}
+          </span>
+        )}
+      </td>
+      <td className="mono" style={{ fontSize: 12 }}>
+        {context}
+      </td>
+      <td>
+        <Badge tone={soulHistoryStatusTone(item.status)}>{item.status}</Badge>
+      </td>
+      <td className="mono" style={{ fontSize: 12 }} title={item.started_at}>
+        {item.started_at}
+      </td>
+      <td className="mono" style={{ fontSize: 12 }} title={item.finished_at ?? ''}>
+        {item.finished_at ?? '—'}
+      </td>
+    </tr>
+  );
+}
+
+function historyChipStyle(active: boolean) {
+  return {
+    padding: '4px 10px',
+    fontSize: 12,
+    fontFamily: 'var(--font-mono)',
+    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+    background: active
+      ? 'color-mix(in srgb, var(--accent) 14%, var(--surface))'
+      : 'var(--surface)',
+    color: active ? 'var(--text)' : 'var(--text-muted)',
+    borderRadius: 'var(--radius)',
+    cursor: 'pointer',
+  } as const;
+}
+
+function historyPagerStyle(disabled: boolean) {
+  return {
+    padding: '4px 10px',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    background: 'transparent',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  } as const;
 }
 
 interface SoulprintTabProps {

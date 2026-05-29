@@ -134,6 +134,102 @@ describe('ServiceDetail', () => {
     });
   });
 
+  it('git-link: http(s) git-url кликабелен (href без .git-суффикса)', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const metaLink = screen.getByTestId('svc-git-link-meta');
+    expect(metaLink).toHaveAttribute('href', 'https://git.example.com/services/redis');
+    expect(metaLink).toHaveAttribute('target', '_blank');
+  });
+
+  it('git-link: non-http git (ssh) не кликабелен', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/services/redis',
+        body: { ...SAMPLE, git: 'git@git.example.com:services/redis.git' },
+      },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    expect(screen.queryByTestId('svc-git-link-meta')).not.toBeInTheDocument();
+  });
+
+  it('таб Schema рендерит state_schema_version + поля + миграции', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/services/redis/state-schema',
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          state_schema_version: 3,
+          schema: {
+            type: 'object',
+            required: ['redis_version'],
+            properties: {
+              redis_version: { type: 'string' },
+              maxmemory: { type: 'integer' },
+            },
+          },
+          migrations: [{ from: 2, to: 3, path: 'migrations/002_to_003.yml' }],
+        },
+      },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Schema/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-schema-section')).toBeInTheDocument();
+    });
+    expect(screen.getByText('redis_version')).toBeInTheDocument();
+    expect(screen.getByText('migrations/002_to_003.yml')).toBeInTheDocument();
+  });
+
+  it('таб Schema: endpoint 404 → graceful degraded-плейсхолдер', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/services/redis/state-schema',
+        status: 404,
+        body: { title: 'not found', detail: 'no such endpoint' },
+      },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Schema/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-schema-degraded')).toBeInTheDocument();
+    });
+  });
+
   it('таб Incarnations подгружает /v1/incarnations?service=redis', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },

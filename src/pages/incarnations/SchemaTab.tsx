@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { extractFields, isSchemaDegraded } from './stateSchema';
 import styles from '../common.module.css';
 
 interface Props {
@@ -20,42 +21,6 @@ interface Props {
 // опционален: на 404/501 (старый Keeper или service-loader не нашёл репо) —
 // graceful-деградация к инструктивному placeholder-у.
 
-// MVP-подмножество JSON Schema: вытаскиваем плоский список top-level-полей
-// (имя + type + required) для table-render. Вложенные object/array показываем
-// тип как есть; глубокий рекурсивный рендер не делаем.
-interface SchemaField {
-  name: string;
-  type: string;
-  required: boolean;
-}
-
-function extractFields(schema: Record<string, unknown> | undefined): SchemaField[] | null {
-  if (!schema || typeof schema !== 'object') return null;
-  const props = (schema as Record<string, unknown>).properties;
-  if (!props || typeof props !== 'object' || Array.isArray(props)) return null;
-  const requiredRaw = (schema as Record<string, unknown>).required;
-  const required = new Set(
-    Array.isArray(requiredRaw) ? requiredRaw.filter((r): r is string => typeof r === 'string') : [],
-  );
-  const out: SchemaField[] = [];
-  for (const [name, def] of Object.entries(props as Record<string, unknown>)) {
-    let type = '—';
-    if (def && typeof def === 'object' && !Array.isArray(def)) {
-      const t = (def as Record<string, unknown>).type;
-      if (typeof t === 'string') type = t;
-      else if (Array.isArray(t)) type = t.map(String).join(' | ');
-    }
-    out.push({ name, type, required: required.has(name) });
-  }
-  return out;
-}
-
-function isDegraded(err: unknown): boolean {
-  // 404 (endpoint/service нет), 501 (не реализован), 502 (loader не достал репо) —
-  // деградируем к placeholder-у. Прочие ошибки показываем как errorBox.
-  return err instanceof ApiError && (err.status === 404 || err.status === 501 || err.status === 502);
-}
-
 export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: Props) {
   const { t } = useTranslation();
   const q = useQuery({
@@ -67,7 +32,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
 
   const fields = q.data ? extractFields(q.data.schema) : null;
   const migrations = q.data?.migrations ?? [];
-  const hardError = q.error && !isDegraded(q.error);
+  const hardError = q.error && !isSchemaDegraded(q.error);
 
   return (
     <section className={styles.section}>
@@ -169,7 +134,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
       ) : null}
 
       {/* Graceful degradation: endpoint недоступен — инструктивный placeholder. */}
-      {isDegraded(q.error) ? (
+      {isSchemaDegraded(q.error) ? (
         <div
           style={{
             padding: 'var(--s-4)',

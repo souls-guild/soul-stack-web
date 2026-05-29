@@ -44,6 +44,9 @@ export type SoulIssueTokenReply = components['schemas']['SoulIssueTokenReply'];
 export type SoulCovenAssignRequest = components['schemas']['SoulCovenAssignRequest'];
 export type SoulCovenAssignReply = components['schemas']['SoulCovenAssignReply'];
 export type SoulCovenAssignSelector = components['schemas']['SoulCovenAssignSelector'];
+export type SoulHistoryReply = components['schemas']['SoulHistoryReply'];
+export type SoulHistoryItem = components['schemas']['SoulHistoryItem'];
+export type SoulHistoryType = NonNullable<SoulHistoryItem['type']>;
 export type SoulprintFacts = components['schemas']['SoulprintFacts'];
 export type SoulprintOsFacts = components['schemas']['SoulprintOsFacts'];
 export type SoulprintKernelFacts = components['schemas']['SoulprintKernelFacts'];
@@ -345,6 +348,12 @@ export const keeperApi = {
         },
       }),
     get: (sid: string) => apiGet<SoulListEntry>(`/v1/souls/${encodeURIComponent(sid)}`),
+    // GET /v1/souls/{sid}/history — per-host operation timeline (scenario apply_runs
+    // + ad-hoc errands), merge started_at DESC. type — multi-value OR (scenario|errand).
+    history: (sid: string, q: ListSoulHistoryQuery = {}) =>
+      apiGet<SoulHistoryReply>(`/v1/souls/${encodeURIComponent(sid)}/history`, {
+        query: { type: q.type, since: q.since, offset: q.offset, limit: q.limit },
+      }),
     // 410 → SoulprintNotReceivedError (запись Soul есть, фактов ещё не приходило).
     // Прочие ошибки пробрасываются как ApiError.
     getSoulprint: async (sid: string): Promise<SoulprintReadReply> => {
@@ -649,6 +658,15 @@ function buildAuthHeaders(): Record<string, string> {
 
 function tokenStoreClear(): void {
   tokenStore.clear();
+}
+
+export interface ListSoulHistoryQuery {
+  // Multi-value `?type=scenario&type=errand` — OR. Пусто — оба источника.
+  type?: SoulHistoryType[];
+  // RFC3339; только записи с started_at > since.
+  since?: string;
+  offset?: number;
+  limit?: number;
 }
 
 export interface ListErrandsQuery {

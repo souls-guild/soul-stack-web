@@ -107,6 +107,158 @@ describe('SoulDetail', () => {
     expect(screen.getByText('10.0.0.10')).toBeInTheDocument();
   });
 
+  it('History-вкладка: рендерит timeline + корректный link-routing', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/souls/host01.example.com/history',
+        body: {
+          sid: 'host01.example.com',
+          items: [
+            {
+              type: 'scenario',
+              id: 'apply-tide-1',
+              incarnation: 'redis-prod',
+              scenario: 'add_user',
+              status: 'succeeded',
+              started_at: '2026-05-27T10:00:00Z',
+              finished_at: '2026-05-27T10:01:00Z',
+              tide_id: 'tide-abc',
+            },
+            {
+              type: 'scenario',
+              id: 'apply-plain-2',
+              incarnation: 'redis-prod',
+              scenario: 'restart',
+              status: 'succeeded',
+              started_at: '2026-05-27T09:00:00Z',
+              finished_at: '2026-05-27T09:00:30Z',
+            },
+            {
+              type: 'errand',
+              id: 'errand-9',
+              module: 'core.cmd.shell',
+              status: 'failed',
+              started_at: '2026-05-27T08:00:00Z',
+              finished_at: '2026-05-27T08:00:05Z',
+              errand_run_id: 'erun-xyz',
+            },
+          ],
+          offset: 0,
+          limit: 50,
+          total: 3,
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/souls/host01.example.com',
+        body: {
+          sid: 'host01.example.com',
+          transport: 'agent',
+          status: 'connected',
+          covens: ['prod'],
+          registered_at: '2026-05-01T00:00:00Z',
+        },
+      },
+    ]);
+    renderAt('host01.example.com');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'host01.example.com' })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('soul-history-table')).toBeInTheDocument();
+    });
+
+    // scenario с tide_id → /tides/:tide_id
+    const tideLink = screen.getByRole('link', { name: 'apply-tide-1' });
+    expect(tideLink).toHaveAttribute('href', '/tides/tide-abc');
+    // scenario без tide_id → /incarnations/:incarnation
+    const incLink = screen.getByRole('link', { name: 'apply-plain-2' });
+    expect(incLink).toHaveAttribute('href', '/incarnations/redis-prod');
+    // errand с errand_run_id → /errand-runs/:errand_run_id
+    const erunLink = screen.getByRole('link', { name: 'errand-9' });
+    expect(erunLink).toHaveAttribute('href', '/errand-runs/erun-xyz');
+    // module errand-записи виден
+    expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
+  });
+
+  it('History-вкладка: фильтр по type зовёт endpoint с ?type=errand', async () => {
+    let lastUrl = '';
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/history')) {
+        lastUrl = url;
+        return new Response(
+          JSON.stringify({ sid: 'h.example.com', items: [], offset: 0, limit: 50, total: 0 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          sid: 'h.example.com',
+          transport: 'agent',
+          status: 'connected',
+          covens: [],
+          registered_at: '2026-05-01T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    renderAt('h.example.com');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'h.example.com' })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('history-filter-errand')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId('history-filter-errand'));
+    await waitFor(() => {
+      expect(lastUrl).toContain('type=errand');
+    });
+    expect(lastUrl).not.toContain('type=scenario');
+  });
+
+  it('History-вкладка: empty-state «Нет операций с этим хостом»', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/souls/empty.example.com/history',
+        body: { sid: 'empty.example.com', items: [], offset: 0, limit: 50, total: 0 },
+      },
+      {
+        method: 'GET',
+        url: '/v1/souls/empty.example.com',
+        body: {
+          sid: 'empty.example.com',
+          transport: 'agent',
+          status: 'connected',
+          covens: [],
+          registered_at: '2026-05-01T00:00:00Z',
+        },
+      },
+    ]);
+    renderAt('empty.example.com');
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'empty.example.com' })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    await waitFor(() => {
+      expect(screen.getByText(/Нет операций с этим хостом/)).toBeInTheDocument();
+    });
+  });
+
   it('410 → graceful «soulprint ещё не получен»', async () => {
     installFetchMock([
       {
