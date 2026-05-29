@@ -72,6 +72,30 @@ describe('ErrandRunsList', () => {
     });
   });
 
+  it('date-range фильтр (клиентский) сужает текущую страницу по started_at', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/errand-runs', body: SAMPLE_PAGE },
+    ]);
+    renderWithProviders(<ErrandRunsList />, '/errand-runs');
+    await waitFor(() => {
+      expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
+    });
+    expect(screen.getByText('core.exec.run')).toBeInTheDocument();
+    const user = userEvent.setup();
+    // Оба прогона — 27 мая 2026. Сужаем «до» 26 мая → оба уходят (empty-state).
+    await user.clear(screen.getByTestId('date-to'));
+    await user.type(screen.getByTestId('date-to'), '2026-05-26');
+    await waitFor(() => {
+      expect(screen.queryByText('core.cmd.shell')).not.toBeInTheDocument();
+      expect(screen.queryByText('core.exec.run')).not.toBeInTheDocument();
+    });
+    // Очистка → оба возвращаются.
+    await user.click(screen.getByTestId('date-clear'));
+    await waitFor(() => {
+      expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
+    });
+  });
+
   it('status chip multi-select добавляет ?status= повторно', async () => {
     let lastUrl = '';
     globalThis.fetch = (async (input: RequestInfo | URL) => {

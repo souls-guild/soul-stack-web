@@ -11,6 +11,8 @@ import {
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
 import { errandRunStatusTone, ERRAND_RUN_TERMINAL } from './status';
+import { EMPTY_DATE_RANGE, inDateRange, type DateRange } from '../runs/dateRange';
+import { DateRangeFilter } from '../runs/DateRangeFilter';
 import styles from '../common.module.css';
 
 const STATUSES: ErrandRunStatus[] = [
@@ -40,6 +42,11 @@ export function ErrandRunsList() {
   const [moduleCsv, setModuleCsv] = useState('');
   const [statusSet, setStatusSet] = useState<Set<ErrandRunStatus>>(new Set());
   const [offset, setOffset] = useState(0);
+  // Клиентский фильтр по диапазону дат старта (см. runs/dateRange.ts). Backend
+  // на errand-runs принимает только `started_after` (нижняя граница, без
+  // верхней) — серверный двусторонний диапазон не поддержан, фильтруем загруженную
+  // страницу на клиенте.
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const limit = 50;
   const statuses = statusSet.size > 0 ? Array.from(statusSet) : undefined;
@@ -63,7 +70,9 @@ export function ErrandRunsList() {
     },
   });
 
-  const items = q.data?.items ?? [];
+  const allItems = q.data?.items ?? [];
+  // Диапазон дат — клиентский фильтр поверх текущей страницы (не серверный).
+  const items = allItems.filter((it) => inDateRange(it.started_at, dateRange));
   const total = q.data?.total ?? 0;
 
   function toggleStatus(s: ErrandRunStatus) {
@@ -121,6 +130,7 @@ export function ErrandRunsList() {
             })}
           </div>
         </div>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} metaKeyClass={styles.metaKey} />
       </div>
 
       {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}

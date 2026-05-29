@@ -7,9 +7,9 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
-import { tideStatusTone } from '../tides/status';
-import { pushStatusTone } from '../pushRuns/status';
-import { errandRunStatusTone } from '../errandRuns/status';
+import { runStatusTone } from '../../components/status';
+import { EMPTY_DATE_RANGE, inDateRange, type DateRange } from './dateRange';
+import { DateRangeFilter } from './DateRangeFilter';
 import styles from '../common.module.css';
 
 // Unified /runs feed (W2) — UNION-view всех run-типов (Tide / Push / Errand-run /
@@ -66,20 +66,6 @@ function relative(ts: string | undefined): string {
   }
 }
 
-function statusTone(type: RunType, status: string): 'ok' | 'warn' | 'danger' | 'info' | 'muted' {
-  switch (type) {
-    case 'tide':
-      return tideStatusTone(status);
-    case 'push':
-      return pushStatusTone(status);
-    case 'errand-run':
-      return errandRunStatusTone(status);
-    case 'errand':
-      // Errand single — те же тоны, что push (success/failed/cancelled/...).
-      return pushStatusTone(status === 'timed_out' || status === 'module_not_allowed' ? 'failed' : status);
-  }
-}
-
 // Tide → /tides/:id, Push → /push-runs/:id, ErrandRun → /errand-runs/:id,
 // Errand → /errands/:id.
 function detailPath(type: RunType, id: string): string {
@@ -119,6 +105,9 @@ export function RunsFeed() {
   const { t } = useTranslation();
   const [typeSet, setTypeSet] = useState<Set<RunType>>(new Set());
   const [statusSet, setStatusSet] = useState<Set<StatusGroup>>(new Set());
+  // Клиентский фильтр по диапазону дат старта (см. dateRange.ts) — поверх
+  // загруженной страницы, не серверный.
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   // 4 параллельных list-запроса. Polling 5s, если в выборке есть running.
   const tidesQ = useQuery({
@@ -232,9 +221,11 @@ export function RunsFeed() {
         const ok = Array.from(statusSet).some((g) => STATUS_GROUP_MATCH[g](r.status));
         if (!ok) return false;
       }
+      // Клиентский диапазон дат по started_at.
+      if (!inDateRange(r.startedAt, dateRange)) return false;
       return true;
     });
-  }, [allRows, typeSet, statusSet]);
+  }, [allRows, typeSet, statusSet, dateRange]);
 
   const anyLoading = tidesQ.isLoading || pushQ.isLoading || errandRunsQ.isLoading || errandsQ.isLoading;
 
@@ -308,6 +299,7 @@ export function RunsFeed() {
             })}
           </div>
         </div>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} metaKeyClass={styles.metaKey} />
       </div>
 
       {errors.length > 0 ? (
@@ -359,7 +351,7 @@ export function RunsFeed() {
                   {r.target}
                 </td>
                 <td>
-                  <Badge tone={statusTone(r.type, r.status)}>{r.status}</Badge>
+                  <Badge tone={runStatusTone(r.status)}>{r.status}</Badge>
                 </td>
                 <td className="mono" title={r.startedAt}>
                   {relative(r.startedAt)}

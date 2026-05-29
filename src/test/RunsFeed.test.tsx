@@ -167,6 +167,64 @@ describe('RunsFeed', () => {
     expect(screen.queryByText(/ошибка/)).not.toBeInTheDocument();
   });
 
+  it('статус-бейдж: succeeded и success дают один tone-класс (унификация)', async () => {
+    // errand-run отдаёт `succeeded` (раньше оставался серым), errand — `success`.
+    // После унификации оба → один зелёный tone (одинаковый className).
+    installFetchMock([
+      { method: 'GET', url: '/v1/tides', body: { items: [], offset: 0, limit: 50, total: 0 } },
+      { method: 'GET', url: '/v1/push-runs', body: { items: [], offset: 0, limit: 50, total: 0 } },
+      {
+        method: 'GET',
+        url: '/v1/errand-runs',
+        body: {
+          items: [
+            {
+              errand_run_id: '01ERUN00000000000000000099',
+              module: 'core.cmd.shell',
+              status: 'succeeded',
+              scope_size: 1,
+              target_preview: 'coven=dev',
+              started_at: '2026-05-27T16:00:00Z',
+              finished_at: '2026-05-27T16:00:30Z',
+            },
+          ],
+          offset: 0,
+          limit: 50,
+          total: 1,
+        },
+      },
+      { method: 'GET', url: '/v1/errands', body: ERRANDS },
+    ]);
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(dataRows()).toHaveLength(2));
+    const table = screen.getByRole('table');
+    // Внутри таблицы (не среди status-filter-чипов): по одному бейджу на статус.
+    const succeededBadge = within(table).getByText('succeeded');
+    const successBadge = within(table).getByText('success');
+    // Оба несут одинаковый набор классов (badge + tone), а не нейтральный.
+    expect(succeededBadge.className).toBe(successBadge.className);
+  });
+
+  it('date-range фильтр сужает ленту по started_at', async () => {
+    mockAll();
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
+    const user = userEvent.setup();
+    // Все 4 прогона — 27 мая 2026. Сужаем «до» 26 мая → ничего не остаётся.
+    await user.clear(screen.getByTestId('date-to'));
+    await user.type(screen.getByTestId('date-to'), '2026-05-26');
+    await waitFor(() => {
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
+    // Расширяем «до» 27 мая (конец дня включительно) → снова все 4.
+    await user.clear(screen.getByTestId('date-to'));
+    await user.type(screen.getByTestId('date-to'), '2026-05-27');
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
+    // Очистка → диапазон снят.
+    await user.click(screen.getByTestId('date-clear'));
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
+  });
+
   it('пустой feed → empty-state', async () => {
     const empty = { items: [], offset: 0, limit: 50, total: 0 };
     installFetchMock([
