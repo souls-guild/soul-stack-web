@@ -17,7 +17,6 @@ import {
   serializeFields,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
-import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder';
 import {
   incarnationCreateSchema,
   type IncarnationCreateFormInput,
@@ -34,9 +33,10 @@ export function IncarnationNewForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [createdApplyId, setCreatedApplyId] = useState<string | null>(null);
 
-  // Pre-fill из ?service=…&scenario=… (приходит из ServiceDetail → «Use in incarnation»).
+  // Pre-fill из ?service=… (приходит из ServiceDetail → «Use in incarnation»).
+  // ?scenario=… игнорируем: input создаваемой incarnation берётся строго из
+  // scenario `create` выбранного сервиса.
   const prefilledService = searchParams.get('service') ?? '';
-  const prefilledScenario = searchParams.get('scenario') ?? '';
 
   const services = useQuery({
     queryKey: ['services.list'],
@@ -57,43 +57,26 @@ export function IncarnationNewForm() {
   const selectedService = watch('service');
   const scenarios = useServiceScenarios(selectedService || undefined);
 
-  // Локальное состояние «выбранный scenario» — не часть POST /v1/incarnations
-  // (там сценарий всегда `create`); используется только как контекст для input-формы.
-  const [selectedScenarioName, setSelectedScenarioName] = useState<string>(prefilledScenario);
-  useEffect(() => {
-    // При смене service сбрасываем выбор scenario, если он не валиден в новом каталоге.
-    if (
-      selectedScenarioName &&
-      !scenarios.loading &&
-      !scenarios.unavailable &&
-      !scenarios.items.some((s) => s.name === selectedScenarioName)
-    ) {
-      setSelectedScenarioName('');
-    }
-  }, [scenarios.loading, scenarios.unavailable, scenarios.items, selectedScenarioName]);
-
-  const selectedScenario = useMemo(
-    () => scenarios.items.find((s) => s.name === selectedScenarioName),
-    [scenarios.items, selectedScenarioName],
+  // Input создаваемой incarnation берётся строго из scenario `create` сервиса
+  // (POST /v1/incarnations всегда вызывает именно его). Резолвим его input_schema:
+  //   - есть `create` с непустой supported-схемой → типизированные поля;
+  //   - нет `create` или схема пустая/сложная → поля input не показываем (создаём
+  //     пустую incarnation, generic-билдера тут нет).
+  const createScenario = useMemo(
+    () => scenarios.items.find((s) => s.name === 'create'),
+    [scenarios.items],
   );
-  const supportedSchema = selectedScenario?.input_schema;
-  const usePerField = isSupportedInputSchema(supportedSchema);
+  const createSchema = createScenario?.input_schema;
+  const usePerField = isSupportedInputSchema(createSchema);
 
   const [fields, setFields] = useState<ScenarioFieldsState>({});
   useEffect(() => {
-    if (usePerField && supportedSchema) {
-      setFields(defaultsFromSchema(supportedSchema));
+    if (usePerField && createSchema) {
+      setFields(defaultsFromSchema(createSchema));
     } else {
       setFields({});
     }
-  }, [usePerField, selectedScenarioName, supportedSchema]);
-
-  // Состояние DynamicInputBuilder — используется когда scenario без typed schema.
-  // Сбрасывается при смене scenario (как и `fields`).
-  const [dynamicInput, setDynamicInput] = useState<Record<string, unknown>>({});
-  useEffect(() => {
-    setDynamicInput({});
-  }, [selectedScenarioName]);
+  }, [usePerField, selectedService, createSchema]);
 
   const createMu = useMutation({
     mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown> }) =>
@@ -111,9 +94,7 @@ export function IncarnationNewForm() {
     setServerError(null);
     setCreatedApplyId(null);
     const input =
-      usePerField && supportedSchema
-        ? serializeFields(supportedSchema, fields)
-        : dynamicInput;
+      usePerField && createSchema ? serializeFields(createSchema, fields) : {};
     createMu.mutate({
       name: values.name,
       service: values.service,
@@ -123,7 +104,6 @@ export function IncarnationNewForm() {
   }
 
   const serviceItems = services.data?.items ?? [];
-  const scenarioSelectAvailable = !scenarios.unavailable && scenarios.items.length > 0;
 
   return (
     <div className={styles.page}>
@@ -204,68 +184,23 @@ export function IncarnationNewForm() {
           />
         </div>
 
-        {selectedService && scenarioSelectAvailable ? (
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              {t('incarnations:scenarioContextLabel')}
-            </span>
-            <select
-              value={selectedScenarioName}
-              onChange={(e) => setSelectedScenarioName(e.target.value)}
-              style={{
-                padding: '8px 10px',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 13,
-              }}
-            >
-              <option value="">{t('incarnations:scenarioJsonMode')}</option>
-              {scenarios.items.map((s) => (
-                <option key={s.name} value={s.name} title={s.description ?? ''}>
-                  {s.name}
-                  {s.description ? ` — ${s.description}` : ''}
-                </option>
-              ))}
-            </select>
-            <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-              {t('incarnations:scenarioCreateAlwaysHint')}
-            </span>
-          </label>
-        ) : null}
-
-        {usePerField && supportedSchema ? (
-          <div>
+        {selectedService && usePerField && createSchema ? (
+          <div data-testid="create-input-fields">
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-              {t('incarnations:inputScenarioFields', { name: selectedScenarioName })}
+              {t('incarnations:createInputFields')}
             </div>
-            <ScenarioInputFields
-              schema={supportedSchema}
-              value={fields}
-              onChange={setFields}
-            />
-            {selectedScenario?.description ? (
+            <ScenarioInputFields schema={createSchema} value={fields} onChange={setFields} />
+            {createScenario?.description ? (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
-                {selectedScenario.description}
+                {createScenario.description}
               </div>
             ) : null}
           </div>
-        ) : (
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-              {t('incarnations:dynamicInputDesc')}
-            </div>
-            <DynamicInputBuilder
-              value={dynamicInput}
-              onChange={setDynamicInput}
-              ariaLabel="Scenario create input fields"
-            />
-            <span style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 6, display: 'block' }}>
-              {t('incarnations:dynamicInputHint')}
-            </span>
+        ) : selectedService && !scenarios.loading && !scenarios.unavailable ? (
+          <div style={{ fontSize: 12, color: 'var(--text-faint)' }} data-testid="create-input-empty">
+            {t('incarnations:createNoInput')}
           </div>
-        )}
+        ) : null}
 
         {serverError ? <div className={styles.errorBox}>{serverError}</div> : null}
         {createdApplyId ? (

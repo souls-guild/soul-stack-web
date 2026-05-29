@@ -235,8 +235,8 @@ describe('RunWizard', () => {
       incarnationNames: ['hello-prod'],
       scenarios: [
         {
-          name: 'create',
-          description: 'create hello',
+          name: 'set_greeting',
+          description: 'set greeting',
           input_schema: { greeting: { type: 'string', required: true, description: 'greet text' } },
         },
       ],
@@ -247,8 +247,8 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'hello-world');
-    await waitFor(() => expect(screen.getByRole('option', { name: /create/ })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/Scenario/), 'create');
+    await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
     // Step 2 → 3 (incarnations + input).
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -263,7 +263,7 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/hello-prod\/scenarios\/create$/);
+    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/hello-prod\/scenarios\/set_greeting$/);
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({ greeting: 'hello world' });
   });
 

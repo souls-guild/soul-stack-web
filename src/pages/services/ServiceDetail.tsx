@@ -10,6 +10,7 @@ import { useServiceRefs } from './refs';
 import { EditServiceModal } from './EditServiceModal';
 import { DeregisterServiceModal } from './DeregisterServiceModal';
 import type { ServiceScenarioInfo } from '../../api/keeper';
+import { isReservedScenario } from '../incarnations/reservedScenarios';
 import styles from '../common.module.css';
 
 type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs';
@@ -245,18 +246,26 @@ export function ServiceDetail() {
                     <td className="mono" style={{ fontSize: 12 }}>
                       {scenarioInputSummary(s)}
                     </td>
-                    <td style={{ display: 'flex', gap: 8 }}>
-                      <Link
-                        to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
-                        aria-label={`${t('runScenario')} ${s.name}`}
-                      >
-                        <Button type="button" variant="primary">{t('admin:svcRunThisScenario')}</Button>
-                      </Link>
-                      <Link
-                        to={`/incarnations/new?service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
-                      >
-                        <Button type="button" variant="secondary">{t('admin:svcUseInIncarnation')}</Button>
-                      </Link>
+                    <td style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {isReservedScenario(s.name) ? (
+                        <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+                          {t('admin:svcReservedScenario')}
+                        </span>
+                      ) : (
+                        <>
+                          <Link
+                            to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
+                            aria-label={`${t('runScenario')} ${s.name}`}
+                          >
+                            <Button type="button" variant="primary">{t('admin:svcRunThisScenario')}</Button>
+                          </Link>
+                          <Link
+                            to={`/incarnations/new?service=${encodeURIComponent(row.name)}`}
+                          >
+                            <Button type="button" variant="secondary">{t('admin:svcUseInIncarnation')}</Button>
+                          </Link>
+                        </>
+                      )}
                       <Button type="button" variant="ghost" onClick={() => setYamlScenario(s)}>
                         {t('admin:svcView')}
                       </Button>

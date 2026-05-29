@@ -38,6 +38,7 @@
   "svcRefsEmpty": "В git-репо нет ни tags, ни branches.",
   "svcRunThisScenario": "Run this scenario",
   "svcUseInIncarnation": "Use in incarnation",
+  "svcReservedScenario": "lifecycle / служебный — запускается не отсюда",
   "svcView": "View",
   "svcScenarioNoInputSchema": "У сценария нет input_schema.",
   "svcDeregisterWarn": "будет удалена из реестра. Git-репо",

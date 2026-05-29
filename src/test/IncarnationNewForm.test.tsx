@@ -33,6 +33,55 @@ describe('IncarnationNewForm', () => {
     expect(await screen.findByText(/обязательное поле/i)).toBeInTheDocument();
   });
 
+  it('create-input: типизированные поля из scenario `create`, converge не предлагается', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create',
+              path: 'scenario/create/main.yml',
+              description: 'init redis',
+              input_schema: { maxmemory: { type: 'string', required: true, description: 'memory cap' } },
+            },
+            { name: 'converge', path: 'scenario/converge/main.yml', input_schema: {} },
+            { name: 'restart', path: 'scenario/restart/main.yml', input_schema: {} },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument();
+    });
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+
+    // Типизированное поле из create.input_schema появилось.
+    expect(await screen.findByTestId('create-input-fields')).toBeInTheDocument();
+    expect(screen.getByText(/^maxmemory \*?$/)).toBeInTheDocument();
+
+    // converge / restart не предлагаются как поля input и нет generic-билдера.
+    expect(screen.queryByText(/^converge/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Scenario create input fields')).not.toBeInTheDocument();
+  });
+
   it('POST /v1/incarnations отправляется с типизированным body', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -18,6 +18,8 @@
   "covensPlaceholder": "prod, datacenter-1 (Enter / пробел / запятая для добавления)",
   "created": "Создано. apply_id:",
   "createdGoTo": ". Переходим к incarnation…",
+  "createInputFields": "Input scenario create",
+  "createNoInput": "У scenario create нет input-полей — incarnation создаётся без входных параметров.",
   "dataSummaryDesc": "Где искать параметры incarnation:",
   "dataSummaryHostsTail": "— declared + connected + per-host runtime data.",
   "dataSummarySchemaTail": "— версия структуры state",

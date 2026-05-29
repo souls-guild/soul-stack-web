@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { ScenariosQueryResult } from './useServiceScenarios';
+import { runnableScenarios } from './reservedScenarios';
 
 // Поле выбора сценария: select при доступных scenarios, иначе text input.
 // register-обработчики react-hook-form подаются полями onChange/onBlur/value/name.
@@ -46,7 +47,7 @@ export function ScenarioField({
           }}
         >
           <option value="">{t('incarnations:selectScenario')}</option>
-          {scenarios.items.map((s) => (
+          {runnableScenarios(scenarios.items).map((s) => (
             <option key={s.name} value={s.name} title={s.description ?? ''}>
               {s.name}
               {s.description ? ` — ${s.description}` : ''}

@@ -38,6 +38,7 @@
   "svcRefsEmpty": "The git repo has no tags or branches.",
   "svcRunThisScenario": "Run this scenario",
   "svcUseInIncarnation": "Use in incarnation",
+  "svcReservedScenario": "lifecycle / service — launched elsewhere",
   "svcView": "View",
   "svcScenarioNoInputSchema": "The scenario has no input_schema.",
   "svcDeregisterWarn": "will be removed from the registry. The git repo",

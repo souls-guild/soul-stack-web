@@ -18,6 +18,8 @@
   "covensPlaceholder": "prod, datacenter-1 (Enter / space / comma to add)",
   "created": "Created. apply_id:",
   "createdGoTo": ". Going to incarnation…",
+  "createInputFields": "Scenario create input",
+  "createNoInput": "Scenario create has no input fields — the incarnation is created without input parameters.",
   "dataSummaryDesc": "Where to find incarnation parameters:",
   "dataSummaryHostsTail": "— declared + connected + per-host runtime data.",
   "dataSummarySchemaTail": "— state structure version",

@@ -14,6 +14,7 @@ import type {
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { useServiceScenarios } from '../incarnations/useServiceScenarios';
+import { runnableScenarios } from '../incarnations/reservedScenarios';
 import { ScenarioInputFields } from '../incarnations/ScenarioInputFields';
 import {
   defaultsFromSchema,
@@ -574,7 +575,7 @@ function Step2ScenarioSelect({
             disabled={scenariosQ.loading || scenariosQ.unavailable}
           >
             <option value="">{t('run:selectScenarioPlaceholder')}</option>
-            {scenariosQ.items.map((s) => (
+            {runnableScenarios(scenariosQ.items).map((s) => (
               <option key={s.name} value={s.name} title={s.description ?? ''}>
                 {s.name}
                 {s.description ? ` — ${s.description}` : ''}
