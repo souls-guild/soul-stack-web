@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Box } from 'lucide-react';
@@ -51,7 +51,13 @@ export function IncarnationNewForm() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<IncarnationCreateFormInput, unknown, IncarnationCreateFormOutput>({
-    resolver: zodResolver(incarnationCreateSchema),
+    // zodResolver (@hookform/resolvers v3) не пробрасывает output-тип transform-схемы
+    // в Resolver<Input, _, Output>; каст согласует типы без смены рантайма.
+    resolver: zodResolver(incarnationCreateSchema) as Resolver<
+      IncarnationCreateFormInput,
+      unknown,
+      IncarnationCreateFormOutput
+    >,
     defaultValues: { name: '', service: prefilledService, covens: [], inputJson: '' },
   });
 
@@ -195,7 +201,7 @@ export function IncarnationNewForm() {
             name="covens"
             render={({ field }) => (
               <ChipsInput
-                value={field.value}
+                value={field.value ?? []}
                 onChange={field.onChange}
                 placeholder={t('incarnations:covensPlaceholder')}
                 ariaLabel="Covens"

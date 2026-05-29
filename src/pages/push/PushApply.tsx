@@ -51,10 +51,10 @@ export function PushApply() {
 
   // Парсинг input — однократно, иначе вылетит для каждого symbol-а.
   const inputParsed = useMemo<{ ok: true; value: Record<string, unknown> } | { ok: false; err: string }>(() => {
-    const t = inputRaw.trim();
-    if (!t) return { ok: true, value: {} };
+    const trimmed = inputRaw.trim();
+    if (!trimmed) return { ok: true, value: {} };
     try {
-      const v = JSON.parse(t);
+      const v = JSON.parse(trimmed);
       if (v === null || typeof v !== 'object' || Array.isArray(v)) {
         return { ok: false, err: t('runhistory:pushInputMustBeObject') };
       }
@@ -62,7 +62,7 @@ export function PushApply() {
     } catch (e) {
       return { ok: false, err: e instanceof Error ? e.message : 'invalid JSON' };
     }
-  }, [inputRaw]);
+  }, [inputRaw, t]);
 
   const submit = useMutation({
     mutationFn: () => {

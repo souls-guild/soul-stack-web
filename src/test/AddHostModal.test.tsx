@@ -70,7 +70,7 @@ describe('AddHostModal', () => {
   });
 
   it('422 unknown-SID → pretty-error', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'PATCH') {
         return new Response(

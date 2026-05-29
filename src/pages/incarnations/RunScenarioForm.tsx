@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
@@ -44,7 +44,13 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<RunScenarioFormInput, unknown, RunScenarioFormOutput>({
-    resolver: zodResolver(runScenarioSchema),
+    // zodResolver (@hookform/resolvers v3) не пробрасывает output-тип transform-схемы
+    // в Resolver<Input, _, Output>; каст согласует типы без смены рантайма.
+    resolver: zodResolver(runScenarioSchema) as Resolver<
+      RunScenarioFormInput,
+      unknown,
+      RunScenarioFormOutput
+    >,
     defaultValues: { scenario: '', inputJson: '' },
   });
 

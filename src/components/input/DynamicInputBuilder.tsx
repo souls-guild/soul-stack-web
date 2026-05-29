@@ -107,7 +107,7 @@ export function DynamicInputBuilder({
     }
     // Raw → form: парсим текущий rawText.
     const parsed = tryParseRawObject(rawText);
-    if (parsed.error) {
+    if (parsed.error !== null) {
       setRawError(parsed.error);
       return;
     }
@@ -122,7 +122,7 @@ export function DynamicInputBuilder({
   function onRawChange(text: string) {
     setRawText(text);
     const parsed = tryParseRawObject(text);
-    if (parsed.error) {
+    if (parsed.error !== null) {
       setRawError(parsed.error);
       return;
     }
