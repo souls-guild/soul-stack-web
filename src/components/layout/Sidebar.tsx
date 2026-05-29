@@ -12,7 +12,6 @@ import {
   Scroll,
   Zap,
   Waves,
-  Send,
   Play,
   Activity,
   HelpCircle,
@@ -26,8 +25,11 @@ import styles from './Sidebar.module.css';
 // UX-pattern: один entry-point для запуска работы (/run Wizard),
 // остальные pages — read-only views (registry / history / audit).
 //
-// Routes /errands/new + /push сохранены как hidden для
-// backward-compat-ссылок (deprecated, см. PM-decision 2026-05-27).
+// Routes /errands/new + /push + /push-runs (+ /push-runs/:applyId)
+// сохранены как hidden для backward-compat-ссылок (deprecated,
+// см. PM-decision 2026-05-27). Push deferred — нет use-case, pull
+// покрывает всё; эндпоинт /v1/push-runs в dev-конфиге не
+// регистрируется (404), поэтому пункт убран из навигации.
 
 interface NavItem {
   to: string;
@@ -65,7 +67,6 @@ const HISTORY: NavItem[] = [
   { to: '/runs', label: 'All runs', icon: Activity, matchPrefix: '/runs' },
   { to: '/tides', label: 'Tides', icon: Waves, matchPrefix: '/tides' },
   { to: '/errand-runs', label: 'Command runs', icon: Terminal, matchPrefix: '/errand-runs' },
-  { to: '/push-runs', label: 'Push runs', icon: Send, matchPrefix: '/push-runs' },
 ];
 
 const BOTTOM: NavItem[] = [
