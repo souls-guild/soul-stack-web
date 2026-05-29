@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Play, Search, Shield } from 'lucide-react';
+import { Play, Plus, Search, Shield } from 'lucide-react';
 import i18n from '../../i18n';
 import { keeperApi, SoulprintNotReceivedError, type SoulListEntry, type SoulStatus, type SoulTransport, type SoulprintReadReply } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { CovenAssignModal } from './CovenAssignModal';
+import { CreateSoulModal } from './CreateSoulModal';
 import { applyFilter, parseSoulprintFilter } from './soulprintFilter';
 import { filtersToCEL } from '../run/targetTranslator';
 import styles from '../common.module.css';
@@ -83,6 +84,7 @@ export function SoulsList() {
   const [sortKey, setSortKey] = useState<SortKey>('last_seen_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const parsed = useMemo(() => parseCovens(coven), [coven]);
   const covenFilter = parsed.valid.length > 0 ? parsed.valid : undefined;
@@ -241,6 +243,15 @@ export function SoulsList() {
             <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
             {t('souls:bulkAssignCoven', { suffix: effectiveSelected.size > 0 ? ` (${effectiveSelected.size})` : '' })}
           </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => setCreateOpen(true)}
+            aria-label={t('souls:registerSoulAria')}
+          >
+            <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            {t('souls:registerSoul')}
+          </Button>
         </div>
       </div>
 
@@ -393,7 +404,25 @@ export function SoulsList() {
             : search
               ? t('souls:emptySearch')
               : (
-                <>{t('souls:emptyNoSoulsPrefix')}<code className="mono">keeper.soul.create</code>.</>
+                <>
+                  {t('souls:emptyNoSouls')}{' '}
+                  <button
+                    type="button"
+                    onClick={() => setCreateOpen(true)}
+                    style={{
+                      background: 'transparent',
+                      border: 0,
+                      padding: 0,
+                      color: 'var(--accent)',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {t('souls:registerSoul')}
+                  </button>
+                  .
+                </>
               )}
         </div>
       ) : null}
@@ -477,6 +506,11 @@ export function SoulsList() {
         open={bulkOpen}
         onClose={() => setBulkOpen(false)}
         variant={{ kind: 'bulk', sids: [...effectiveSelected] }}
+      />
+
+      <CreateSoulModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
       />
     </div>
   );

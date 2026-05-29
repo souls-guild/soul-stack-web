@@ -41,6 +41,8 @@ export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
 export type SoulprintReadReply = components['schemas']['SoulprintReadReply'];
 export type SoulIssueTokenReply = components['schemas']['SoulIssueTokenReply'];
+export type SoulCreateRequest = components['schemas']['SoulCreateRequest'];
+export type SoulCreateReply = components['schemas']['SoulCreateReply'];
 export type SoulCovenAssignRequest = components['schemas']['SoulCovenAssignRequest'];
 export type SoulCovenAssignReply = components['schemas']['SoulCovenAssignReply'];
 export type SoulCovenAssignSelector = components['schemas']['SoulCovenAssignSelector'];
@@ -414,6 +416,11 @@ export const keeperApi = {
         'POST',
         { query: { force } },
       ),
+    // POST /v1/souls — регистрация нового хоста. 201 → SoulCreateReply.
+    // bootstrap_token присутствует только для transport: agent (one-time, never log).
+    // 409 → SID уже занят; 422 → невалидный SID/transport.
+    create: (body: SoulCreateRequest) =>
+      apiSend<SoulCreateReply>('/v1/souls', 'POST', { body }),
     // POST /v1/souls/coven. Bulk coven-assign: mode=append/remove (label) или
     // mode=replace (labels). Чанкинг с per-чанк commit — status=completed|partial.
     bulkAssignCoven: (body: SoulCovenAssignRequest) =>
