@@ -204,6 +204,14 @@ export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
 export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
 export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
 
+// Choir + Voice (ADR-044). Топология хостов внутри инкарнации.
+export type Choir = components['schemas']['Choir'];
+export type Voice = components['schemas']['Voice'];
+export type ChoirCreateRequest = components['schemas']['ChoirCreateRequest'];
+export type VoiceAddRequest = components['schemas']['VoiceAddRequest'];
+export type ChoirListReply = components['schemas']['ChoirListReply'];
+export type VoiceListReply = components['schemas']['VoiceListReply'];
+
 // Refs / scenarios endpoints ещё не зафиксированы в openapi (фиксируется параллельно
 // в backend-slice-е). Локальные типы — узкий контракт, использующийся UI;
 // graceful-degraded при 404/501.
@@ -367,6 +375,47 @@ export const keeperApi = {
         `/v1/incarnations/${encodeURIComponent(name)}/hosts`,
         'PATCH',
         { body },
+      ),
+  },
+
+  // Choir/Voice — топология хостов внутри инкарнации (ADR-044).
+  choirs: {
+    // GET /v1/incarnations/{name}/choirs → ChoirListReply (sorted by choir_name).
+    list: (incarnationName: string) =>
+      apiGet<ChoirListReply>(
+        `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs`,
+      ),
+    // POST /v1/incarnations/{name}/choirs → 201 Choir.
+    create: (incarnationName: string, body: ChoirCreateRequest) =>
+      apiSend<Choir>(
+        `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs`,
+        'POST',
+        { body },
+      ),
+    // DELETE /v1/incarnations/{name}/choirs/{choir} → 204 (CASCADE удаляет Voice-ы).
+    delete: (incarnationName: string, choirName: string) =>
+      apiSend<void>(
+        `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs/${encodeURIComponent(choirName)}`,
+        'DELETE',
+      ),
+    // GET .../choirs/{choir}/voices → VoiceListReply.
+    listVoices: (incarnationName: string, choirName: string) =>
+      apiGet<VoiceListReply>(
+        `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs/${encodeURIComponent(choirName)}/voices`,
+      ),
+    // POST .../choirs/{choir}/voices {sid, role?, position?} → 201 Voice.
+    // 422 ErrNotMembers если SID не является членом инкарнации.
+    addVoice: (incarnationName: string, choirName: string, body: VoiceAddRequest) =>
+      apiSend<Voice>(
+        `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs/${encodeURIComponent(choirName)}/voices`,
+        'POST',
+        { body },
+      ),
+    // DELETE .../choirs/{choir}/voices/{sid} → 204.
+    removeVoice: (incarnationName: string, choirName: string, sid: string) =>
+      apiSend<void>(
+        `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs/${encodeURIComponent(choirName)}/voices/${encodeURIComponent(sid)}`,
+        'DELETE',
       ),
   },
 

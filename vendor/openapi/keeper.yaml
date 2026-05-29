@@ -65,6 +65,8 @@ tags:
     description: Push-режим SSH-доставки Destiny (docs/keeper/push.md).
   - name: Cloud
     description: Cloud-провайдеры — Provider и Profile (docs/keeper/cloud.md).
+  - name: Choir
+    description: Топология хостов внутри инкарнации — Choir (партия) и Voice (членство SID) (ADR-044).
 
 paths:
   /healthz:
@@ -824,6 +826,162 @@ paths:
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
         '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/choirs:
+    post:
+      tags: [Choir]
+      operationId: CreateChoir
+      summary: Создать Choir (партию хостов внутри инкарнации, ADR-044).
+      description: |
+        Permission: choir.create (scope incarnation/service/coven по path-{name}).
+        MCP-tool: keeper.choir.create.
+
+        Choir — именованная топология хостов ВНУТРИ инкарнации (declared-«партия
+        хора»). `created_by_aid` берётся из JWT-контекста, НЕ из тела. `choir_name`
+        валидируется на формат `^[a-z][a-z0-9_-]*$`. `min_size`/`max_size` —
+        опциональные sane-bounds (> 0, min ≤ max).
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoirCreateRequest'
+      responses:
+        '201':
+          description: Choir создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Choir'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Choir]
+      operationId: ListChoirs
+      summary: Список Choir-ов инкарнации (ADR-044).
+      description: |
+        Permission: choir.list (scope incarnation/service/coven по path-{name}).
+        Сортировка по choir_name. Несуществующая incarnation → 200 + items=[].
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+      responses:
+        '200':
+          description: Список Choir-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoirListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/choirs/{choir}:
+    delete:
+      tags: [Choir]
+      operationId: DeleteChoir
+      summary: Удалить Choir (каскадом его Voice-ы, ADR-044).
+      description: |
+        Permission: choir.delete (scope incarnation/service/coven по path-{name}).
+        MCP-tool: keeper.choir.delete. ON DELETE CASCADE сносит все Voice-ы Choir-а.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - $ref: '#/components/parameters/ChoirNamePath'
+      responses:
+        '204':
+          description: Choir удалён.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/choirs/{choir}/voices:
+    post:
+      tags: [Choir]
+      operationId: AddVoice
+      summary: Добавить Voice (членство SID в Choir-е, ADR-044).
+      description: |
+        Permission: choir.add-voice (scope incarnation/service/coven по path-{name}).
+        MCP-tool: keeper.choir.add-voice.
+
+        Инвариант членства (ADR-044): Voice создаётся только для SID, который уже
+        член инкарнации (его `souls.coven[]` содержит `incarnation.name`). SID вне
+        членства → 422 (нарушившие SID-ы в detail). `added_by_aid` берётся из
+        JWT-контекста, НЕ из тела. `role`/`position` — опциональные declared-атрибуты.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - $ref: '#/components/parameters/ChoirNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceAddRequest'
+      responses:
+        '201':
+          description: Voice добавлен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Voice'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Choir]
+      operationId: ListVoices
+      summary: Список Voice-ов Choir-а (ADR-044).
+      description: |
+        Permission: choir.list (scope incarnation/service/coven по path-{name}).
+        Сортировка по position (NULL — в конец), затем по sid. Несуществующий
+        Choir → 200 + items=[].
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - $ref: '#/components/parameters/ChoirNamePath'
+      responses:
+        '200':
+          description: Список Voice-ов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/incarnations/{name}/choirs/{choir}/voices/{sid}:
+    delete:
+      tags: [Choir]
+      operationId: RemoveVoice
+      summary: Убрать Voice из Choir-а (ADR-044).
+      description: |
+        Permission: choir.remove-voice (scope incarnation/service/coven по path-{name}).
+        MCP-tool: keeper.choir.remove-voice.
+      parameters:
+        - $ref: '#/components/parameters/IncarnationNamePath'
+        - $ref: '#/components/parameters/ChoirNamePath'
+        - $ref: '#/components/parameters/SidPath'
+      responses:
+        '204':
+          description: Voice удалён.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
@@ -2935,6 +3093,14 @@ components:
       description: |
         SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
         экранирования). См. operator-api.md → Conventions → ID в path.
+    ChoirNamePath:
+      name: choir
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_-]*$'
+      description: Имя Choir-а внутри инкарнации (kebab/snake, начинается с буквы, ADR-044).
     OffsetQuery:
       name: offset
       in: query
@@ -4840,6 +5006,138 @@ components:
             `append` — insert-or-update role по SID; `remove` — удалить
             переданные SID-ы.
       required: [hosts, mode]
+
+    Choir:
+      type: object
+      description: |
+        Choir — именованная топология хостов ВНУТРИ инкарнации (declared-«партия
+        хора», ADR-044). Источник правды — таблица `incarnation_choirs`, НЕ
+        `incarnation.state`.
+      properties:
+        incarnation_name:
+          type: string
+        choir_name:
+          type: string
+          pattern: '^[a-z][a-z0-9_-]*$'
+        description:
+          type: string
+          nullable: true
+        min_size:
+          type: integer
+          nullable: true
+          description: Опциональный нижний лимит размера партии (> 0).
+        max_size:
+          type: integer
+          nullable: true
+          description: Опциональный верхний лимит размера партии (≥ min_size).
+        created_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          nullable: true
+          description: AID Архонта-создателя (из JWT-контекста; NULL после ревокации FK).
+      required: [incarnation_name, choir_name, description, min_size, max_size, created_at, created_by_aid]
+
+    Voice:
+      type: object
+      description: |
+        Voice — членство SID в Choir-е (ADR-044). PK — тройка
+        (incarnation_name, choir_name, sid); один SID легально является Voice в
+        Choir-ах разных инкарнаций.
+      properties:
+        incarnation_name:
+          type: string
+        choir_name:
+          type: string
+        sid:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Поглощённая declared-роль (kebab-case или null, ADR-044).
+        position:
+          type: integer
+          nullable: true
+          description: Порядковый индекс внутри партии (≥ 0 или null).
+        added_at:
+          type: string
+          format: date-time
+        added_by_aid:
+          type: string
+          nullable: true
+          description: AID Архонта, добавившего Voice (из JWT-контекста).
+      required: [incarnation_name, choir_name, sid, role, position, added_at, added_by_aid]
+
+    ChoirCreateRequest:
+      type: object
+      description: |
+        Body POST /v1/incarnations/{name}/choirs. `created_by_aid` НЕ принимается
+        из тела — берётся из JWT-контекста.
+      properties:
+        choir_name:
+          type: string
+          pattern: '^[a-z][a-z0-9_-]*$'
+        description:
+          type: string
+          nullable: true
+        min_size:
+          type: integer
+          nullable: true
+        max_size:
+          type: integer
+          nullable: true
+      required: [choir_name]
+
+    VoiceAddRequest:
+      type: object
+      description: |
+        Body POST /v1/incarnations/{name}/choirs/{choir}/voices. `added_by_aid`
+        НЕ принимается из тела — берётся из JWT-контекста.
+      properties:
+        sid:
+          type: string
+        role:
+          type: string
+          nullable: true
+          description: Опциональная declared-роль (kebab-case, 1..63 символа).
+        position:
+          type: integer
+          nullable: true
+          description: Опциональный порядковый индекс (≥ 0).
+      required: [sid]
+
+    ChoirListReply:
+      type: object
+      description: Список Choir-ов инкарнации (ADR-044).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Choir'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
+    VoiceListReply:
+      type: object
+      description: Список Voice-ов Choir-а (ADR-044).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Voice'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
 
     IncarnationCheckDriftRequest:
       type: object

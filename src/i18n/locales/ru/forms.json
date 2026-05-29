@@ -1,5 +1,8 @@
 {
   "addHostTitle": "Add host → {{name}}",
+  "addVoiceTitle": "Добавить Voice → {{choir}}",
+  "createChoirTitle": "Создать Choir → {{name}}",
+  "deleteChoirTitle": "Удалить Choir: {{choir}}",
   "addRole": "добавить роль",
   "ariaAssignRole": "назначить роль {{aid}}",
   "ariaDeleteRole": "удалить роль {{name}}",

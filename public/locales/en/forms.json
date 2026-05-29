@@ -1,5 +1,8 @@
 {
   "addHostTitle": "Add host → {{name}}",
+  "addVoiceTitle": "Add Voice → {{choir}}",
+  "createChoirTitle": "Create Choir → {{name}}",
+  "deleteChoirTitle": "Delete Choir: {{choir}}",
   "addRole": "add role",
   "ariaAssignRole": "assign role {{aid}}",
   "ariaDeleteRole": "delete role {{name}}",

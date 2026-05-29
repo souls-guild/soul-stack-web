@@ -22,12 +22,13 @@ import { UnlockModal } from './UnlockModal';
 import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
 import { HostsTab } from './HostsTab';
+import { ChoirsTab } from './ChoirsTab';
 import { SpecTab } from './SpecTab';
 import { StateTab } from './StateTab';
 import { SchemaTab } from './SchemaTab';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'hosts' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
+type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
 
 export function IncarnationDetail() {
   const { t } = useTranslation();
@@ -205,6 +206,9 @@ export function IncarnationDetail() {
         <button type="button" role="tab" aria-selected={tab === 'hosts'} className={`${styles.tab} ${tab === 'hosts' ? styles.tabActive : ''}`} onClick={() => setTab('hosts')}>
           Hosts
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'choirs'} className={`${styles.tab} ${tab === 'choirs' ? styles.tabActive : ''}`} onClick={() => setTab('choirs')}>
+          Choirs
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'history'} className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`} onClick={() => setTab('history')}>
           <HistoryIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />History
         </button>
@@ -304,6 +308,10 @@ export function IncarnationDetail() {
           state={row.state ?? null}
           status={row.status}
         />
+      ) : null}
+
+      {tab === 'choirs' ? (
+        <ChoirsTab incarnationName={row.name} />
       ) : null}
 
       {tab === 'history' ? (
