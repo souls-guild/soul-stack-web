@@ -157,6 +157,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
 describe('RunWizard', () => {
   beforeEach(() => {
     tokenStore.clear();
+    sessionStorage.clear();
     // @ts-expect-error — EventSource нет в jsdom, минимальный stub.
     globalThis.EventSource = class {
       readyState = 0;
@@ -399,6 +400,70 @@ describe('RunWizard', () => {
     expect(body.module).toBe('core.http.probe');
     expect(body.input).toEqual({ url: 'https://example.com' });
     expect(body.target.sids).toEqual(['host-a.example.com']);
+  });
+
+  it('Command-state переживает переключение workload Command↔Scenario↔Command', async () => {
+    setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['db'] }] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Command → Step2 host → Step3 params, заполняем cmd.
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    const covenChip = await screen.findByLabelText('Coven labels');
+    await user.type(covenChip.querySelector('input') as HTMLInputElement, 'db ');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.type(screen.getByLabelText('Command'), 'uptime');
+
+    // Назад на Step1, переключаемся на Scenario и обратно на Command.
+    await user.click(screen.getByRole('button', { name: /Назад/ }));
+    await user.click(screen.getByRole('button', { name: /Назад/ }));
+    await user.click(screen.getByLabelText('Scenario apply'));
+    await user.click(screen.getByLabelText('Command'));
+
+    // Идём вперёд до Step3 — cmd сохранился.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    expect((screen.getByLabelText('Command') as HTMLTextAreaElement).value).toBe('uptime');
+  });
+
+  it('Scenario required-поле блокирует Далее/submit + inline-ошибка', async () => {
+    setupFetchStub({
+      serviceName: 'hello-world',
+      incarnationNames: ['hello-prod'],
+      scenarios: [
+        {
+          name: 'set_greeting',
+          description: 'set greeting',
+          input_schema: { greeting: { type: 'string', required: true, description: 'greet text' } },
+        },
+      ],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'hello-world');
+    await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('hello-prod')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('hello-prod'));
+
+    // required greeting пустой → inline-ошибка + кнопка Далее disabled.
+    await waitFor(() => expect(screen.getByTestId('field-required-greeting')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+
+    // Заполняем → ошибка уходит, можно дальше.
+    const greetingLabel = await screen.findByText(/^greeting \*?$/);
+    const greetingField = greetingLabel.parentElement?.querySelector('input') as HTMLInputElement;
+    await user.type(greetingField, 'hi');
+    await waitFor(() => expect(screen.queryByTestId('field-required-greeting')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
   });
 
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {

@@ -14,6 +14,7 @@ import { ScenarioInputFields } from './ScenarioInputFields';
 import {
   defaultsFromSchema,
   isSupportedInputSchema,
+  missingRequiredFields,
   serializeFields,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
@@ -70,13 +71,22 @@ export function IncarnationNewForm() {
   const usePerField = isSupportedInputSchema(createSchema);
 
   const [fields, setFields] = useState<ScenarioFieldsState>({});
+  const [showInputErrors, setShowInputErrors] = useState(false);
   useEffect(() => {
     if (usePerField && createSchema) {
       setFields(defaultsFromSchema(createSchema));
     } else {
       setFields({});
     }
+    setShowInputErrors(false);
   }, [usePerField, selectedService, createSchema]);
+
+  // Пустые required-поля create-input (зеркалит backend 422). Submit блокируется
+  // до заполнения; inline-ошибка под полем — после попытки submit.
+  const missingRequired = useMemo(
+    () => (usePerField && createSchema ? missingRequiredFields(createSchema, fields) : []),
+    [usePerField, createSchema, fields],
+  );
 
   const createMu = useMutation({
     mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown> }) =>
@@ -86,6 +96,11 @@ export function IncarnationNewForm() {
       setTimeout(() => navigate(`/incarnations/${encodeURIComponent(reply.incarnation)}`), 600);
     },
     onError: (err) => {
+      if (err instanceof ApiError && err.status === 422) {
+        setServerError(t('incarnations:missingRequired', { fields: missingRequired.join(', ') || err.detail }));
+        setShowInputErrors(true);
+        return;
+      }
       setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
@@ -93,6 +108,12 @@ export function IncarnationNewForm() {
   function onSubmit(values: IncarnationCreateFormOutput) {
     setServerError(null);
     setCreatedApplyId(null);
+    // Required-валидация ДО запроса (не доводим до backend 422).
+    if (missingRequired.length > 0) {
+      setShowInputErrors(true);
+      setServerError(t('incarnations:missingRequired', { fields: missingRequired.join(', ') }));
+      return;
+    }
     const input =
       usePerField && createSchema ? serializeFields(createSchema, fields) : {};
     createMu.mutate({
@@ -189,7 +210,12 @@ export function IncarnationNewForm() {
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
               {t('incarnations:createInputFields')}
             </div>
-            <ScenarioInputFields schema={createSchema} value={fields} onChange={setFields} />
+            <ScenarioInputFields
+              schema={createSchema}
+              value={fields}
+              onChange={setFields}
+              showErrors={showInputErrors}
+            />
             {createScenario?.description ? (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
                 {createScenario.description}
@@ -218,7 +244,11 @@ export function IncarnationNewForm() {
         ) : null}
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <Button type="submit" variant="primary" disabled={isSubmitting || createMu.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isSubmitting || createMu.isPending || missingRequired.length > 0}
+          >
             {createMu.isPending ? t('creating') : t('createIncarnation')}
           </Button>
           <Link to="/incarnations">

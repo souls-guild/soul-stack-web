@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { ScenarioInputSchema, ScenarioInputSchemaProperty } from '../../api/keeper';
 import type { ScenarioFieldValue, ScenarioFieldsState } from './scenarioInputFields.helpers';
 
@@ -5,24 +6,33 @@ interface Props {
   schema: ScenarioInputSchema;
   value: ScenarioFieldsState;
   onChange: (next: ScenarioFieldsState) => void;
+  // Показать inline-ошибку под пустыми required-полями (после попытки submit
+  // или при включённой live-валидации).
+  showErrors?: boolean;
 }
 
-export function ScenarioInputFields({ schema, value, onChange }: Props) {
+export function ScenarioInputFields({ schema, value, onChange, showErrors = false }: Props) {
   const entries = Object.entries(schema ?? {});
   if (entries.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {entries.map(([key, prop]) => (
-        <ScenarioInputOneField
-          key={key}
-          name={key}
-          required={Boolean(prop.required)}
-          prop={prop}
-          value={value[key]}
-          onChange={(v) => onChange({ ...value, [key]: v })}
-        />
-      ))}
+      {entries.map(([key, prop]) => {
+        const required = Boolean(prop.required) && prop.type !== 'boolean';
+        const v = value[key];
+        const missing = showErrors && required && (v === undefined || v === '');
+        return (
+          <ScenarioInputOneField
+            key={key}
+            name={key}
+            required={Boolean(prop.required)}
+            missing={missing}
+            prop={prop}
+            value={v}
+            onChange={(nv) => onChange({ ...value, [key]: nv })}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -30,21 +40,31 @@ export function ScenarioInputFields({ schema, value, onChange }: Props) {
 interface OneProps {
   name: string;
   required: boolean;
+  missing: boolean;
   prop: ScenarioInputSchemaProperty;
   value: ScenarioFieldValue;
   onChange: (v: ScenarioFieldValue) => void;
 }
 
-function ScenarioInputOneField({ name, required, prop, value, onChange }: OneProps) {
+function ScenarioInputOneField({ name, required, missing, prop, value, onChange }: OneProps) {
+  const { t } = useTranslation();
   const labelText = `${name}${required ? ' *' : ''}`;
   const baseStyle: React.CSSProperties = {
     padding: '8px 10px',
     borderRadius: 'var(--radius)',
-    border: '1px solid var(--border)',
+    border: `1px solid ${missing ? 'var(--danger)' : 'var(--border)'}`,
     background: 'var(--surface)',
     fontFamily: 'var(--font-mono)',
     fontSize: 13,
   };
+  const missingMsg = missing ? (
+    <span
+      data-testid={`field-required-${name}`}
+      style={{ color: 'var(--danger)', fontSize: 12 }}
+    >
+      {t('forms:required')}
+    </span>
+  ) : null;
   if (prop.type === 'boolean') {
     return (
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -76,6 +96,7 @@ function ScenarioInputOneField({ name, required, prop, value, onChange }: OnePro
         {prop.description ? (
           <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
         ) : null}
+        {missingMsg}
       </label>
     );
   }
@@ -101,6 +122,7 @@ function ScenarioInputOneField({ name, required, prop, value, onChange }: OnePro
         {prop.description ? (
           <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
         ) : null}
+        {missingMsg}
       </label>
     );
   }
@@ -118,6 +140,7 @@ function ScenarioInputOneField({ name, required, prop, value, onChange }: OnePro
       {prop.description ? (
         <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
       ) : null}
+      {missingMsg}
     </label>
   );
 }

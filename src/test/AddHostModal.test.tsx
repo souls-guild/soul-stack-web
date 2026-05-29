@@ -59,7 +59,9 @@ describe('AddHostModal', () => {
     await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
     await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
     await user.type(screen.getByPlaceholderText('master / replica / …'), 'master');
-    await user.click(screen.getByRole('button', { name: 'Добавить' }));
+    // Force-add требует подтверждения опасной операции.
+    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.click(screen.getByTestId('force-add-confirm'));
 
     await waitFor(() => {
       expect(lastUrl).toMatch(/\/v1\/incarnations\/redis-prod\/hosts/);
@@ -88,7 +90,8 @@ describe('AddHostModal', () => {
     const user = userEvent.setup();
     await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
     await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
-    await user.click(screen.getByRole('button', { name: 'Добавить' }));
+    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.click(screen.getByTestId('force-add-confirm'));
 
     await waitFor(() => {
       expect(screen.getByText(/Неизвестный SID/)).toBeInTheDocument();
@@ -102,7 +105,32 @@ describe('AddHostModal', () => {
     );
     const user = userEvent.setup();
     await waitFor(() => screen.getByLabelText('SID хоста'));
-    await user.click(screen.getByRole('button', { name: 'Добавить' }));
+    // Подтверждаем (иначе кнопка disabled), затем submit без SID.
+    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.click(screen.getByTestId('force-add-confirm'));
     expect(screen.getByText('Выберите SID хоста.')).toBeInTheDocument();
+  });
+
+  it('force-add: danger-warning + кнопка заблокирована без подтверждения', async () => {
+    installFetchMock([{ method: 'GET', url: '/v1/souls', body: SOULS }]);
+    renderWithProviders(
+      <AddHostModal open incarnationName="redis-prod" existingSids={[]} onClose={() => {}} />,
+    );
+    const user = userEvent.setup();
+    await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
+
+    // Warning-блок виден.
+    expect(screen.getByTestId('force-add-warning')).toBeInTheDocument();
+    expect(screen.getByTestId('force-add-warning').textContent).toMatch(/несогласованному состоянию/);
+
+    // Кнопка disabled до подтверждения.
+    const addBtn = screen.getByTestId('force-add-confirm');
+    expect(addBtn).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
+    expect(addBtn).toBeDisabled();
+
+    // После подтверждения — enabled.
+    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    expect(addBtn).not.toBeDisabled();
   });
 });

@@ -46,6 +46,24 @@ export function defaultsFromSchema(schema: ScenarioInputSchema): ScenarioFieldsS
   return out;
 }
 
+// Имена required-полей схемы, которые в текущем state пусты (зеркалит backend
+// required-валидацию: '' / undefined считаются незаполненными). Для boolean
+// required игнорируется — false валиден.
+export function missingRequiredFields(
+  schema: ScenarioInputSchema | undefined | null,
+  state: ScenarioFieldsState,
+): string[] {
+  if (!schema || typeof schema !== 'object') return [];
+  const out: string[] = [];
+  for (const [key, prop] of Object.entries(schema)) {
+    if (!prop?.required) continue;
+    if (prop.type === 'boolean') continue;
+    const v = state[key];
+    if (v === undefined || v === '') out.push(key);
+  }
+  return out;
+}
+
 // Сериализация в payload: '' пропускается, числа конвертируются.
 export function serializeFields(
   schema: ScenarioInputSchema,

@@ -40,6 +40,7 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
   const qc = useQueryClient();
   const [sid, setSid] = useState('');
   const [role, setRole] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -70,6 +71,7 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
   function close() {
     setSid('');
     setRole('');
+    setConfirmed(false);
     setFormError(null);
     setServerError(null);
     onClose();
@@ -87,6 +89,12 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
       setFormError(t('incarnations:roleKebab'));
       return;
     }
+    // Принудительное добавление в обход add-сценария согласования — требует
+    // явного подтверждения опасной операции.
+    if (!confirmed) {
+      setFormError(t('incarnations:forceAddNotConfirmed'));
+      return;
+    }
     mu.mutate();
   }
 
@@ -100,7 +108,13 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
           <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
             {t('cancel')}
           </Button>
-          <Button type="button" variant="primary" onClick={submit} disabled={mu.isPending}>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={submit}
+            disabled={mu.isPending || !confirmed}
+            data-testid="force-add-confirm"
+          >
             {mu.isPending ? t('adding') : t('add')}
           </Button>
         </>
@@ -148,6 +162,25 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
             spellCheck={false}
             style={inputStyle}
           />
+        </label>
+
+        <div
+          className={styles.errorBox}
+          style={{ marginTop: 16, fontSize: 12.5, lineHeight: 1.5 }}
+          data-testid="force-add-warning"
+        >
+          <strong>{t('incarnations:forceAddWarningTitle')}</strong> {t('incarnations:forceAddWarningBody')}
+        </div>
+        <label
+          style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 10, fontSize: 13 }}
+        >
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            aria-label={t('incarnations:forceAddConfirmAria')}
+          />
+          <span>{t('incarnations:forceAddConfirmLabel')}</span>
         </label>
 
         {formError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{formError}</div> : null}

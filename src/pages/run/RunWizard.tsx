@@ -19,6 +19,7 @@ import { ScenarioInputFields } from '../incarnations/ScenarioInputFields';
 import {
   defaultsFromSchema,
   isSupportedInputSchema,
+  missingRequiredFields,
   serializeFields,
   type ScenarioFieldsState,
 } from '../incarnations/scenarioInputFields.helpers';
@@ -92,6 +93,30 @@ interface OptionsState {
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
+// Черновик wizard-а в sessionStorage: переживает навигацию away/back между шагами
+// и сменой workload (под-шаги пере-монтируются — без persist локальный state шага
+// терялся бы). Очищается после успешного submit.
+const DRAFT_KEY = 'run-wizard-draft';
+
+interface WizardDraft {
+  step: 1 | 2 | 3 | 4;
+  workload: Workload;
+  scenarioState: ScenarioStateValues;
+  commandState: CommandStateValues;
+  hostCriteria: HostCriteria;
+  options: OptionsState;
+}
+
+function loadDraft(): WizardDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as WizardDraft;
+  } catch {
+    return null;
+  }
+}
+
 function pickWorkloadFromQuery(raw: string | null): Workload {
   if (raw === 'command') return 'command';
   return 'scenario';
@@ -107,6 +132,23 @@ export function RunWizard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Любой явный query-param = намерение deep-link → черновик игнорируется (свежий
+  // вход через bulk-run/ссылку начинает заново). Без query-params восстанавливаем
+  // сохранённый черновик (навигация away/back между шагами).
+  const hasQueryIntent = useMemo(
+    () =>
+      ['workload', 'service', 'scenario', 'incarnation', 'module', 'cmd', 'target_coven', 'target_regex', 'target_sids'].some(
+        (k) => searchParams.has(k),
+      ),
+    [searchParams],
+  );
+  const draft = useMemo<WizardDraft | null>(
+    () => (hasQueryIntent ? null : loadDraft()),
+    // читаем один раз на mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const initialWorkload = pickWorkloadFromQuery(searchParams.get('workload'));
   const initialService = searchParams.get('service') ?? '';
@@ -130,41 +172,58 @@ export function RunWizard() {
     [initialCriteria],
   );
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [workload, setWorkload] = useState<Workload>(initialWorkload);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(draft?.step ?? 1);
+  const [workload, setWorkload] = useState<Workload>(draft?.workload ?? initialWorkload);
 
-  const [scenarioState, setScenarioState] = useState<ScenarioStateValues>({
-    service: initialService,
-    scenario: initialScenario,
-    incarnations: initialIncarnation ? [initialIncarnation] : [],
-    fields: {},
-    inputObj: {},
-  });
-
-  const [commandState, setCommandState] = useState<CommandStateValues>({
-    moduleKind: pickInitialCommandModule(initialModuleParam),
-    customModule:
-      initialModuleParam && initialModuleParam !== 'core.cmd.shell' && initialModuleParam !== 'core.exec.run'
-        ? initialModuleParam
-        : '',
-    cmd: initialCmd,
-    timeoutSeconds: 30,
-    customInput: {},
-  });
-
-  const [hostCriteria, setHostCriteria] = useState<HostCriteria>(
-    hasCriteriaFromQuery ? initialCriteria : EMPTY_HOST_CRITERIA,
+  const [scenarioState, setScenarioState] = useState<ScenarioStateValues>(
+    draft?.scenarioState ?? {
+      service: initialService,
+      scenario: initialScenario,
+      incarnations: initialIncarnation ? [initialIncarnation] : [],
+      fields: {},
+      inputObj: {},
+    },
   );
 
-  const [options, setOptions] = useState<OptionsState>({
-    waveSize: '',
-    concurrency: '50',
-    onFailure: 'abort',
-    dryRun: false,
-    wait: false,
-  });
+  const [commandState, setCommandState] = useState<CommandStateValues>(
+    draft?.commandState ?? {
+      moduleKind: pickInitialCommandModule(initialModuleParam),
+      customModule:
+        initialModuleParam && initialModuleParam !== 'core.cmd.shell' && initialModuleParam !== 'core.exec.run'
+          ? initialModuleParam
+          : '',
+      cmd: initialCmd,
+      timeoutSeconds: 30,
+      customInput: {},
+    },
+  );
+
+  const [hostCriteria, setHostCriteria] = useState<HostCriteria>(
+    draft?.hostCriteria ?? (hasCriteriaFromQuery ? initialCriteria : EMPTY_HOST_CRITERIA),
+  );
+
+  const [options, setOptions] = useState<OptionsState>(
+    draft?.options ?? {
+      waveSize: '',
+      concurrency: '50',
+      onFailure: 'abort',
+      dryRun: false,
+      wait: false,
+    },
+  );
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Persist черновика на каждое изменение wizard-state. sessionStorage —
+  // переживает навигацию внутри вкладки браузера, чистится при закрытии вкладки.
+  useEffect(() => {
+    const payload: WizardDraft = { step, workload, scenarioState, commandState, hostCriteria, options };
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+    } catch {
+      // sessionStorage недоступен (private-mode/quota) — persist опционален, не падаем.
+    }
+  }, [step, workload, scenarioState, commandState, hostCriteria, options]);
 
   function goNext() {
     setStep((s) => (s < 4 ? ((s + 1) as 2 | 3 | 4) : s));
@@ -275,14 +334,20 @@ export function RunWizard() {
     return hasAnyCriteria(hostCriteria) && resolvedSids.length > 0;
   }, [workload, scenarioState, hostCriteria, resolvedSids]);
 
+  // Пустые required-поля typed input_schema сценария (зеркалит backend 422).
+  const scenarioMissingRequired = useMemo(
+    () => (workload === 'scenario' && usePerField ? missingRequiredFields(inputSchema, scenarioState.fields) : []),
+    [workload, usePerField, inputSchema, scenarioState.fields],
+  );
+
   const canAdvanceFromStep3 = useMemo(() => {
     if (workload === 'scenario') {
-      return scenarioState.incarnations.length > 0;
+      return scenarioState.incarnations.length > 0 && scenarioMissingRequired.length === 0;
     }
     // command: Step3 — module+params.
     if (commandState.moduleKind === 'custom') return commandState.customModule.trim().length > 0;
     return commandState.cmd.trim().length > 0;
-  }, [workload, scenarioState.incarnations, commandState]);
+  }, [workload, scenarioState.incarnations, scenarioMissingRequired, commandState]);
 
   // --- Submit ---
   const submitMu = useMutation({
@@ -298,6 +363,11 @@ export function RunWizard() {
       );
     },
     onSuccess: (redirect) => {
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
       navigate(redirect);
     },
   });
@@ -412,6 +482,7 @@ export function RunWizard() {
             usePerField={usePerField}
             inputSchema={inputSchema}
             selectedScenarioMeta={selectedScenarioMeta}
+            missingRequired={scenarioMissingRequired}
           />
         ) : null}
         {step === 3 && workload === 'command' ? (
@@ -604,6 +675,7 @@ function Step3ScenarioIncarnations({
   usePerField,
   inputSchema,
   selectedScenarioMeta,
+  missingRequired,
 }: {
   value: ScenarioStateValues;
   onChange: (next: ScenarioStateValues) => void;
@@ -613,14 +685,18 @@ function Step3ScenarioIncarnations({
   usePerField: boolean;
   inputSchema: ScenarioInputSchema | undefined;
   selectedScenarioMeta: ServiceScenarioInfo | undefined;
+  missingRequired: string[];
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState('');
 
-  // Перезаливаем fields-state при смене supported schema.
+  // Сидируем defaults при смене supported schema, но НЕ затираем уже введённые/
+  // восстановленные из черновика значения (иначе re-mount шага сбрасывал бы input).
   useEffect(() => {
     if (usePerField && inputSchema) {
-      onChange({ ...value, fields: defaultsFromSchema(inputSchema) });
+      if (Object.keys(value.fields).length === 0) {
+        onChange({ ...value, fields: defaultsFromSchema(inputSchema) });
+      }
     } else if (Object.keys(value.fields).length > 0) {
       onChange({ ...value, fields: {} });
     }
@@ -734,6 +810,7 @@ function Step3ScenarioIncarnations({
             schema={inputSchema}
             value={value.fields}
             onChange={(next) => onChange({ ...value, fields: next })}
+            showErrors={missingRequired.length > 0}
           />
           {selectedScenarioMeta?.description ? (
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>

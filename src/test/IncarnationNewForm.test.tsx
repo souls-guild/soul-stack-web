@@ -82,6 +82,54 @@ describe('IncarnationNewForm', () => {
     expect(screen.queryByLabelText('Scenario create input fields')).not.toBeInTheDocument();
   });
 
+  it('create-input: пустое required-поле блокирует submit + inline-ошибка', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create',
+              path: 'scenario/create/main.yml',
+              description: 'init redis',
+              input_schema: { maxmemory: { type: 'string', required: true, description: 'memory cap' } },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+    await screen.findByTestId('create-input-fields');
+
+    // Submit disabled пока required maxmemory пуст.
+    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    expect(submitBtn).toBeDisabled();
+
+    // Заполняем required → submit разблокирован.
+    const field = screen.getByText(/^maxmemory \*?$/).parentElement?.querySelector('input') as HTMLInputElement;
+    await user.type(field, '512mb');
+    expect(submitBtn).not.toBeDisabled();
+  });
+
   it('POST /v1/incarnations отправляется с типизированным body', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
