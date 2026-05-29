@@ -144,6 +144,76 @@ describe('IncarnationDetail', () => {
     expect(filtered.every((t) => !t.includes('gamma'))).toBe(true);
   });
 
+  it('Trash2 на declared-host открывает RemoveHostModal, PATCH уходит только после подтверждения', async () => {
+    let patchCount = 0;
+    let lastUrl = '';
+    let lastBody: unknown = null;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'PATCH') {
+        patchCount += 1;
+        lastUrl = url;
+        lastBody = init?.body ? JSON.parse(init.body as string) : null;
+        return new Response(JSON.stringify({ name: 'redis-prod' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/v1/souls')) {
+        return new Response(JSON.stringify({ items: [], offset: 0, limit: 200, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          name: 'redis-prod',
+          service: 'redis',
+          service_version: 'v2.0.0',
+          state_schema_version: 3,
+          covens: ['prod'],
+          spec: { hosts: [{ sid: 'agent-04.local', role: 'master' }] },
+          state: {},
+          status: 'ready',
+          created_by_aid: 'archon-alice',
+          created_at: '2026-05-20T10:00:00Z',
+          updated_at: '2026-05-25T12:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/redis-prod',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'redis-prod' })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Hosts/i }));
+
+    // Клик по Trash2 — открывает модалку, PATCH ещё не уходит.
+    await user.click(screen.getByRole('button', { name: /Remove host agent-04.local/i }));
+    expect(screen.getByTestId('remove-host-warning')).toBeInTheDocument();
+    expect(patchCount).toBe(0);
+
+    // Подтверждение чекбоксом → confirm.
+    await user.click(screen.getByLabelText('Подтвердить удаление хоста'));
+    await user.click(screen.getByTestId('remove-host-confirm'));
+
+    await waitFor(() => {
+      expect(patchCount).toBe(1);
+    });
+    expect(lastUrl).toMatch(/\/v1\/incarnations\/redis-prod\/hosts/);
+    expect(lastBody).toEqual({ mode: 'remove', hosts: [{ sid: 'agent-04.local' }] });
+  });
+
   it('Overview summary-карточка кликает на Hosts tab и показывает per-host runtime data', async () => {
     installFetchMock([
       {

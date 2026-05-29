@@ -12,6 +12,7 @@
   "deregisterServiceTitle": "Deregister service: {{name}}",
   "destroyTitle": "Destroy: {{name}}",
   "displayNameHint": "Человекочитаемое имя для отображения в UI",
+  "removeHostTitle": "Remove host: {{sid}}",
   "editPermissionsTitle": "Permissions: {{name}}",
   "editServiceTitle": "Edit service: {{name}}",
   "hideRevoked": "Hide revoked",

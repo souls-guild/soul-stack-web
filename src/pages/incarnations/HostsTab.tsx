@@ -9,6 +9,7 @@ import { keeperApi, type SoulListEntry } from '../../api/keeper';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { AddHostModal } from './AddHostModal';
+import { RemoveHostModal } from './RemoveHostModal';
 import styles from '../common.module.css';
 
 // Hosts-вкладка для IncarnationDetail.
@@ -83,6 +84,8 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
   const declared = extractDeclaredHosts(spec);
   const runtimeHosts = extractRuntimeHosts(state);
   const [addOpen, setAddOpen] = useState(false);
+  // sid выбранного к удалению хоста; null → модалка подтверждения закрыта.
+  const [removeSid, setRemoveSid] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   // Editing spec.hosts недоступно при сносе — backend вернёт 409. Прячем UI заранее.
@@ -105,6 +108,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
       }),
     onSuccess: () => {
       setRemoveError(null);
+      setRemoveSid(null);
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
       qc.invalidateQueries({ queryKey: ['incarnation-souls', incarnationName] });
     },
@@ -145,8 +149,6 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         {t('incarnations:declaredHostsDesc')}
       </p>
 
-      {removeError ? <div className={styles.errorBox}>{removeError}</div> : null}
-
       {declared === null || declared.length === 0 ? (
         <div className={styles.empty}>
           {t('incarnations:specHostsNotSet')} {t('incarnations:addHostHint')}
@@ -174,8 +176,10 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => removeMu.mutate(h.sid)}
-                      disabled={removeMu.isPending && removeMu.variables === h.sid}
+                      onClick={() => {
+                        setRemoveError(null);
+                        setRemoveSid(h.sid);
+                      }}
                       aria-label={`Remove host ${h.sid}`}
                       title={t('pages:removeFromDeclared')}
                     >
@@ -194,6 +198,18 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         incarnationName={incarnationName}
         existingSids={declaredSids}
         onClose={() => setAddOpen(false)}
+      />
+
+      <RemoveHostModal
+        sid={removeSid}
+        incarnationName={incarnationName}
+        pending={removeMu.isPending}
+        error={removeError}
+        onClose={() => {
+          setRemoveSid(null);
+          setRemoveError(null);
+        }}
+        onConfirm={(sid) => removeMu.mutate(sid)}
       />
 
       <div
