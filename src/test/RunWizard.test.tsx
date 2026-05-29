@@ -213,7 +213,7 @@ describe('RunWizard', () => {
     expect(screen.queryByLabelText('Push destiny')).not.toBeInTheDocument();
   });
 
-  it('Scenario: service → scenario → multi-select incarnations → submit', async () => {
+  it('Scenario: service → scenario → пустая regex (все incarnations) → submit', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -225,10 +225,11 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    // Step 2 → 3 (incarnations).
+    // Step 2 → 3. Regex пуст → совпадают ВСЕ incarnations (read-only список).
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     // Step 3 → 4 → submit.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -239,8 +240,8 @@ describe('RunWizard', () => {
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({});
   });
 
-  it('Scenario multi-incarnation fan-out: POST на каждую incarnation, redirect /incarnations', async () => {
-    const stub = setupFetchStub({ incarnationNames: ['redis-a', 'redis-b'] });
+  it('Scenario regex-фильтр: совпавшее подмножество → fan-out по совпавшим', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-a', 'redis-b', 'pg-1'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
@@ -251,9 +252,14 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-a')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-a'));
-    await user.click(screen.getByLabelText('redis-b'));
+    // regex ^redis- → только redis-a / redis-b (pg-1 не совпадает).
+    await user.type(screen.getByLabelText('Incarnation regex'), '^redis-');
+    await waitFor(() => {
+      const list = screen.getByLabelText('Matched incarnations').textContent ?? '';
+      expect(list).toContain('redis-a');
+      expect(list).toContain('redis-b');
+      expect(list).not.toContain('pg-1');
+    });
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
@@ -263,6 +269,28 @@ describe('RunWizard', () => {
     expect(scenarioPosts).toHaveLength(2);
     expect(scenarioPosts.map((p) => p.url).some((u) => /redis-a\/scenarios\/restart$/.test(u))).toBe(true);
     expect(scenarioPosts.map((p) => p.url).some((u) => /redis-b\/scenarios\/restart$/.test(u))).toBe(true);
+    expect(scenarioPosts.map((p) => p.url).some((u) => /pg-1\/scenarios\//.test(u))).toBe(false);
+  });
+
+  it('Scenario невалидная regex → 0 совпадений, submit заблокирован', async () => {
+    setupFetchStub({ incarnationNames: ['redis-a'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Незакрытая группа — невалидная regex.
+    await user.type(screen.getByLabelText('Incarnation regex'), '(redis');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toMatch(/нет совпадений/),
+    );
+    // 0 совпадений → «Далее» disabled (нет incarnations для fan-out).
+    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
   });
 
   it('Scenario per-field input доходит до submit-body.input', async () => {
@@ -286,10 +314,11 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
-    // Step 2 → 3 (incarnations + input).
+    // Step 2 → 3 (incarnations + input). Пустая regex → совпадает hello-prod.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('hello-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('hello-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('hello-prod'),
+    );
 
     const greetingLabel = await screen.findByText(/^greeting \*?$/);
     const greetingField = greetingLabel.parentElement?.querySelector('input') as HTMLInputElement;
@@ -319,8 +348,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     await waitFor(() => expect(screen.getByLabelText('Scenario input fields')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /Add first field/i }));
@@ -332,6 +362,85 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({ shard: 'primary' });
+  });
+
+  it('Scenario смешанная schema (simple + array): типизированные поля, не raw-JSON fallback', async () => {
+    // Регрессия: раньше один составной тип (array/object) ронял ВСЮ форму в
+    // DynamicInputBuilder, пряча простые типизированные поля. Теперь — per-field.
+    const stub = setupFetchStub({
+      serviceName: 'redis',
+      incarnationNames: ['redis-prod'],
+      scenarios: [
+        {
+          name: 'add_replicas',
+          description: 'scale',
+          input_schema: {
+            redis_maxmemory: { type: 'string', description: 'mem', default: '256mb' },
+            replicas: { type: 'array', required: true, description: 'new replica SIDs' },
+          },
+        },
+      ],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /add_replicas/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'add_replicas');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    // Простое поле — типизированный input (НЕ raw-JSON-textarea формы).
+    await waitFor(() => expect(screen.getByText(/^redis_maxmemory$/)).toBeInTheDocument());
+    // Составное поле — per-field JSON-textarea.
+    const composite = screen.getByTestId('field-composite-replicas') as HTMLTextAreaElement;
+    expect(composite).toBeInTheDocument();
+    // НЕ деградировали в общий DynamicInputBuilder.
+    expect(screen.queryByLabelText('Scenario input fields')).not.toBeInTheDocument();
+
+    // Невалидный JSON в составном поле → submit заблокирован + inline-ошибка.
+    fireEvent.change(composite, { target: { value: '[broken' } });
+    await waitFor(() => expect(screen.getByTestId('field-json-error-replicas')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+
+    // Валидный JSON-массив → разблокировка; значение доходит до submit.input.
+    fireEvent.change(composite, { target: { value: '["r1.example.com","r2.example.com"]' } });
+    await waitFor(() => expect(screen.queryByTestId('field-json-error-replicas')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+
+    expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({
+      redis_maxmemory: '256mb',
+      replicas: ['r1.example.com', 'r2.example.com'],
+    });
+  });
+
+  it('Stepper: прыжок вперёд на невалидный шаг заблокирован (не красит done)', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // На Step 1 шаги 2/3/4 ещё недостижимы (scenario не выбран) → их кнопки disabled.
+    const stepButtons = screen.getByLabelText('Wizard steps').querySelectorAll('button');
+    // [0]=Step1 (текущий), [1]=Step2, [2]=Step3, [3]=Step4.
+    expect(stepButtons[3]).toBeDisabled();
+    expect(stepButtons[2]).toBeDisabled();
+
+    // Клик по «4» не переводит на Step 4 (остаёмся на Step 1).
+    await user.click(stepButtons[3]);
+    expect(screen.getByLabelText('Scenario apply')).toBeInTheDocument();
+    // Ни один шаг не помечен done (stepDone) — белым ничего не подсветилось.
+    const doneCount = Array.from(screen.getByLabelText('Wizard steps').querySelectorAll('button')).filter(
+      (b) => /stepDone/.test(b.className),
+    ).length;
+    expect(doneCount).toBe(0);
   });
 
   it('Command: host-selector резолвит coven-критерий → sids в POST /v1/errand-runs', async () => {
@@ -550,8 +659,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('hello-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('hello-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('hello-prod'),
+    );
 
     // required greeting пустой → inline-ошибка + кнопка Далее disabled.
     await waitFor(() => expect(screen.getByTestId('field-required-greeting')).toBeInTheDocument());
@@ -577,8 +687,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     // Step 3 → 4. По умолчанию — Classic; submit без wave недоступен в Tide.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -625,8 +736,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     // Classic выбран по умолчанию — поля Tide скрыты.
@@ -651,8 +763,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     // Classic-режим: dry-run чекбокс доступен.
@@ -675,8 +788,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
@@ -697,8 +811,9 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    await user.click(screen.getByLabelText('redis-prod'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     // Classic — чекбокс есть; включаем его, затем уходим в Tide.
@@ -743,13 +858,15 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
   });
 
-  it('Stale-черновик с incarnations=null → массив страхуется, без краша на .length', async () => {
+  it('Stale-черновик прошлой версии (v отличается) → отбрасывается, дефолты без краша', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
-    // Версия совпадает, но массивное поле пришло не-массивом (повреждённый/старый
-    // payload). asArray-страховка должна вернуть [] вместо null.
+    // Прошлая версия формы (v=2, scenarioState без incarnationRegex). loadDraft
+    // отбрасывает по несовпадению версии → визард стартует с дефолтов, без краша.
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
@@ -764,22 +881,22 @@ describe('RunWizard', () => {
     );
 
     renderWizardWithRoutes();
-    // Визард на Step 3 (восстановлен step) без краша на scenarioState.incarnations.length.
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    expect(screen.getByLabelText('redis-prod')).not.toBeChecked();
+    // Версия не совпала → стартуем на Step 1 с дефолтным workload=scenario.
+    expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (с v) → state восстанавливается', async () => {
+  it('Валидный свежий черновик (v=3, incarnationRegex) → state восстанавливается', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 2,
+        v: 3,
         step: 3,
         workload: 'scenario',
         scenarioState: {
           service: 'redis',
           scenario: 'restart',
+          incarnationRegex: '^redis-prod$',
           incarnations: ['redis-prod'],
           fields: {},
           inputObj: {},
@@ -811,10 +928,13 @@ describe('RunWizard', () => {
     );
 
     renderWizardWithRoutes();
-    // Восстановлен на Step 3, выбор incarnation сохранён (redis-prod checked).
-    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
-    expect(screen.getByLabelText('redis-prod')).toBeChecked();
-    expect(screen.getByLabelText('redis-staging')).not.toBeChecked();
+    // Восстановлен на Step 3; regex сохранён → матчится только redis-prod (не staging).
+    expect((screen.getByLabelText('Incarnation regex') as HTMLInputElement).value).toBe('^redis-prod$');
+    await waitFor(() => {
+      const list = screen.getByLabelText('Matched incarnations').textContent ?? '';
+      expect(list).toContain('redis-prod');
+      expect(list).not.toContain('redis-staging');
+    });
   });
 
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {

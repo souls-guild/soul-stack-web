@@ -1,6 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import type { ScenarioInputSchema, ScenarioInputSchemaProperty } from '../../api/keeper';
-import type { ScenarioFieldValue, ScenarioFieldsState } from './scenarioInputFields.helpers';
+import {
+  isCompositeType,
+  type ScenarioFieldValue,
+  type ScenarioFieldsState,
+} from './scenarioInputFields.helpers';
 
 interface Props {
   schema: ScenarioInputSchema;
@@ -20,7 +24,8 @@ export function ScenarioInputFields({ schema, value, onChange, showErrors = fals
       {entries.map(([key, prop]) => {
         const required = Boolean(prop.required) && prop.type !== 'boolean';
         const v = value[key];
-        const missing = showErrors && required && (v === undefined || v === '');
+        const empty = v === undefined || (typeof v === 'string' && v.trim() === '');
+        const missing = showErrors && required && empty;
         return (
           <ScenarioInputOneField
             key={key}
@@ -65,6 +70,38 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
       {t('forms:required')}
     </span>
   ) : null;
+  // Составной тип (array/object): per-field JSON-textarea. Значение хранится
+  // raw-строкой; невалидный JSON подсвечивается inline (submit блокируется
+  // caller-ом через invalidCompositeFields).
+  if (isCompositeType(prop)) {
+    const raw = value === undefined ? '' : String(value);
+    const jsonError = raw.trim() !== '' && !isParsableJson(raw);
+    return (
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {labelText} <span style={{ color: 'var(--text-faint)' }}>({prop.type})</span>
+        </span>
+        <textarea
+          data-testid={`field-composite-${name}`}
+          rows={4}
+          value={raw}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={prop.type === 'array' ? '[]' : '{}'}
+          spellCheck={false}
+          style={{ ...baseStyle, border: `1px solid ${missing || jsonError ? 'var(--danger)' : 'var(--border)'}` }}
+        />
+        {prop.description ? (
+          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        ) : null}
+        {jsonError ? (
+          <span data-testid={`field-json-error-${name}`} style={{ color: 'var(--danger)', fontSize: 12 }}>
+            {t('run:scenarioInputJsonError')}
+          </span>
+        ) : null}
+        {missingMsg}
+      </label>
+    );
+  }
   if (prop.type === 'boolean') {
     return (
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -143,4 +180,13 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
       {missingMsg}
     </label>
   );
+}
+
+function isParsableJson(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
 }

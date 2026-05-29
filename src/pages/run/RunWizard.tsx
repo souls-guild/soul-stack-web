@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
@@ -21,6 +21,7 @@ import { runnableScenarios } from '../incarnations/reservedScenarios';
 import { ScenarioInputFields } from '../incarnations/ScenarioInputFields';
 import {
   defaultsFromSchema,
+  invalidCompositeFields,
   isSupportedInputSchema,
   missingRequiredFields,
   serializeFields,
@@ -67,7 +68,12 @@ const WORKLOADS: Array<{ kind: Workload; title: string; descKey: string; icon: t
 interface ScenarioStateValues {
   service: string;
   scenario: string;
-  // Множественный выбор incarnations для fan-out.
+  // Regex по имени incarnation — источник истины множества для fan-out. Список
+  // совпавших показывается read-only; сценарий запускается на ВСЕХ совпавших.
+  incarnationRegex: string;
+  // Производное от incarnationRegex множество имён (резолвится в Step3 при наличии
+  // загруженного списка incarnations). Хранится в state, чтобы submit и валидация
+  // не зависели от смонтированности шага.
   incarnations: string[];
   fields: ScenarioFieldsState;
   // Используется только когда scenario без typed input_schema — DynamicInputBuilder.
@@ -133,7 +139,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 2;
+const DRAFT_VERSION = 3;
 
 interface WizardDraft {
   v: number;
@@ -152,6 +158,7 @@ interface WizardDraft {
 const DEFAULT_SCENARIO_STATE: ScenarioStateValues = {
   service: '',
   scenario: '',
+  incarnationRegex: '',
   incarnations: [],
   fields: {},
   inputObj: {},
@@ -279,6 +286,8 @@ export function RunWizard() {
       ...DEFAULT_SCENARIO_STATE,
       service: initialService,
       scenario: initialScenario,
+      // Deep-link на конкретную incarnation → anchored-exact regex (фан-аут на неё одну).
+      incarnationRegex: initialIncarnation ? `^${escapeRegex(initialIncarnation)}$` : '',
       incarnations: initialIncarnation ? [initialIncarnation] : [],
     };
   });
@@ -449,6 +458,12 @@ export function RunWizard() {
     [workload, usePerField, inputSchema, scenarioState.fields],
   );
 
+  // Составные поля (array/object) с непарсимым JSON — блокируют submit/«Далее».
+  const scenarioInvalidComposite = useMemo(
+    () => (workload === 'scenario' && usePerField ? invalidCompositeFields(inputSchema, scenarioState.fields) : []),
+    [workload, usePerField, inputSchema, scenarioState.fields],
+  );
+
   // Пустые required params типизированной формы (модули с params[]).
   const commandMissingRequired = useMemo(() => {
     if (workload !== 'command' || !hasParams(commandState.moduleParams)) return [];
@@ -457,7 +472,11 @@ export function RunWizard() {
 
   const canAdvanceFromStep3 = useMemo(() => {
     if (workload === 'scenario') {
-      return scenarioState.incarnations.length > 0 && scenarioMissingRequired.length === 0;
+      return (
+        scenarioState.incarnations.length > 0 &&
+        scenarioMissingRequired.length === 0 &&
+        scenarioInvalidComposite.length === 0
+      );
     }
     // command: Step3 — module+params.
     // Free-text fallback (каталог недоступен): нужно имя модуля.
@@ -469,7 +488,14 @@ export function RunWizard() {
     // Прочие модули без формализованных params (free-text fallback или core
     // без cmd-поля) — имени достаточно.
     return true;
-  }, [workload, scenarioState.incarnations, scenarioMissingRequired, commandState, commandMissingRequired]);
+  }, [
+    workload,
+    scenarioState.incarnations,
+    scenarioMissingRequired,
+    scenarioInvalidComposite,
+    commandState,
+    commandMissingRequired,
+  ]);
 
   // --- Submit ---
   const submitMu = useMutation({
@@ -589,6 +615,16 @@ export function RunWizard() {
 
   const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && tideValid && !submitMu.isPending;
 
+  // Самый дальний достижимый шаг по валидации (gate каждого шага). Stepper красит
+  // «done» только реально пройденные шаги и запрещает прыжок вперёд за невалидный
+  // шаг — раньше клик по номеру «4» красил все предыдущие done (белым), даже если
+  // их данные не введены.
+  const maxReachableStep = useMemo<1 | 2 | 3 | 4>(() => {
+    if (!canAdvanceFromStep2) return 2;
+    if (!canAdvanceFromStep3) return 3;
+    return 4;
+  }, [canAdvanceFromStep2, canAdvanceFromStep3]);
+
   return (
     <div className={pageStyles.page}>
       <div className={pageStyles.header}>
@@ -601,7 +637,12 @@ export function RunWizard() {
         </div>
       </div>
 
-      <Stepper step={step} workload={workload} onJump={(s) => setStep(s)} />
+      <Stepper
+        step={step}
+        workload={workload}
+        maxReachableStep={maxReachableStep}
+        onJump={(s) => setStep(s)}
+      />
 
       <div className={styles.body}>
         {step === 1 ? <Step1 value={workload} onChange={setWorkload} /> : null}
@@ -631,6 +672,7 @@ export function RunWizard() {
             inputSchema={inputSchema}
             selectedScenarioMeta={selectedScenarioMeta}
             missingRequired={scenarioMissingRequired}
+            invalidComposite={scenarioInvalidComposite}
           />
         ) : null}
         {step === 3 && workload === 'command' ? (
@@ -682,10 +724,15 @@ export function RunWizard() {
 function Stepper({
   step,
   workload,
+  maxReachableStep,
   onJump,
 }: {
   step: 1 | 2 | 3 | 4;
   workload: Workload;
+  // Самый дальний шаг, докуда дошла валидация. Шаг считается «done» (пройден),
+  // только если он позади и его gate реально пройден; прыжок вперёд за этот
+  // предел запрещён.
+  maxReachableStep: 1 | 2 | 3 | 4;
   onJump: (s: 1 | 2 | 3 | 4) => void;
 }) {
   const { t } = useTranslation();
@@ -699,14 +746,18 @@ function Stepper({
     <ol className={styles.steps} aria-label="Wizard steps">
       {STEPS.map((s) => {
         const active = s.id === step;
-        const done = s.id < step;
+        // «done» = позади текущего И валидация дошла дальше него (gate пройден).
+        const done = s.id < step && s.id < maxReachableStep;
+        // Доступен клик: текущий, любой пройденный/назад, или следующий достижимый.
+        const reachable = s.id <= Math.max(step, maxReachableStep);
         const cls = `${styles.step} ${active ? styles.stepActive : ''} ${done ? styles.stepDone : ''}`;
         return (
           <li key={s.id}>
             <button
               type="button"
               className={cls.trim()}
-              onClick={() => onJump(s.id)}
+              onClick={() => reachable && onJump(s.id)}
+              disabled={!reachable}
               aria-current={active ? 'step' : undefined}
             >
               <span className={styles.stepNum}>{s.id}.</span>
@@ -777,7 +828,9 @@ function Step2ScenarioSelect({
         <select
           className={styles.field}
           value={value.service}
-          onChange={(e) => onChange({ ...value, service: e.target.value, scenario: '', incarnations: [] })}
+          onChange={(e) =>
+            onChange({ ...value, service: e.target.value, scenario: '', incarnationRegex: '', incarnations: [] })
+          }
         >
           <option value="">{t('run:selectServicePlaceholder')}</option>
           {(servicesQ.data?.items ?? []).map((s) => (
@@ -816,8 +869,10 @@ function Step2ScenarioSelect({
   );
 }
 
-// Step 3 Scenario: multi-select incarnations (regex-фильтр + host-count preview) +
-// input-параметры сценария.
+// Step 3 Scenario: regex по имени incarnation → read-only список совпавших
+// (фан-аут на ВСЕ совпавшие) + input-параметры сценария. Выбора (чекбоксов) нет:
+// множество задаётся одной regex (концепция «scenario = запуск на N инкарнаций,
+// выбранных regex»).
 function Step3ScenarioIncarnations({
   value,
   onChange,
@@ -828,9 +883,13 @@ function Step3ScenarioIncarnations({
   inputSchema,
   selectedScenarioMeta,
   missingRequired,
+  invalidComposite,
 }: {
   value: ScenarioStateValues;
-  onChange: (next: ScenarioStateValues) => void;
+  // Dispatch (а не plain-callback): два derived-эффекта ниже (defaults-seed и
+  // matched-sync) используют функциональный апдейт, иначе их onced-closure `value`
+  // затирал бы изменения друг друга (race между эффектами на одном рендере).
+  onChange: Dispatch<SetStateAction<ScenarioStateValues>>;
   incarnationsLoading: boolean;
   incarnationNames: string[];
   hostCountByIncarnation: Record<string, number> | undefined;
@@ -838,50 +897,53 @@ function Step3ScenarioIncarnations({
   inputSchema: ScenarioInputSchema | undefined;
   selectedScenarioMeta: ServiceScenarioInfo | undefined;
   missingRequired: string[];
+  invalidComposite: string[];
 }) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState('');
 
   // Сидируем defaults при смене supported schema, но НЕ затираем уже введённые/
   // восстановленные из черновика значения (иначе re-mount шага сбрасывал бы input).
   useEffect(() => {
     if (usePerField && inputSchema) {
-      if (Object.keys(value.fields).length === 0) {
-        onChange({ ...value, fields: defaultsFromSchema(inputSchema) });
-      }
-    } else if (Object.keys(value.fields).length > 0) {
-      onChange({ ...value, fields: {} });
+      onChange((prev) =>
+        Object.keys(prev.fields).length === 0 ? { ...prev, fields: defaultsFromSchema(inputSchema) } : prev,
+      );
+    } else {
+      onChange((prev) => (Object.keys(prev.fields).length > 0 ? { ...prev, fields: {} } : prev));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usePerField, inputSchema]);
 
+  // Компиляция regex. Пустая regex → совпадают ВСЕ incarnations сервиса
+  // (явный «запуск на всём сервисе»). Невалидная regex → 0 совпадений, подсказка.
   const filterRe = useMemo(() => {
-    const r = filter.trim();
-    if (!r) return { re: null as RegExp | null, error: null as string | null };
+    const r = value.incarnationRegex.trim();
+    if (!r) return { re: null as RegExp | null, error: null as string | null, empty: true };
     try {
-      return { re: new RegExp(r), error: null };
+      return { re: new RegExp(r), error: null as string | null, empty: false };
     } catch (err) {
-      return { re: null, error: err instanceof Error ? err.message : String(err) };
+      return { re: null, error: err instanceof Error ? err.message : String(err), empty: false };
     }
-  }, [filter]);
+  }, [value.incarnationRegex]);
 
   const matched = useMemo(() => {
-    if (!filterRe.re) return incarnationNames;
+    if (filterRe.error) return [];
+    if (filterRe.empty) return incarnationNames;
     return incarnationNames.filter((n) => filterRe.re!.test(n));
-  }, [incarnationNames, filterRe.re]);
+  }, [incarnationNames, filterRe]);
 
-  const selected = new Set(value.incarnations);
-  function toggle(name: string) {
-    const next = new Set(selected);
-    if (next.has(name)) next.delete(name);
-    else next.add(name);
-    onChange({ ...value, incarnations: Array.from(next) });
-  }
+  // Множество для fan-out — производное от regex; синхронизируем в state, чтобы
+  // submit/валидация видели актуальный список независимо от рендера шага.
+  const matchedKey = matched.join('\n');
+  useEffect(() => {
+    onChange((prev) => (matchedKey === prev.incarnations.join('\n') ? prev : { ...prev, incarnations: matched }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedKey]);
 
   const totalHosts = useMemo(() => {
     if (!hostCountByIncarnation) return undefined;
-    return value.incarnations.reduce((acc, n) => acc + (hostCountByIncarnation[n] ?? 0), 0);
-  }, [hostCountByIncarnation, value.incarnations]);
+    return matched.reduce((acc, n) => acc + (hostCountByIncarnation[n] ?? 0), 0);
+  }, [hostCountByIncarnation, matched]);
 
   return (
     <>
@@ -890,17 +952,18 @@ function Step3ScenarioIncarnations({
         <input
           type="text"
           className={styles.field}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          value={value.incarnationRegex}
+          onChange={(e) => onChange({ ...value, incarnationRegex: e.target.value })}
           placeholder={t('run:incarnationRegexPlaceholder')}
           aria-label="Incarnation regex"
         />
-        {filterRe.error ? <span className={styles.warn}>{filterRe.error}</span> : null}
+        <span className={styles.hint}>{t('run:incarnationRegexHint')}</span>
+        {filterRe.error ? <span className={styles.warn}>{t('run:incarnationRegexInvalid')}</span> : null}
       </label>
 
       <div>
         <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-          {t('run:incarnationSelectedOf', { selected: value.incarnations.length, total: incarnationNames.length })}
+          {t('run:incarnationMatchedOf', { matched: matched.length, total: incarnationNames.length })}
         </div>
         <div
           style={{
@@ -911,16 +974,21 @@ function Step3ScenarioIncarnations({
             padding: 8,
             background: 'var(--surface)',
           }}
-          role="listbox"
-          aria-label="Incarnations"
+          role="list"
+          aria-label="Matched incarnations"
         >
           {incarnationsLoading ? <div className={pageStyles.loading}>{t('loading')}</div> : null}
+          {!incarnationsLoading && matched.length === 0 ? (
+            <div style={{ color: 'var(--text-faint)', fontSize: 12.5 }}>
+              {t('run:incarnationNoMatch')}
+            </div>
+          ) : null}
           {matched.map((name) => {
-            const checked = selected.has(name);
             const count = hostCountByIncarnation?.[name];
             return (
-              <label
+              <div
                 key={name}
+                role="listitem"
                 style={{
                   display: 'flex',
                   gap: 8,
@@ -930,12 +998,11 @@ function Step3ScenarioIncarnations({
                   fontSize: 12.5,
                 }}
               >
-                <input type="checkbox" checked={checked} onChange={() => toggle(name)} aria-label={name} />
                 {name}
                 <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>
                   {count === undefined ? t('run:hostCountUnknown') : t('run:hostCount', { count })}
                 </span>
-              </label>
+              </div>
             );
           })}
         </div>
@@ -943,7 +1010,9 @@ function Step3ScenarioIncarnations({
 
       <div className={styles.preview} aria-label="Incarnation preview">
         <div>
-          {t('run:incarnationPreview', { count: value.incarnations.length })}
+          <Badge tone={matched.length > 0 ? 'info' : 'muted'}>
+            {t('run:incarnationRunOnN', { count: matched.length })}
+          </Badge>
           {totalHosts !== undefined ? (
             <>
               {' '}
@@ -962,7 +1031,7 @@ function Step3ScenarioIncarnations({
             schema={inputSchema}
             value={value.fields}
             onChange={(next) => onChange({ ...value, fields: next })}
-            showErrors={missingRequired.length > 0}
+            showErrors={missingRequired.length > 0 || invalidComposite.length > 0}
           />
           {selectedScenarioMeta?.description ? (
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
@@ -1448,6 +1517,10 @@ function buildTargetOverride(
   if (coven.length > 0) target.coven = coven;
   if (w) target.where = w;
   return target;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function parseIntOrEmpty(s: string): number | undefined {
