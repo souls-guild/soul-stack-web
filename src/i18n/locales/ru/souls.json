@@ -35,7 +35,7 @@
   "createSidError": "Невалидный SID: строчные буквы/цифры, точки, дефисы; начинается с буквы или цифры.",
   "createTransportAgentHint": "agent — Soul-демон подключается по mTLS gRPC stream. Выпускается bootstrap-токен.",
   "createTransportSshHint": "ssh — Keeper доставляет конфигурацию по SSH без агента. Токен не выпускается.",
-  "createCovensAria": "coven-метки (CSV)",
+  "createCovensAria": "coven-метки",
   "createSuccessTitle": "Soul зарегистрирован: {{sid}}",
   "createTokenWarn": "Токен отображается ОДИН РАЗ. Скопируйте сейчас и доставьте на хост безопасно. TTL до: {{expires}}",
   "createOnboardingHint": "Запустите soul с этим токеном → CSR → mTLS SoulSeed → статус pending→connected.",

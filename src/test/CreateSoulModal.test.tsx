@@ -17,7 +17,7 @@ describe('CreateSoulModal', () => {
 
     expect(screen.getByLabelText('SID нового хоста')).toBeInTheDocument();
     expect(screen.getByRole('combobox')).toBeInTheDocument(); // transport select
-    expect(screen.getByLabelText('coven-метки (CSV)')).toBeInTheDocument();
+    expect(screen.getByLabelText('coven-метки')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Зарегистрировать/i })).toBeInTheDocument();
   });
 
@@ -132,6 +132,70 @@ describe('CreateSoulModal', () => {
     });
     // токен не показывается
     expect(screen.queryByText(/Токен отображается ОДИН РАЗ/i)).not.toBeInTheDocument();
+  });
+
+  it('ввод двух covens через chips → submit body содержит covens: ["prod","blue"]', async () => {
+    const calls: { method: string; url: string; body?: unknown }[] = [];
+    installFetchMock([
+      {
+        method: 'POST',
+        url: '/v1/souls',
+        status: 201,
+        body: {
+          sid: 'host-chips.example.com',
+          transport: 'agent',
+          status: 'pending',
+          registered_at: '2026-05-29T10:00:00Z',
+          created_by_aid: 'archon-bootstrap',
+          bootstrap_token: 'tok-abc',
+          expires_at: '2026-05-30T10:00:00Z',
+        },
+      },
+    ]);
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (init?.body) {
+        try { calls.push({ method, url, body: JSON.parse(init.body as string) }); } catch { /* empty */ }
+      }
+      return originalFetch(input, init);
+    };
+
+    const user = userEvent.setup();
+    renderWithProviders(<CreateSoulModal open onClose={() => {}} />);
+
+    const sidInput = screen.getByLabelText('SID нового хоста');
+    await user.type(sidInput, 'host-chips.example.com');
+
+    // Вводим первый coven-чип: "prod" + Enter
+    const chipsBox = screen.getByLabelText('coven-метки');
+    const chipsInput = chipsBox.querySelector('input') as HTMLInputElement;
+    await user.click(chipsInput);
+    await user.type(chipsInput, 'prod');
+    await user.keyboard('{Enter}');
+
+    // Вводим второй coven-чип: "blue" + Enter
+    await user.type(chipsInput, 'blue');
+    await user.keyboard('{Enter}');
+
+    // Оба чипа отображаются
+    expect(screen.getByText('prod')).toBeInTheDocument();
+    expect(screen.getByText('blue')).toBeInTheDocument();
+
+    const registerBtn = screen.getByRole('button', { name: /Зарегистрировать/i });
+    await waitFor(() => expect(registerBtn).not.toBeDisabled());
+    await user.click(registerBtn);
+
+    await waitFor(() => {
+      expect(calls.some((c) => {
+        const b = c.body as { covens?: string[] };
+        return c.method === 'POST' && Array.isArray(b?.covens) && b.covens.includes('prod') && b.covens.includes('blue');
+      })).toBe(true);
+    });
+
+    globalThis.fetch = originalFetch;
   });
 
   it('409 conflict → human-readable ошибка', async () => {

@@ -35,7 +35,7 @@
   "createSidError": "Invalid SID: lowercase letters/digits, dots, hyphens; must start with a letter or digit.",
   "createTransportAgentHint": "agent — Soul daemon connects via mTLS gRPC stream. A bootstrap token is issued.",
   "createTransportSshHint": "ssh — Keeper delivers configuration over SSH without an agent. No token is issued.",
-  "createCovensAria": "coven labels (CSV)",
+  "createCovensAria": "coven labels",
   "createSuccessTitle": "Soul registered: {{sid}}",
   "createTokenWarn": "Token is shown ONCE. Copy it now and deliver to the host securely. TTL until: {{expires}}",
   "createOnboardingHint": "Run soul with this token → CSR → mTLS SoulSeed → status pending→connected.",

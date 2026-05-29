@@ -6,6 +6,7 @@ import { Button, Modal } from '../../components/primitives';
 import { keeperApi, type SoulCreateReply, type SoulTransport } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
+import { ChipsInput } from '../incarnations/ChipsInput';
 import styles from '../common.module.css';
 
 // SID: FQDN-like — строчные буквы/цифры, точки, дефисы. Не хардкодим валидацию
@@ -13,20 +14,6 @@ import styles from '../common.module.css';
 const SID_PATTERN = /^[a-z0-9][a-z0-9.-]{0,253}$/;
 
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
-
-function parseCovens(raw: string): { valid: string[]; invalid: string[] } {
-  const tokens = raw
-    .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0);
-  const valid: string[] = [];
-  const invalid: string[] = [];
-  for (const t of tokens) {
-    if (COVEN_PATTERN.test(t)) valid.push(t);
-    else invalid.push(t);
-  }
-  return { valid, invalid };
-}
 
 function prettyError(err: unknown): string {
   const t = i18n.t.bind(i18n);
@@ -165,19 +152,18 @@ export function CreateSoulModal({ open, onClose }: Props) {
 
   const [sid, setSid] = useState('');
   const [transport, setTransport] = useState<SoulTransport>('agent');
-  const [covensRaw, setCovensRaw] = useState('');
+  const [covens, setCovens] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
   const [reply, setReply] = useState<SoulCreateReply | null>(null);
 
   const sidValid = SID_PATTERN.test(sid);
-  const covens = parseCovens(covensRaw);
 
   const mu = useMutation({
     mutationFn: () =>
       keeperApi.souls.create({
         sid: sid.trim(),
         transport,
-        covens: covens.valid.length > 0 ? covens.valid : undefined,
+        covens: covens.length > 0 ? covens : undefined,
       }),
     onSuccess: (data) => {
       setReply(data);
@@ -192,7 +178,7 @@ export function CreateSoulModal({ open, onClose }: Props) {
   function close() {
     setSid('');
     setTransport('agent');
-    setCovensRaw('');
+    setCovens([]);
     setServerError(null);
     setReply(null);
     onClose();
@@ -202,7 +188,7 @@ export function CreateSoulModal({ open, onClose }: Props) {
     return <SuccessView reply={reply} onClose={close} />;
   }
 
-  const canSubmit = sid.trim().length > 0 && sidValid && covens.invalid.length === 0 && !mu.isPending;
+  const canSubmit = sid.trim().length > 0 && sidValid && !mu.isPending;
 
   return (
     <Modal
@@ -282,34 +268,21 @@ export function CreateSoulModal({ open, onClose }: Props) {
           </span>
         </label>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13 }}>
             covens{' '}
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               ({t('forms:optional')})
             </span>
           </span>
-          <input
-            type="text"
-            value={covensRaw}
-            onChange={(e) => setCovensRaw(e.target.value)}
+          <ChipsInput
+            value={covens}
+            onChange={setCovens}
             placeholder={t('souls:covensPlaceholder')}
-            aria-label={t('souls:createCovensAria')}
-            aria-invalid={covens.invalid.length > 0 ? 'true' : undefined}
-            style={{
-              padding: '8px 10px',
-              borderRadius: 'var(--radius)',
-              border: `1px solid ${covens.invalid.length > 0 ? 'var(--danger)' : 'var(--border)'}`,
-              background: 'var(--surface)',
-              fontFamily: 'var(--font-mono)',
-            }}
+            ariaLabel={t('souls:createCovensAria')}
+            validate={(tok) => (COVEN_PATTERN.test(tok) ? null : t('incarnations:kebabPattern'))}
           />
-          {covens.invalid.length > 0 ? (
-            <span style={{ fontSize: 12, color: 'var(--danger)' }}>
-              {t('souls:covensInvalidLabels', { tokens: covens.invalid.join(', ') })}
-            </span>
-          ) : null}
-        </label>
+        </div>
 
         {serverError ? (
           <div className={styles.errorBox} role="alert">
