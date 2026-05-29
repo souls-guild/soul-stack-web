@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Send } from 'lucide-react';
@@ -31,6 +32,7 @@ function relative(ts: string | undefined): string {
 }
 
 export function PushRunsList() {
+  const { t } = useTranslation();
   const [sshProvider, setSshProvider] = useState('');
   const [statusSet, setStatusSet] = useState<Set<PushRunStatus>>(new Set());
   const [offset, setOffset] = useState(0);
@@ -70,13 +72,13 @@ export function PushRunsList() {
             <Send size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Push runs
           </h1>
-          <div className={styles.crumbs}>история SSH-прогонов</div>
+          <div className={styles.crumbs}>{t('runhistory:pushRunsCrumbs')}</div>
         </div>
       </div>
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>SSH provider</div>
+          <div className={styles.metaKey}>{t('runhistory:filterSshProviderLabel')}</div>
           <input
             type="text"
             value={sshProvider}
@@ -109,15 +111,15 @@ export function PushRunsList() {
         </div>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && items.length === 0 ? (
-        <div className={styles.empty}>Push-прогонов под фильтр не найдено.</div>
+        <div className={styles.empty}>{t('runhistory:noPushRunsFound')}</div>
       ) : null}
 
       {items.length > 0 ? (

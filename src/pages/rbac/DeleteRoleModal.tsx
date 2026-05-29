@@ -66,17 +66,18 @@ export function DeleteRoleModal({ open, role, onClose }: Props) {
           marginBottom: 12,
         }}
       >
-        Каскадом сносятся permissions роли и membership. Действие необратимо.
+        {t('admin:rbacDeleteWarn')}
       </div>
       {role.builtin ? (
         <div style={{ fontSize: 13, marginBottom: 12 }}>
-          Это <strong>builtin</strong>-роль — сервер вернёт <code className="mono">409 role-builtin</code>.
-          Удаление запрещено.
+          {t('admin:rbacDeleteBuiltinWarn')}
         </div>
       ) : null}
       {operatorsCount > 0 ? (
         <div style={{ fontSize: 13, marginBottom: 12 }}>
-          <strong>{operatorsCount}</strong> {operatorsCount === 1 ? 'оператор потеряет' : 'операторов потеряют'} permissions из этой роли:
+          <strong>{operatorsCount}</strong>{' '}
+          {operatorsCount === 1 ? t('admin:rbacDeleteOperatorLoseOne') : t('admin:rbacDeleteOperatorLoseMany')}{' '}
+          {t('admin:rbacDeleteOperatorSuffix')}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
             {role.operators.map((aid) => (
               <code
@@ -96,7 +97,7 @@ export function DeleteRoleModal({ open, role, onClose }: Props) {
         </div>
       ) : (
         <div style={{ fontSize: 13, marginBottom: 12, color: 'var(--text-muted)' }}>
-          В роли нет операторов — снос затронет только саму запись.
+          {t('admin:rbacDeleteNoOperators')}
         </div>
       )}
       {serverError ? <div className={styles.errorBox} role="alert">{serverError}</div> : null}

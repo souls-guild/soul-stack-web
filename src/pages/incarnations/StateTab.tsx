@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Activity, Server } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { JsonKeyFilter } from '../../components/JsonKeyFilter';
@@ -16,6 +17,7 @@ interface Props {
 // Если в state.hosts (object keyed by SID) есть per-host записи — отдельная
 // секция с таблицей.
 export function StateTab({ state, stateSchemaVersion }: Props) {
+  const { t } = useTranslation();
   const isEmpty = !state || (typeof state === 'object' && Object.keys(state).length === 0);
 
   // state.hosts — convention: scenario может писать per-host state в
@@ -45,15 +47,12 @@ export function StateTab({ state, stateSchemaVersion }: Props) {
         Runtime State
       </h2>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Source: <span className="mono">incarnation.state</span> — записывается
-        scenario-applier-ом после успешных apply-прогонов. Read-only.
-        state_schema_version: <span className="mono">{stateSchemaVersion}</span> — структура
-        определяется в <span className="mono">service.yml</span> (см. вкладку «Schema»).
+        {t('incarnations:stateSourceLead')} state_schema_version:{' '}
+        <span className="mono">{stateSchemaVersion}</span> {t('incarnations:stateSourceTail')}
       </p>
       {isEmpty ? (
         <div className={styles.empty}>
-          state пуст — incarnation ещё не проходил apply-сценариев, либо сценарии
-          ничего не записали в state.
+          {t('incarnations:stateEmpty')}
         </div>
       ) : (
         <>
@@ -62,7 +61,7 @@ export function StateTab({ state, stateSchemaVersion }: Props) {
               <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 8 }}>
                 Top-level fields
               </h3>
-              <JsonKeyFilter value={stateWithoutHosts} emptyLabel="нет top-level полей" />
+              <JsonKeyFilter value={stateWithoutHosts} emptyLabel={t('incarnations:noTopLevelFields')} />
             </>
           ) : null}
 
@@ -73,7 +72,7 @@ export function StateTab({ state, stateSchemaVersion }: Props) {
                 Per-host data ({perHost.length})
               </h3>
               <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-muted)' }}>
-                Convention: scenario записывает per-host state в{' '}
+                {t('incarnations:perHostDataDesc')}{' '}
                 <span className="mono">state.hosts[&lt;sid&gt;]</span>.
               </p>
               <table className={styles.table}>
@@ -106,7 +105,7 @@ export function StateTab({ state, stateSchemaVersion }: Props) {
 
           {restEmpty && perHost.length === 0 ? (
             <div className={styles.empty}>
-              state содержит только пустые объекты.
+              {t('incarnations:stateContainsEmpty')}
             </div>
           ) : null}
         </>

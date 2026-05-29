@@ -72,14 +72,13 @@ export function UnlockModal({ open, incarnationName, onClose }: Props) {
     >
       <form noValidate>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-          Оператор берёт на себя ответственность за консистентность хостов. Причина пишется в
-          <code className="mono"> state_history.metadata.unlock_reason</code>.
+          {t('incarnations:unlockDesc')}
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13 }}>Reason</span>
           <textarea
             rows={4}
-            placeholder="Что было разобрано вручную?"
+            placeholder={t('incarnations:unlockReasonPlaceholder')}
             spellCheck={false}
             aria-invalid={errors.reason ? 'true' : undefined}
             {...register('reason')}
@@ -94,7 +93,7 @@ export function UnlockModal({ open, incarnationName, onClose }: Props) {
             }}
           />
           {errors.reason ? (
-            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.reason.message}</span>
+            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.reason.message ?? '')}</span>
           ) : null}
         </label>
         {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}

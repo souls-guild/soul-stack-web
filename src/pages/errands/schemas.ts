@@ -5,25 +5,28 @@
 // Submit-payload — `ErrandRunRequest` из openapi (см. ../../api/keeper.ts).
 
 import { z } from 'zod';
+import i18n from '../../i18n';
+
+const t = i18n.t.bind(i18n);
 
 // SID = FQDN. Минимально-валидируем формат — не пусто, без пробелов; полноценная
 // FQDN-валидация на сервере.
 const sidSchema = z
   .string()
-  .min(1, 'SID обязателен')
-  .max(253, 'SID длиннее 253 символов')
-  .regex(/^[a-zA-Z0-9._-]+$/, 'SID может содержать только буквы, цифры, точку, дефис и подчёркивание');
+  .min(1, t('runhistory:zodSidRequired'))
+  .max(253, t('runhistory:zodSidTooLong'))
+  .regex(/^[a-zA-Z0-9._-]+$/, t('runhistory:zodSidChars'));
 
 const timeoutSchema = z
-  .number({ invalid_type_error: 'число секунд' })
-  .int('целое число')
-  .positive('должно быть > 0')
-  .max(3600, 'максимум 3600 (1 час)');
+  .number({ invalid_type_error: t('runhistory:zodNumberError') })
+  .int(t('runhistory:zodIntError'))
+  .positive(t('runhistory:zodPositive'))
+  .max(3600, t('runhistory:zodMaxTimeout'));
 
 // `env: map<string,string>` — превратим в массив пар {key,value} для динамической
 // формы; на submit-е свернём в Record.
 const envPairSchema = z.object({
-  key: z.string().min(1, 'ключ обязателен'),
+  key: z.string().min(1, t('runhistory:zodKeyRequired')),
   value: z.string(),
 });
 
@@ -33,7 +36,7 @@ const envPairSchema = z.object({
 export const shellSchema = z.object({
   module: z.literal('core.cmd.shell'),
   sid: sidSchema,
-  cmd: z.string().min(1, 'команда обязательна'),
+  cmd: z.string().min(1, t('runhistory:zodCmdRequired')),
   timeout_seconds: timeoutSchema.default(30),
   cwd: z.string().optional(),
   env: z.array(envPairSchema).optional(),
@@ -45,7 +48,7 @@ export type ShellInput = z.infer<typeof shellSchema>;
 export const execSchema = z.object({
   module: z.literal('core.exec.run'),
   sid: sidSchema,
-  cmd: z.string().min(1, 'бинарь обязателен'),
+  cmd: z.string().min(1, t('runhistory:zodArgsBinaryRequired')),
   // args — текстарea с line-per-arg; парсим в массив строк.
   args_raw: z.string().default(''),
   timeout_seconds: timeoutSchema.default(30),
@@ -57,7 +60,7 @@ export type ExecInput = z.infer<typeof execSchema>;
 
 // Fallback для любых других модулей — JSON-textarea с валидацией.
 export const jsonFallbackSchema = z.object({
-  module: z.string().min(1, 'имя модуля обязательно'),
+  module: z.string().min(1, t('runhistory:zodModuleRequired')),
   sid: sidSchema,
   params_json: z
     .string()
@@ -73,7 +76,7 @@ export const jsonFallbackSchema = z.object({
           return false;
         }
       },
-      { message: 'невалидный JSON-object' },
+      { message: t('runhistory:zodInvalidJsonObject') },
     ),
   timeout_seconds: timeoutSchema.default(30),
   dry_run: z.boolean().default(false),

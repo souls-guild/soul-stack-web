@@ -56,7 +56,7 @@ export function PushApply() {
     try {
       const v = JSON.parse(t);
       if (v === null || typeof v !== 'object' || Array.isArray(v)) {
-        return { ok: false, err: 'input должен быть JSON-object' };
+        return { ok: false, err: t('runhistory:pushInputMustBeObject') };
       }
       return { ok: true, value: v as Record<string, unknown> };
     } catch (e) {
@@ -107,17 +107,17 @@ export function PushApply() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Push apply</h1>
-          <div className={styles.crumbs}>SSH-прогон Destiny без агента</div>
+          <div className={styles.crumbs}>{t('runhistory:pushApplyCrumbs')}</div>
         </div>
       </div>
 
       <div className={styles.deprecationBanner} role="note" aria-label="Deprecation notice">
-        Страница скрыта из навигации. Используйте{' '}
-        <Link to="/run?workload=push">Run Wizard</Link>{' '}
-        для запуска push-прогонов. Прямой URL сохранён для backward-compat ссылок.
+        {t('runhistory:deprecationBannerBefore')}
+        <Link to="/run?workload=push">{t('runhistory:runWizardLink')}</Link>
+        {t('runhistory:deprecationPushAfter')}
       </div>
 
-      <section className={styles.section} aria-label="Параметры прогона">
+      <section className={styles.section} aria-label={t('runhistory:pushParamsSectionAria')}>
         <div className={styles.filters}>
           <Input
             label="Destiny ref"
@@ -125,7 +125,7 @@ export function PushApply() {
             onChange={(e) => setDestiny(e.target.value)}
             placeholder="redis-cluster@v2.0.0"
             mono
-            hint="<name>@<git-ref>"
+            hint={t('runhistory:pushDestinyHint')}
           />
           <Input
             label="SSH provider"
@@ -133,10 +133,10 @@ export function PushApply() {
             onChange={(e) => setSshProvider(e.target.value)}
             placeholder="default"
             mono
-            hint="optional — первый из keeper.yml"
+            hint={t('runhistory:pushSshHint')}
           />
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={styles.metaKey}>Cleanup stale</span>
+            <span className={styles.metaKey}>{t('runhistory:pushCleanupLabel')}</span>
             <input
               type="checkbox"
               checked={cleanup}
@@ -147,7 +147,7 @@ export function PushApply() {
           </label>
         </div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={styles.metaKey}>Inventory (FQDN, по строкам или через запятую)</span>
+          <span className={styles.metaKey}>{t('runhistory:pushInventoryLabel')}</span>
           <textarea
             value={inventoryRaw}
             onChange={(e) => setInventoryRaw(e.target.value)}
@@ -163,10 +163,10 @@ export function PushApply() {
               resize: 'vertical',
             }}
           />
-          <span className={styles.metaKey}>{inventory.length} host(s)</span>
+          <span className={styles.metaKey}>{t('runhistory:pushHostsCount', { count: inventory.length })}</span>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={styles.metaKey}>Input (JSON-object)</span>
+          <span className={styles.metaKey}>{t('runhistory:inputJsonLabel')}</span>
           <textarea
             value={inputRaw}
             onChange={(e) => setInputRaw(e.target.value)}
@@ -193,20 +193,20 @@ export function PushApply() {
         {submit.error ? (
           <div className={styles.errorBox}>
             {submit.error instanceof ApiError
-              ? `Ошибка ${submit.error.status}: ${submit.error.message}`
+              ? t('errors:generic', { status: submit.error.status, detail: submit.error.message })
               : String(submit.error)}
           </div>
         ) : null}
       </section>
 
       {applyId ? (
-        <section className={styles.section} aria-label="Состояние прогона">
-          <h2 className={styles.sectionTitle}>Прогон <span className="mono">{applyId}</span></h2>
-          {poll.isLoading ? <div className={styles.loading}>Запрашиваем…</div> : null}
+        <section className={styles.section} aria-label="Run state">
+          <h2 className={styles.sectionTitle}>{t('runhistory:pushRunStateTitle')} <span className="mono">{applyId}</span></h2>
+          {poll.isLoading ? <div className={styles.loading}>{t('runhistory:pushRunStateRequesting')}</div> : null}
           {poll.error ? (
             <div className={styles.errorBox}>
               {poll.error instanceof ApiError
-                ? `Ошибка ${poll.error.status}: ${poll.error.message}`
+                ? t('errors:generic', { status: poll.error.status, detail: poll.error.message })
                 : String(poll.error)}
             </div>
           ) : null}
@@ -252,7 +252,7 @@ export function PushApply() {
                   </tbody>
                 </table>
               ) : (
-                <JsonViewer value={view.summary} emptyLabel="summary будет после терминала" />
+                <JsonViewer value={view.summary} emptyLabel={t('runhistory:pushSummaryAfterTerminal')} />
               )}
             </>
           ) : null}

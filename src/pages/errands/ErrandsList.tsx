@@ -80,7 +80,7 @@ export function ErrandsList() {
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Errands
           </h1>
-          <div className={styles.crumbs}>журнал ad-hoc прогонов — запуск через <Link to="/run?workload=command">Run Wizard</Link></div>
+          <div className={styles.crumbs}>{t('runhistory:errandsCrumbsBefore')}<Link to="/run?workload=command">{t('runhistory:runWizardLink')}</Link></div>
         </div>
       </div>
 
@@ -99,7 +99,7 @@ export function ErrandsList() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Module (CSV, exact-match OR)</div>
+          <div className={styles.metaKey}>{t('runhistory:filterModuleLabel')}</div>
           <input
             type="text"
             value={moduleCsv}
@@ -121,7 +121,7 @@ export function ErrandsList() {
             }}
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
           >
-            <option value="">— все —</option>
+            <option value="">{t('all')}</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -130,7 +130,7 @@ export function ErrandsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Started after (RFC3339)</div>
+          <div className={styles.metaKey}>{t('runhistory:filterStartedAfterLabel')}</div>
           <input
             type="text"
             value={startedAfter}

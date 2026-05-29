@@ -54,7 +54,7 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
       setServerError(null);
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -79,11 +79,11 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
     return (
       <Modal
         open={open}
-        title={`Bootstrap-токен выпущен: ${sid}`}
+        title={t('souls:tokenIssuedTitle', { sid })}
         onClose={close}
         footer={
           <Button type="button" variant="primary" onClick={close}>
-            Готово
+            {t('souls:done')}
           </Button>
         }
       >
@@ -98,8 +98,7 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
             marginBottom: 12,
           }}
         >
-          Токен отображается ОДИН РАЗ. Скопируйте сейчас — повторный показ невозможен,
-          только новый выпуск через force.
+          {t('souls:tokenIssuedWarn')}
         </div>
         <div className={styles.meta}>
           <span className={styles.metaKey}>sid</span>
@@ -133,8 +132,8 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
           <button
             type="button"
             onClick={doCopy}
-            aria-label="скопировать bootstrap-токен"
-            title="copy"
+            aria-label={t('souls:copyTokenAria')}
+            title={t('copy')}
             style={{
               background: 'transparent',
               border: '1px solid var(--border)',
@@ -149,7 +148,7 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
               flexShrink: 0,
             }}
           >
-            <Copy size={12} /> {copied ? 'скопировано' : 'copy'}
+            <Copy size={12} /> {copied ? t('copied') : t('copy')}
           </button>
         </div>
       </Modal>
@@ -179,12 +178,10 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
     >
       <form noValidate>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-          Перевыпуск bootstrap-токена для Soul (transport: agent). Plain-токен будет
-          показан один раз. Отдельный revoke-endpoint в API отсутствует — чтобы
-          ревокировать активный токен, выпустите новый с <code className="mono">force=true</code>.
+          {t('souls:issueTokenIntro')} <code className="mono">force=true</code>.
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-          <span style={{ fontSize: 13 }}>TTL (секунд)</span>
+          <span style={{ fontSize: 13 }}>{t('souls:ttlLabel')}</span>
           <input
             type="number"
             min={60}
@@ -200,22 +197,21 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
             }}
           />
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Параметр пока не передаётся в API — Keeper использует серверный default.
-            Поле для будущего расширения endpoint-а.
+            {t('souls:ttlHint')}
           </span>
           {errors.ttl_seconds ? (
-            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.ttl_seconds.message}</span>
+            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.ttl_seconds.message ?? '')}</span>
           ) : null}
         </label>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
           <input type="checkbox" {...register('force')} />
           <span>
-            <code className="mono">force=true</code> — истечь активный токен и выпустить новый
+            <code className="mono">force=true</code> {t('souls:forceHint')}
           </span>
         </label>
         {!force ? (
           <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-            Без force при активном токене Keeper вернёт 409 bootstrap-token-active.
+            {t('souls:forceWarn')}
           </div>
         ) : null}
         {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}

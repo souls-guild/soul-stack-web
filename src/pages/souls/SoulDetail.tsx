@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { Key, Shield, Terminal } from 'lucide-react';
+import i18n from '../../i18n';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import {
@@ -27,10 +29,11 @@ function skewWarning(collectedAt?: string, receivedAt?: string): string | null {
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   const diff = Math.abs(b - a);
   if (diff <= SKEW_WARN_MS) return null;
-  return `skew ${Math.floor(diff / 60000)} мин (collected_at vs received_at; > 10 мин — возможен NTP-рассинхрон)`;
+  return i18n.t('souls:skewWarning', { minutes: Math.floor(diff / 60000) });
 }
 
 export function SoulDetail() {
+  const { t } = useTranslation();
   const { sid = '' } = useParams<{ sid: string }>();
   const [tab, setTab] = useState<Tab>('overview');
   const [tokenOpen, setTokenOpen] = useState(false);
@@ -49,12 +52,12 @@ export function SoulDetail() {
     retry: false,
   });
 
-  if (soulQ.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (soulQ.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (soulQ.error) {
     return (
       <div className={styles.errorBox}>
         {soulQ.error instanceof ApiError
-          ? `Ошибка ${soulQ.error.status}: ${soulQ.error.message}`
+          ? t('errors:generic', { status: soulQ.error.status, detail: soulQ.error.message })
           : String(soulQ.error)}
       </div>
     );
@@ -64,7 +67,7 @@ export function SoulDetail() {
   if (!row) {
     return (
       <div className={styles.empty}>
-        Soul <code className="mono">{sid}</code> не найдена.
+        {t('souls:soulNotFound', { sid })}
       </div>
     );
   }
@@ -88,18 +91,18 @@ export function SoulDetail() {
             {row.transport === 'agent' ? (
               <Button type="button" variant="secondary" onClick={() => setTokenOpen(true)}>
                 <Key size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Issue Token
+                {t('souls:issueToken')}
               </Button>
             ) : null}
             <Link to={`/errands/new?sid=${encodeURIComponent(row.sid)}`}>
               <Button type="button" variant="secondary">
                 <Terminal size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Run Errand
+                {t('souls:runErrand')}
               </Button>
             </Link>
             <Button type="button" variant="secondary" onClick={() => setCovenOpen(true)}>
               <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-              Coven assignment
+              {t('souls:covenAssignment')}
             </Button>
           </div>
         </div>
@@ -173,8 +176,7 @@ export function SoulDetail() {
                 color: 'var(--text-muted)',
               }}
             >
-              SSH target editing — TBD endpoint <code className="mono">/v1/souls/{'{sid}'}/ssh-target</code>
-              {' '}отсутствует в API.
+              {t('souls:sshTargetTbdPrefix')}<code className="mono">/v1/souls/{'{sid}'}/ssh-target</code>{t('souls:sshTargetTbdSuffix')}
             </div>
           ) : null}
         </section>
@@ -186,7 +188,7 @@ export function SoulDetail() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>History</h2>
           <div className={styles.empty}>
-            TODO: endpoint <code className="mono">GET /v1/souls/{'{sid}'}/history</code> в core ещё не выставлен.
+            {t('souls:historyTodoPrefix')}<code className="mono">GET /v1/souls/{'{sid}'}/history</code>{t('souls:historyTodoSuffix')}
           </div>
         </section>
       ) : null}
@@ -199,16 +201,16 @@ interface SoulprintTabProps {
 }
 
 function SoulprintTab({ query }: SoulprintTabProps) {
+  const { t } = useTranslation();
   if (query.isLoading) {
-    return <div className={styles.loading}>Загружаем soulprint…</div>;
+    return <div className={styles.loading}>{t('souls:loadingSoulprint')}</div>;
   }
   if (query.error instanceof SoulprintNotReceivedError) {
     return (
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Soulprint</h2>
         <div className={styles.empty}>
-          Soulprint ещё не получен от Soul (410). Возможные причины: только что
-          онбординг, либо <code className="mono">transport: ssh</code> без агента.
+          {t('souls:soulprintNotReceived')} <code className="mono">transport: ssh</code> {t('souls:soulprintNotReceivedSsh')}
         </div>
       </section>
     );
@@ -217,7 +219,7 @@ function SoulprintTab({ query }: SoulprintTabProps) {
     return (
       <div className={styles.errorBox}>
         {query.error instanceof ApiError
-          ? `Ошибка ${query.error.status}: ${query.error.message}`
+          ? t('errors:generic', { status: query.error.status, detail: query.error.message })
           : String(query.error)}
       </div>
     );

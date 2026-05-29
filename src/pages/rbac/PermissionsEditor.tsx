@@ -1,4 +1,5 @@
 import { useId, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { validatePermission } from './schemas';
 
@@ -14,23 +15,24 @@ interface Props {
 // permission. Enter / запятая / пробел добавляет токен. Catalog — список
 // известных permissions для подсказки (buildPermissionCatalog).
 export function PermissionsEditor({ value, onChange, catalog, placeholder, ariaLabel }: Props) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const listId = useId();
 
   function tryAdd(raw: string) {
-    const t = raw.trim();
-    if (!t) return false;
-    if (value.includes(t)) {
-      setErr('такой permission уже есть');
+    const token = raw.trim();
+    if (!token) return false;
+    if (value.includes(token)) {
+      setErr(t('admin:rbacPermDuplicate'));
       return false;
     }
-    const reason = validatePermission(t);
-    if (reason) {
-      setErr(reason);
+    const reasonKey = validatePermission(token);
+    if (reasonKey) {
+      setErr(t(reasonKey));
       return false;
     }
-    onChange([...value, t]);
+    onChange([...value, token]);
     setErr(null);
     return true;
   }
@@ -80,7 +82,7 @@ export function PermissionsEditor({ value, onChange, catalog, placeholder, ariaL
             {perm}
             <button
               type="button"
-              aria-label={`удалить ${perm}`}
+              aria-label={t('admin:rbacPermRemoveAria', { perm })}
               onClick={() => onChange(value.filter((p) => p !== perm))}
               style={{
                 border: 0,

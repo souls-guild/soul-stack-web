@@ -6,37 +6,40 @@
 
 import { z } from 'zod';
 
+// Сообщения валидации хранятся как i18n-ключи (ns beacons); компонент рендерит
+// их через t(fieldError.message). См. правило i18n в CLAUDE.md.
+
 // kebab-case 1..63 — симметрично openapi pattern.
 const nameSchema = z
   .string()
-  .min(1, 'имя обязательно')
-  .max(63, 'максимум 63 символа')
-  .regex(/^[a-z0-9-]{1,63}$/, 'kebab-case (a-z, 0-9, дефис)');
+  .min(1, 'beacons:errNameRequired')
+  .max(63, 'beacons:errNameMax')
+  .regex(/^[a-z0-9-]{1,63}$/, 'beacons:errNameKebab');
 
 // duration-конвенция Go: 30s / 1m / 1h. Минимально-валидируем — суффикс h/m/s/ms.
 const durationSchema = z
   .string()
-  .min(1, 'обязательно')
-  .regex(/^\d+(ms|s|m|h)$/, 'формат: <число><ms|s|m|h>, напр. 30s');
+  .min(1, 'beacons:errDurationRequired')
+  .regex(/^\d+(ms|s|m|h)$/, 'beacons:errDurationFormat');
 
 // SID — XOR с coven (проверяем в форме, не в схеме).
 const sidSchema = z
   .string()
-  .max(253, 'SID длиннее 253 символов')
-  .regex(/^[a-zA-Z0-9._-]+$/, 'буквы, цифры, точка, дефис, подчёркивание')
+  .max(253, 'beacons:errSidMax')
+  .regex(/^[a-zA-Z0-9._-]+$/, 'beacons:errSidChars')
   .optional()
   .or(z.literal(''));
 
 const covenItemSchema = z
   .string()
-  .regex(/^[a-z0-9][a-z0-9-]*$/, 'coven kebab-case');
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'beacons:errCovenKebab');
 
 // --- Vigil: формы per check ---
 
 // core.beacon.file_changed — наблюдение за файлом/директорией.
 export const fileChangedSchema = z.object({
   check: z.literal('core.beacon.file_changed'),
-  path: z.string().min(1, 'путь обязателен'),
+  path: z.string().min(1, 'beacons:errPathRequired'),
   recursive: z.boolean().default(false),
   throttle: z.string().optional().or(z.literal('')),
 });
@@ -45,7 +48,7 @@ export type FileChangedInput = z.infer<typeof fileChangedSchema>;
 // core.beacon.service_down — heartbeat init-системы.
 export const serviceDownSchema = z.object({
   check: z.literal('core.beacon.service_down'),
-  service: z.string().min(1, 'service-name обязателен'),
+  service: z.string().min(1, 'beacons:errServiceRequired'),
 });
 export type ServiceDownInput = z.infer<typeof serviceDownSchema>;
 
@@ -60,14 +63,14 @@ export type PortClosedInput = z.infer<typeof portClosedSchema>;
 // core.beacon.process_absent — отсутствует процесс по имени.
 export const processAbsentSchema = z.object({
   check: z.literal('core.beacon.process_absent'),
-  process: z.string().min(1, 'process-name обязателен'),
+  process: z.string().min(1, 'beacons:errProcessRequired'),
 });
 export type ProcessAbsentInput = z.infer<typeof processAbsentSchema>;
 
 // core.beacon.http_unhealthy — HTTP-probe.
 export const httpUnhealthySchema = z.object({
   check: z.literal('core.beacon.http_unhealthy'),
-  url: z.string().url('некорректный URL'),
+  url: z.string().url('beacons:errUrl'),
   expected_code: z.number().int().min(100).max(599).default(200),
   timeout: durationSchema.optional().or(z.literal('')),
 });
@@ -102,7 +105,7 @@ export const vigilFormSchema = z
   .object({
     name: nameSchema,
     interval: durationSchema,
-    check: z.string().min(1, 'check обязателен'),
+    check: z.string().min(1, 'beacons:errCheckRequired'),
     sid: sidSchema,
     coven: z.array(covenItemSchema).default([]),
     enabled: z.boolean().default(true),
@@ -117,7 +120,7 @@ export const vigilFormSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['sid'],
-        message: 'sid и coven взаимоисключающие',
+        message: 'beacons:errSidCovenXor',
       });
     }
     // params_json должен быть JSON-object.
@@ -127,14 +130,14 @@ export const vigilFormSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['params_json'],
-          message: 'params должен быть JSON-object',
+          message: 'beacons:errParamsJsonObject',
         });
       }
-    } catch (e) {
+    } catch {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['params_json'],
-        message: e instanceof Error ? e.message : 'invalid JSON',
+        message: 'beacons:errInvalidJson',
       });
     }
   });
@@ -173,12 +176,12 @@ export const decreeFormSchema = z
     coven: z.array(covenItemSchema).default([]),
     incarnation_name: z
       .string()
-      .min(1, 'incarnation обязательна')
-      .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'kebab-case (a-z0-9, дефис)'),
+      .min(1, 'beacons:errIncarnationRequired')
+      .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'beacons:errIncarnationKebab'),
     action_scenario: z
       .string()
-      .min(1, 'action_scenario обязателен')
-      .regex(/^[a-z][a-z0-9_]*$/, 'snake_case (a-z, 0-9, _)'),
+      .min(1, 'beacons:errActionScenarioRequired')
+      .regex(/^[a-z][a-z0-9_]*$/, 'beacons:errActionScenarioSnake'),
     action_input_json: z.string().default('{}'),
     cooldown: durationSchema.optional().or(z.literal('')),
     enabled: z.boolean().default(false), // default-deny: opt-in для safety.
@@ -190,7 +193,7 @@ export const decreeFormSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['sid'],
-        message: 'sid и coven взаимоисключающие',
+        message: 'beacons:errSidCovenXor',
       });
     }
     try {
@@ -199,14 +202,14 @@ export const decreeFormSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['action_input_json'],
-          message: 'action_input должен быть JSON-object',
+          message: 'beacons:errActionInputJsonObject',
         });
       }
-    } catch (e) {
+    } catch {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['action_input_json'],
-        message: e instanceof Error ? e.message : 'invalid JSON',
+        message: 'beacons:errInvalidJson',
       });
     }
   });

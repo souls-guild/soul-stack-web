@@ -12,25 +12,27 @@ const ROLE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 // поймает сервер (422 validation-failed), мы его покажем как-есть.
 const PERMISSION = /^[A-Za-z0-9._*-]+$/;
 
+// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
 export const roleCreateSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, 'обязательное поле')
-    .regex(ROLE_NAME, 'kebab-case: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$'),
-  description: z.string().trim().max(500, 'максимум 500 символов'),
-  permissions: z.array(z.string().regex(PERMISSION, 'недопустимые символы')),
+    .min(1, 'admin:rbacErrRoleNameRequired')
+    .regex(ROLE_NAME, 'admin:rbacErrRoleNamePattern'),
+  description: z.string().trim().max(500, 'admin:rbacErrDescriptionMax'),
+  permissions: z.array(z.string().regex(PERMISSION, 'admin:rbacErrPermissionChars')),
 });
 
 export type RoleCreateFormValues = z.infer<typeof roleCreateSchema>;
 
 export const editPermissionsSchema = z.object({
-  permissions: z.array(z.string().regex(PERMISSION, 'недопустимые символы')),
+  permissions: z.array(z.string().regex(PERMISSION, 'admin:rbacErrPermissionChars')),
 });
 
 export type EditPermissionsFormValues = z.infer<typeof editPermissionsSchema>;
 
+// Возвращает i18n-ключ ошибки или null. Caller локализует через t().
 export function validatePermission(token: string): string | null {
-  if (!PERMISSION.test(token)) return 'формат: namespace.verb или namespace.* или *';
+  if (!PERMISSION.test(token)) return 'admin:rbacErrPermissionFormat';
   return null;
 }

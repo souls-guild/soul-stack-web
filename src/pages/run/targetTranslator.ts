@@ -12,6 +12,10 @@
 // все включённые режимы через `where`-конъюнкцию.
 
 import type { ErrandRunTarget } from '../../api/keeper';
+import i18n from '../../i18n';
+
+// Pure-функции (вне React-дерева) используют глобальный i18n-инстанс.
+const t = i18n.t.bind(i18n);
 
 export type TargetMode = 'sids' | 'coven' | 'glob' | 'regex' | 'cel_where';
 
@@ -61,7 +65,7 @@ export function translateTarget(spec: TargetSpec): TranslateResult {
 
   if (spec.modes.has('sids')) {
     if (spec.sids.length === 0) {
-      warnings.push('режим SIDs включён, но список SID пуст');
+      warnings.push(t('run:warnSidsEmpty'));
     } else {
       target.sids = [...spec.sids];
     }
@@ -69,7 +73,7 @@ export function translateTarget(spec: TargetSpec): TranslateResult {
 
   if (spec.modes.has('coven')) {
     if (spec.coven.length === 0) {
-      warnings.push('режим Coven включён, но список меток пуст');
+      warnings.push(t('run:warnCovenEmpty'));
     } else {
       target.coven = [...spec.coven];
     }
@@ -77,19 +81,19 @@ export function translateTarget(spec: TargetSpec): TranslateResult {
 
   if (spec.modes.has('glob')) {
     const g = spec.glob.trim();
-    if (!g) warnings.push('режим Glob включён, но маска пустая');
+    if (!g) warnings.push(t('run:warnGlobEmpty'));
     else whereParts.push(`sid.glob(${celString(g)})`);
   }
 
   if (spec.modes.has('regex')) {
     const r = spec.regex.trim();
-    if (!r) warnings.push('режим Regex включён, но выражение пустое');
+    if (!r) warnings.push(t('run:warnRegexEmpty'));
     else whereParts.push(`sid.matches(${celString(r)})`);
   }
 
   if (spec.modes.has('cel_where')) {
     const w = spec.celWhere.trim();
-    if (!w) warnings.push('режим CEL where включён, но предикат пустой');
+    if (!w) warnings.push(t('run:warnCelWhereEmpty'));
     else whereParts.push(w);
   }
 
@@ -107,7 +111,7 @@ export function describeTarget(spec: TargetSpec): string {
   if (spec.modes.has('glob') && spec.glob.trim()) parts.push(`glob=${spec.glob.trim()}`);
   if (spec.modes.has('regex') && spec.regex.trim()) parts.push(`regex=${spec.regex.trim()}`);
   if (spec.modes.has('cel_where') && spec.celWhere.trim()) parts.push(`where=${spec.celWhere.trim()}`);
-  return parts.length === 0 ? '— target не задан —' : parts.join(' AND ');
+  return parts.length === 0 ? t('run:targetNotSet') : parts.join(' AND ');
 }
 
 // Считаем «есть ли реально хоть что-то задающее scope». Используется для блокировки submit.

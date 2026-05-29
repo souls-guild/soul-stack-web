@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { Play, Search, Shield } from 'lucide-react';
+import i18n from '../../i18n';
 import { keeperApi, SoulprintNotReceivedError, type SoulListEntry, type SoulStatus, type SoulTransport, type SoulprintReadReply } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
@@ -25,10 +27,11 @@ function formatTimeAgo(iso: string | undefined): string {
   const ts = new Date(iso).getTime();
   if (Number.isNaN(ts)) return iso;
   const deltaSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (deltaSec < 60) return `${deltaSec}s назад`;
-  if (deltaSec < 3600) return `${Math.floor(deltaSec / 60)}m назад`;
-  if (deltaSec < 86_400) return `${Math.floor(deltaSec / 3600)}h назад`;
-  return `${Math.floor(deltaSec / 86_400)}d назад`;
+  const t = i18n.t.bind(i18n);
+  if (deltaSec < 60) return t('souls:timeAgoSeconds', { n: deltaSec });
+  if (deltaSec < 3600) return t('souls:timeAgoMinutes', { n: Math.floor(deltaSec / 60) });
+  if (deltaSec < 86_400) return t('souls:timeAgoHours', { n: Math.floor(deltaSec / 3600) });
+  return t('souls:timeAgoDays', { n: Math.floor(deltaSec / 86_400) });
 }
 
 // Парсит CSV-строку coven-меток ("prod, redis-prod, stage") в массив
@@ -69,6 +72,7 @@ function sortItems(items: SoulListEntry[], key: SortKey, dir: SortDir): SoulList
 }
 
 export function SoulsList() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [status, setStatus] = useState<SoulStatus | ''>('');
   const [transport, setTransport] = useState<SoulTransport | ''>('');
@@ -223,10 +227,10 @@ export function SoulsList() {
             variant="primary"
             disabled={effectiveSelected.size === 0}
             onClick={bulkRunOnSelected}
-            aria-label="Bulk Run on selected"
+            aria-label={t('souls:bulkRunAriaLabel')}
           >
             <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Run on {effectiveSelected.size > 0 ? `${effectiveSelected.size} ` : ''}selected
+            {t('souls:bulkRunOnSelected', { count: effectiveSelected.size > 0 ? `${effectiveSelected.size} ` : '' })}
           </Button>
           <Button
             type="button"
@@ -235,20 +239,20 @@ export function SoulsList() {
             onClick={() => setBulkOpen(true)}
           >
             <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Bulk: Assign Coven{effectiveSelected.size > 0 ? ` (${effectiveSelected.size})` : ''}
+            {t('souls:bulkAssignCoven', { suffix: effectiveSelected.size > 0 ? ` (${effectiveSelected.size})` : '' })}
           </Button>
         </div>
       </div>
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>Search SID (contains)</div>
+          <div className={styles.metaKey}>{t('souls:searchSidLabel')}</div>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="host01"
-            aria-label="search SID"
+            placeholder={t('souls:searchSidPlaceholder')}
+            aria-label={t('souls:searchSidAria')}
             style={{
               padding: '8px 10px',
               borderRadius: 'var(--radius)',
@@ -260,7 +264,7 @@ export function SoulsList() {
           />
         </label>
         <label style={{ flex: '1 1 320px', minWidth: 280 }}>
-          <div className={styles.metaKey}>Soulprint search</div>
+          <div className={styles.metaKey}>{t('souls:soulprintSearchLabel')}</div>
           <div style={{ position: 'relative' }}>
             <Search
               size={14}
@@ -277,8 +281,8 @@ export function SoulsList() {
               type="text"
               value={soulprintQuery}
               onChange={(e) => setSoulprintQuery(e.target.value)}
-              placeholder="os.family=debian & memory.total_mb>=4096"
-              aria-label="search soulprint"
+              placeholder={t('souls:soulprintSearchPlaceholder')}
+              aria-label={t('souls:soulprintSearchAria')}
               aria-invalid={parsedSoulprint.invalid.length > 0 ? 'true' : undefined}
               style={{
                 padding: '8px 10px 8px 30px',
@@ -292,11 +296,11 @@ export function SoulsList() {
             />
           </div>
           <span style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4, display: 'block' }}>
-            paths: os.* / kernel.* / cpu.* / memory.* / network.* — ops: = != &gt;= &lt;= ~ ; wildcard *
+            {t('souls:soulprintSearchHint')}
           </span>
           {parsedSoulprint.invalid.length > 0 ? (
             <span style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4, display: 'block' }}>
-              Не распознано: {parsedSoulprint.invalid.join(', ')}
+              {t('souls:soulprintUnrecognized', { tokens: parsedSoulprint.invalid.join(', ') })}
             </span>
           ) : null}
         </label>
@@ -307,7 +311,7 @@ export function SoulsList() {
             onChange={(e) => setStatus(e.target.value as SoulStatus | '')}
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
           >
-            <option value="">— все —</option>
+            <option value="">{t('souls:allOption')}</option>
             {SOUL_STATUSES.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
@@ -320,19 +324,19 @@ export function SoulsList() {
             onChange={(e) => setTransport(e.target.value as SoulTransport | '')}
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
           >
-            <option value="">— все —</option>
+            <option value="">{t('souls:allOption')}</option>
             {SOUL_TRANSPORTS.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Covens (CSV, OR)</div>
+          <div className={styles.metaKey}>{t('souls:covensLabel')}</div>
           <input
             type="text"
             value={coven}
             onChange={(e) => setCoven(e.target.value)}
-            placeholder="prod, redis-prod, ..."
+            placeholder={t('souls:covensPlaceholder')}
             aria-invalid={parsed.invalid.length > 0 ? 'true' : undefined}
             style={{
               padding: '8px 10px',
@@ -345,7 +349,7 @@ export function SoulsList() {
           />
           {parsed.invalid.length > 0 ? (
             <span style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4, display: 'block' }}>
-              Не валидные метки: {parsed.invalid.join(', ')} (lowercase, цифры, дефис-разделитель).
+              {t('souls:covensInvalidLabels', { tokens: parsed.invalid.join(', ') })}
             </span>
           ) : null}
         </label>
@@ -354,8 +358,8 @@ export function SoulsList() {
       {soulprintFilterActive ? (
         <div className={styles.metaKey} aria-live="polite">
           {soulprintLoading
-            ? `Загружаем soulprints (${prefiltered.length})…`
-            : `Matched ${visible.length} of ${prefiltered.length}`}
+            ? t('souls:loadingSoulprints', { count: prefiltered.length })
+            : t('souls:matched', { shown: visible.length, total: prefiltered.length })}
         </div>
       ) : null}
 
@@ -365,31 +369,31 @@ export function SoulsList() {
           variant="ghost"
           disabled={!filteredWhereCEL}
           onClick={runOnFiltered}
-          aria-label="Run on filtered souls"
+          aria-label={t('souls:runOnFilteredAria')}
           title={filteredWhereCEL
-            ? `Pre-fill Wizard target_where: ${filteredWhereCEL}`
-            : 'Активируйте хотя бы один фильтр'}
+            ? t('souls:runOnFilteredTitle', { cel: filteredWhereCEL })
+            : t('souls:runOnFilteredNoFilter')}
         >
           <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-          Run on filtered{visible.length > 0 ? ` (${visible.length} souls)` : ''}
+          {t('souls:runOnFiltered', { suffix: visible.length > 0 ? ` (${visible.length} souls)` : '' })}
         </Button>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && visible.length === 0 && !soulprintLoading ? (
         <div className={styles.empty}>
           {soulprintFilterActive
-            ? 'Под soulprint-фильтр ничего не подошло (либо у хостов нет соответствующих фактов).'
+            ? t('souls:emptySoulprintFilter')
             : search
-              ? 'Под search-фильтр ничего не нашлось.'
+              ? t('souls:emptySearch')
               : (
-                <>Souls под фильтр не найдено. Регистрируются через <code className="mono">keeper.soul.create</code>.</>
+                <>{t('souls:emptyNoSoulsPrefix')}<code className="mono">keeper.soul.create</code>.</>
               )}
         </div>
       ) : null}
@@ -401,7 +405,7 @@ export function SoulsList() {
               <th style={{ width: 32 }}>
                 <input
                   type="checkbox"
-                  aria-label="выбрать все"
+                  aria-label={t('souls:selectAll')}
                   checked={allChecked}
                   ref={(el) => { if (el) el.indeterminate = someChecked; }}
                   onChange={toggleAll}
@@ -445,7 +449,7 @@ export function SoulsList() {
                 <td>
                   <input
                     type="checkbox"
-                    aria-label={`выбрать ${row.sid}`}
+                    aria-label={t('souls:selectRow', { sid: row.sid })}
                     checked={effectiveSelected.has(row.sid)}
                     onChange={() => toggle(row.sid)}
                   />

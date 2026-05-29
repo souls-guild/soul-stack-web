@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import i18n from '../../i18n';
 import styles from '../common.module.css';
 
 // Add host в declared spec.hosts[] incarnation (PATCH .../hosts, mode=append).
@@ -24,11 +25,12 @@ interface Props {
 }
 
 function prettyError(err: unknown): string {
+  const t = i18n.t.bind(i18n);
   if (err instanceof ApiError) {
-    if (err.status === 422) return `Неизвестный SID — хост не зарегистрирован в реестре souls. ${err.detail}`;
-    if (err.status === 409) return 'Incarnation в состоянии destroying — правка spec.hosts невозможна.';
-    if (err.status === 404) return 'Incarnation не найдена.';
-    return `Ошибка ${err.status}: ${err.message}`;
+    if (err.status === 422) return t('incarnations:addHostUnknownSid', { detail: err.detail });
+    if (err.status === 409) return t('incarnations:removeBlocked409');
+    if (err.status === 404) return t('incarnations:incarnationNotFound');
+    return t('errors:generic', { status: err.status, detail: err.message });
   }
   return String(err);
 }
@@ -82,7 +84,7 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
     }
     const r = role.trim();
     if (r && (!ROLE_PATTERN.test(r) || r.length > 63)) {
-      setFormError('Role — kebab-case (lowercase, цифры, дефис-разделитель), до 63 символов.');
+      setFormError(t('incarnations:roleKebab'));
       return;
     }
     mu.mutate();
@@ -106,22 +108,21 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
     >
       <form noValidate>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-          Добавление хоста в declared <code className="mono">spec.hosts[]</code> (mode=append).
-          При совпадении SID role обновится.
+          {t('incarnations:addHostDesc')}
         </p>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
           <span style={{ fontSize: 13 }}>SID</span>
           {souls.isLoading ? (
-            <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Загружаем souls…</span>
+            <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{t('incarnations:soulsLoading')}</span>
           ) : (
             <select
               value={sid}
               onChange={(e) => setSid(e.target.value)}
-              aria-label="SID хоста"
+              aria-label={t('incarnations:sidHostAria')}
               style={selectStyle}
             >
-              <option value="">— выберите SID —</option>
+              <option value="">{t('incarnations:selectSid')}</option>
               {candidates.map((s) => (
                 <option key={s.sid} value={s.sid}>
                   {s.sid}
@@ -132,18 +133,18 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
           )}
           {souls.data && candidates.length === 0 ? (
             <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-              Все зарегистрированные souls уже в declared-списке.
+              {t('incarnations:allDeclaredSouls')}
             </span>
           ) : null}
         </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 13 }}>Role (опционально)</span>
+          <span style={{ fontSize: 13 }}>{t('incarnations:roleOptional')}</span>
           <input
             type="text"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            placeholder="master / replica / …"
+            placeholder={t('incarnations:rolePlaceholder')}
             spellCheck={false}
             style={inputStyle}
           />

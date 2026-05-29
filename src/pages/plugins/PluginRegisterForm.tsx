@@ -17,28 +17,26 @@ const KEBAB_RE = /^[a-z][a-z0-9-]*$/;
 // откажет 422; см. описание /v1/plugins/sigils/{namespace}/{name}/{ref}).
 const TAG_REF_RE = /^[A-Za-z0-9._-]+$/;
 
+// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
 const schema = z.object({
   namespace: z
     .string()
     .trim()
-    .min(1, 'обязательно')
-    .regex(KEBAB_RE, 'kebab-case (^[a-z][a-z0-9-]*$)'),
+    .min(1, 'admin:pluginErrRequired')
+    .regex(KEBAB_RE, 'admin:pluginErrKebab'),
   name: z
     .string()
     .trim()
-    .min(1, 'обязательно')
-    .regex(KEBAB_RE, 'kebab-case (^[a-z][a-z0-9-]*$)'),
+    .min(1, 'admin:pluginErrRequired')
+    .regex(KEBAB_RE, 'admin:pluginErrKebab'),
   ref: z
     .string()
     .trim()
-    .min(1, 'обязательно')
-    .regex(TAG_REF_RE, 'одиночный path-сегмент (v1.2.3); branch-ref со слешем сервер откажет 422'),
+    .min(1, 'admin:pluginErrRequired')
+    .regex(TAG_REF_RE, 'admin:pluginErrTagRef'),
 });
 
 type FormValues = z.infer<typeof schema>;
-
-const NAMESPACE_HINT =
-  'mod — soul_module / soul_beacon, cloud — cloud_driver, ssh — ssh_provider';
 
 export function PluginRegisterForm() {
   const { t } = useTranslation();
@@ -69,17 +67,13 @@ export function PluginRegisterForm() {
     onError: (err) => {
       if (err instanceof ApiError) {
         if (err.status === 422) {
-          setServerError(`Validation: ${err.detail || err.message}`);
+          setServerError(`${t('admin:pluginErrValidation')} ${err.detail || err.message}`);
         } else if (err.status === 404) {
-          setServerError(
-            `Плагин не найден в кеше host-а. Сперва задеплойте бинарь по namespace/name; ref — operator-asserted метка. ${err.detail}`,
-          );
+          setServerError(`${t('admin:pluginErrNotFound')} ${err.detail ?? ''}`);
         } else if (err.status === 409) {
-          setServerError(
-            `Активный допуск на (namespace, name, ref) уже есть — сперва revoke. ${err.detail}`,
-          );
+          setServerError(`${t('admin:pluginErrConflict')} ${err.detail ?? ''}`);
         } else {
-          setServerError(`Ошибка ${err.status}: ${err.message}`);
+          setServerError(t('errors:generic', { status: err.status, detail: err.message }));
         }
       } else {
         setServerError(String(err));
@@ -100,14 +94,10 @@ export function PluginRegisterForm() {
           <Link to="/plugins">plugins</Link> / <span>register</span>
         </div>
         <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Stamp size={22} /> Допустить плагин в Sigil-allow-list
+          <Stamp size={22} /> {t('admin:pluginRegisterTitle')}
         </h1>
         <div className={styles.crumbs}>
-          Keeper читает бинарь + manifest из локального кеша
-          host-а по <code className="mono">(namespace, name)</code> (single-slot),
-          сам считает sha256 и подписывает блок Sigil-а. Клиент НЕ передаёт хеш
-          или подпись. <code className="mono">ref</code> — operator-asserted метка
-          версии (НЕ git-verified).
+          {t('admin:pluginRegisterCrumbs')}
         </div>
       </div>
 
@@ -115,26 +105,26 @@ export function PluginRegisterForm() {
         <div className={styles.filters}>
           <Input
             label="Namespace"
-            placeholder="mod / cloud / ssh"
+            placeholder={t('admin:pluginNamespacePlaceholder')}
             mono
-            hint={NAMESPACE_HINT}
-            error={errors.namespace?.message}
+            hint={t('admin:pluginNamespaceHint')}
+            error={errors.namespace?.message ? t(errors.namespace.message) : undefined}
             {...register('namespace')}
           />
           <Input
             label="Name"
-            placeholder="soul-mod-acme"
+            placeholder={t('admin:pluginNamePlaceholderAcme')}
             mono
-            hint="как в manifest.name (kebab-case)"
-            error={errors.name?.message}
+            hint={t('admin:pluginNameHint')}
+            error={errors.name?.message ? t(errors.name.message) : undefined}
             {...register('name')}
           />
           <Input
             label="Ref"
-            placeholder="v1.2.3"
+            placeholder={t('admin:pluginRefPlaceholder')}
             mono
-            hint="tag-ref, одиночный path-сегмент"
-            error={errors.ref?.message}
+            hint={t('admin:pluginRefHint')}
+            error={errors.ref?.message ? t(errors.ref.message) : undefined}
             {...register('ref')}
           />
           <div style={{ alignSelf: 'flex-end' }}>
@@ -157,7 +147,7 @@ export function PluginRegisterForm() {
             padding: 'var(--s-4)',
           }}
         >
-          <h2 className={styles.sectionTitle}>Плагин допущен</h2>
+          <h2 className={styles.sectionTitle}>{t('admin:pluginAllowedTitle')}</h2>
           <div className={styles.meta}>
             <span className={styles.metaKey}>Namespace</span>
             <span className={styles.metaVal}>{reply.namespace}</span>
@@ -177,9 +167,9 @@ export function PluginRegisterForm() {
                 )
               }
             >
-              К записи
+              {t('admin:pluginGoToRecord')}
             </Button>
-            <Button variant="ghost" onClick={() => navigate('/plugins')}>К списку</Button>
+            <Button variant="ghost" onClick={() => navigate('/plugins')}>{t('admin:pluginGoToList')}</Button>
           </div>
         </section>
       ) : null}

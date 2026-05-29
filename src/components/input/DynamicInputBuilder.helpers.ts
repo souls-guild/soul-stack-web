@@ -5,6 +5,11 @@
 // чтобы редактирование одного row не дёргало input-focus у соседнего, когда
 // key === field.key и пользователь как раз правит key).
 
+import i18n from '../../i18n';
+
+// Pure-функции (вне React-дерева) используют глобальный i18n-инстанс.
+const t = i18n.t.bind(i18n);
+
 export type FieldType = 'string' | 'number' | 'integer' | 'boolean' | 'json';
 
 export interface FieldRow {
@@ -81,10 +86,10 @@ export function fieldsToObject(rows: FieldRow[]): FieldsValidation {
       return;
     }
     if (seenKeys.has(row.key)) {
-      rowErrors[idx] = 'дубликат ключа';
+      rowErrors[idx] = t('run:builderDuplicateKey');
       duplicates.add(row.key);
       const prev = seenKeys.get(row.key)!;
-      if (rowErrors[prev] === null) rowErrors[prev] = 'дубликат ключа';
+      if (rowErrors[prev] === null) rowErrors[prev] = t('run:builderDuplicateKey');
       anyError = true;
       return;
     }
@@ -120,16 +125,16 @@ function coerceRowValue(row: FieldRow): CoerceResult {
     case 'integer': {
       const raw = typeof row.raw === 'string' ? row.raw.trim() : String(row.raw);
       if (raw === '') return { value: 0, error: null };
-      if (!/^-?\d+$/.test(raw)) return { error: 'не integer' };
+      if (!/^-?\d+$/.test(raw)) return { error: t('run:builderNotInteger') };
       const n = Number(raw);
-      if (!Number.isFinite(n)) return { error: 'не integer' };
+      if (!Number.isFinite(n)) return { error: t('run:builderNotInteger') };
       return { value: n, error: null };
     }
     case 'number': {
       const raw = typeof row.raw === 'string' ? row.raw.trim() : String(row.raw);
       if (raw === '') return { value: 0, error: null };
       const n = Number(raw);
-      if (!Number.isFinite(n)) return { error: 'не number' };
+      if (!Number.isFinite(n)) return { error: t('run:builderNotNumber') };
       return { value: n, error: null };
     }
     case 'json': {
@@ -139,7 +144,7 @@ function coerceRowValue(row: FieldRow): CoerceResult {
         const parsed = JSON.parse(raw);
         return { value: parsed, error: null };
       } catch (e) {
-        return { error: e instanceof Error ? `JSON: ${e.message}` : 'невалидный JSON' };
+        return { error: e instanceof Error ? `JSON: ${e.message}` : t('run:builderInvalidJson') };
       }
     }
   }

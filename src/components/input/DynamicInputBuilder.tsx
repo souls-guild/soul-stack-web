@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Code, Pencil } from 'lucide-react';
 import {
   changeRowType,
@@ -9,6 +10,7 @@ import {
   type FieldRow,
   type FieldType,
 } from './DynamicInputBuilder.helpers';
+import i18n from '../../i18n';
 import styles from './DynamicInputBuilder.module.css';
 
 interface Props {
@@ -36,6 +38,7 @@ export function DynamicInputBuilder({
   allowRawJsonToggle = true,
   ariaLabel,
 }: Props) {
+  const { t } = useTranslation();
   // Локальный state-of-truth — массив FieldRow + флаг raw-режима.
   // Внешний `value` синхронизируется через onChange при валидных изменениях.
   const [rows, setRows] = useState<FieldRow[]>(() => parseRawJsonToFields(value ?? {}));
@@ -131,9 +134,7 @@ export function DynamicInputBuilder({
     <div className={styles.wrap} aria-label={ariaLabel ?? 'Dynamic input builder'}>
       <div className={styles.toolbar}>
         <span className={styles.hint}>
-          {rawMode
-            ? 'Raw JSON-режим. Введите валидный JSON-объект.'
-            : 'Form-режим. Добавьте поля для построения JSON-объекта.'}
+          {rawMode ? t('run:builderRawHint') : t('run:builderFormHint')}
         </span>
         {allowRawJsonToggle ? (
           <div className={styles.modeRow} role="group" aria-label="Input mode">
@@ -144,7 +145,7 @@ export function DynamicInputBuilder({
               onClick={() => {
                 if (rawMode) toggleRawMode();
               }}
-              title="Form-режим"
+              title={t('run:builderFormTitle')}
             >
               <Pencil size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} />
               form
@@ -156,7 +157,7 @@ export function DynamicInputBuilder({
               onClick={() => {
                 if (!rawMode) toggleRawMode();
               }}
-              title="Raw JSON-режим"
+              title={t('run:builderRawTitle')}
             >
               <Code size={12} style={{ verticalAlign: '-2px', marginRight: 4 }} />
               raw JSON
@@ -210,12 +211,13 @@ function FormView({
   onPatchRow,
   onChangeType,
 }: FormViewProps) {
+  const { t } = useTranslation();
   if (rows.length === 0) {
     return (
       <div className={styles.empty}>
-        <span>Полей нет. Будет отправлен пустой JSON-объект.</span>
+        <span>{t('run:builderEmptyHint')}</span>
         <button type="button" className={styles.addBtn} onClick={onAddRow} aria-label="Add first field">
-          <Plus size={12} /> добавить поле
+          <Plus size={12} /> {t('run:builderAddFirstField')}
         </button>
       </div>
     );
@@ -230,13 +232,13 @@ function FormView({
             error={rowErrors[idx]}
             onKeyChange={(k) => onPatchRow(idx, { key: k })}
             onRawChange={(r) => onPatchRow(idx, { raw: r })}
-            onTypeChange={(t) => onChangeType(idx, t)}
+            onTypeChange={(ty) => onChangeType(idx, ty)}
             onDelete={() => onDeleteRow(idx)}
           />
         ))}
       </div>
       <button type="button" className={styles.addBtn} onClick={onAddRow} aria-label="Add field">
-        <Plus size={12} /> добавить поле
+        <Plus size={12} /> {t('run:builderAddField')}
       </button>
     </>
   );
@@ -299,6 +301,7 @@ function ValueInput({
   row: FieldRow;
   onRawChange: (raw: string | boolean) => void;
 }) {
+  const { t } = useTranslation();
   if (row.type === 'boolean') {
     return (
       <label className={styles.checkboxCell}>
@@ -318,7 +321,7 @@ function ValueInput({
         rows={3}
         value={typeof row.raw === 'string' ? row.raw : ''}
         onChange={(e) => onRawChange(e.target.value)}
-        placeholder='{"nested": 1} или [1,2,3]'
+        placeholder={t('run:builderJsonPlaceholder')}
         spellCheck={false}
         aria-label={`field value ${row.id}`}
       />
@@ -358,10 +361,10 @@ function tryParseRawObject(text: string): { value: Record<string, unknown>; erro
   try {
     const parsed = JSON.parse(t);
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { value: null, error: 'Ожидается JSON-object {...}' };
+      return { value: null, error: i18n.t('run:builderExpectObject') };
     }
     return { value: parsed as Record<string, unknown>, error: null };
   } catch (e) {
-    return { value: null, error: e instanceof Error ? `JSON: ${e.message}` : 'невалидный JSON' };
+    return { value: null, error: e instanceof Error ? `JSON: ${e.message}` : i18n.t('run:builderInvalidJson') };
   }
 }

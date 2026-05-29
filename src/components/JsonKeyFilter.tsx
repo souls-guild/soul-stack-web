@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import styles from './JsonKeyFilter.module.css';
 
 interface Props {
@@ -54,7 +55,9 @@ function highlight(text: string, q: string): React.ReactNode {
   );
 }
 
-export function JsonKeyFilter({ value, emptyLabel = 'пусто' }: Props) {
+export function JsonKeyFilter({ value, emptyLabel }: Props) {
+  const { t } = useTranslation();
+  const resolvedEmpty = emptyLabel ?? t('incarnations:jsonEmpty');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState<Set<string>>(new Set());
 
@@ -78,10 +81,10 @@ export function JsonKeyFilter({ value, emptyLabel = 'пусто' }: Props) {
   }, [entries, q]);
 
   if (value === null || value === undefined) {
-    return <div className={styles.empty}>{emptyLabel}</div>;
+    return <div className={styles.empty}>{resolvedEmpty}</div>;
   }
   if (isPlainObject && entries.length === 0) {
-    return <div className={styles.empty}>{emptyLabel}</div>;
+    return <div className={styles.empty}>{resolvedEmpty}</div>;
   }
   if (!isPlainObject) {
     // Массив или скаляр — рендерим как обычный JSON-блок.
@@ -106,18 +109,18 @@ export function JsonKeyFilter({ value, emptyLabel = 'пусто' }: Props) {
       <div className={styles.searchRow}>
         <input
           type="text"
-          placeholder="Фильтр по top-level ключам…"
+          placeholder={t('incarnations:filterByKeys')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className={styles.searchInput}
-          aria-label="Фильтр по top-level ключам"
+          aria-label={t('incarnations:filterByKeysAria')}
         />
         <span className={styles.counter}>
           {filtered.length} / {entries.length}
         </span>
       </div>
       {filtered.length === 0 ? (
-        <div className={styles.empty}>Ничего не найдено по «{q}».</div>
+        <div className={styles.empty}>{t('incarnations:filterNothing', { q })}</div>
       ) : (
         <div className={styles.list}>
           {filtered.map((e) => {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -9,6 +10,7 @@ import {
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
+import i18n from '../../i18n';
 import styles from '../common.module.css';
 
 // Перечень source-ов из openapi.yaml — `AuditEvent.source.enum`.
@@ -52,7 +54,7 @@ function maybeTruncatePayload(payload: unknown): { value: unknown; truncated: bo
   try {
     text = JSON.stringify(payload);
   } catch {
-    return { value: { error: 'не сериализуется в JSON' }, truncated: true };
+    return { value: { error: i18n.t('admin:auditPayloadNotSerializable') }, truncated: true };
   }
   if (text.length <= PAYLOAD_LIMIT_CHARS) {
     return { value: payload, truncated: false };
@@ -83,6 +85,7 @@ function localToRfc3339(local: string): string | undefined {
 }
 
 function EventCard({ ev }: { ev: AuditEvent }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { value, truncated } = useMemo(() => maybeTruncatePayload(ev.payload), [ev.payload]);
   return (
@@ -108,13 +111,13 @@ function EventCard({ ev }: { ev: AuditEvent }) {
           <span style={{ color: 'var(--text-muted)' }}>{ev.created_at}</span>
         </div>
         <div className={styles.timelineHead} style={{ fontSize: 12 }}>
-          <span className="mono">archon: {ev.archon_aid ?? '—'}</span>
+          <span className="mono">{t('admin:auditArchonPrefix')} {ev.archon_aid ?? '—'}</span>
           <span className="mono" title="correlation_id">
             corr: {ev.correlation_id ?? '—'}
           </span>
           <span style={{ color: 'var(--text-faint)' }}>
-            {open ? '▾ свернуть' : '▸ payload'}
-            {truncated ? ' · truncated' : ''}
+            {open ? t('admin:auditCollapse') : t('admin:auditExpand')}
+            {truncated ? ` · ${t('admin:auditTruncated')}` : ''}
           </span>
         </div>
       </div>
@@ -123,7 +126,7 @@ function EventCard({ ev }: { ev: AuditEvent }) {
           <div className={styles.metaKey} style={{ marginBottom: 4 }}>
             id: <span className="mono">{ev.id}</span>
           </div>
-          <JsonViewer value={value} emptyLabel="payload пуст" />
+          <JsonViewer value={value} emptyLabel={t('admin:auditPayloadEmpty')} />
         </div>
       ) : null}
     </div>
@@ -131,6 +134,7 @@ function EventCard({ ev }: { ev: AuditEvent }) {
 }
 
 export function AuditLog() {
+  const { t } = useTranslation();
   // Поддерживаем deep-link `/audit?archon_aid=archon-alice` из ArchonDetail
   // («Activity»-tab открывает audit с предустановленным фильтром).
   const [searchParams, setSearchParams] = useSearchParams();
@@ -190,18 +194,18 @@ export function AuditLog() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Audit</h1>
-          <div className={styles.crumbs}>трейл операторских действий</div>
+          <div className={styles.crumbs}>{t('admin:auditCrumbs')}</div>
         </div>
       </div>
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>Type (CSV, OR)</div>
+          <div className={styles.metaKey}>{t('admin:auditTypeLabel')}</div>
           <input
             type="text"
             value={typeCsv}
             onChange={(e) => { setTypeCsv(e.target.value); setOffset(0); }}
-            placeholder="scenario.applied, push.applied"
+            placeholder={t('admin:auditTypePlaceholder')}
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)', minWidth: 280 }}
           />
         </label>
@@ -211,7 +215,7 @@ export function AuditLog() {
             type="text"
             value={archonAid}
             onChange={(e) => syncArchonAid(e.target.value)}
-            placeholder="archon-alice"
+            placeholder={t('admin:auditArchonAidPlaceholder')}
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)', minWidth: 200 }}
           />
         </label>
@@ -221,12 +225,12 @@ export function AuditLog() {
             type="text"
             value={correlationId}
             onChange={(e) => { setCorrelationId(e.target.value); setOffset(0); }}
-            placeholder="01HZ…"
+            placeholder={t('admin:auditCorrelationPlaceholder')}
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--font-mono)', minWidth: 220 }}
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Started after</div>
+          <div className={styles.metaKey}>{t('admin:auditStartedAfter')}</div>
           <input
             type="datetime-local"
             value={startedAfter}
@@ -235,7 +239,7 @@ export function AuditLog() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Started before</div>
+          <div className={styles.metaKey}>{t('admin:auditStartedBefore')}</div>
           <input
             type="datetime-local"
             value={startedBefore}
@@ -257,7 +261,7 @@ export function AuditLog() {
       </div>
 
       <div className={styles.filters} aria-label="Source filter">
-        <span className={styles.metaKey} style={{ alignSelf: 'center' }}>Source:</span>
+        <span className={styles.metaKey} style={{ alignSelf: 'center' }}>{t('admin:auditSourceLabel')}</span>
         {SOURCES.map((s) => {
           const active = sources.includes(s);
           return (
@@ -282,15 +286,17 @@ export function AuditLog() {
         })}
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('admin:auditLoading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError
+            ? t('errors:generic', { status: q.error.status, detail: q.error.message })
+            : String(q.error)}
         </div>
       ) : null}
 
       {q.data && items.length === 0 ? (
-        <div className={styles.empty}>Audit-events под фильтр не найдено.</div>
+        <div className={styles.empty}>{t('admin:auditEmpty')}</div>
       ) : null}
 
       {items.length > 0 ? (
@@ -304,17 +310,23 @@ export function AuditLog() {
               onClick={() => setOffset(Math.max(0, offset - limit))}
               style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset === 0 ? 'not-allowed' : 'pointer' }}
             >
-              ← Prev
+              {t('admin:auditPrev')}
             </button>
             <span>
-              Page {currentPage} / {pageCount} · {offset + 1}–{offset + items.length} of {total}
+              {t('admin:auditPageInfo', {
+                page: currentPage,
+                pages: pageCount,
+                from: offset + 1,
+                to: offset + items.length,
+                total,
+              })}
             </span>
             <button
               disabled={offset + limit >= total}
               onClick={() => setOffset(offset + limit)}
               style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset + limit >= total ? 'not-allowed' : 'pointer' }}
             >
-              Next →
+              {t('admin:auditNext')}
             </button>
           </div>
         </>

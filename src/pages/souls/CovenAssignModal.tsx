@@ -33,8 +33,8 @@ interface Props {
 }
 
 function validateCoven(v: string): string | null {
-  if (!COVEN_PATTERN.test(v)) return 'lowercase, цифры, дефис-разделитель';
-  if (v.length > 63) return 'не длиннее 63 символов';
+  if (!COVEN_PATTERN.test(v)) return 'souls:validCovenChars';
+  if (v.length > 63) return 'souls:validCovenMaxLen';
   return null;
 }
 
@@ -96,7 +96,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
       }
       const reason = validateCoven(v);
       if (reason) {
-        setServerError(reason);
+        setServerError(t(reason));
         return;
       }
       mu.mutate({ ...base, label: v });
@@ -106,8 +106,8 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
   const targetCount = variant.kind === 'single' ? 1 : variant.sids.length;
   const title =
     variant.kind === 'single'
-      ? `Coven assignment: ${variant.sid}`
-      : `Bulk coven-assign: ${targetCount} Soul${targetCount === 1 ? '' : 's'}`;
+      ? `${t('souls:covenAssignment')}: ${variant.sid}`
+      : t('souls:bulkCovenTitle', { count: targetCount, noun: targetCount === 1 ? 'Soul' : 'Souls' });
 
   // Success state — показываем reply matched/changed/status.
   if (reply) {
@@ -118,7 +118,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
         onClose={close}
         footer={
           <Button type="button" variant="primary" onClick={close}>
-            Готово
+            {t('souls:done')}
           </Button>
         }
       >
@@ -134,7 +134,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
               marginBottom: 12,
             }}
           >
-            partial — часть чанков закоммичена до фейла. Повторите операцию (идемпотентна).
+            {t('souls:covenPartialWarn')}
           </div>
         ) : null}
         <div className={styles.meta}>
@@ -149,7 +149,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
           {reply.mode === 'replace' ? (
             <>
               <span className={styles.metaKey}>labels</span>
-              <span className={styles.metaVal}>{(reply.labels ?? []).join(', ') || '— (снято всё)'}</span>
+              <span className={styles.metaVal}>{(reply.labels ?? []).join(', ') || t('souls:replaceEmptyLabels')}</span>
             </>
           ) : (
             <>
@@ -181,11 +181,11 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
       <form noValidate>
         {variant.kind === 'bulk' ? (
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-            Будут применены к {targetCount} Soul-ам. Селектор — точечный список SID.
+            {t('souls:bulkCovenIntro', { count: targetCount })}
           </p>
         ) : (
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-            Текущий набор Coven-меток предзаполнен. Удалите / добавьте, выберите mode и применяйте.
+            {t('souls:singleCovenIntro')}
           </p>
         )}
 
@@ -206,7 +206,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
               checked={mode === 'append'}
               onChange={() => setMode('append')}
             />
-            <span>append (одна метка)</span>
+            <span>{t('souls:modeAppend')}</span>
           </label>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginRight: 12 }}>
             <input
@@ -216,7 +216,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
               checked={mode === 'remove'}
               onChange={() => setMode('remove')}
             />
-            <span>remove (одна метка)</span>
+            <span>{t('souls:modeRemove')}</span>
           </label>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <input
@@ -226,24 +226,24 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
               checked={mode === 'replace'}
               onChange={() => setMode('replace')}
             />
-            <span>replace (набор)</span>
+            <span>{t('souls:modeReplace')}</span>
           </label>
         </fieldset>
 
         {mode === 'replace' ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13 }}>Coven-метки (пустой набор = снять все)</span>
+            <span style={{ fontSize: 13 }}>{t('souls:replaceLabelsLabel')}</span>
             <ChipsInput
               value={labels}
               onChange={setLabels}
-              placeholder="prod, redis-prod, ..."
-              validate={validateCoven}
-              ariaLabel="coven-метки"
+              placeholder={t('souls:covensPlaceholder')}
+              validate={(v) => { const r = validateCoven(v); return r ? t(r) : null; }}
+              ariaLabel={t('souls:covenLabelAria')}
             />
           </label>
         ) : (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13 }}>Coven-метка</span>
+            <span style={{ fontSize: 13 }}>{t('souls:singleLabelLabel')}</span>
             <input
               type="text"
               value={label}

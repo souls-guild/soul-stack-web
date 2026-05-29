@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Send } from 'lucide-react';
@@ -32,6 +33,7 @@ function readHosts(summary: PushApplyView['summary'] | undefined): HostSummary[]
 }
 
 export function PushRunDetail() {
+  const { t } = useTranslation();
   const { applyId = '' } = useParams<{ applyId: string }>();
 
   const q = useQuery({
@@ -45,16 +47,16 @@ export function PushRunDetail() {
     },
   });
 
-  if (q.isLoading && !q.data) return <div className={styles.loading}>Загружаем…</div>;
+  if (q.isLoading && !q.data) return <div className={styles.loading}>{t('loading')}</div>;
   if (q.error) {
     return (
       <div className={styles.errorBox}>
-        {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+        {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
       </div>
     );
   }
   const view = q.data;
-  if (!view) return <div className={styles.empty}>Push-прогон не найден.</div>;
+  if (!view) return <div className={styles.empty}>{t('runhistory:pushRunNotFound')}</div>;
 
   const hosts = readHosts(view.summary);
   const targets = view.inventory_sids?.length ?? 0;
@@ -105,8 +107,8 @@ export function PushRunDetail() {
         </div>
       </section>
 
-      <section className={styles.section} aria-label="Per-host исходы">
-        <h2 className={styles.sectionTitle}>Per-host исходы</h2>
+      <section className={styles.section} aria-label="Per-host">
+        <h2 className={styles.sectionTitle}>Per-host</h2>
         {hosts && hosts.length > 0 ? (
           <table className={styles.table}>
             <thead>
@@ -129,16 +131,16 @@ export function PushRunDetail() {
             </tbody>
           </table>
         ) : NON_TERMINAL.has(view.status ?? '') ? (
-          <div className={styles.empty}>summary.hosts появится после терминала.</div>
+          <div className={styles.empty}>{t('runhistory:pushHostsAfterTerminal')}</div>
         ) : (
-          <JsonViewer value={view.summary} emptyLabel="summary пустой" />
+          <JsonViewer value={view.summary} emptyLabel={t('runhistory:summaryEmptyJson')} />
         )}
       </section>
 
       {view.input ? (
         <section className={styles.section} aria-label="Input">
           <h2 className={styles.sectionTitle}>Input</h2>
-          <JsonViewer value={view.input} emptyLabel="input пустой" />
+          <JsonViewer value={view.input} emptyLabel={t('runhistory:summaryEmptyInput')} />
         </section>
       ) : null}
     </div>

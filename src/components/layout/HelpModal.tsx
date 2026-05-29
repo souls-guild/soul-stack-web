@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Copy, ExternalLink, FileText } from 'lucide-react';
 import { Modal } from '../primitives';
 import styles from './HelpModal.module.css';
@@ -30,6 +31,7 @@ function getMcpBase(): string {
 }
 
 function CopyButton({ value, label }: { value: string; label: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   async function onCopy() {
     try {
@@ -39,69 +41,58 @@ function CopyButton({ value, label }: { value: string; label: string }) {
     } catch {
       // clipboard может быть недоступен (http-context) — fallback в select-and-copy:
       // показываем prompt с готовым значением, чтобы оператор не упёрся в тупик.
-      window.prompt('Скопируйте значение:', value);
+      window.prompt(t('admin:helpCopyPrompt'), value);
     }
   }
   return (
     <button type="button" className={styles.copy} onClick={onCopy} aria-label={label}>
-      <Copy size={12} /> {copied ? 'Скопировано' : 'Copy'}
+      <Copy size={12} /> {copied ? t('admin:helpCopied') : t('admin:helpCopy')}
     </button>
   );
 }
 
 export function HelpModal({ open, onClose }: Props) {
+  const { t } = useTranslation();
   const keeperBase = getKeeperBase();
   const mcpBase = getMcpBase();
   const openapiUrl = `${keeperBase}/openapi.yaml`;
   return (
-    <Modal open={open} title="Помощь · Soul Stack Keeper" onClose={onClose}>
+    <Modal open={open} title={t('admin:helpTitle')} onClose={onClose}>
       <div className={styles.body}>
         <section className={styles.section}>
-          <h3 className={styles.h}>OpenAPI спецификация</h3>
-          <p className={styles.lead}>
-            Keeper отдаёт OpenAPI 3.1 spec по адресу <code className="mono">/openapi.yaml</code>.
-            Используется для генерации клиентов и валидации запросов.
-          </p>
+          <h3 className={styles.h}>{t('admin:helpOpenapiTitle')}</h3>
+          <p className={styles.lead}>{t('admin:helpOpenapiLead')}</p>
           <div className={styles.row}>
             <code className={`mono ${styles.url}`}>{openapiUrl}</code>
             <div className={styles.actions}>
-              <CopyButton value={openapiUrl} label="Скопировать OpenAPI URL" />
+              <CopyButton value={openapiUrl} label={t('admin:helpOpenapiCopyAria')} />
               <a
                 href={openapiUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={styles.linkBtn}
               >
-                <ExternalLink size={12} /> Открыть
+                <ExternalLink size={12} /> {t('admin:helpOpen')}
               </a>
             </div>
           </div>
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.h}>MCP endpoint</h3>
-          <p className={styles.lead}>
-            Model Context Protocol listener для интеграции с Claude Desktop и другими MCP-клиентами.
-            Транспорт <code className="mono">stdio</code> поверх HTTP/SSE, см. <code className="mono">keeper.yml</code>{' '}
-            <code className="mono">listen.mcp.addr</code>.
-          </p>
+          <h3 className={styles.h}>{t('admin:helpMcpTitle')}</h3>
+          <p className={styles.lead}>{t('admin:helpMcpLead')}</p>
           <div className={styles.row}>
             <code className={`mono ${styles.url}`}>{mcpBase}</code>
             <div className={styles.actions}>
-              <CopyButton value={mcpBase} label="Скопировать MCP URL" />
+              <CopyButton value={mcpBase} label={t('admin:helpMcpCopyAria')} />
             </div>
           </div>
-          <p className={styles.hint}>
-            Для Claude Desktop пропишите endpoint в <code className="mono">claude_desktop_config.json</code>{' '}
-            под ключом <code className="mono">mcpServers.soul-stack</code>.
-          </p>
+          <p className={styles.hint}>{t('admin:helpMcpHint')}</p>
         </section>
 
         <section className={styles.section}>
-          <h3 className={styles.h}>Документация</h3>
-          <p className={styles.lead}>
-            Документация и ADR — в репозитории <code className="mono">soul-stack/docs/</code>.
-          </p>
+          <h3 className={styles.h}>{t('admin:helpDocsTitle')}</h3>
+          <p className={styles.lead}>{t('admin:helpDocsLead')}</p>
           <div className={styles.row}>
             <a
               href="https://github.com/soul-stack/soul-stack/blob/main/docs/README.md"

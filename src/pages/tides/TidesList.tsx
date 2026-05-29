@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Waves } from 'lucide-react';
@@ -32,6 +33,7 @@ function relative(ts: string | undefined): string {
 }
 
 export function TidesList() {
+  const { t } = useTranslation();
   const [incarnation, setIncarnation] = useState('');
   const [statusSet, setStatusSet] = useState<Set<TideStatus>>(new Set());
   const [offset, setOffset] = useState(0);
@@ -71,7 +73,7 @@ export function TidesList() {
             <Waves size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Tides
           </h1>
-          <div className={styles.crumbs}>история Tide-прогонов (ADR-040)</div>
+          <div className={styles.crumbs}>{t('runhistory:tidesCrumbs')}</div>
         </div>
       </div>
 
@@ -110,15 +112,15 @@ export function TidesList() {
         </div>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && items.length === 0 ? (
-        <div className={styles.empty}>Tide-прогонов под фильтр не найдено.</div>
+        <div className={styles.empty}>{t('runhistory:noTidesFound')}</div>
       ) : null}
 
       {items.length > 0 ? (

@@ -48,7 +48,7 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
                 <button
                   type="button"
                   aria-label={t('forms:ariaEditPermissions', { name: r.name })}
-                  title={r.builtin ? t('pages:builtinEditDenied') : 'Edit permissions'}
+                  title={r.builtin ? t('pages:builtinEditDenied') : t('admin:rbacBuiltinEditTitle')}
                   onClick={() => onEdit(r)}
                   style={iconBtn(false)}
                 >
@@ -57,7 +57,7 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
                 <button
                   type="button"
                   aria-label={t('forms:ariaDeleteRole', { name: r.name })}
-                  title={r.builtin ? t('pages:builtinDeleteDenied') : 'Delete role'}
+                  title={r.builtin ? t('pages:builtinDeleteDenied') : t('admin:rbacBuiltinDeleteTitle')}
                   disabled={r.builtin}
                   onClick={() => onDelete(r)}
                   style={iconBtn(true, r.builtin)}
@@ -202,7 +202,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
               <td className="mono">{aid}</td>
               <td>
                 {rs.length === 0 ? (
-                  <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>— ни одной роли —</span>
+                  <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{t('admin:rbacNoRolesForOperator')}</span>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {rs.map((rn) => (
@@ -223,8 +223,8 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
                         {rn}
                         <button
                           type="button"
-                          aria-label={`снять ${aid} с роли ${rn}`}
-                          title={`снять ${aid} с роли ${rn}`}
+                          aria-label={t('admin:rbacUnassignAria', { aid, role: rn })}
+                          title={t('admin:rbacUnassignAria', { aid, role: rn })}
                           onClick={() => {
                             setServerError(null);
                             revokeMut.mutate({ role: rn, aid });
@@ -255,7 +255,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
                     style={iconBtn(false)}
                   >
                     <UserPlus size={14} />
-                    <span style={{ marginLeft: 4 }}>Assign</span>
+                    <span style={{ marginLeft: 4 }}>{t('admin:rbacAssign')}</span>
                   </button>
                 </div>
               </td>

@@ -66,11 +66,11 @@ export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 'var(--s-4)' }}>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-          Оператор получит все permissions выбранной роли. Операция идемпотентна.
+          {t('admin:rbacAssignProse')}
         </p>
         {candidates.length === 0 ? (
           <div className={styles.empty} style={{ padding: 'var(--s-4)' }}>
-            Оператор уже состоит во всех ролях кластера.
+            {t('admin:rbacAssignAllRoles')}
           </div>
         ) : (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -88,10 +88,10 @@ export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
                 fontSize: 13,
               }}
             >
-              <option value="">— выберите роль —</option>
+              <option value="">{t('admin:rbacAssignSelectPlaceholder')}</option>
               {candidates.map((r) => (
                 <option key={r.name} value={r.name}>
-                  {r.name}{r.builtin ? ' (builtin)' : ''}{r.description ? ` — ${r.description}` : ''}
+                  {r.name}{r.builtin ? ` ${t('admin:rbacAssignBuiltinSuffix')}` : ''}{r.description ? ` — ${r.description}` : ''}
                 </option>
               ))}
             </select>

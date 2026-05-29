@@ -46,11 +46,12 @@ const STEPS: Array<{ id: 1 | 2 | 3 | 4; label: string }> = [
   { id: 4, label: 'Options' },
 ];
 
-// Step 1 — выбор workload.
-const WORKLOADS: Array<{ kind: Workload; title: string; desc: string; icon: typeof Box }> = [
-  { kind: 'scenario', title: 'Scenario apply', desc: 'Apply scenario из service на incarnation (pull-режим).', icon: Box },
-  { kind: 'command', title: 'Command', desc: 'Ad-hoc exec на нескольких Souls через Errand multi-target.', icon: Terminal },
-  { kind: 'push', title: 'Push destiny', desc: 'Push destiny по SSH без агента.', icon: Upload },
+// Step 1 — выбор workload. `title` — имя workload-сущности (English, не переводится);
+// `descKey` — i18n-ключ описания (переводится).
+const WORKLOADS: Array<{ kind: Workload; title: string; descKey: string; icon: typeof Box }> = [
+  { kind: 'scenario', title: 'Scenario apply', descKey: 'run:workloadScenarioDesc', icon: Box },
+  { kind: 'command', title: 'Command', descKey: 'run:workloadCommandDesc', icon: Terminal },
+  { kind: 'push', title: 'Push destiny', descKey: 'run:workloadPushDesc', icon: Upload },
 ];
 
 interface ScenarioStateValues {
@@ -236,7 +237,11 @@ export function RunWizard() {
       return submitPush();
     },
     onError: (err) => {
-      setSubmitError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setSubmitError(
+        err instanceof ApiError
+          ? t('run:submitErrorPrefix', { status: err.status, message: err.message })
+          : String(err),
+      );
     },
     onSuccess: (redirect) => {
       navigate(redirect);
@@ -359,7 +364,7 @@ export function RunWizard() {
             <Play size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Run
           </h1>
-          <div className={pageStyles.crumbs}>unified entry-point: scenario / command / push</div>
+          <div className={pageStyles.crumbs}>{t('run:crumbs')}</div>
         </div>
       </div>
 
@@ -452,6 +457,7 @@ function Stepper({ step, onJump }: { step: 1 | 2 | 3 | 4; onJump: (s: 1 | 2 | 3 
 }
 
 function Step1({ value, onChange }: { value: Workload; onChange: (v: Workload) => void }) {
+  const { t } = useTranslation();
   return (
     <div className={styles.radioRow} role="radiogroup" aria-label="Workload type">
       {WORKLOADS.map((w) => {
@@ -473,7 +479,7 @@ function Step1({ value, onChange }: { value: Workload; onChange: (v: Workload) =
             <Icon size={18} style={{ marginTop: 2, color: 'var(--text-muted)' }} />
             <div>
               <div className={styles.radioTitle}>{w.title}</div>
-              <div className={styles.radioDesc}>{w.desc}</div>
+              <div className={styles.radioDesc}>{t(w.descKey)}</div>
             </div>
           </label>
         );
@@ -503,6 +509,7 @@ function Step2Scenario({
   inputSchema: ScenarioInputSchema | undefined;
   selectedScenarioMeta: ServiceScenarioInfo | undefined;
 }) {
+  const { t } = useTranslation();
   const servicesQ = useQuery({
     queryKey: ['run.services.list'],
     queryFn: () => keeperApi.services.list(),
@@ -532,7 +539,7 @@ function Step2Scenario({
           value={value.service}
           onChange={(e) => onChange({ ...value, service: e.target.value, scenario: '', incarnation: '' })}
         >
-          <option value="">— выберите сервис —</option>
+          <option value="">{t('run:selectServicePlaceholder')}</option>
           {(servicesQ.data?.items ?? []).map((s) => (
             <option key={s.name} value={s.name}>
               {s.name} ({s.ref})
@@ -550,7 +557,7 @@ function Step2Scenario({
             onChange={(e) => onChange({ ...value, scenario: e.target.value })}
             disabled={scenariosQ.loading || scenariosQ.unavailable}
           >
-            <option value="">— выберите scenario —</option>
+            <option value="">{t('run:selectScenarioPlaceholder')}</option>
             {scenariosQ.items.map((s) => (
               <option key={s.name} value={s.name} title={s.description ?? ''}>
                 {s.name}
@@ -560,7 +567,7 @@ function Step2Scenario({
           </select>
           {scenariosQ.unavailable ? (
             <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-              scenario-каталог не предоставлен сервером — dynamic input form fallback.
+              {t('run:scenarioCatalogUnavailable')}
             </span>
           ) : null}
         </label>
@@ -583,7 +590,7 @@ function Step2Scenario({
                   checked={value.incarnationMode === 'existing'}
                   onChange={() => onChange({ ...value, incarnationMode: 'existing' })}
                 />
-                Existing
+                {t('run:incarnationModeExisting')}
               </label>
               <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
                 <input
@@ -593,19 +600,19 @@ function Step2Scenario({
                   checked={value.incarnationMode === 'create'}
                   onChange={() => onChange({ ...value, incarnationMode: 'create' })}
                 />
-                Create new
+                {t('run:incarnationModeCreate')}
               </label>
             </div>
             {value.incarnationMode === 'existing' ? (
               <label className={styles.fieldRow}>
-                <span className={styles.fieldLabel}>Existing incarnation (filter by service)</span>
+                <span className={styles.fieldLabel}>{t('run:existingIncarnationLabel')}</span>
                 <select
                   className={styles.field}
                   value={value.incarnation}
                   onChange={(e) => onChange({ ...value, incarnation: e.target.value })}
                   disabled={incarnationsQ.isLoading}
                 >
-                  <option value="">— выберите incarnation —</option>
+                  <option value="">{t('run:selectIncarnationPlaceholder')}</option>
                   {(incarnationsQ.data?.items ?? []).map((i) => (
                     <option key={i.name} value={i.name}>
                       {i.name} [{i.status}]
@@ -616,25 +623,25 @@ function Step2Scenario({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <label className={styles.fieldRow}>
-                  <span className={styles.fieldLabel}>New incarnation name (kebab-case)</span>
+                  <span className={styles.fieldLabel}>{t('run:newIncarnationNameLabel')}</span>
                   <input
                     type="text"
                     className={styles.field}
                     value={value.newIncarnationName}
                     onChange={(e) => onChange({ ...value, newIncarnationName: e.target.value })}
-                    placeholder="redis-prod"
+                    placeholder={t('run:newIncarnationNamePlaceholder')}
                   />
                 </label>
                 <div>
                   <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-                    Covens (declared environment-теги)
+                    {t('run:covensLabel')}
                   </div>
                   <ChipsInput
                     value={value.newIncarnationCovens}
                     onChange={(next) => onChange({ ...value, newIncarnationCovens: next })}
-                    placeholder="prod, datacenter-1"
+                    placeholder={t('run:covensPlaceholder')}
                     ariaLabel="Covens"
-                    validate={(t) => (NAME_REGEX.test(t) ? null : 'kebab-case: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$')}
+                    validate={(v) => (NAME_REGEX.test(v) ? null : t('run:covenKebabError'))}
                   />
                 </div>
               </div>
@@ -644,7 +651,7 @@ function Step2Scenario({
           {usePerField && inputSchema ? (
             <div>
               <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-                Input (поля scenario <code className="mono">{value.scenario}</code>)
+                {t('run:scenarioInputFieldsLabel', { scenario: value.scenario })}
               </div>
               <ScenarioInputFields
                 schema={inputSchema}
@@ -660,7 +667,7 @@ function Step2Scenario({
           ) : (
             <div>
               <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-                Input (динамический form-builder без input_schema)
+                {t('run:scenarioInputDynamicLabel')}
               </div>
               <DynamicInputBuilder
                 value={value.inputObj}
@@ -682,6 +689,7 @@ function Step2Command({
   value: CommandStateValues;
   onChange: (next: CommandStateValues) => void;
 }) {
+  const { t } = useTranslation();
   const isCustom = value.moduleKind === 'custom';
   return (
     <>
@@ -697,25 +705,25 @@ function Step2Command({
         >
           <option value="core.cmd.shell">core.cmd.shell</option>
           <option value="core.exec.run">core.exec.run</option>
-          <option value="custom">— custom module —</option>
+          <option value="custom">{t('run:customModuleOption')}</option>
         </select>
       </label>
       {isCustom ? (
         <>
           <label className={styles.fieldRow}>
-            <span className={styles.fieldLabel}>Module name</span>
+            <span className={styles.fieldLabel}>{t('run:moduleNameLabel')}</span>
             <input
               type="text"
               className={styles.field}
               value={value.customModule}
               onChange={(e) => onChange({ ...value, customModule: e.target.value })}
-              placeholder="core.http.probe"
+              placeholder={t('run:moduleNamePlaceholder')}
               aria-label="Custom module name"
             />
           </label>
           <div>
             <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-              Input
+              {t('run:inputLabel')}
             </div>
             <DynamicInputBuilder
               value={value.customInput}
@@ -727,20 +735,26 @@ function Step2Command({
       ) : (
         <label className={styles.fieldRow}>
           <span className={styles.fieldLabel}>
-            {value.moduleKind === 'core.cmd.shell' ? 'Command (sh -c)' : 'Binary + args (одной строкой)'}
+            {value.moduleKind === 'core.cmd.shell'
+              ? t('run:commandShellLabel')
+              : t('run:commandExecLabel')}
           </span>
           <textarea
             className={styles.field}
             rows={4}
             value={value.cmd}
             onChange={(e) => onChange({ ...value, cmd: e.target.value })}
-            placeholder={value.moduleKind === 'core.cmd.shell' ? 'uptime && df -h' : '/usr/bin/uptime'}
+            placeholder={
+              value.moduleKind === 'core.cmd.shell'
+                ? t('run:commandShellPlaceholder')
+                : t('run:commandExecPlaceholder')
+            }
             aria-label="Command"
           />
         </label>
       )}
       <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>Timeout (s)</span>
+        <span className={styles.fieldLabel}>{t('run:timeoutLabel')}</span>
         <input
           type="number"
           className={styles.field}
@@ -762,6 +776,7 @@ function Step2Push({
   value: PushStateValues;
   onChange: (next: PushStateValues) => void;
 }) {
+  const { t } = useTranslation();
   const providersQ = useQuery({
     queryKey: ['run.pushProviders.list'],
     queryFn: () => keeperApi.pushProviders.list(),
@@ -772,18 +787,18 @@ function Step2Push({
   return (
     <>
       <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>Destiny ref (&lt;name&gt;@&lt;ref&gt;)</span>
+        <span className={styles.fieldLabel}>{t('run:destinyRefLabel')}</span>
         <input
           type="text"
           className={styles.field}
           value={value.destiny}
           onChange={(e) => onChange({ ...value, destiny: e.target.value })}
-          placeholder="redis-cluster@v2.0.0"
+          placeholder={t('run:destinyRefPlaceholder')}
           aria-label="Destiny ref"
         />
       </label>
       <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>SSH provider</span>
+        <span className={styles.fieldLabel}>{t('run:sshProviderLabel')}</span>
         {providers.length > 0 ? (
           <select
             className={styles.field}
@@ -791,7 +806,7 @@ function Step2Push({
             onChange={(e) => onChange({ ...value, sshProvider: e.target.value })}
             aria-label="SSH provider"
           >
-            <option value="">— routing (первый зарегистрированный) —</option>
+            <option value="">{t('run:sshProviderRoutingPlaceholder')}</option>
             {providers.map((p) => (
               <option key={p.name} value={p.name}>
                 {p.name}
@@ -804,14 +819,14 @@ function Step2Push({
             className={styles.field}
             value={value.sshProvider}
             onChange={(e) => onChange({ ...value, sshProvider: e.target.value })}
-            placeholder="default"
+            placeholder={t('run:sshProviderNamePlaceholder')}
             aria-label="SSH provider name"
           />
         )}
       </label>
       <div>
         <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-          Input
+          {t('run:inputLabel')}
         </div>
         <DynamicInputBuilder
           value={value.inputObj}
@@ -830,6 +845,7 @@ function Step3Target({
   value: TargetSpec;
   onChange: (next: TargetSpec) => void;
 }) {
+  const { t } = useTranslation();
   function toggleMode(m: TargetMode) {
     const modes = new Set(value.modes);
     if (modes.has(m)) modes.delete(m);
@@ -855,7 +871,7 @@ function Step3Target({
     <>
       <div>
         <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-          Режимы (можно несколько — AND-merge)
+          {t('run:targetModesLabel')}
         </div>
         <div className={styles.modeRow} role="group" aria-label="Target modes">
           {(['sids', 'coven', 'glob', 'regex', 'cel_where'] as TargetMode[]).map((m) => {
@@ -880,27 +896,27 @@ function Step3Target({
       {value.modes.has('coven') ? (
         <div>
           <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-            Coven labels
+            {t('run:covenLabelsLabel')}
           </div>
           <ChipsInput
             value={value.coven}
             onChange={(next) => onChange({ ...value, coven: next })}
-            placeholder="prod, datacenter-1"
+            placeholder={t('run:covenLabelsPlaceholder')}
             ariaLabel="Coven labels"
-            validate={(t) => (NAME_REGEX.test(t) ? null : 'kebab-case')}
+            validate={(v) => (NAME_REGEX.test(v) ? null : t('run:covenKebabShortError'))}
           />
         </div>
       ) : null}
 
       {value.modes.has('glob') ? (
         <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>Glob (FQDN-маска → sid.glob)</span>
+          <span className={styles.fieldLabel}>{t('run:globLabel')}</span>
           <input
             type="text"
             className={styles.field}
             value={value.glob}
             onChange={(e) => onChange({ ...value, glob: e.target.value })}
-            placeholder="prod-*"
+            placeholder={t('run:globPlaceholder')}
             aria-label="Glob pattern"
           />
         </label>
@@ -908,13 +924,13 @@ function Step3Target({
 
       {value.modes.has('regex') ? (
         <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>Regex (RE2 → sid.matches)</span>
+          <span className={styles.fieldLabel}>{t('run:regexLabel')}</span>
           <input
             type="text"
             className={styles.field}
             value={value.regex}
             onChange={(e) => onChange({ ...value, regex: e.target.value })}
-            placeholder="^db-[0-9]+$"
+            placeholder={t('run:regexPlaceholder')}
             aria-label="Regex pattern"
           />
         </label>
@@ -922,13 +938,13 @@ function Step3Target({
 
       {value.modes.has('cel_where') ? (
         <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>CEL where (raw)</span>
+          <span className={styles.fieldLabel}>{t('run:celWhereLabel')}</span>
           <textarea
             className={styles.field}
             rows={3}
             value={value.celWhere}
             onChange={(e) => onChange({ ...value, celWhere: e.target.value })}
-            placeholder='soulprint.self.os.family == "debian"'
+            placeholder={t('run:celWherePlaceholder')}
             aria-label="CEL where"
           />
         </label>
@@ -938,13 +954,13 @@ function Step3Target({
         <div>{desc}</div>
         {tr.target.where ? (
           <div style={{ marginTop: 4 }}>
-            <span style={{ color: 'var(--text-faint)' }}>where:</span> {tr.target.where}
+            <span style={{ color: 'var(--text-faint)' }}>{t('run:wherePrefix')}</span> {tr.target.where}
           </div>
         ) : null}
         {previewTotal !== undefined ? (
           <div style={{ marginTop: 4 }}>
             <Badge tone="info">
-              {previewTotal} souls match coven-фильтр
+              {t('run:soulsMatchCoven', { count: previewTotal })}
             </Badge>
           </div>
         ) : null}
@@ -961,6 +977,7 @@ function Step3Target({
 }
 
 function SidsField({ value, onChange }: { value: TargetSpec; onChange: (n: TargetSpec) => void }) {
+  const { t } = useTranslation();
   const soulsQ = useQuery({
     queryKey: ['run.target.souls.list'],
     queryFn: () => keeperApi.souls.list({ limit: 500 }),
@@ -978,7 +995,7 @@ function SidsField({ value, onChange }: { value: TargetSpec; onChange: (n: Targe
   return (
     <div>
       <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
-        SIDs ({value.sids.length} selected of {all.length})
+        {t('run:sidsSelectedOf', { selected: value.sids.length, total: all.length })}
       </div>
       <div
         style={{
@@ -992,7 +1009,7 @@ function SidsField({ value, onChange }: { value: TargetSpec; onChange: (n: Targe
         role="listbox"
         aria-label="SIDs"
       >
-        {soulsQ.isLoading ? <div className={pageStyles.loading}>Загружаем…</div> : null}
+        {soulsQ.isLoading ? <div className={pageStyles.loading}>{t('loading')}</div> : null}
         {all.map((s) => {
           const checked = selected.has(s.sid);
           return (
@@ -1036,25 +1053,26 @@ function Step4Options({
   onChange: (next: OptionsState) => void;
   workload: Workload;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {workload === 'scenario' ? (
         <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>Wave size (опционально, активирует Tide)</span>
+          <span className={styles.fieldLabel}>{t('run:waveSizeLabel')}</span>
           <input
             type="number"
             className={styles.field}
             min={1}
             value={value.waveSize}
             onChange={(e) => onChange({ ...value, waveSize: e.target.value })}
-            placeholder="например 10"
+            placeholder={t('run:waveSizePlaceholder')}
             aria-label="Wave size"
           />
         </label>
       ) : null}
       {workload === 'command' || (workload === 'scenario' && value.waveSize) ? (
         <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>Concurrency</span>
+          <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
           <input
             type="number"
             className={styles.field}
@@ -1103,7 +1121,7 @@ function Step4Options({
             onChange={(e) => onChange({ ...value, dryRun: e.target.checked })}
             aria-label="dry_run"
           />
-          Dry-run
+          {t('run:dryRunLabel')}
         </label>
       ) : null}
       <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
@@ -1113,7 +1131,7 @@ function Step4Options({
           onChange={(e) => onChange({ ...value, wait: e.target.checked })}
           aria-label="wait"
         />
-        Ждать терминала (polling на detail-странице)
+        {t('run:waitLabel')}
       </label>
     </>
   );

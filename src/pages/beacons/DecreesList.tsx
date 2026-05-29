@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
@@ -30,7 +30,7 @@ export function DecreesList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Decrees</h1>
-          <div className={styles.crumbs}>Oracle-reactor правила</div>
+          <div className={styles.crumbs}>{t('beacons:decreesSubtitle')}</div>
         </div>
         <Link to="/decrees/new">
           <Button variant="primary">{t('newDecree')}</Button>
@@ -60,13 +60,13 @@ export function DecreesList() {
       {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && items.length === 0 ? (
         <div className={styles.empty}>
-          Decree-ов нет. Создаются через <code className="mono">POST /v1/decrees</code> или кнопку выше.
+          <Trans i18nKey="beacons:decreesEmpty" components={{ code: <code className="mono" /> }} />
         </div>
       ) : null}
 

@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -12,24 +13,25 @@ interface Props {
 
 // Tags-input: Enter / запятая / пробел добавляет токен, Backspace в пустом — удаляет последний.
 export function ChipsInput({ value, onChange, placeholder, validate, ariaLabel }: Props) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
   function tryAdd(raw: string) {
-    const t = raw.trim();
-    if (!t) return false;
-    if (value.includes(t)) {
-      setErr('такой тег уже есть');
+    const tok = raw.trim();
+    if (!tok) return false;
+    if (value.includes(tok)) {
+      setErr(t('incarnations:chipExists'));
       return false;
     }
     if (validate) {
-      const reason = validate(t);
+      const reason = validate(tok);
       if (reason) {
         setErr(reason);
         return false;
       }
     }
-    onChange([...value, t]);
+    onChange([...value, tok]);
     setErr(null);
     return true;
   }
@@ -79,8 +81,8 @@ export function ChipsInput({ value, onChange, placeholder, validate, ariaLabel }
             {tag}
             <button
               type="button"
-              aria-label={`удалить ${tag}`}
-              onClick={() => onChange(value.filter((t) => t !== tag))}
+              aria-label={t('incarnations:chipRemove', { tag })}
+              onClick={() => onChange(value.filter((x) => x !== tag))}
               style={{
                 border: 0,
                 background: 'transparent',

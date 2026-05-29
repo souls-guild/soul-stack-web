@@ -86,13 +86,11 @@ export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
               marginBottom: 12,
             }}
           >
-            Это <strong>builtin</strong>-роль — сервер вернёт <code className="mono">409 role-builtin</code>.
-            Редактирование заблокировано.
+            {t('admin:rbacEditBuiltinWarn')}
           </div>
         ) : (
           <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-            Replace-семантика: переданный набор полностью заменяет существующий.
-            Добавьте новые permissions через input ниже или удалите ненужные крестиком.
+            {t('admin:rbacEditReplaceProse')}
           </p>
         )}
         <Controller
@@ -103,8 +101,8 @@ export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
               value={field.value ?? []}
               onChange={field.onChange}
               catalog={catalog}
-              placeholder="incarnation.run, soul.read, ..."
-              ariaLabel="permissions роли"
+              placeholder={t('admin:rbacPermissionsPlaceholderEdit')}
+              ariaLabel={t('admin:rbacPermissionsAria')}
             />
           )}
         />

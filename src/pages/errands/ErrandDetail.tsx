@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Copy, Terminal } from 'lucide-react';
@@ -9,6 +10,7 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
+import i18n from '../../i18n';
 import styles from '../common.module.css';
 
 type Tab = 'output' | 'params' | 'events';
@@ -61,7 +63,7 @@ function deriveEvents(r: ErrandResult): DerivedEvent[] {
       at: r.started_at,
       kind: 'started',
       tone: 'info',
-      text: `started by ${r.started_by_aid}`,
+      text: i18n.t('runhistory:startedByPrefix', { aid: r.started_by_aid }),
     },
   ];
   if (r.finished_at) {
@@ -100,6 +102,7 @@ function StreamBlock({
   truncated?: boolean;
   autoScroll?: boolean;
 }) {
+  const { t } = useTranslation();
   const preRef = useRef<HTMLPreElement | null>(null);
   useEffect(() => {
     if (autoScroll && preRef.current) {
@@ -110,7 +113,7 @@ function StreamBlock({
   if (!text) {
     return (
       <div className={styles.empty} style={{ padding: 'var(--s-4)' }}>
-        {label}: пусто
+        {t('runhistory:outputEmpty', { label })}
       </div>
     );
   }
@@ -135,7 +138,7 @@ function StreamBlock({
         <button
           type="button"
           onClick={() => copyToClipboard(text)}
-          aria-label={`скопировать ${label}`}
+          aria-label={t('runhistory:copyStream', { label })}
           title="copy"
           style={{
             background: 'transparent',
@@ -175,6 +178,7 @@ function StreamBlock({
 }
 
 export function ErrandDetail() {
+  const { t } = useTranslation();
   const { id = '' } = useParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>('output');
 
@@ -190,17 +194,17 @@ export function ErrandDetail() {
     },
   });
 
-  if (q.isLoading && !q.data) return <div className={styles.loading}>Загружаем…</div>;
+  if (q.isLoading && !q.data) return <div className={styles.loading}>{t('loading')}</div>;
   if (q.error) {
     return (
       <div className={styles.errorBox}>
-        {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+        {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
       </div>
     );
   }
 
   const data = q.data;
-  if (!data) return <div className={styles.empty}>Errand не найден.</div>;
+  if (!data) return <div className={styles.empty}>{t('runhistory:errandNotFound')}</div>;
 
   // Заголовок и meta-блок одинаковы для running/terminal — пользуемся available-полями.
   const isFull = isResult(data);
@@ -271,7 +275,7 @@ export function ErrandDetail() {
         ) : (
           <>
             <span className={styles.metaKey}>status</span>
-            <span className={styles.metaVal}>running (polling…)</span>
+            <span className={styles.metaVal}>{t('runhistory:statusRunningPolling')}</span>
           </>
         )}
       </div>
@@ -324,7 +328,7 @@ export function ErrandDetail() {
               />
             </>
           ) : (
-            <div className={styles.empty}>Errand ещё выполняется — output появится после завершения.</div>
+            <div className={styles.empty}>{t('runhistory:errandStillRunning')}</div>
           )}
         </section>
       ) : null}
@@ -354,8 +358,7 @@ export function ErrandDetail() {
             </div>
           ) : (
             <div className={styles.empty}>
-              Errand-ы verb-модулей (shell/exec) структурный output не возвращают — см. stdout/stderr во
-              вкладке Output. Read-safe-модули отдают <code className="mono">output</code> здесь.
+              {t('runhistory:paramsReadSafeHintPre')}<code className="mono">output</code>{t('runhistory:paramsReadSafeHintPost')}
             </div>
           )}
         </section>
@@ -380,7 +383,7 @@ export function ErrandDetail() {
               ))}
             </div>
           ) : (
-            <div className={styles.empty}>События появятся после завершения Errand-а.</div>
+            <div className={styles.empty}>{t('runhistory:eventsAfterFinish')}</div>
           )}
         </section>
       ) : null}

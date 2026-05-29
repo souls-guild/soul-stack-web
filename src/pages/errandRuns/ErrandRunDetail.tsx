@@ -96,16 +96,16 @@ export function ErrandRunDetail() {
     },
   });
 
-  if (q.isLoading && !q.data) return <div className={styles.loading}>Загружаем…</div>;
+  if (q.isLoading && !q.data) return <div className={styles.loading}>{t('loading')}</div>;
   if (q.error) {
     return (
       <div className={styles.errorBox}>
-        {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+        {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
       </div>
     );
   }
   const view = q.data;
-  if (!view) return <div className={styles.empty}>Errand run не найден.</div>;
+  if (!view) return <div className={styles.empty}>{t('runhistory:errandRunNotFound')}</div>;
 
   const isRunning = !ERRAND_RUN_TERMINAL.has(view.status);
   const total = view.summary?.counts?.total ?? view.scope_size;
@@ -192,7 +192,12 @@ export function ErrandRunDetail() {
           />
         </div>
         <div className={styles.metaKey}>
-          {done} / {total} done ({pct}%) — {sseFailed ? 'polling' : 'SSE'}
+          {t('runhistory:progressDoneOf', {
+            done,
+            total,
+            pct,
+            mode: sseFailed ? 'polling' : 'SSE',
+          })}
         </div>
       </section>
 
@@ -232,8 +237,8 @@ export function ErrandRunDetail() {
         ) : (
           <div className={styles.empty}>
             {isRunning
-              ? 'Per-host исходы появятся по мере отработки.'
-              : 'summary.hosts пустой.'}
+              ? t('runhistory:perHostAfterDone')
+              : t('runhistory:perHostEmptySummary')}
           </div>
         )}
       </section>

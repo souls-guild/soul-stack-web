@@ -71,9 +71,8 @@ export function DeregisterServiceModal({ open, service, onClose }: Props) {
           marginBottom: 12,
         }}
       >
-        Запись сервиса <strong>{service.name}</strong> будет удалена из реестра. Git-репо{' '}
-        <span className="mono">{service.git}</span> не трогается — сервис можно зарегистрировать
-        заново. Инкарнации этого сервиса при этом останутся, но потеряют ссылку на реестр.
+        {t('admin:svcDeregisterRecordPrefix')} <strong>{service.name}</strong> {t('admin:svcDeregisterWarn')}{' '}
+        <span className="mono">{service.git}</span> {t('admin:svcDeregisterWarn2')}
       </div>
       {serverError ? (
         <div className={styles.errorBox} role="alert">

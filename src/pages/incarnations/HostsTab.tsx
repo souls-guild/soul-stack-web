@@ -110,9 +110,9 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        if (err.status === 409) setRemoveError('Incarnation в состоянии destroying — правка spec.hosts невозможна.');
-        else if (err.status === 404) setRemoveError('Incarnation не найдена.');
-        else setRemoveError(`Ошибка ${err.status}: ${err.message}`);
+        if (err.status === 409) setRemoveError(t('incarnations:removeBlocked409'));
+        else if (err.status === 404) setRemoveError(t('incarnations:incarnationNotFound'));
+        else setRemoveError(t('errors:generic', { status: err.status, detail: err.message }));
       } else {
         setRemoveError(String(err));
       }
@@ -142,17 +142,14 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         )}
       </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Декларированный список хостов из <code className="mono">incarnation.spec.hosts[]</code>{' '}
-        (ADR-008). Source of truth для bootstrap-create и topology resolver-а.
+        {t('incarnations:declaredHostsDesc')}
       </p>
 
       {removeError ? <div className={styles.errorBox}>{removeError}</div> : null}
 
       {declared === null || declared.length === 0 ? (
         <div className={styles.empty}>
-          <code className="mono">spec.hosts</code> не задан. Volatile-роль определяется
-          probe-шагом в сценарии (<code className="mono">core.exec.run</code> + <code className="mono">register:</code>{' '}
-          + <code className="mono">where:</code>). Добавьте хост кнопкой «Add host».
+          {t('incarnations:specHostsNotSet')} {t('incarnations:addHostHint')}
         </div>
       ) : (
         <table className={styles.table}>
@@ -213,29 +210,27 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         </h2>
         <Link
           to={`/run?workload=command&target_coven=${encodeURIComponent(incarnationName)}`}
-          aria-label="Run command on these hosts"
+          aria-label={t('incarnations:runCommandOnHosts')}
         >
           <Button type="button" variant="primary">
             <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Run command on these hosts
+            {t('incarnations:runCommandOnHosts')}
           </Button>
         </Link>
       </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Souls с <code className="mono">coven = {incarnationName}</code>. Соответствие с
-        реальностью (declared ↔ connected) можно проверить через probe-scenario; это
-        derived view, не authoritative.
+        Souls <code className="mono">coven = {incarnationName}</code>. {t('incarnations:connectedSoulsDesc')}
       </p>
 
       {connected.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {connected.error ? (
         <div className={styles.errorBox}>
-          Не удалось загрузить souls: {String(connected.error)}
+          {t('incarnations:hostsLoadFailed', { detail: String(connected.error) })}
         </div>
       ) : null}
       {connected.data && connected.data.items.length === 0 ? (
         <div className={styles.empty}>
-          На coven <code className="mono">{incarnationName}</code> нет привязанных souls.
+          {t('incarnations:noConnectedSouls', { name: incarnationName })}
         </div>
       ) : null}
       {connected.data && connected.data.items.length > 0 ? (
@@ -273,14 +268,11 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         Per-host runtime data
       </h2>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Per-host подсекция <code className="mono">incarnation.state.hosts[&lt;sid&gt;]</code> —
-        convention: scenario записывает per-host state в эту секцию (role, pid, users
-        и т.д.). Если scenario не использует convention — секция будет пустой.
+        {t('incarnations:perHostRuntimeDesc')}
       </p>
       {runtimeHosts.length === 0 ? (
         <div className={styles.empty}>
-          В <code className="mono">state.hosts</code> нет данных — либо не было apply,
-          либо scenario не пишет per-host state.
+          {t('incarnations:noHostsInState')}
         </div>
       ) : (
         <table className={styles.table}>

@@ -11,28 +11,29 @@ const GIT_RE =
 // Опц. duration авто-refresh ('5m', '1h30m'). Пусто = без авто-refresh.
 const DURATION_RE = /^\d+(ns|us|µs|ms|s|m|h)([0-9]+(ns|us|µs|ms|s|m|h))*$/;
 
+// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
 const gitField = z
   .string()
   .trim()
-  .min(1, 'Укажите git-источник')
-  .refine((v) => GIT_RE.test(v), 'Ожидается git-URL: http(s):// / git:// / ssh / file://');
+  .min(1, 'admin:svcErrGitRequired')
+  .refine((v) => GIT_RE.test(v), 'admin:svcErrGitPattern');
 
 const refField = z
   .string()
   .trim()
-  .min(1, 'Укажите git ref (tag или branch)');
+  .min(1, 'admin:svcErrRefRequired');
 
 const refreshField = z
   .string()
   .trim()
-  .refine((v) => v === '' || DURATION_RE.test(v), 'Duration в формате 5m / 1h / 30s; пусто — без авто-refresh');
+  .refine((v) => v === '' || DURATION_RE.test(v), 'admin:svcErrRefreshFormat');
 
 export const serviceRegisterSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, 'Укажите имя сервиса')
-    .refine((v) => NAME_RE.test(v), 'kebab-case: со строчной буквы, далее [a-z0-9-]'),
+    .min(1, 'admin:svcErrNameRequired')
+    .refine((v) => NAME_RE.test(v), 'admin:svcErrNamePattern'),
   git: gitField,
   ref: refField,
   refresh: refreshField,

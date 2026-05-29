@@ -11,23 +11,11 @@ import styles from '../common.module.css';
 
 type Tab = 'overview' | 'audit' | 'kinds';
 
-// Описания plugin-kind по namespace-у (для оператора).
-const KIND_INFO: Record<string, { title: string; summary: string }> = {
-  mod: {
-    title: 'soul_module / soul_beacon',
-    summary:
-      'Destiny-шаги (Apply on Soul). Сюда же relay beacon-плагины (pull-monitor для Vigil-проверок).',
-  },
-  cloud: {
-    title: 'cloud_driver',
-    summary:
-      'CreateVM / DestroyVM. Вызывается keeper-side через core.cloud.provisioned.',
-  },
-  ssh: {
-    title: 'ssh_provider',
-    summary:
-      'SSH-key-source для keeper.push (push-доставка без агента).',
-  },
+// Plugin-kind title (structural — имена контрактов) + i18n-ключ summary.
+const KIND_INFO: Record<string, { title: string; summaryKey: string }> = {
+  mod: { title: 'soul_module / soul_beacon', summaryKey: 'admin:pluginKindModSummary' },
+  cloud: { title: 'cloud_driver', summaryKey: 'admin:pluginKindCloudSummary' },
+  ssh: { title: 'ssh_provider', summaryKey: 'admin:pluginKindSshSummary' },
 };
 
 export function PluginDetail() {
@@ -85,12 +73,12 @@ export function PluginDetail() {
     },
   });
 
-  if (list.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (list.isLoading) return <div className={styles.loading}>{t('admin:pluginLoading')}</div>;
   if (list.error) {
     return (
       <div className={styles.errorBox}>
         {list.error instanceof ApiError
-          ? `Ошибка ${list.error.status}: ${list.error.message}`
+          ? t('errors:generic', { status: list.error.status, detail: list.error.message })
           : String(list.error)}
       </div>
     );
@@ -105,8 +93,8 @@ export function PluginDetail() {
           </span>
         </div>
         <div className={styles.empty}>
-          Активного Sigil-допуска <code className="mono">{namespace}/{name}@{ref}</code> нет в реестре.
-          Допуск выдаётся через <code className="mono">POST /v1/plugins/sigils</code>.
+          {t('admin:pluginNotFound')} <code className="mono">{namespace}/{name}@{ref}</code> {t('admin:pluginNotFound2')}{' '}
+          <code className="mono">POST /v1/plugins/sigils</code>.
         </div>
       </div>
     );
@@ -167,7 +155,7 @@ export function PluginDetail() {
       {revokeMut.error ? (
         <div className={styles.errorBox}>
           {revokeMut.error instanceof ApiError
-            ? `Ошибка ${revokeMut.error.status}: ${revokeMut.error.message}`
+            ? t('errors:generic', { status: revokeMut.error.status, detail: revokeMut.error.message })
             : String(revokeMut.error)}
         </div>
       ) : null}
@@ -222,10 +210,9 @@ export function PluginDetail() {
           </div>
 
           <section className={styles.section} aria-label="sha256">
-            <h2 className={styles.sectionTitle}>SHA-256 бинаря</h2>
+            <h2 className={styles.sectionTitle}>{t('admin:pluginSha256Title')}</h2>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-              Хеш Keeper посчитал сам по локальному кешу host-а.
-              Authority целостности — sha256 + подпись Keeper-а (а не git-tag-ref).
+              {t('admin:pluginSha256Prose')}
             </p>
             <Sha256Block sha256={row.sha256} />
           </section>
@@ -234,19 +221,19 @@ export function PluginDetail() {
 
       {tab === 'audit' ? (
         <section className={styles.section} aria-label="audit history">
-          <h2 className={styles.sectionTitle}>Audit-история этого ref</h2>
-          {audit.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+          <h2 className={styles.sectionTitle}>{t('admin:pluginAuditTitle')}</h2>
+          {audit.isLoading ? <div className={styles.loading}>{t('admin:pluginLoading')}</div> : null}
           {audit.error ? (
             <div className={styles.errorBox}>
               {audit.error instanceof ApiError
-                ? `Ошибка ${audit.error.status}: ${audit.error.message}`
+                ? t('errors:generic', { status: audit.error.status, detail: audit.error.message })
                 : String(audit.error)}
             </div>
           ) : null}
           {audit.data && matched.length === 0 ? (
             <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
-              Событий <code className="mono">plugin.sigil.allowed</code> /{' '}
-              <code className="mono">plugin.sigil.revoked</code> по этой записи в журнале не найдено.
+              {t('admin:pluginAuditEmpty')} <code className="mono">plugin.sigil.allowed</code> /{' '}
+              <code className="mono">plugin.sigil.revoked</code> {t('admin:pluginAuditEmpty2')}
             </div>
           ) : null}
           {matched.length > 0 ? (
@@ -276,10 +263,10 @@ export function PluginDetail() {
         <section className={styles.section} aria-label="plugin kinds">
           <h2 className={styles.sectionTitle}>
             <Info size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
-            Что значит plugin-kind
+            {t('admin:pluginKindsTitle')}
           </h2>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-            Namespace плагина определяет, как Keeper его исполняет:
+            {t('admin:pluginKindsProse')}
           </p>
           <ul style={{ fontSize: 13, lineHeight: 1.6, paddingLeft: 18 }}>
             {Object.entries(KIND_INFO).map(([ns, info]) => (
@@ -287,7 +274,7 @@ export function PluginDetail() {
                 <code className="mono">
                   <Badge tone={ns === row.namespace ? 'info' : 'muted'}>{ns}</Badge>
                 </code>{' '}
-                — <strong>{info.title}</strong>. {info.summary}
+                — <strong>{info.title}</strong>. {t(info.summaryKey)}
               </li>
             ))}
           </ul>
@@ -298,6 +285,7 @@ export function PluginDetail() {
 }
 
 function Sha256Block({ sha256 }: { sha256: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   return (
     <div
@@ -326,10 +314,10 @@ function Sha256Block({ sha256 }: { sha256: string }) {
             setCopied(false);
           }
         }}
-        title="Скопировать sha256"
+        title={t('admin:pluginSha256Copy')}
       >
         <Copy size={14} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-        {copied ? 'Скопировано' : 'Copy'}
+        {copied ? t('copied') : t('copy')}
       </Button>
     </div>
   );

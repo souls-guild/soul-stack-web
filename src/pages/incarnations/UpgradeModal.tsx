@@ -88,8 +88,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
       }
     >
       <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-        Запускает миграцию state + переключает service_version одной PG-транзакцией.
-        Текущая привязка: <span className="mono">{currentRef}</span>.
+        {t('incarnations:upgradeDesc')} <span className="mono">{currentRef}</span>.
       </p>
       {useDropdown ? (
         <Controller
@@ -113,7 +112,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
                   fontSize: 13,
                 }}
               >
-                <option value="">— выберите ref —</option>
+                <option value="">{t('incarnations:selectRef')}</option>
                 {refs.tags.length > 0 ? (
                   <optgroup label="tags">
                     {refs.tags.map((r) => (
@@ -137,11 +136,11 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
               </select>
               {errors.to_version ? (
                 <span style={{ color: 'var(--danger)', fontSize: 12 }}>
-                  {errors.to_version.message}
+                  {t(errors.to_version.message ?? '')}
                 </span>
               ) : (
                 <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-                  Источник — <code className="mono">GET /v1/services/{serviceName}/refs</code>.
+                  {t('incarnations:refsManual', { name: serviceName })}
                 </span>
               )}
             </label>
@@ -153,7 +152,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
           placeholder="v3.0.0 / main / abcdef0"
           mono
           aria-invalid={errors.to_version ? 'true' : undefined}
-          error={errors.to_version?.message}
+          error={errors.to_version ? t(errors.to_version.message ?? '') : undefined}
           hint={
             refs.loading
               ? t('forms:refsLoading')
@@ -175,7 +174,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
             fontSize: 13,
           }}
         >
-          Upgrade принят. apply_id: <span className="mono">{applyId}</span>
+          {t('incarnations:upgradeAccepted')} <span className="mono">{applyId}</span>
         </div>
       ) : null}
       {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}

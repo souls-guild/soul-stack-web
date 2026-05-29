@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Waves } from 'lucide-react';
@@ -40,6 +41,7 @@ function progressPct(t: Tide): number {
 }
 
 export function TideDetail() {
+  const { t } = useTranslation();
   const { id = '' } = useParams<{ id: string }>();
 
   const q = useQuery({
@@ -53,16 +55,16 @@ export function TideDetail() {
     },
   });
 
-  if (q.isLoading && !q.data) return <div className={styles.loading}>Загружаем…</div>;
+  if (q.isLoading && !q.data) return <div className={styles.loading}>{t('loading')}</div>;
   if (q.error) {
     return (
       <div className={styles.errorBox}>
-        {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+        {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
       </div>
     );
   }
   const tide = q.data;
-  if (!tide) return <div className={styles.empty}>Tide не найден.</div>;
+  if (!tide) return <div className={styles.empty}>{t('runhistory:tideNotFound')}</div>;
 
   const pct = progressPct(tide);
   const surges = tide.summary?.surges ?? [];
@@ -143,7 +145,10 @@ export function TideDetail() {
 
       <section className={styles.section} aria-label="Tide progress">
         <h2 className={styles.sectionTitle}>
-          Прогресс: Surge {tide.current_surge_index} / {tide.total_surges}
+          {t('runhistory:progressTitle', {
+            current: tide.current_surge_index,
+            total: tide.total_surges,
+          })}
         </h2>
         <div aria-label="progress" style={progressOuter}>
           <div style={{ ...progressInner, width: `${pct}%` }} />
@@ -156,8 +161,8 @@ export function TideDetail() {
         {surges.length === 0 ? (
           <div className={styles.empty}>
             {NON_TERMINAL.has(tide.status)
-              ? 'Surge-волны появятся по мере прохождения.'
-              : 'Surge-снимков нет (orchestrator не записал summary).'}
+              ? t('runhistory:surgesEmptyNonTerminal')
+              : t('runhistory:surgesEmptyTerminal')}
           </div>
         ) : (
           <div className={styles.timeline}>

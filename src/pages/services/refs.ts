@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import { keeperApi, type ServiceRefInfo } from '../../api/keeper';
+import i18n from '../../i18n';
 
 // Хук-обёртка: тянет /v1/services/{name}/refs. Endpoint может отсутствовать —
 // возвращаем `unavailable: true`, caller рисует text input fallback.
@@ -55,7 +56,7 @@ export function useServiceRefs(serviceName: string | undefined, enabled = true):
         error: unavailable
           ? null
           : q.error instanceof ApiError
-            ? `Ошибка ${q.error.status}: ${q.error.message}`
+            ? i18n.t('errors:generic', { status: q.error.status, detail: q.error.message })
             : String(q.error),
       };
     }

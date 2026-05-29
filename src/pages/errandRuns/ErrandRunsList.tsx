@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Terminal } from 'lucide-react';
@@ -35,6 +36,7 @@ function parseCsv(input: string): string[] {
 }
 
 export function ErrandRunsList() {
+  const { t } = useTranslation();
   const [moduleCsv, setModuleCsv] = useState('');
   const [statusSet, setStatusSet] = useState<Set<ErrandRunStatus>>(new Set());
   const [offset, setOffset] = useState(0);
@@ -82,13 +84,13 @@ export function ErrandRunsList() {
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Errand runs
           </h1>
-          <div className={styles.crumbs}>история multi-target Errand-прогонов</div>
+          <div className={styles.crumbs}>{t('runhistory:errandRunsCrumbs')}</div>
         </div>
       </div>
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>Module (CSV, exact-match OR)</div>
+          <div className={styles.metaKey}>{t('runhistory:filterModuleLabel')}</div>
           <input
             type="text"
             value={moduleCsv}
@@ -121,18 +123,18 @@ export function ErrandRunsList() {
         </div>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && items.length === 0 ? (
         <div className={styles.empty}>
-          Errand-run-ов под фильтр не найдено.{' '}
+          {t('runhistory:noErrandRunsFound')}{' '}
           <Link to="/run" style={{ color: 'var(--accent)' }}>
-            Запустить новый
+            {t('runhistory:errandsNotFoundRunNew')}
           </Link>
           .
         </div>

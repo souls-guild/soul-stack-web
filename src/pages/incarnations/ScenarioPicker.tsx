@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { ScenariosQueryResult } from './useServiceScenarios';
 
 // Поле выбора сценария: select при доступных scenarios, иначе text input.
@@ -21,6 +22,7 @@ export function ScenarioField({
   error,
   disabled,
 }: Props) {
+  const { t } = useTranslation();
   const useDropdown = !scenarios.unavailable && scenarios.items.length > 0;
 
   return (
@@ -43,7 +45,7 @@ export function ScenarioField({
             fontSize: 13,
           }}
         >
-          <option value="">— выберите сценарий —</option>
+          <option value="">{t('incarnations:selectScenario')}</option>
           {scenarios.items.map((s) => (
             <option key={s.name} value={s.name} title={s.description ?? ''}>
               {s.name}
@@ -58,7 +60,7 @@ export function ScenarioField({
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           disabled={disabled}
-          placeholder="restart / add_user / converge / …"
+          placeholder={t('incarnations:scenarioPlaceholder')}
           aria-invalid={error ? 'true' : undefined}
           style={{
             padding: '8px 10px',
@@ -73,17 +75,16 @@ export function ScenarioField({
       {error ? (
         <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span>
       ) : scenarios.loading ? (
-        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>Загружаем сценарии…</span>
+        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{t('incarnations:scenarioLoading')}</span>
       ) : scenarios.unavailable ? (
         <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-          Каталог сценариев недоступен. Имя вводится вручную; совпадение с{' '}
-          <code className="mono">scenario/&lt;name&gt;/</code> в сервисе проверит Keeper.
+          {t('incarnations:scenarioUnavailable')}
         </span>
       ) : scenarios.error ? (
         <span style={{ color: 'var(--danger)', fontSize: 12 }}>{scenarios.error}</span>
       ) : (
         <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-          Из <code className="mono">GET /v1/services/&#123;name&#125;/scenarios</code>.
+          {t('incarnations:scenarioSource')}
         </span>
       )}
     </label>

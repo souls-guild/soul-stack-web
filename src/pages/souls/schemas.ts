@@ -11,15 +11,15 @@ export const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 export const covenLabelSchema = z
   .string()
-  .min(1, 'метка обязательна')
-  .max(63, 'не длиннее 63 символов')
-  .regex(COVEN_PATTERN, 'lowercase, цифры, дефис-разделитель');
+  .min(1, 'souls:zodLabelRequired')
+  .max(63, 'souls:zodLabelMaxLen')
+  .regex(COVEN_PATTERN, 'souls:zodLabelPattern');
 
 export const issueTokenSchema = z.object({
   ttl_seconds: z
-    .number({ invalid_type_error: 'число секунд' })
-    .int('целое число')
-    .min(60, 'минимум 60 секунд')
+    .number({ invalid_type_error: 'souls:zodTtlType' })
+    .int('souls:zodTtlInt')
+    .min(60, 'souls:zodTtlMin')
     .default(3600),
   force: z.boolean().default(false),
 });
@@ -40,7 +40,7 @@ export const bulkCovenAssignSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['labels'],
-          message: 'для replace задайте набор меток (можно пустой)',
+          message: 'souls:zodReplaceLabelsRequired',
         });
       }
     } else {
@@ -48,7 +48,7 @@ export const bulkCovenAssignSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['label'],
-          message: 'для append/remove обязательна одна метка',
+          message: 'souls:zodAppendRemoveLabel',
         });
         return;
       }
@@ -56,7 +56,7 @@ export const bulkCovenAssignSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['label'],
-          message: 'lowercase, цифры, дефис-разделитель',
+          message: 'souls:zodLabelPattern',
         });
       }
     }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
@@ -14,6 +15,7 @@ import styles from '../common.module.css';
 type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs';
 
 export function ServiceDetail() {
+  const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const [tab, setTab] = useState<Tab>('overview');
   const [yamlScenario, setYamlScenario] = useState<ServiceScenarioInfo | null>(null);
@@ -41,18 +43,18 @@ export function ServiceDetail() {
 
   const refs = useServiceRefs(name, tab === 'refs');
 
-  if (detail.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (detail.isLoading) return <div className={styles.loading}>{t('admin:svcLoading')}</div>;
   if (detail.error) {
     return (
       <div className={styles.errorBox}>
         {detail.error instanceof ApiError
-          ? `Ошибка ${detail.error.status}: ${detail.error.message}`
+          ? t('errors:generic', { status: detail.error.status, detail: detail.error.message })
           : String(detail.error)}
       </div>
     );
   }
   const row = detail.data;
-  if (!row) return <div className={styles.empty}>Service не найден.</div>;
+  if (!row) return <div className={styles.empty}>{t('admin:svcNotFound')}</div>;
 
   const scenarioUnavailable = scenarios.error instanceof ApiError &&
     (scenarios.error.status === 404 || scenarios.error.status === 501 || scenarios.error.status >= 500);
@@ -75,10 +77,10 @@ export function ServiceDetail() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button type="button" variant="secondary" onClick={() => setEditOpen(true)}>
-              Edit
+              {t('edit')}
             </Button>
             <Button type="button" variant="danger" onClick={() => setDeregisterOpen(true)}>
-              Deregister
+              {t('deregister')}
             </Button>
           </div>
         </div>
@@ -142,11 +144,11 @@ export function ServiceDetail() {
 
       {tab === 'overview' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Service</h2>
+          <h2 className={styles.sectionTitle}>{t('admin:svcSectionTitle')}</h2>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            Scenarios этого сервиса доступны через git-репо <span className="mono">{row.git}</span> на ref
-            <span className="mono"> {row.ref}</span> (каталог <span className="mono">scenario/</span>).
-            Просмотреть каталог — таб <span className="mono">Scenarios</span>; git-tags/branches — таб{' '}
+            {t('admin:svcOverviewProse')} <span className="mono">{row.git}</span> {t('admin:svcOverviewProse2')}
+            <span className="mono"> {row.ref}</span> {t('admin:svcOverviewProse3')} <span className="mono">scenario/</span>
+            {t('admin:svcOverviewProse4')} <span className="mono">Scenarios</span>{t('admin:svcOverviewProse5')}{' '}
             <span className="mono">Refs</span>.
           </div>
         </section>
@@ -154,18 +156,18 @@ export function ServiceDetail() {
 
       {tab === 'incarnations' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Incarnation-ы сервиса</h2>
-          {incs.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+          <h2 className={styles.sectionTitle}>{t('admin:svcIncTitle')}</h2>
+          {incs.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
           {incs.error ? (
             <div className={styles.errorBox}>
               {incs.error instanceof ApiError
-                ? `Ошибка ${incs.error.status}: ${incs.error.message}`
+                ? t('errors:generic', { status: incs.error.status, detail: incs.error.message })
                 : String(incs.error)}
             </div>
           ) : null}
           {incs.data && incs.data.items.length === 0 ? (
             <div className={styles.empty}>
-              Инкарнаций этого сервиса пока нет. Создаётся через scenario{' '}
+              {t('admin:svcIncEmpty')}{' '}
               <code className="mono">create</code>.
             </div>
           ) : null}
@@ -205,25 +207,25 @@ export function ServiceDetail() {
 
       {tab === 'scenarios' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Scenarios каталог</h2>
-          {scenarios.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+          <h2 className={styles.sectionTitle}>{t('admin:svcScenariosTitle')}</h2>
+          {scenarios.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
           {scenarioUnavailable ? (
             <div className={styles.empty}>
-              Каталог сценариев пока не выставлен (endpoint{' '}
-              <code className="mono">GET /v1/services/{row.name}/scenarios</code> вернул{' '}
-              {(scenarios.error as ApiError).status}). Запускать сценарии — через{' '}
+              {t('admin:svcScenariosUnavailable')}{' '}
+              <code className="mono">GET /v1/services/{row.name}/scenarios</code> {t('admin:svcScenariosUnavailable2')}{' '}
+              {(scenarios.error as ApiError).status}{t('admin:svcScenariosUnavailable3')}{' '}
               <Link to="/run?workload=scenario">Run Wizard</Link>.
             </div>
           ) : null}
           {scenarios.error && !scenarioUnavailable ? (
             <div className={styles.errorBox}>
               {scenarios.error instanceof ApiError
-                ? `Ошибка ${scenarios.error.status}: ${scenarios.error.message}`
+                ? t('errors:generic', { status: scenarios.error.status, detail: scenarios.error.message })
                 : String(scenarios.error)}
             </div>
           ) : null}
           {scenarios.data && (scenarios.data.scenarios?.length ?? 0) === 0 ? (
-            <div className={styles.empty}>В каталоге пока нет сценариев.</div>
+            <div className={styles.empty}>{t('admin:svcScenariosEmpty')}</div>
           ) : null}
           {scenarios.data && (scenarios.data.scenarios?.length ?? 0) > 0 ? (
             <table className={styles.table}>
@@ -246,17 +248,17 @@ export function ServiceDetail() {
                     <td style={{ display: 'flex', gap: 8 }}>
                       <Link
                         to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
-                        aria-label={`Run scenario ${s.name}`}
+                        aria-label={`${t('runScenario')} ${s.name}`}
                       >
-                        <Button type="button" variant="primary">Run this scenario</Button>
+                        <Button type="button" variant="primary">{t('admin:svcRunThisScenario')}</Button>
                       </Link>
                       <Link
                         to={`/incarnations/new?service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
                       >
-                        <Button type="button" variant="secondary">Use in incarnation</Button>
+                        <Button type="button" variant="secondary">{t('admin:svcUseInIncarnation')}</Button>
                       </Link>
                       <Button type="button" variant="ghost" onClick={() => setYamlScenario(s)}>
-                        View
+                        {t('admin:svcView')}
                       </Button>
                     </td>
                   </tr>
@@ -269,14 +271,13 @@ export function ServiceDetail() {
 
       {tab === 'refs' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Git refs</h2>
-          {refs.loading ? <div className={styles.loading}>Загружаем…</div> : null}
+          <h2 className={styles.sectionTitle}>{t('admin:svcRefsTitle')}</h2>
+          {refs.loading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
           {refs.unavailable ? (
             <div className={styles.empty}>
-              Каталог refs недоступен (endpoint{' '}
-              <code className="mono">GET /v1/services/{row.name}/refs</code> не отвечает или
-              не существует). Используйте текущий{' '}
-              <span className="mono">{row.ref}</span> или укажите ref вручную при upgrade.
+              {t('admin:svcRefsUnavailable')}{' '}
+              <code className="mono">GET /v1/services/{row.name}/refs</code> {t('admin:svcRefsUnavailable2')}{' '}
+              <span className="mono">{row.ref}</span> {t('admin:svcRefsUnavailable3')}
             </div>
           ) : null}
           {refs.error ? <div className={styles.errorBox}>{refs.error}</div> : null}
@@ -319,7 +320,7 @@ export function ServiceDetail() {
             </table>
           ) : null}
           {!refs.loading && !refs.unavailable && refs.tags.length === 0 && refs.branches.length === 0 ? (
-            <div className={styles.empty}>В git-репо нет ни tags, ни branches.</div>
+            <div className={styles.empty}>{t('admin:svcRefsEmpty')}</div>
           ) : null}
         </section>
       ) : null}
@@ -357,7 +358,7 @@ export function ServiceDetail() {
               </pre>
             </>
           ) : (
-            <div className={styles.empty}>У сценария нет input_schema.</div>
+            <div className={styles.empty}>{t('admin:svcScenarioNoInputSchema')}</div>
           )}
         </Modal>
       ) : null}

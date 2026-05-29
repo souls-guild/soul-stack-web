@@ -31,6 +31,7 @@ function ParamsTypedFields({
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
 }) {
+  const { t } = useTranslation();
   const set = (patch: Record<string, unknown>) => onChange({ ...value, ...patch });
 
   if (check === 'core.beacon.file_changed') {
@@ -57,8 +58,8 @@ function ParamsTypedFields({
           mono
           value={String(value.throttle ?? '')}
           onChange={(e) => set({ throttle: e.target.value })}
-          placeholder="5s (optional)"
-          hint="<число><ms|s|m|h>"
+          placeholder={t('beacons:throttlePlaceholder')}
+          hint={t('beacons:durationHint')}
         />
       </>
     );
@@ -132,7 +133,7 @@ function ParamsTypedFields({
           mono
           value={String(value.timeout ?? '')}
           onChange={(e) => set({ timeout: e.target.value })}
-          placeholder="5s (optional)"
+          placeholder={t('beacons:timeoutPlaceholder')}
         />
       </>
     );
@@ -189,7 +190,7 @@ export function VigilNewForm() {
     },
     onError: (err) => {
       setServerError(
-        err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err),
+        err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err),
       );
     },
   });
@@ -283,28 +284,28 @@ export function VigilNewForm() {
             <a href="/vigils" onClick={(e) => { e.preventDefault(); nav('/vigils'); }}>vigils</a> / new
           </div>
           <h1 className={styles.title}>New Vigil</h1>
-          <div className={styles.crumbs}>Создать Soul-side проверку beacons</div>
+          <div className={styles.crumbs}>{t('beacons:newVigilSubtitle')}</div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <section className={styles.section} aria-label="Базовые параметры">
-          <h2 className={styles.sectionTitle}>Базовые поля</h2>
+        <section className={styles.section} aria-label={t('beacons:baseFieldsLegend')}>
+          <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.filters}>
             <Input
               label="Name (kebab-case)"
               mono
               {...register('name')}
               placeholder="redis-down"
-              error={errors.name?.message}
+              error={errors.name?.message ? t(errors.name.message) : undefined}
             />
             <Input
               label="Interval"
               mono
               {...register('interval')}
               placeholder="30s"
-              hint="<число><ms|s|m|h>"
-              error={errors.interval?.message}
+              hint={t('beacons:durationHint')}
+              error={errors.interval?.message ? t(errors.interval.message) : undefined}
             />
             <label>
               <div className={styles.metaKey}>Beacon kind</div>
@@ -324,7 +325,7 @@ export function VigilNewForm() {
                 ))}
               </select>
               {errors.check ? (
-                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.check.message}</span>
+                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.check.message ?? '')}</span>
               ) : null}
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -338,10 +339,10 @@ export function VigilNewForm() {
           </div>
         </section>
 
-        <section className={styles.section} aria-label="Subject (XOR sid/coven)">
+        <section className={styles.section} aria-label={t('beacons:subjectXorLegend')}>
           <h2 className={styles.sectionTitle}>Subject</h2>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Укажите ОДНО: либо <code className="mono">sid</code> (один host), либо <code className="mono">coven</code> (метки). Опустить оба — Vigil раздаётся всему флоту.
+            {t('beacons:subjectVigilHint', { sid: 'sid', coven: 'coven' })}
           </div>
           <div className={styles.filters}>
             <Input
@@ -349,16 +350,16 @@ export function VigilNewForm() {
               mono
               {...register('sid')}
               placeholder="host01.example.com"
-              error={errors.sid?.message}
+              error={errors.sid?.message ? t(errors.sid.message) : undefined}
               disabled={coven.length > 0}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 240 }}>
-              <span className={styles.metaKey}>coven (через пробел/запятую)</span>
+              <span className={styles.metaKey}>{t('beacons:covenSpaceComma')}</span>
               <input
                 value={covenInput}
                 onChange={(e) => { setCovenInput(e.target.value); }}
                 onBlur={syncCovenToForm}
-                placeholder="prod, redis-master"
+                placeholder={t('beacons:covenPlaceholder')}
                 style={{
                   padding: '8px 10px',
                   borderRadius: 'var(--radius)',
@@ -368,7 +369,7 @@ export function VigilNewForm() {
                 }}
                 disabled={Boolean(watch('sid'))}
               />
-              <span className={styles.metaKey}>{coven.length} coven-тег(ов)</span>
+              <span className={styles.metaKey}>{t('beacons:covenTagCount', { count: coven.length })}</span>
             </label>
           </div>
         </section>
@@ -381,11 +382,11 @@ export function VigilNewForm() {
               checked={useRawParams}
               onChange={(e) => setUseRawParams(e.target.checked)}
             />
-            Raw JSON (для unknown beacon-kind или продвинутых полей)
+            {t('beacons:rawJsonToggle')}
           </label>
           {useRawParams || !isKnownBeacon(check) ? (
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span className={styles.metaKey}>params (JSON-object)</span>
+              <span className={styles.metaKey}>{t('beacons:paramsJsonLabel')}</span>
               <textarea
                 {...register('params_json')}
                 rows={6}
@@ -401,7 +402,7 @@ export function VigilNewForm() {
                 placeholder='{"path": "/etc/foo"}'
               />
               {errors.params_json ? (
-                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.params_json.message}</span>
+                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.params_json.message ?? '')}</span>
               ) : null}
             </label>
           ) : (

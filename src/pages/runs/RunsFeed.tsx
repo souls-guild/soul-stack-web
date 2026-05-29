@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
@@ -103,6 +104,7 @@ function isOptionalMiss(err: unknown): boolean {
 const LIMIT = 50;
 
 export function RunsFeed() {
+  const { t } = useTranslation();
   const [typeSet, setTypeSet] = useState<Set<RunType>>(new Set());
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -146,7 +148,9 @@ export function RunsFeed() {
   ] as const) {
     if (q.error && !isOptionalMiss(q.error)) {
       errors.push(
-        `${label}: ${q.error instanceof ApiError ? `ошибка ${q.error.status}` : String(q.error)}`,
+        q.error instanceof ApiError
+          ? t('runhistory:feedSectionError', { label, status: q.error.status })
+          : `${label}: ${String(q.error)}`,
       );
     }
   }
@@ -236,13 +240,13 @@ export function RunsFeed() {
             <Activity size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             All runs
           </h1>
-          <div className={styles.crumbs}>сводный feed всех прогонов (Tide / Push / Errand-run / Errand)</div>
+          <div className={styles.crumbs}>{t('runhistory:runsFeedCrumbs')}</div>
         </div>
       </div>
 
       <div className={styles.filters}>
         <div>
-          <div className={styles.metaKey}>Type</div>
+          <div className={styles.metaKey}>{t('runhistory:filterTypeLabel')}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
             {TYPE_ORDER.map((t) => {
               const active = typeSet.has(t);
@@ -261,7 +265,7 @@ export function RunsFeed() {
           </div>
         </div>
         <label>
-          <div className={styles.metaKey}>Status (substring)</div>
+          <div className={styles.metaKey}>{t('runhistory:filterStatusSubstringLabel')}</div>
           <input
             type="text"
             value={statusFilter}
@@ -276,20 +280,20 @@ export function RunsFeed() {
         <div className={styles.errorBox}>{errors.join(' · ')}</div>
       ) : null}
 
-      {anyLoading && allRows.length === 0 ? <div className={styles.loading}>Загружаем…</div> : null}
+      {anyLoading && allRows.length === 0 ? <div className={styles.loading}>{t('loading')}</div> : null}
 
       {!anyLoading && filtered.length === 0 ? (
         <div className={styles.empty}>
           {allRows.length === 0 ? (
             <>
-              Ещё не было прогонов.{' '}
+              {t('runhistory:noRunsAtAll')}{' '}
               <Link to="/run" style={{ color: 'var(--accent)' }}>
-                Запустить
+                {t('runhistory:runAll')}
               </Link>
               .
             </>
           ) : (
-            'Под выбранный фильтр прогонов не найдено.'
+            t('runhistory:noRunsForFilter')
           )}
         </div>
       ) : null}

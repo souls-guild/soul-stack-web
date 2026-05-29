@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -56,6 +57,7 @@ function isDegraded(err: unknown): boolean {
 }
 
 export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: Props) {
+  const { t } = useTranslation();
   const q = useQuery({
     queryKey: ['service-state-schema', serviceName, serviceVersion],
     queryFn: () => keeperApi.services.getStateSchema(serviceName, serviceVersion),
@@ -74,7 +76,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
         State Schema
       </h2>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Структура <span className="mono">incarnation.state</span> и история миграций.
+        {t('incarnations:schemaCrumbsHint')}
       </p>
 
       <div className={styles.meta}>
@@ -88,12 +90,12 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
         <span className={styles.metaVal}>{stateSchemaVersion}</span>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем схему…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('incarnations:loadSchema')}</div> : null}
 
       {hardError ? (
         <div className={styles.errorBox}>
-          Не удалось загрузить state-schema:{' '}
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {t('incarnations:schemaLoadFailed')}{' '}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
@@ -101,13 +103,13 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
       {q.data && fields && fields.length > 0 ? (
         <>
           <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
-            Структура state (service.yml::state_schema)
+            {t('incarnations:schemaStructTitle')}
           </h3>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Поле</th>
-                <th>Тип</th>
+                <th>{t('incarnations:colField')}</th>
+                <th>{t('incarnations:colType')}</th>
                 <th>Required</th>
               </tr>
             </thead>
@@ -116,7 +118,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
                 <tr key={f.name}>
                   <td className="mono">{f.name}</td>
                   <td className="mono">{f.type}</td>
-                  <td className="mono">{f.required ? 'да' : '—'}</td>
+                  <td className="mono">{f.required ? t('incarnations:yesShort') : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -126,9 +128,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
 
       {q.data && (!fields || fields.length === 0) ? (
         <div className={styles.empty}>
-          Структура state не задекларирована в <span className="mono">service.yml</span>{' '}
-          (<span className="mono">state_schema:</span> отсутствует). Поля state определяются
-          сценариями динамически.
+          {t('incarnations:schemaNotDeclared')}
         </div>
       ) : null}
 
@@ -136,11 +136,11 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
       {q.data ? (
         <>
           <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
-            Миграции state
+            {t('incarnations:schemaMigrationsTitle')}
           </h3>
           {migrations.length === 0 ? (
             <div className={styles.empty}>
-              Миграций нет — сервис на первой версии структуры state.
+              {t('incarnations:migrationsEmpty')}
             </div>
           ) : (
             <table className={styles.table}>
@@ -148,7 +148,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
                 <tr>
                   <th>From</th>
                   <th>To</th>
-                  <th>Файл</th>
+                  <th>{t('incarnations:colFile')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -163,12 +163,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
             </table>
           )}
           <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--text-muted)' }}>
-            Грамматику миграции (<span className="mono">rename</span> /{' '}
-            <span className="mono">set</span> / <span className="mono">delete</span> /{' '}
-            <span className="mono">move</span> + <span className="mono">foreach</span>) смотри в
-            файлах репозитория сервиса. Upgrade на новую версию — через action «Upgrade» в шапке
-            (forward-only, атомарно одной PG-транзакцией, snapshot в{' '}
-            <span className="mono">state_history</span>).
+            {t('incarnations:migrationGrammarHint')}
           </p>
         </>
       ) : null}
@@ -190,21 +185,19 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
           }}
         >
           <div style={{ color: 'var(--text-muted)' }}>
-            Детальная state-schema по этому сервису сейчас недоступна (backend вернул{' '}
-            {q.error instanceof ApiError ? q.error.status : '—'}). Структура и миграции:
+            {t('incarnations:schemaDegradedLead', { status: q.error instanceof ApiError ? q.error.status : '—' })}
           </div>
           <div>
-            <strong>Структура state:</strong> поле{' '}
-            <span className="mono">state_schema_version: {stateSchemaVersion}</span> и
-            опциональная декларация <span className="mono">state_schema:</span> в{' '}
-            <span className="mono">service.yml</span> сервиса{' '}
-            <span className="mono">{serviceName}</span> на ref{' '}
-            <span className="mono">{serviceVersion}</span>.
+            <strong>{t('incarnations:schemaDegradedStruct')}</strong>{' '}
+            {t('incarnations:schemaDegradedStructHint', {
+              version: stateSchemaVersion,
+              service: serviceName,
+              ref: serviceVersion,
+            })}
           </div>
           <div>
-            <strong>Миграции:</strong> каталог{' '}
-            <span className="mono">migrations/&lt;NNN&gt;_to_&lt;MMM&gt;.yml</span> в репозитории
-            сервиса.
+            <strong>{t('incarnations:schemaDegradedMigrations')}</strong>{' '}
+            {t('incarnations:schemaDegradedMigrationsHint')}
           </div>
         </div>
       ) : null}

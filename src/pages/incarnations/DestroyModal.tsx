@@ -92,14 +92,14 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
           marginBottom: 12,
         }}
       >
-        Действие необратимо. Async-операция: incarnation переходит в <code className="mono">destroying</code>.
+        {t('incarnations:destroyIrreversible')} <code className="mono">destroying</code>.
       </div>
 
       <Input
-        label={`Напечатайте "${incarnationName}" для подтверждения`}
+        label={t('incarnations:destroyConfirmLabel', { name: incarnationName })}
         mono
         aria-invalid={errors.confirmName ? 'true' : undefined}
-        error={errors.confirmName?.message}
+        error={errors.confirmName ? t(errors.confirmName.message ?? '', { name: incarnationName }) : undefined}
         {...register('confirmName')}
       />
 
@@ -110,8 +110,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
           style={{ width: 16, height: 16, marginTop: 2, accentColor: 'var(--danger)' }}
         />
         <span>
-          <strong style={{ color: 'var(--danger)' }}>allow_destroy</strong> — снос без teardown-scenario
-          (force, DELETE строки напрямую). Без флага идёт штатный destroy через scenario{' '}
+          <strong style={{ color: 'var(--danger)' }}>allow_destroy</strong> {t('incarnations:allowDestroyDesc')}{' '}
           <code className="mono">destroy</code>.
         </span>
       </label>
@@ -127,7 +126,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
             fontSize: 13,
           }}
         >
-          Destroy принят. apply_id: <span className="mono">{applyId}</span>
+          {t('incarnations:destroyAccepted')} <span className="mono">{applyId}</span>
         </div>
       ) : null}
       {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}

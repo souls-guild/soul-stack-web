@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
@@ -77,7 +77,7 @@ export function VigilDetail() {
       {deleteMut.error ? (
         <div className={styles.errorBox}>
           {deleteMut.error instanceof ApiError
-            ? `Ошибка ${deleteMut.error.status}: ${deleteMut.error.message}`
+            ? t('errors:generic', { status: deleteMut.error.status, detail: deleteMut.error.message })
             : String(deleteMut.error)}
         </div>
       ) : null}
@@ -93,7 +93,7 @@ export function VigilDetail() {
             ? `sid: ${v.sid}`
             : v.coven && v.coven.length > 0
               ? `coven: ${v.coven.join(', ')}`
-              : '— (весь флот)'}
+              : t('beacons:subjectWholeFleet')}
         </span>
         <span className={styles.metaKey}>Enabled</span>
         <span className={styles.metaVal}>{String(v.enabled)}</span>
@@ -107,13 +107,13 @@ export function VigilDetail() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Params</h2>
-        <JsonViewer value={v.params} emptyLabel="params не заданы" />
+        <JsonViewer value={v.params} emptyLabel={t('beacons:paramsEmpty')} />
       </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Portent history</h2>
         <div className={styles.empty}>
-          TBD — endpoint <code className="mono">GET /v1/portents?vigil=…</code> ещё не выставлен в openapi.
+          <Trans i18nKey="beacons:portentHistoryTodo" components={{ code: <code className="mono" /> }} />
         </div>
       </section>
     </div>

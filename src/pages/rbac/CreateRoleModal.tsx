@@ -79,17 +79,17 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
         <Input
           label="Name"
           mono
-          placeholder="soul-operator"
+          placeholder={t('admin:rbacRoleNamePlaceholder')}
           aria-invalid={errors.name ? 'true' : undefined}
-          error={errors.name?.message}
+          error={errors.name?.message ? t(errors.name.message) : undefined}
           {...register('name')}
         />
         <div style={{ height: 12 }} />
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 13 }}>Description</span>
+          <span style={{ fontSize: 13 }}>{t('admin:rbacDescription')}</span>
           <textarea
             rows={2}
-            placeholder="Управление Soul-ами, чтение состояния флота"
+            placeholder={t('admin:rbacDescriptionPlaceholder')}
             spellCheck={false}
             aria-invalid={errors.description ? 'true' : undefined}
             {...register('description')}
@@ -104,7 +104,9 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
             }}
           />
           {errors.description ? (
-            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.description.message}</span>
+            <span style={{ color: 'var(--danger)', fontSize: 12 }}>
+              {errors.description.message ? t(errors.description.message) : null}
+            </span>
           ) : null}
         </label>
         <div style={{ height: 12 }} />
@@ -118,13 +120,13 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
                 value={field.value ?? []}
                 onChange={field.onChange}
                 catalog={catalog}
-                placeholder="soul.list, soul.read, ..."
-                ariaLabel="permissions роли"
+                placeholder={t('admin:rbacPermissionsPlaceholderCreate')}
+                ariaLabel={t('admin:rbacPermissionsAria')}
               />
             )}
           />
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Можно оставить пустым — добавите потом через Role permissions.
+            {t('admin:rbacPermissionsHint')}
           </span>
         </label>
         {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert">{serverError}</div> : null}

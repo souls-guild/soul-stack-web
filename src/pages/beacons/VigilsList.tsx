@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VigilView } from '../../api/keeper';
@@ -51,7 +51,7 @@ export function VigilsList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Vigils</h1>
-          <div className={styles.crumbs}>Soul-side проверки beacons</div>
+          <div className={styles.crumbs}>{t('beacons:vigilsSubtitle')}</div>
         </div>
         <Link to="/vigils/new">
           <Button variant="primary">{t('newVigil')}</Button>
@@ -60,7 +60,7 @@ export function VigilsList() {
 
       <div className={styles.filters}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span className={styles.metaKey}>Enabled only</span>
+          <span className={styles.metaKey}>{t('beacons:enabledOnly')}</span>
           <input
             type="checkbox"
             checked={enabledOnly}
@@ -82,7 +82,7 @@ export function VigilsList() {
               fontFamily: 'var(--font-mono)',
             }}
           >
-            <option value="">— все —</option>
+            <option value="">{t('beacons:filterAll')}</option>
             {KNOWN_BEACONS.map((b) => (
               <option key={b} value={b}>{b}</option>
             ))}
@@ -110,14 +110,13 @@ export function VigilsList() {
       {q.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError ? t('errors:generic', { status: q.error.status, detail: q.error.message }) : String(q.error)}
         </div>
       ) : null}
 
       {q.data && filtered.length === 0 ? (
         <div className={styles.empty}>
-          Vigil-ов под фильтр не найдено. Создаются через{' '}
-          <code className="mono">POST /v1/vigils</code> или кнопку выше.
+          <Trans i18nKey="beacons:vigilsEmpty" components={{ code: <code className="mono" /> }} />
         </div>
       ) : null}
 

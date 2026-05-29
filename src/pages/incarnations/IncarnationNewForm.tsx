@@ -103,7 +103,7 @@ export function IncarnationNewForm() {
       setTimeout(() => navigate(`/incarnations/${encodeURIComponent(reply.incarnation)}`), 600);
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -134,7 +134,7 @@ export function IncarnationNewForm() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Box size={22} /> Новая incarnation
+              <Box size={22} /> {t('incarnations:title')}
             </h1>
           </div>
         </div>
@@ -146,7 +146,7 @@ export function IncarnationNewForm() {
           placeholder="redis-prod"
           mono
           aria-invalid={errors.name ? 'true' : undefined}
-          error={errors.name?.message}
+          error={errors.name ? t(errors.name.message ?? '') : undefined}
           {...register('name')}
         />
 
@@ -165,7 +165,7 @@ export function IncarnationNewForm() {
               fontSize: 13,
             }}
           >
-            <option value="">— выберите сервис —</option>
+            <option value="">{t('incarnations:selectService')}</option>
             {serviceItems.map((s) => (
               <option key={s.name} value={s.name}>
                 {s.name} ({s.ref})
@@ -173,21 +173,21 @@ export function IncarnationNewForm() {
             ))}
           </select>
           {errors.service ? (
-            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.service.message}</span>
+            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.service.message ?? '')}</span>
           ) : services.error ? (
             <span style={{ color: 'var(--danger)', fontSize: 12 }}>
-              Не удалось загрузить services. POST /v1/incarnations будет проверять имя на серверной стороне.
+              {t('incarnations:servicesLoadFailed')}
             </span>
           ) : (
             <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-              Список из <code className="mono">GET /v1/services</code>.
+              {t('incarnations:servicesSource')}
             </span>
           )}
         </label>
 
         <div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-            Covens (declared environment-теги)
+            {t('incarnations:covensLabel')}
           </div>
           <Controller
             control={control}
@@ -196,9 +196,9 @@ export function IncarnationNewForm() {
               <ChipsInput
                 value={field.value}
                 onChange={field.onChange}
-                placeholder="prod, datacenter-1 (Enter / пробел / запятая для добавления)"
+                placeholder={t('incarnations:covensPlaceholder')}
                 ariaLabel="Covens"
-                validate={(t) => (KEBAB.test(t) ? null : 'kebab-case: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$')}
+                validate={(tok) => (KEBAB.test(tok) ? null : t('incarnations:kebabPattern'))}
               />
             )}
           />
@@ -207,7 +207,7 @@ export function IncarnationNewForm() {
         {selectedService && scenarioSelectAvailable ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-              Scenario (контекст input-формы)
+              {t('incarnations:scenarioContextLabel')}
             </span>
             <select
               value={selectedScenarioName}
@@ -221,7 +221,7 @@ export function IncarnationNewForm() {
                 fontSize: 13,
               }}
             >
-              <option value="">— JSON-режим (без схемы) —</option>
+              <option value="">{t('incarnations:scenarioJsonMode')}</option>
               {scenarios.items.map((s) => (
                 <option key={s.name} value={s.name} title={s.description ?? ''}>
                   {s.name}
@@ -230,8 +230,7 @@ export function IncarnationNewForm() {
               ))}
             </select>
             <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-              POST /v1/incarnations всегда вызывает scenario <code className="mono">create</code>;
-              выбор здесь задаёт input_schema для генерации полей.
+              {t('incarnations:scenarioCreateAlwaysHint')}
             </span>
           </label>
         ) : null}
@@ -239,7 +238,7 @@ export function IncarnationNewForm() {
         {usePerField && supportedSchema ? (
           <div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-              Input (поля scenario <code className="mono">{selectedScenarioName}</code>)
+              {t('incarnations:inputScenarioFields', { name: selectedScenarioName })}
             </div>
             <ScenarioInputFields
               schema={supportedSchema}
@@ -255,7 +254,7 @@ export function IncarnationNewForm() {
         ) : (
           <div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-              Input scenario create (динамический form-builder)
+              {t('incarnations:dynamicInputDesc')}
             </div>
             <DynamicInputBuilder
               value={dynamicInput}
@@ -263,8 +262,7 @@ export function IncarnationNewForm() {
               ariaLabel="Scenario create input fields"
             />
             <span style={{ color: 'var(--text-faint)', fontSize: 12, marginTop: 6, display: 'block' }}>
-              Передаётся как <code className="mono">input</code> в <code className="mono">scenario create</code>.
-              Пусто = <code className="mono">{'{}'}</code>.
+              {t('incarnations:dynamicInputHint')}
             </span>
           </div>
         )}
@@ -280,7 +278,7 @@ export function IncarnationNewForm() {
               fontSize: 13,
             }}
           >
-            Создано. apply_id: <span className="mono">{createdApplyId}</span>. Переходим к incarnation…
+            {t('incarnations:created')} <span className="mono">{createdApplyId}</span>{t('incarnations:createdGoTo')}
           </div>
         ) : null}
 

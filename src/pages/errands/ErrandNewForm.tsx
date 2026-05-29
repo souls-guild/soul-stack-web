@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useForm,
@@ -63,6 +64,7 @@ const textareaStyle: CSSProperties = {
 };
 
 export function ErrandNewForm() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const prefilledSid = params.get('sid') ?? '';
@@ -95,14 +97,14 @@ export function ErrandNewForm() {
             <Terminal size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
             Run Errand
           </h1>
-          <div className={styles.crumbs}>pull ad-hoc запуск одного модуля на Soul</div>
+          <div className={styles.crumbs}>{t('runhistory:errandNewCrumbs')}</div>
         </div>
       </div>
 
       <div className={styles.deprecationBanner} role="note" aria-label="Deprecation notice">
-        Страница скрыта из навигации. Используйте{' '}
-        <Link to="/run?workload=command">Run Wizard</Link>{' '}
-        для запуска ad-hoc команд (поддерживает multi-target). Прямой URL сохранён для backward-compat ссылок.
+        {t('runhistory:deprecationBannerBefore')}
+        <Link to="/run?workload=command">{t('runhistory:runWizardLink')}</Link>
+        {t('runhistory:deprecationErrandAfter')}
       </div>
 
       <section className={styles.section} aria-label="Module">
@@ -122,7 +124,7 @@ export function ErrandNewForm() {
                 {m}
               </option>
             ))}
-            <option value="__custom__">— custom (JSON) —</option>
+            <option value="__custom__">{t('runhistory:customOption')}</option>
           </select>
         </label>
       </section>
@@ -209,10 +211,11 @@ function SidField<T extends FieldValues>({
   errorMsg,
   name,
 }: SidFieldProps<T>) {
+  const { t } = useTranslation();
   if (prefilledSid) {
     return (
       <Input
-        label="SID (FQDN)"
+        label={t('runhistory:sidLabel')}
         readOnly
         mono
         {...register(name)}
@@ -222,7 +225,7 @@ function SidField<T extends FieldValues>({
   }
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <span className={styles.metaKey}>SID (FQDN)</span>
+      <span className={styles.metaKey}>{t('runhistory:sidLabel')}</span>
       <input
         list="errand-sids"
         placeholder="host01.example.com"
@@ -260,9 +263,10 @@ function EnvFields<T extends FieldValues>({
   register,
   basePath,
 }: EnvFieldsProps<T>) {
+  const { t } = useTranslation();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span className={styles.metaKey}>Env (опционально)</span>
+      <span className={styles.metaKey}>{t('runhistory:envLabel')}</span>
       {fields.map((f, i) => (
         <div key={f.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
@@ -280,7 +284,7 @@ function EnvFields<T extends FieldValues>({
           <button
             type="button"
             onClick={() => remove(i)}
-            aria-label={`удалить env ${i}`}
+            aria-label={t('runhistory:envRemove', { i })}
             style={{
               background: 'transparent',
               border: '1px solid var(--border)',
@@ -311,27 +315,29 @@ function EnvFields<T extends FieldValues>({
           fontSize: 12.5,
         }}
       >
-        <Plus size={14} /> добавить env
+        <Plus size={14} /> {t('runhistory:envAdd')}
       </button>
     </div>
   );
 }
 
 function ErrorBlock({ error }: { error: unknown }) {
+  const { t } = useTranslation();
   if (!error) return null;
   return (
     <div className={styles.errorBox}>
-      {error instanceof ApiError ? `Ошибка ${error.status}: ${error.message}` : String(error)}
+      {error instanceof ApiError ? t('errors:generic', { status: error.status, detail: error.message }) : String(error)}
     </div>
   );
 }
 
-function SubmitRow({ pending, label = 'Run Errand' }: { pending: boolean; label?: string }) {
+function SubmitRow({ pending, label }: { pending: boolean; label?: string }) {
+  const { t } = useTranslation();
   return (
     <div>
       <Button variant="primary" type="submit" disabled={pending}>
         <Send size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />
-        {pending ? 'Запускаем…' : label}
+        {pending ? t('running2') : (label ?? t('runhistory:runErrandSubmit'))}
       </Button>
     </div>
   );
@@ -356,6 +362,7 @@ function TimeoutAndDryRow<T extends FieldValues>({
   timeoutName: Path<T>;
   dryName: Path<T>;
 }): ReactNode {
+  const { t } = useTranslation();
   return (
     <>
       <Input
@@ -368,7 +375,7 @@ function TimeoutAndDryRow<T extends FieldValues>({
         mono
       />
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span className={styles.metaKey}>Dry-run</span>
+        <span className={styles.metaKey}>{t('runhistory:dryRunLabel')}</span>
         <input
           type="checkbox"
           {...register(dryName)}
@@ -383,6 +390,7 @@ function TimeoutAndDryRow<T extends FieldValues>({
 // --- form variants ---
 
 function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: CommonProps<ShellInput>) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -406,7 +414,7 @@ function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Com
     <form
       onSubmit={handleSubmit(onSubmit)}
       className={styles.section}
-      aria-label="Параметры core.cmd.shell"
+      aria-label={t('runhistory:paramsSectionAria', { module: 'core.cmd.shell' })}
     >
       <input type="hidden" {...register('module')} value="core.cmd.shell" />
       <div className={styles.filters}>
@@ -425,7 +433,7 @@ function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Com
         />
       </div>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className={styles.metaKey}>Command (sh -c)</span>
+        <span className={styles.metaKey}>{t('runhistory:commandLabel')}</span>
         <textarea
           rows={4}
           placeholder="uptime && df -h"
@@ -436,17 +444,15 @@ function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Com
             border: errors.cmd ? '1px solid var(--danger)' : '1px solid var(--border)',
           }}
         />
-        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-          параметр шлётся как <code>cmd</code> в API
-        </span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{t('runhistory:cmdHint')}</span>
         {errors.cmd ? (
           <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.cmd.message}</span>
         ) : null}
       </label>
       <Input
-        label="Working dir (опционально)"
+        label={t('runhistory:cwdLabel')}
         placeholder="/var/tmp"
-        hint="параметр шлётся как cwd в API"
+        hint={t('runhistory:cwdHint')}
         {...register('cwd')}
         mono
       />
@@ -464,6 +470,7 @@ function ShellForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Com
 }
 
 function ExecForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: CommonProps<ExecInput>) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -488,7 +495,7 @@ function ExecForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Comm
     <form
       onSubmit={handleSubmit(onSubmit)}
       className={styles.section}
-      aria-label="Параметры core.exec.run"
+      aria-label={t('runhistory:paramsSectionAria', { module: 'core.exec.run' })}
     >
       <input type="hidden" {...register('module')} value="core.exec.run" />
       <div className={styles.filters}>
@@ -507,30 +514,28 @@ function ExecForm({ prefilledSid, soulsOptions, pending, error, onSubmit }: Comm
         />
       </div>
       <Input
-        label="Binary (абсолютный путь)"
+        label={t('runhistory:binaryLabel')}
         placeholder="/usr/bin/uptime"
         aria-invalid={errors.cmd ? 'true' : undefined}
         {...register('cmd')}
         error={errors.cmd?.message}
-        hint="параметр шлётся как cmd в API"
+        hint={t('runhistory:cmdHint')}
         mono
       />
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className={styles.metaKey}>Args (одна строка = один аргумент)</span>
+        <span className={styles.metaKey}>{t('runhistory:argsLabel')}</span>
         <textarea
           rows={4}
           placeholder={'--verbose\n-c\n3'}
           {...register('args_raw')}
           style={textareaStyle}
         />
-        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-          параметр шлётся как <code>args</code> в API
-        </span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{t('runhistory:argsHint')}</span>
       </label>
       <Input
-        label="Working dir (опционально)"
+        label={t('runhistory:cwdLabel')}
         placeholder="/var/tmp"
-        hint="параметр шлётся как cwd в API"
+        hint={t('runhistory:cwdHint')}
         {...register('cwd')}
         mono
       />
@@ -555,6 +560,7 @@ function CustomForm({
   error,
   onSubmit,
 }: CommonProps<JsonFallbackInput> & { prefilledModule: string }) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -574,7 +580,7 @@ function CustomForm({
     <form onSubmit={handleSubmit(onSubmit)} className={styles.section} aria-label="Custom module">
       <div className={styles.filters}>
         <Input
-          label="Module name"
+          label={t('runhistory:moduleNameLabel')}
           placeholder="core.http.probe"
           {...register('module')}
           error={errors.module?.message}
@@ -595,7 +601,7 @@ function CustomForm({
         />
       </div>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span className={styles.metaKey}>Input (JSON-object)</span>
+        <span className={styles.metaKey}>{t('runhistory:inputJsonLabel')}</span>
         <textarea
           rows={8}
           placeholder='{"url": "https://example.com"}'

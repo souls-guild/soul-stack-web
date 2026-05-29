@@ -62,7 +62,7 @@ export function IncarnationDetail() {
       qc.invalidateQueries({ queryKey: ['incarnation', name] });
     },
     onError: (err) => {
-      setDriftError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setDriftError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -88,16 +88,16 @@ export function IncarnationDetail() {
     return { specKeys, stateKeys, declaredHosts, runtimeHosts };
   }, [detail.data]);
 
-  if (detail.isLoading) return <div className={styles.loading}>Загружаем…</div>;
+  if (detail.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (detail.error) {
     return (
       <div className={styles.errorBox}>
-        {detail.error instanceof ApiError ? `Ошибка ${detail.error.status}: ${detail.error.message}` : String(detail.error)}
+        {detail.error instanceof ApiError ? t('errors:generic', { status: detail.error.status, detail: detail.error.message }) : String(detail.error)}
       </div>
     );
   }
   const row = detail.data;
-  if (!row) return <div className={styles.empty}>Incarnation не найдена.</div>;
+  if (!row) return <div className={styles.empty}>{t('incarnations:incarnationNotFound')}</div>;
 
   const isLocked = row.status === 'error_locked' || row.status === 'migration_failed' || row.status === 'destroy_failed';
   const isDestroying = row.status === 'destroying';
@@ -157,13 +157,13 @@ export function IncarnationDetail() {
               </>
             ) : null}
             {isLocked ? (
-              <Button variant="primary" onClick={() => setUnlockOpen(true)} title="Снять lock">
+              <Button variant="primary" onClick={() => setUnlockOpen(true)} title={t('incarnations:unlockTitleShort')}>
                 <Lock size={14} /> Unlock
               </Button>
             ) : null}
             {isDestroying ? (
-              <Button variant="ghost" disabled title="incarnation в состоянии destroying">
-                Destroy in progress…
+              <Button variant="ghost" disabled title={t('incarnations:destroyInProgressTitle')}>
+                {t('incarnations:destroyInProgress')}
               </Button>
             ) : null}
           </div>
@@ -217,10 +217,9 @@ export function IncarnationDetail() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Data summary</h2>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-            Где искать параметры incarnation: <strong>Spec</strong> — что задекларировал
-            оператор, <strong>State</strong> — что система знает после apply-прогонов,
-            <strong> Schema</strong> — версия структуры state, <strong>Hosts</strong> —
-            declared + connected + per-host runtime data.
+            {t('incarnations:dataSummaryDesc')} <strong>Spec</strong> {t('incarnations:dataSummarySpecTail')},{' '}
+            <strong>State</strong> {t('incarnations:dataSummaryStateTail')},{' '}
+            <strong>Schema</strong> {t('incarnations:dataSummarySchemaTail')}, <strong>Hosts</strong> {t('incarnations:dataSummaryHostsTail')}
           </p>
           <div className={styles.summaryGrid}>
             <button type="button" className={styles.summaryCard} onClick={() => setTab('spec')}>
@@ -229,9 +228,9 @@ export function IncarnationDetail() {
                 Spec
               </span>
               <span className={styles.summaryCardValue}>
-                {summary.specKeys} {summary.specKeys === 1 ? 'поле' : 'полей'}
+                {summary.specKeys} {summary.specKeys === 1 ? t('incarnations:fieldOne') : t('incarnations:fieldMany')}
               </span>
-              <span className={styles.summaryCardHint}>declared by operator</span>
+              <span className={styles.summaryCardHint}>{t('incarnations:declaredByOperator')}</span>
             </button>
             <button type="button" className={styles.summaryCard} onClick={() => setTab('state')}>
               <span className={styles.summaryCardLabel}>
@@ -239,9 +238,9 @@ export function IncarnationDetail() {
                 State
               </span>
               <span className={styles.summaryCardValue}>
-                {summary.stateKeys} {summary.stateKeys === 1 ? 'поле' : 'полей'}
+                {summary.stateKeys} {summary.stateKeys === 1 ? t('incarnations:fieldOne') : t('incarnations:fieldMany')}
               </span>
-              <span className={styles.summaryCardHint}>runtime после apply</span>
+              <span className={styles.summaryCardHint}>{t('incarnations:runtimeAfterApply')}</span>
             </button>
             <button type="button" className={styles.summaryCard} onClick={() => setTab('schema')}>
               <span className={styles.summaryCardLabel}>
@@ -256,7 +255,7 @@ export function IncarnationDetail() {
               <span className={styles.summaryCardValue}>
                 {summary.declaredHosts} declared · {summary.runtimeHosts} runtime
               </span>
-              <span className={styles.summaryCardHint}>+ connected souls по coven</span>
+              <span className={styles.summaryCardHint}>{t('incarnations:hostsCardHint')}</span>
             </button>
           </div>
 
@@ -306,14 +305,14 @@ export function IncarnationDetail() {
       {tab === 'history' ? (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>state_history</h2>
-          {history.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+          {history.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
           {history.error ? (
             <div className={styles.errorBox}>
-              {history.error instanceof ApiError ? `Ошибка ${history.error.status}: ${history.error.message}` : String(history.error)}
+              {history.error instanceof ApiError ? t('errors:generic', { status: history.error.status, detail: history.error.message }) : String(history.error)}
             </div>
           ) : null}
           {history.data && history.data.items.length === 0 ? (
-            <div className={styles.empty}>История пуста.</div>
+            <div className={styles.empty}>{t('incarnations:historyEmpty')}</div>
           ) : null}
           {history.data && history.data.items.length > 0 ? (
             <table className={styles.table}>
@@ -354,7 +353,7 @@ export function IncarnationDetail() {
           {driftError ? <div className={styles.errorBox}>{driftError}</div> : null}
           {row.last_drift_check_at ? (
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Last server-recorded check: <span className="mono">{row.last_drift_check_at}</span>
+              {t('incarnations:lastServerCheck')} <span className="mono">{row.last_drift_check_at}</span>
             </div>
           ) : null}
           {drift ? (

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { keeperApi, type ServiceView } from '../../api/keeper';
@@ -8,6 +9,7 @@ import { RegisterServiceModal } from './RegisterServiceModal';
 import styles from '../common.module.css';
 
 export function ServicesList() {
+  const { t } = useTranslation();
   const [nameFilter, setNameFilter] = useState('');
   const [refFilter, setRefFilter] = useState('');
   const [registerOpen, setRegisterOpen] = useState(false);
@@ -34,21 +36,21 @@ export function ServicesList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Services</h1>
-          <div className={styles.crumbs}>реестр Service-ов (git+ref)</div>
+          <div className={styles.crumbs}>{t('admin:svcCrumbs')}</div>
         </div>
         <Button type="button" variant="primary" onClick={() => setRegisterOpen(true)}>
-          Register service
+          {t('registerService')}
         </Button>
       </div>
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>Name contains</div>
+          <div className={styles.metaKey}>{t('admin:svcNameContains')}</div>
           <input
             type="text"
             value={nameFilter}
             onChange={(e) => setNameFilter(e.target.value)}
-            placeholder="redis / postgres / …"
+            placeholder={t('admin:svcNamePlaceholder')}
             style={{
               padding: '8px 10px',
               borderRadius: 'var(--radius)',
@@ -59,12 +61,12 @@ export function ServicesList() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Ref equals</div>
+          <div className={styles.metaKey}>{t('admin:svcRefEquals')}</div>
           <input
             type="text"
             value={refFilter}
             onChange={(e) => setRefFilter(e.target.value)}
-            placeholder="v2.0.0 / main"
+            placeholder={t('admin:svcRefPlaceholder')}
             style={{
               padding: '8px 10px',
               borderRadius: 'var(--radius)',
@@ -76,16 +78,18 @@ export function ServicesList() {
         </label>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
-          {q.error instanceof ApiError ? `Ошибка ${q.error.status}: ${q.error.message}` : String(q.error)}
+          {q.error instanceof ApiError
+            ? t('errors:generic', { status: q.error.status, detail: q.error.message })
+            : String(q.error)}
         </div>
       ) : null}
 
       {q.data && filtered.length === 0 ? (
         <div className={styles.empty}>
-          Service-ов под фильтр не найдено. Регистрируются через{' '}
+          {t('admin:svcEmpty')}{' '}
           <code className="mono">keeper.service.register</code>.
         </div>
       ) : null}

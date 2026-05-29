@@ -83,27 +83,27 @@ export function EditServiceModal({ open, onClose, service }: Props) {
         <Input
           label="Git"
           mono
-          placeholder="https://git.example.com/service-redis.git"
-          hint="git-источник service-репо"
-          error={errors.git?.message}
+          placeholder={t('admin:svcGitPlaceholder')}
+          hint={t('admin:svcGitHintShort')}
+          error={errors.git?.message ? t(errors.git.message) : undefined}
           {...register('git')}
         />
         <div style={{ height: 12 }} />
         <Input
           label="Ref"
           mono
-          placeholder="main"
-          hint="git tag или branch — версия сервиса"
-          error={errors.ref?.message}
+          placeholder={t('admin:svcRefPlaceholderMain')}
+          hint={t('admin:svcRefHint')}
+          error={errors.ref?.message ? t(errors.ref.message) : undefined}
           {...register('ref')}
         />
         <div style={{ height: 12 }} />
         <Input
           label="Refresh"
           mono
-          placeholder="5m"
-          hint="опц. авто-refresh; пусто — без авто-refresh"
-          error={errors.refresh?.message}
+          placeholder={t('admin:svcRefreshPlaceholder')}
+          hint={t('admin:svcRefreshHintShort')}
+          error={errors.refresh?.message ? t(errors.refresh.message) : undefined}
           {...register('refresh')}
         />
         {serverError ? (

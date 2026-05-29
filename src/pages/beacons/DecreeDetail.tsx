@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Scroll, AlertTriangle } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
@@ -61,7 +61,7 @@ export function DecreeDetail() {
                 <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                   on_beacon: {d.on_beacon}
                 </span>
-                {d.enabled ? <Badge tone="ok">enabled</Badge> : <Badge tone="muted">disabled (default-deny)</Badge>}
+                {d.enabled ? <Badge tone="ok">enabled</Badge> : <Badge tone="muted">{t('beacons:disabledDefaultDeny')}</Badge>}
                 {!d.enabled ? <AlertTriangle size={14} color="var(--text-muted)" aria-hidden="true" /> : null}
               </div>
             </div>
@@ -75,7 +75,7 @@ export function DecreeDetail() {
       {deleteMut.error ? (
         <div className={styles.errorBox}>
           {deleteMut.error instanceof ApiError
-            ? `Ошибка ${deleteMut.error.status}: ${deleteMut.error.message}`
+            ? t('errors:generic', { status: deleteMut.error.status, detail: deleteMut.error.message })
             : String(deleteMut.error)}
         </div>
       ) : null}
@@ -91,7 +91,7 @@ export function DecreeDetail() {
             ? `sid: ${d.sid}`
             : d.coven && d.coven.length > 0
               ? `coven: ${d.coven.join(', ')}`
-              : '— (любой subject Vigil-а)'}
+              : t('beacons:subjectAnyVigil')}
         </span>
         <span className={styles.metaKey}>Incarnation</span>
         <span className={styles.metaVal}>
@@ -132,19 +132,19 @@ export function DecreeDetail() {
             {d.where}
           </pre>
         ) : (
-          <div className={styles.empty}>where не задан (срабатывает на любой Portent от Vigil-а)</div>
+          <div className={styles.empty}>{t('beacons:whereEmpty')}</div>
         )}
       </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Action input</h2>
-        <JsonViewer value={d.action_input} emptyLabel="action_input не задан" />
+        <JsonViewer value={d.action_input} emptyLabel={t('beacons:actionInputEmpty')} />
       </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Recent fires</h2>
         <div className={styles.empty}>
-          TBD — endpoint <code className="mono">GET /v1/oracle/fires</code> ещё не выставлен в openapi.
+          <Trans i18nKey="beacons:recentFiresTodo" components={{ code: <code className="mono" /> }} />
         </div>
       </section>
     </div>

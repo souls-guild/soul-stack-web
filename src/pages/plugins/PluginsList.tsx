@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Puzzle, Plus } from 'lucide-react';
@@ -18,6 +19,7 @@ function statusOf(row: PluginSigilView): 'active' | 'revoked' {
 }
 
 export function PluginsList() {
+  const { t } = useTranslation();
   const [namespace, setNamespace] = useState<string>('');
   const [status, setStatus] = useState<StatusFilter>('');
   const [search, setSearch] = useState('');
@@ -55,14 +57,13 @@ export function PluginsList() {
             <Puzzle size={22} /> Plugins
           </h1>
           <div className={styles.crumbs}>
-            Sigil-allow-list плагинов (Keeper считает sha256
-            сам по локальному кешу host-а)
+            {t('admin:pluginCrumbs')}
           </div>
         </div>
         <Link to="/plugins/register" style={{ textDecoration: 'none' }}>
           <Button variant="primary">
             <Plus size={14} style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            Допустить плагин
+            {t('admin:pluginAllow')}
           </Button>
         </Link>
       </div>
@@ -104,18 +105,18 @@ export function PluginsList() {
               background: 'var(--surface)',
             }}
           >
-            <option value="">— все —</option>
+            <option value="">{t('admin:pluginStatusAll')}</option>
             <option value="active">active</option>
             <option value="revoked">revoked</option>
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Name contains</div>
+          <div className={styles.metaKey}>{t('admin:pluginNameContains')}</div>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="soul-mod-acme / aws / …"
+            placeholder={t('admin:pluginNamePlaceholder')}
             style={{
               padding: '8px 10px',
               borderRadius: 'var(--radius)',
@@ -127,18 +128,18 @@ export function PluginsList() {
         </label>
       </div>
 
-      {q.isLoading ? <div className={styles.loading}>Загружаем…</div> : null}
+      {q.isLoading ? <div className={styles.loading}>{t('admin:pluginLoading')}</div> : null}
       {q.error ? (
         <div className={styles.errorBox}>
           {q.error instanceof ApiError
-            ? `Ошибка ${q.error.status}: ${q.error.message}`
+            ? t('errors:generic', { status: q.error.status, detail: q.error.message })
             : String(q.error)}
         </div>
       ) : null}
 
       {q.data && filtered.length === 0 ? (
         <div className={styles.empty}>
-          Sigil-допусков под фильтр не найдено. Допускаются через{' '}
+          {t('admin:pluginEmpty')}{' '}
           <code className="mono">keeper.plugin.allow</code>.
         </div>
       ) : null}

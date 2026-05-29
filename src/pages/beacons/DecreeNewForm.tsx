@@ -66,7 +66,7 @@ export function DecreeNewForm() {
     },
     onError: (err) => {
       setServerError(
-        err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err),
+        err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err),
       );
     },
   });
@@ -106,23 +106,23 @@ export function DecreeNewForm() {
             <a href="/decrees" onClick={(e) => { e.preventDefault(); nav('/decrees'); }}>decrees</a> / new
           </div>
           <h1 className={styles.title}>New Decree</h1>
-          <div className={styles.crumbs}>Reactor: on Portent → scenario (default-deny)</div>
+          <div className={styles.crumbs}>{t('beacons:newDecreeSubtitle')}</div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <section className={styles.section} aria-label="Базовые">
-          <h2 className={styles.sectionTitle}>Базовые</h2>
+        <section className={styles.section} aria-label={t('beacons:baseFieldsLegend')}>
+          <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.filters}>
             <Input
               label="Name (kebab-case)"
               mono
               {...register('name')}
               placeholder="restart-on-config-change"
-              error={errors.name?.message}
+              error={errors.name?.message ? t(errors.name.message) : undefined}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div className={styles.metaKey}>on_beacon (Vigil-name)</div>
+              <div className={styles.metaKey}>{t('beacons:onBeaconLabel')}</div>
               <input
                 list="known-vigils"
                 {...register('on_beacon')}
@@ -140,16 +140,16 @@ export function DecreeNewForm() {
                 {(vigils.data?.items ?? []).map((v) => <option key={v.name} value={v.name} />)}
               </datalist>
               {errors.on_beacon ? (
-                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.on_beacon.message}</span>
+                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.on_beacon.message ?? '')}</span>
               ) : null}
             </label>
             <Input
               label="Cooldown"
               mono
               {...register('cooldown')}
-              placeholder="1m (optional)"
-              hint="<число><ms|s|m|h>"
-              error={errors.cooldown?.message}
+              placeholder={t('beacons:cooldownPlaceholder')}
+              hint={t('beacons:durationHint')}
+              error={errors.cooldown?.message ? t(errors.cooldown.message) : undefined}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span className={styles.metaKey}>Enabled (default-deny)</span>
@@ -163,9 +163,9 @@ export function DecreeNewForm() {
         </section>
 
         <section className={styles.section} aria-label="CEL where">
-          <h2 className={styles.sectionTitle}>CEL where (optional)</h2>
+          <h2 className={styles.sectionTitle}>{t('beacons:celWhereOptional')}</h2>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className={styles.metaKey}>предикат над event.data; compile-проверяется сервером</span>
+            <span className={styles.metaKey}>{t('beacons:celWhereHint')}</span>
             <textarea
               {...register('where')}
               rows={3}
@@ -183,10 +183,10 @@ export function DecreeNewForm() {
           </label>
         </section>
 
-        <section className={styles.section} aria-label="Subject (XOR sid/coven)">
+        <section className={styles.section} aria-label={t('beacons:subjectXorLegend')}>
           <h2 className={styles.sectionTitle}>Subject</h2>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Опц.: ОДНО из <code className="mono">sid</code>/<code className="mono">coven</code>. Опустить оба — реагируем на любой subject Vigil-а.
+            {t('beacons:subjectDecreeHint', { sid: 'sid', coven: 'coven' })}
           </div>
           <div className={styles.filters}>
             <Input
@@ -194,16 +194,16 @@ export function DecreeNewForm() {
               mono
               {...register('sid')}
               placeholder="host01.example.com"
-              error={errors.sid?.message}
+              error={errors.sid?.message ? t(errors.sid.message) : undefined}
               disabled={coven.length > 0}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 240 }}>
-              <span className={styles.metaKey}>coven (через пробел/запятую)</span>
+              <span className={styles.metaKey}>{t('beacons:covenSpaceComma')}</span>
               <input
                 value={covenInput}
                 onChange={(e) => setCovenInput(e.target.value)}
                 onBlur={syncCovenToForm}
-                placeholder="prod, redis-master"
+                placeholder={t('beacons:covenPlaceholder')}
                 style={{
                   padding: '8px 10px',
                   borderRadius: 'var(--radius)',
@@ -213,7 +213,7 @@ export function DecreeNewForm() {
                 }}
                 disabled={Boolean(watch('sid'))}
               />
-              <span className={styles.metaKey}>{coven.length} coven-тег(ов)</span>
+              <span className={styles.metaKey}>{t('beacons:covenTagCount', { count: coven.length })}</span>
             </label>
           </div>
         </section>
@@ -240,7 +240,7 @@ export function DecreeNewForm() {
                 {(incarnations.data?.items ?? []).map((i) => <option key={i.name} value={i.name} />)}
               </datalist>
               {errors.incarnation_name ? (
-                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.incarnation_name.message}</span>
+                <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.incarnation_name.message ?? '')}</span>
               ) : null}
             </label>
             <Input
@@ -248,11 +248,11 @@ export function DecreeNewForm() {
               mono
               {...register('action_scenario')}
               placeholder="restart"
-              error={errors.action_scenario?.message}
+              error={errors.action_scenario?.message ? t(errors.action_scenario.message) : undefined}
             />
           </div>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className={styles.metaKey}>action_input (JSON-object)</span>
+            <span className={styles.metaKey}>{t('beacons:actionInputJsonLabel')}</span>
             <textarea
               {...register('action_input_json')}
               rows={5}
@@ -268,7 +268,7 @@ export function DecreeNewForm() {
               placeholder='{}'
             />
             {errors.action_input_json ? (
-              <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.action_input_json.message}</span>
+              <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.action_input_json.message ?? '')}</span>
             ) : null}
           </label>
         </section>

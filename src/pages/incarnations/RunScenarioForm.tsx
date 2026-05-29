@@ -77,7 +77,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
       qc.invalidateQueries({ queryKey: ['incarnation-history', incarnationName] });
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? `Ошибка ${err.status}: ${err.message}` : String(err));
+      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -107,7 +107,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
             value={field.value}
             onChange={field.onChange}
             onBlur={field.onBlur}
-            error={errors.scenario?.message}
+            error={errors.scenario ? t(errors.scenario.message ?? '') : undefined}
           />
         )}
       />
@@ -115,7 +115,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
       {usePerField && supportedSchema ? (
         <div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-            Input (поля сценария)
+            {t('incarnations:inputScenarioFieldsGeneric')}
           </div>
           <ScenarioInputFields
             schema={supportedSchema}
@@ -130,7 +130,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
         </div>
       ) : (
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Input (JSON-объект)</span>
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('incarnations:inputJsonLabel')}</span>
           <textarea
             placeholder='{}'
             rows={8}
@@ -149,12 +149,12 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
             }}
           />
           {errors.inputJson ? (
-            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{errors.inputJson.message}</span>
+            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.inputJson.message ?? '')}</span>
           ) : (
             <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
               {selectedScenario && !usePerField
-                ? 'Схема сценария содержит сложные типы — JSON-режим.'
-                : 'Соответствует input_schema сценария.'}
+                ? t('incarnations:inputComplexJson')
+                : t('incarnations:inputMatchesSchema')}
             </span>
           )}
         </label>
@@ -170,8 +170,8 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
             fontSize: 13,
           }}
         >
-          Запуск принят: scenario <span className="mono">{reply.scenario}</span>, apply_id{' '}
-          <span className="mono">{reply.apply_id}</span>. История пополнится после завершения прогона.
+          {t('incarnations:runAccepted')} <span className="mono">{reply.scenario}</span>, apply_id{' '}
+          <span className="mono">{reply.apply_id}</span>{t('incarnations:runAcceptedTail')}
         </div>
       ) : null}
       {serverError ? <div className={styles.errorBox}>{serverError}</div> : null}
@@ -190,7 +190,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
             setFields({});
           }}
         >
-          Сбросить
+          {t('reset')}
         </Button>
       </div>
     </form>

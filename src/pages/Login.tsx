@@ -11,12 +11,13 @@ import styles from './Login.module.css';
 
 // JWT — 3 base64url-сегмента, разделённых точкой. Контент не валидируем —
 // authoritative проверка на стороне Keeper-а.
+// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
 const schema = z.object({
   token: z
     .string()
     .trim()
-    .min(1, 'вставьте JWT-токен Архонта')
-    .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'не похоже на JWT (ожидается три base64url-сегмента через точку)'),
+    .min(1, 'admin:loginErrTokenRequired')
+    .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'admin:loginErrTokenFormat'),
 });
 
 type Values = z.infer<typeof schema>;
@@ -53,11 +54,15 @@ export function Login() {
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
-        setServerError(err.status === 401 ? 'Keeper отверг токен (401).' : `Keeper вернул ошибку: ${err.message}`);
+        setServerError(
+          err.status === 401
+            ? t('admin:loginErrRejected')
+            : `${t('admin:loginErrKeeperPrefix')} ${err.message}`,
+        );
       } else if (err instanceof NetworkError) {
-        setServerError('Не удалось связаться с Keeper. Проверьте, что Operator API доступен.');
+        setServerError(t('admin:loginErrNetwork'));
       } else {
-        setServerError(err instanceof Error ? err.message : 'неизвестная ошибка');
+        setServerError(err instanceof Error ? err.message : t('admin:loginErrUnknown'));
       }
     }
   }
@@ -69,29 +74,23 @@ export function Login() {
           <div className={styles.mark}>SS</div>
           <div>
             <h1 className={styles.title}>Soul Stack</h1>
-            <p className={styles.subtitle}>Keeper UI · вход Архонта</p>
+            <p className={styles.subtitle}>{t('admin:loginSubtitle')}</p>
           </div>
         </div>
         <label className={styles.field}>
-          JWT-токен
+          {t('admin:loginTokenLabel')}
           <textarea
             className={styles.tokenArea}
-            placeholder="eyJhbGciOiJI..."
+            placeholder={t('admin:loginTokenPlaceholder')}
             spellCheck={false}
             autoComplete="off"
             aria-invalid={errors.token ? 'true' : undefined}
             {...register('token')}
           />
           {errors.token ? (
-            <span className={styles.error}>{errors.token.message}</span>
+            <span className={styles.error}>{errors.token.message ? t(errors.token.message) : null}</span>
           ) : (
-            <span className={styles.hint}>
-              Пока эндпоинта <code className="mono">/v1/auth/login</code> нет, вставляйте JWT вручную:
-              bootstrap-токен из файла <code className="mono">keeper init --archon</code> либо токен,
-              выданный <code className="mono">POST /v1/operators/{'{aid}'}/issue-token</code>.
-              Токен проверяется ping-ом{' '}
-              <code className="mono">GET /v1/incarnations?limit=1</code>.
-            </span>
+            <span className={styles.hint}>{t('admin:loginHint')}</span>
           )}
         </label>
         {serverError ? <div className={styles.error}>{serverError}</div> : null}
