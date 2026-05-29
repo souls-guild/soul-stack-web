@@ -306,11 +306,18 @@ export const keeperApi = {
     // иначе — classic IncarnationRunReply. Caller, использующий wave, должен сам сделать
     // type-narrowing по присутствию `tide_id`. Существующий /incarnations/:name → RunScenarioForm
     // вызывает БЕЗ wave и продолжает работать как было.
-    runScenario: (name: string, scenario: string, body: IncarnationRunRequest = {}) =>
+    // dryRun — только classic (не-Tide): добавляет `?dry_run=true` (canonical путь
+    // soulctl). Backend объединяет query-флаг с body-полем по OR; шлём через query.
+    runScenario: (
+      name: string,
+      scenario: string,
+      body: IncarnationRunRequest = {},
+      opts: { dryRun?: boolean } = {},
+    ) =>
       apiSend<IncarnationRunReply & Partial<IncarnationRunTideReply>>(
         `/v1/incarnations/${encodeURIComponent(name)}/scenarios/${encodeURIComponent(scenario)}`,
         'POST',
-        { body },
+        { body, query: opts.dryRun ? { dry_run: true } : undefined },
       ),
     history: (name: string, q: { offset?: number; limit?: number } = {}) =>
       apiGet<IncarnationHistoryReply>(`/v1/incarnations/${encodeURIComponent(name)}/history`, {

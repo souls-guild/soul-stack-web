@@ -639,6 +639,81 @@ describe('RunWizard', () => {
     expect('target' in body).toBe(false);
   });
 
+  it('Scenario Classic + dry-run: POST несёт ?dry_run=true', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('redis-prod'));
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Classic-режим: dry-run чекбокс доступен.
+    await user.click(screen.getByLabelText('dry_run'));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+
+    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/redis-prod\/scenarios\/restart\?dry_run=true$/);
+  });
+
+  it('Scenario Classic без dry-run: POST без ?dry_run', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('redis-prod'));
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+
+    expect(stub.posted?.url).not.toContain('dry_run');
+  });
+
+  it('Scenario Tide-режим: dry-run чекбокс недоступен, dry_run не уходит', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('redis-prod'));
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Classic — чекбокс есть; включаем его, затем уходим в Tide.
+    await user.click(screen.getByLabelText('dry_run'));
+    await user.click(screen.getByTestId('run-mode-tide'));
+    // В Tide-режиме dry-run чекбокс скрыт.
+    expect(screen.queryByLabelText('dry_run')).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Wave size'), '2');
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('tide-detail')).toBeInTheDocument());
+
+    expect(stub.posted?.url).not.toContain('dry_run');
+  });
+
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
     setupFetchStub({ souls: [{ sid: 'host-a.example.com', covens: ['prod'] }] });
     renderWizardWithRoutes('/run?workload=command&target_coven=prod');

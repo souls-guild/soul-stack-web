@@ -456,17 +456,20 @@ export function RunWizard() {
   async function submitScenario(): Promise<string> {
     const body = buildScenarioBody();
     const names = scenarioState.incarnations;
+    // dry_run несовместим с Tide: шлём только в classic-режиме (canonical
+    // `?dry_run=true`, как soulctl). В Tide-режиме чекбокс недоступен (см. Step4).
+    const runOpts = options.runMode === 'classic' && options.dryRun ? { dryRun: true } : undefined;
 
     // Single — обычный single-вызов, redirect на результат.
     if (names.length === 1) {
-      const reply = await keeperApi.incarnations.runScenario(names[0], scenarioState.scenario, body);
+      const reply = await keeperApi.incarnations.runScenario(names[0], scenarioState.scenario, body, runOpts);
       if (reply.tide_id) return `/tides/${encodeURIComponent(reply.tide_id)}`;
       return `/incarnations/${encodeURIComponent(names[0])}`;
     }
 
     // Multi — client-side fan-out: по запросу на каждую incarnation.
     const results = await Promise.allSettled(
-      names.map((name) => keeperApi.incarnations.runScenario(name, scenarioState.scenario, body)),
+      names.map((name) => keeperApi.incarnations.runScenario(name, scenarioState.scenario, body, runOpts)),
     );
     const launched = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.length - launched;
@@ -1315,7 +1318,7 @@ function Step4Options({
           </div>
         </fieldset>
       ) : null}
-      {workload === 'scenario' ? (
+      {workload === 'scenario' && !tideMode ? (
         <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
           <input
             type="checkbox"
