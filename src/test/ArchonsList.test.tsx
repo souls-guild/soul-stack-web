@@ -84,10 +84,10 @@ describe('ArchonsList', () => {
     }) as typeof fetch;
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText(/Auth method/i), 'jwt');
+    await user.selectOptions(screen.getByLabelText(/Метод аутентификации/i), 'jwt');
     // Default: Hide revoked = ON → revoked param НЕ передаётся (server-default
     // = только активные). Снимаем чекбокс — должен появиться revoked=true.
-    await user.click(screen.getByLabelText(/Hide revoked/i));
+    await user.click(screen.getByLabelText(/Скрыть отозванных/i));
     await waitFor(() => {
       expect(lastUrl).toMatch(/auth_method=jwt/);
       expect(lastUrl).toMatch(/revoked=true/);
@@ -105,7 +105,7 @@ describe('ArchonsList', () => {
     // archon-old (revoked_at != null) — скрыт по умолчанию.
     expect(screen.queryByRole('link', { name: 'archon-old' })).not.toBeInTheDocument();
     // Counter: видимых 2, всего 3.
-    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/Showing 2 of 3/);
+    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/2.*3/);
   });
 
   it('Hide revoked OFF: revoked-Архонт виден с red chip + Revoke disabled', async () => {
@@ -117,7 +117,7 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(/Hide revoked/i));
+    await user.click(screen.getByLabelText(/Скрыть отозванных/i));
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
     });
@@ -128,7 +128,7 @@ describe('ArchonsList', () => {
     expect(screen.getByTestId('revoke-archon-old')).toBeDisabled();
     expect(screen.getByTestId('issue-token-archon-old')).toBeDisabled();
     // Counter: 3 of 3.
-    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/Showing 3 of 3/);
+    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/3.*3/);
   });
 
   it('per-row Revoke через Modal → POST /v1/operators/{aid}/revoke', async () => {
@@ -232,7 +232,7 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
 
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
 
     const createBtn = screen.getByRole('button', { name: /Создать/i });
@@ -251,8 +251,9 @@ describe('ArchonsList', () => {
     ]);
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'Alice!');
-    expect(screen.getAllByText(/pattern/i).length).toBeGreaterThan(0);
+    // Невалидный AID: uppercase — нарушает ^[a-z0-9]...
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'Alice!');
+    expect(screen.getAllByText(/формат:/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
   });
 
@@ -263,7 +264,7 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
     // Валидный AID, но display_name пуст → submit disabled.
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
     // Заполнили display_name → submit разблокирован.
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
@@ -276,7 +277,7 @@ describe('ArchonsList', () => {
     ]);
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'x'.repeat(129));
     expect(screen.getByText(/максимум 128 символов/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
@@ -329,7 +330,7 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
 
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
 
     // Ждём, пока select наполнится опциями.
@@ -391,7 +392,7 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
 
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
     await user.click(screen.getByRole('button', { name: /Создать/i }));
 
@@ -437,7 +438,7 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
 
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
@@ -501,7 +502,7 @@ describe('ArchonsList', () => {
 
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
+    await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
@@ -519,5 +520,42 @@ describe('ArchonsList', () => {
     expect(JSON.parse(postBodies[1]).roles).toBeUndefined();
     // Подсказка пользователю про unsupported.
     expect(screen.getByRole('status')).toHaveTextContent(/backend не поддерживает/i);
+  });
+
+  // --- AID-паттерн: новый формат ADR-014 amendment ---
+
+  it.each([
+    ['alice@corp.com', true],
+    ['ops-bob', true],
+    ['archon-alice', true],  // старый формат тоже валиден
+    ['a1', true],             // минимальная длина 2
+    ['user.name_42@example.org', true],
+    ['BOB', false],           // uppercase — запрещено
+    ['-x', false],            // leading dash — запрещено
+    ['', false],              // пустой — не проходит regex (length < 2)
+    ['a', false],             // длина 1 — меньше минимума
+    ['Alice!', false],        // uppercase + спецсимвол
+  ])('AID "%s" → valid=%s', async (aid, expectedValid) => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    const input = screen.getByPlaceholderText(/alice@corp\.com/i);
+    if (aid.length > 0) {
+      await user.type(input, aid);
+    }
+    const errorShown = screen.queryAllByText(/формат:/i).length > 0;
+    const btnDisabled = screen.getByRole('button', { name: /Создать/i }).hasAttribute('disabled');
+    if (expectedValid) {
+      // Валидный AID: нет ошибки-подсказки; кнопка может быть disabled из-за display_name
+      expect(errorShown).toBe(false);
+    } else {
+      // Невалидный AID при непустом вводе: ошибка + кнопка disabled
+      if (aid.length > 0) {
+        expect(errorShown).toBe(true);
+      }
+      expect(btnDisabled).toBe(true);
+    }
   });
 });

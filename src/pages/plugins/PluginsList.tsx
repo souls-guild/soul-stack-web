@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Puzzle, Plus } from 'lucide-react';
 import { keeperApi, type PluginSigilView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { isSigilDisabled } from './sigilUtils';
 import { Badge, Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
@@ -130,11 +131,15 @@ export function PluginsList() {
 
       {q.isLoading ? <div className={styles.loading}>{t('admin:pluginLoading')}</div> : null}
       {q.error ? (
-        <div className={styles.errorBox}>
-          {q.error instanceof ApiError
-            ? t('errors:generic', { status: q.error.status, detail: q.error.message })
-            : String(q.error)}
-        </div>
+        isSigilDisabled(q.error) ? (
+          <SigilDisabledNotice />
+        ) : (
+          <div className={styles.errorBox}>
+            {q.error instanceof ApiError
+              ? t('errors:generic', { status: q.error.status, detail: q.error.message })
+              : String(q.error)}
+          </div>
+        )
       ) : null}
 
       {q.data && filtered.length === 0 ? (
@@ -191,6 +196,28 @@ export function PluginsList() {
           </tbody>
         </table>
       ) : null}
+    </div>
+  );
+}
+
+function SigilDisabledNotice() {
+  const { t } = useTranslation();
+  return (
+    <div
+      style={{
+        padding: 'var(--s-4)',
+        background: 'color-mix(in srgb, var(--text-muted) 6%, var(--surface))',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <strong style={{ fontSize: 15 }}>{t('admin:pluginSigilDisabledTitle')}</strong>
+      <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        {t('admin:pluginSigilDisabledBody')}
+      </span>
     </div>
   );
 }

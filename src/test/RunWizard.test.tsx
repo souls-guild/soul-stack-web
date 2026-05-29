@@ -213,8 +213,8 @@ describe('RunWizard', () => {
     expect(screen.queryByLabelText('Push destiny')).not.toBeInTheDocument();
   });
 
-  it('Scenario: service → scenario → пустая regex (все incarnations) → submit', async () => {
-    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+  it('Scenario: пустая regex → «Далее» заблокирован, подсказка показана', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
@@ -225,19 +225,49 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    // Step 2 → 3. Regex пуст → совпадают ВСЕ incarnations (read-only список).
+    // Step 2 → 3. Regex пуст.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() =>
-      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
-    );
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
 
-    // Step 3 → 4 → submit.
+    // Пустая regex → matched=[], «Далее» disabled, подсказка видна.
+    expect(screen.getByLabelText('Incarnation regex')).toHaveValue('');
+    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+    // Подсказка "укажите regex или * для всех" должна присутствовать на экране.
+    await waitFor(() => expect(screen.getByText(/укажите regex или \* для всех/)).toBeInTheDocument());
+  });
+
+  it('Scenario: regex * → все incarnations → submit', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Step 1 → 2 (scenario select).
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    // Step 2 → 3. Вводим * → совпадают ВСЕ incarnations.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() => {
+      const list = screen.getByLabelText('Matched incarnations').textContent ?? '';
+      expect(list).toContain('redis-prod');
+      expect(list).toContain('redis-staging');
+    });
+    expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
+
+    // Step 3 → 4 → submit (fan-out на обе incarnations).
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('incarnations-list')).toBeInTheDocument());
 
-    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/redis-prod\/scenarios\/restart$/);
-    expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({});
+    const scenarioPosts = stub.posts.filter((p) => /\/scenarios\//.test(p.url));
+    expect(scenarioPosts).toHaveLength(2);
+    expect(scenarioPosts.map((p) => p.url).some((u) => /redis-prod\/scenarios\/restart$/.test(u))).toBe(true);
+    expect(scenarioPosts.map((p) => p.url).some((u) => /redis-staging\/scenarios\/restart$/.test(u))).toBe(true);
   });
 
   it('Scenario regex-фильтр: совпавшее подмножество → fan-out по совпавшим', async () => {
@@ -314,8 +344,10 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
-    // Step 2 → 3 (incarnations + input). Пустая regex → совпадает hello-prod.
+    // Step 2 → 3 (incarnations + input). * → совпадает hello-prod.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('hello-prod'),
     );
@@ -348,6 +380,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -391,6 +425,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'add_replicas');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -659,6 +695,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('hello-prod'),
     );
@@ -687,6 +725,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -736,6 +776,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -763,6 +805,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -788,6 +832,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -811,6 +857,8 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
@@ -858,9 +906,8 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() =>
-      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
-    );
+    // Пустая regex → matched=[] (шаг заблокирован) — тест только проверяет отсутствие краша.
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
   });
 
   it('Stale-черновик прошлой версии (v отличается) → отбрасывается, дефолты без краша', async () => {

@@ -1,133 +1,121 @@
-import { useId, useState, type KeyboardEvent } from 'react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
-import { validatePermission } from './schemas';
+import type { PermissionResource } from '../../api/keeper';
 
 interface Props {
   value: string[];
   onChange: (next: string[]) => void;
-  catalog: readonly string[];
-  placeholder?: string;
+  catalog: readonly PermissionResource[];
   ariaLabel?: string;
 }
 
-// Permission-input: input с <datalist> autocomplete + chips удалённого
-// permission. Enter / запятая / пробел добавляет токен. Catalog — список
-// известных permissions для подсказки (buildPermissionCatalog).
-export function PermissionsEditor({ value, onChange, catalog, placeholder, ariaLabel }: Props) {
+// Grouped permission-picker по реальному каталогу GET /v1/permissions (ADR-042):
+// resource → actions, оператор отмечает чекбоксы. Полное право = `resource.action`
+// (напр. soul.list, incarnation.run) — раньше тут был free-text input с хардкод-
+// списком, из-за чего слался несуществующий soul.read → unknown_permission.
+// Права из value, которых нет в каталоге (wildcard `*`, `incarnation.*`, legacy),
+// сохраняются read-only чипами, чтобы replace-семантика PATCH их не теряла.
+export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState('');
-  const [err, setErr] = useState<string | null>(null);
-  const listId = useId();
+  const groupId = useId();
 
-  function tryAdd(raw: string) {
-    const token = raw.trim();
-    if (!token) return false;
-    if (value.includes(token)) {
-      setErr(t('admin:rbacPermDuplicate'));
-      return false;
-    }
-    const reasonKey = validatePermission(token);
-    if (reasonKey) {
-      setErr(t(reasonKey));
-      return false;
-    }
-    onChange([...value, token]);
-    setErr(null);
-    return true;
+  const selected = new Set(value);
+  const catalogPerms = new Set<string>();
+  for (const res of catalog) {
+    for (const act of res.actions) catalogPerms.add(`${res.resource}.${act.action}`);
   }
+  // Права, которые каталог не покрывает (включая wildcard) — не теряем при save.
+  const preserved = value.filter((p) => !catalogPerms.has(p));
 
-  function onKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
-      if (draft.trim()) {
-        e.preventDefault();
-        if (tryAdd(draft)) setDraft('');
-      }
-    } else if (e.key === 'Backspace' && draft === '' && value.length > 0) {
-      onChange(value.slice(0, -1));
+  function toggle(perm: string, on: boolean) {
+    if (on) {
+      if (!selected.has(perm)) onChange([...value, perm]);
+    } else {
+      onChange(value.filter((p) => p !== perm));
     }
   }
 
   return (
-    <div>
-      <div
-        aria-label={ariaLabel}
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 6,
-          padding: 6,
-          border: `1px solid ${err ? 'var(--danger)' : 'var(--border)'}`,
-          borderRadius: 'var(--radius)',
-          background: 'var(--surface)',
-          minHeight: 38,
-          alignItems: 'center',
-        }}
-      >
-        {value.map((perm) => (
-          <span
-            key={perm}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 6px 2px 8px',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-            }}
-          >
-            {perm}
-            <button
-              type="button"
-              aria-label={t('admin:rbacPermRemoveAria', { perm })}
-              onClick={() => onChange(value.filter((p) => p !== perm))}
+    <div aria-label={ariaLabel}>
+      {catalog.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {t('admin:rbacPermCatalogEmpty')}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {catalog.map((res) => (
+            <fieldset
+              key={res.resource}
               style={{
-                border: 0,
-                background: 'transparent',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                padding: 0,
-                display: 'inline-flex',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '8px 12px 12px',
+                margin: 0,
               }}
             >
-              <X size={12} />
-            </button>
-          </span>
-        ))}
-        <input
-          type="text"
-          list={listId}
-          value={draft}
-          onChange={(e) => { setDraft(e.target.value); setErr(null); }}
-          onKeyDown={onKey}
-          onBlur={() => { if (draft.trim()) { if (tryAdd(draft)) setDraft(''); } }}
-          placeholder={value.length === 0 ? placeholder : ''}
-          spellCheck={false}
-          style={{
-            flex: 1,
-            minWidth: 160,
-            border: 0,
-            outline: 'none',
-            background: 'transparent',
-            color: 'var(--text)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 13,
-            padding: '4px 6px',
-          }}
-        />
-        <datalist id={listId}>
-          {catalog
-            .filter((p) => !value.includes(p))
-            .map((p) => <option key={p} value={p} />)}
-        </datalist>
-      </div>
-      {err ? (
-        <span style={{ color: 'var(--danger)', fontSize: 12, display: 'block', marginTop: 4 }}>
-          {err}
-        </span>
+              <legend
+                className="mono"
+                style={{ fontSize: 12.5, color: 'var(--text-muted)', padding: '0 4px' }}
+              >
+                {res.resource}
+              </legend>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+                {res.actions.map((act) => {
+                  const perm = `${res.resource}.${act.action}`;
+                  const id = `${groupId}-${perm}`;
+                  return (
+                    <label
+                      key={perm}
+                      htmlFor={id}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        id={id}
+                        type="checkbox"
+                        checked={selected.has(perm)}
+                        onChange={(e) => toggle(perm, e.target.checked)}
+                        style={{ accentColor: 'var(--accent)' }}
+                      />
+                      {perm}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      )}
+
+      {preserved.length > 0 ? (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+            {t('admin:rbacPermPreserved')}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {preserved.map((perm) => (
+              <span
+                key={perm}
+                className="mono"
+                style={{
+                  padding: '2px 8px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  fontSize: 12,
+                }}
+              >
+                {perm}
+              </span>
+            ))}
+          </div>
+        </div>
       ) : null}
     </div>
   );

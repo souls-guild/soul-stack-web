@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VigilView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge, Button } from '../../components/primitives';
+import { Badge, Button, Pager } from '../../components/primitives';
 import { KNOWN_BEACONS } from './schemas';
 import styles from '../common.module.css';
 
@@ -152,23 +152,7 @@ export function VigilsList() {
               ))}
             </tbody>
           </table>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
-            <button
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - limit))}
-              style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset === 0 ? 'not-allowed' : 'pointer' }}
-            >
-              ← Prev
-            </button>
-            <span>{offset + 1}–{offset + items.length} of {total}</span>
-            <button
-              disabled={offset + limit >= total}
-              onClick={() => setOffset(offset + limit)}
-              style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset + limit >= total ? 'not-allowed' : 'pointer' }}
-            >
-              Next →
-            </button>
-          </div>
+          <Pager offset={offset} limit={limit} total={total} shown={items.length} onChange={setOffset} />
         </>
       ) : null}
     </div>

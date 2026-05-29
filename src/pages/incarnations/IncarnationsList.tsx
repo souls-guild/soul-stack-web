@@ -134,7 +134,7 @@ export function IncarnationsList() {
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>Search by name</div>
+          <div className={styles.metaKey}>{t('incarnations:filterSearchByName')}</div>
           <input
             type="text"
             value={search}
@@ -150,7 +150,7 @@ export function IncarnationsList() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Service</div>
+          <div className={styles.metaKey}>{t('incarnations:filterService')}</div>
           <select
             value={serviceFilter}
             onChange={(e) => setServiceFilter(e.target.value)}
@@ -171,7 +171,7 @@ export function IncarnationsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Status</div>
+          <div className={styles.metaKey}>{t('incarnations:filterStatus')}</div>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as IncarnationStatus | '')}

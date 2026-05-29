@@ -34,6 +34,31 @@ describe('PluginsList', () => {
     tokenStore.clear();
   });
 
+  it('404 от /v1/plugins/sigils → «Sigil не включён» без краша', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/plugins/sigils', status: 404, body: { title: 'not found', detail: 'no such endpoint' } },
+    ]);
+    renderWithProviders(<PluginsList />, '/plugins');
+    await waitFor(() => {
+      expect(screen.getByText(/Sigil/i)).toBeInTheDocument();
+    });
+    // Убеждаемся, что не сырая ошибка, а дружелюбное сообщение
+    expect(screen.queryByText(/HTTP 404/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no such endpoint/i)).not.toBeInTheDocument();
+  });
+
+  it('500 от /v1/plugins/sigils → обычная error-обработка (не «не включён»)', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/plugins/sigils', status: 500, body: { title: 'internal error', detail: 'db down' } },
+    ]);
+    renderWithProviders(<PluginsList />, '/plugins');
+    await waitFor(() => {
+      expect(screen.getByText(/500/)).toBeInTheDocument();
+    });
+    // Не показывает «не включён» при 500
+    expect(screen.queryByText(/pluginSigilDisabledTitle/i)).not.toBeInTheDocument();
+  });
+
   it('рендерит таблицу из /v1/plugins/sigils', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Award, CheckCircle2, XCircle, Copy, Info } from 'lucide-react';
 import { keeperApi, type PluginSigilView, type AuditEvent } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { isSigilDisabled } from './sigilUtils';
 import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import styles from '../common.module.css';
@@ -75,6 +76,31 @@ export function PluginDetail() {
 
   if (list.isLoading) return <div className={styles.loading}>{t('admin:pluginLoading')}</div>;
   if (list.error) {
+    if (isSigilDisabled(list.error)) {
+      return (
+        <div className={styles.page}>
+          <div className={styles.crumbs}>
+            <Link to="/plugins">plugins</Link>
+          </div>
+          <div
+            style={{
+              padding: 'var(--s-4)',
+              background: 'color-mix(in srgb, var(--text-muted) 6%, var(--surface))',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <strong style={{ fontSize: 15 }}>{t('admin:pluginSigilDisabledTitle')}</strong>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {t('admin:pluginSigilDisabledBody')}
+            </span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={styles.errorBox}>
         {list.error instanceof ApiError

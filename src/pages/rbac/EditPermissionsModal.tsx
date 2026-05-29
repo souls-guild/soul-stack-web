@@ -4,7 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
-import { keeperApi, type RoleView } from '../../api/keeper';
+import { keeperApi, type RoleView, type PermissionResource } from '../../api/keeper';
 import { editPermissionsSchema, type EditPermissionsFormValues } from './schemas';
 import { PermissionsEditor } from './PermissionsEditor';
 import { prettyRbacError } from './errors';
@@ -14,7 +14,7 @@ interface Props {
   open: boolean;
   role: RoleView;
   onClose: () => void;
-  catalog: readonly string[];
+  catalog: readonly PermissionResource[];
 }
 
 // Replace-семантика permissions роли — PATCH /v1/roles/{name}/permissions
@@ -101,7 +101,6 @@ export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
               value={field.value ?? []}
               onChange={field.onChange}
               catalog={catalog}
-              placeholder={t('admin:rbacPermissionsPlaceholderEdit')}
               ariaLabel={t('admin:rbacPermissionsAria')}
             />
           )}

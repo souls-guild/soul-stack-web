@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { Key, Shield, Terminal } from 'lucide-react';
 import i18n from '../../i18n';
-import { Badge, Button, Dot } from '../../components/primitives';
+import { Badge, Button, Dot, Pager } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import {
   keeperApi,
@@ -293,37 +293,7 @@ function SoulHistoryTab({ sid }: { sid: string }) {
               ))}
             </tbody>
           </table>
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-              fontSize: 12.5,
-              color: 'var(--text-muted)',
-            }}
-          >
-            <button
-              type="button"
-              data-testid="history-prev"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - HISTORY_LIMIT))}
-              style={historyPagerStyle(offset === 0)}
-            >
-              ← Prev
-            </button>
-            <span>
-              {offset + 1}–{offset + items.length} of {total}
-            </span>
-            <button
-              type="button"
-              data-testid="history-next"
-              disabled={offset + HISTORY_LIMIT >= total}
-              onClick={() => setOffset(offset + HISTORY_LIMIT)}
-              style={historyPagerStyle(offset + HISTORY_LIMIT >= total)}
-            >
-              Next →
-            </button>
-          </div>
+          <Pager offset={offset} limit={HISTORY_LIMIT} total={total} shown={items.length} onChange={setOffset} />
         </>
       ) : null}
     </section>
@@ -397,16 +367,6 @@ function historyChipStyle(active: boolean) {
     color: active ? 'var(--text)' : 'var(--text-muted)',
     borderRadius: 'var(--radius)',
     cursor: 'pointer',
-  } as const;
-}
-
-function historyPagerStyle(disabled: boolean) {
-  return {
-    padding: '4px 10px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    background: 'transparent',
-    cursor: disabled ? 'not-allowed' : 'pointer',
   } as const;
 }
 

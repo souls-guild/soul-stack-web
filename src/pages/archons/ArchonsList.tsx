@@ -12,7 +12,7 @@ import {
   type RoleView,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge, Button, Input } from '../../components/primitives';
+import { Badge, Button, Input, Pager } from '../../components/primitives';
 import { RevokeArchonModal } from './RevokeArchonModal';
 import { AID_PATTERN } from './schemas';
 import styles from '../common.module.css';
@@ -105,10 +105,11 @@ function RolesPicker({
   disabled?: boolean;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const remaining = roles.filter((r) => !selected.includes(r.name));
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 280 }}>
-      <span className={styles.metaKey}>Roles (optional)</span>
+      <span className={styles.metaKey}>{t('pages:archonRolesOptional')}</span>
       <div
         aria-label="выбранные роли"
         style={{
@@ -207,7 +208,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
       <thead>
         <tr>
           <th>AID</th>
-          <th>Display name</th>
+          <th>{t('pages:archonDisplayName')}</th>
           <th>Auth</th>
           <th>Created</th>
           <th>Created by</th>
@@ -376,7 +377,7 @@ export function ArchonsList() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Archons</h1>
-          <div className={styles.crumbs}>cluster operators</div>
+          <div className={styles.crumbs}>{t('pages:archonsCrumbs')}</div>
         </div>
       </div>
 
@@ -391,15 +392,15 @@ export function ArchonsList() {
             label="AID"
             value={aidNew}
             onChange={(e) => setAidNew(e.target.value)}
-            placeholder="archon-alice"
+            placeholder={t('pages:archonAidPlaceholder')}
             mono
-            error={aidNew && !aidNewValid ? 'pattern ^archon-[a-z0-9-]{1,62}$' : undefined}
+            error={aidNew && !aidNewValid ? t('pages:archonAidError') : undefined}
           />
           <Input
-            label="Display name"
+            label={t('pages:archonDisplayName')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Alice Ops"
+            placeholder={t('pages:archonDisplayNamePlaceholder')}
             error={displayNameTrimmed.length > 128 ? 'максимум 128 символов' : undefined}
           />
           <RolesPicker
@@ -445,7 +446,7 @@ export function ArchonsList() {
         <h2 className={styles.sectionTitle}>Существующие</h2>
         <div className={styles.filters}>
           <label>
-            <div className={styles.metaKey}>Auth method</div>
+            <div className={styles.metaKey}>{t('pages:archonAuthMethod')}</div>
             <select
               value={authMethod}
               onChange={(e) => { setAuthMethod(e.target.value as OperatorAuthMethod | ''); setOffset(0); }}
@@ -456,7 +457,7 @@ export function ArchonsList() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={styles.metaKey}>Hide revoked</span>
+            <span className={styles.metaKey}>{t('pages:archonHideRevoked')}</span>
             <input
               type="checkbox"
               checked={hideRevoked}
@@ -465,7 +466,7 @@ export function ArchonsList() {
             />
           </label>
           <label>
-            <div className={styles.metaKey}>Limit</div>
+            <div className={styles.metaKey}>{t('pages:archonLimit')}</div>
             <input
               type="number"
               min={1}
@@ -504,23 +505,7 @@ export function ArchonsList() {
               onIssue={(aid) => issueMut.mutate(aid)}
               onRevoke={(aid) => setRevokingAid(aid)}
             />
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
-              <button
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-                style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset === 0 ? 'not-allowed' : 'pointer' }}
-              >
-                ← Prev
-              </button>
-              <span>{offset + 1}–{offset + items.length} of {total}</span>
-              <button
-                disabled={offset + limit >= total}
-                onClick={() => setOffset(offset + limit)}
-                style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'transparent', cursor: offset + limit >= total ? 'not-allowed' : 'pointer' }}
-              >
-                Next →
-              </button>
-            </div>
+            <Pager offset={offset} limit={limit} total={total} shown={items.length} onChange={setOffset} />
           </>
         ) : null}
 

@@ -180,6 +180,23 @@ export type RoleCreateRequest = components['schemas']['RoleCreateRequest'];
 export type RolePermissionsUpdateRequest = components['schemas']['RolePermissionsUpdateRequest'];
 export type GrantOperatorRequest = components['schemas']['GrantOperatorRequest'];
 
+// Каталог permissions (GET /v1/permissions, ADR-042). В vendored openapi-спеке
+// ещё не зафиксирован — типизируем вручную узким контрактом (types.gen.ts руками
+// не правим). Полное право = `resource.action` (напр. soul.list, incarnation.run);
+// action отдаётся БЕЗ resource-префикса. selector_keys — допустимые ключи
+// target.where для этого действия (информативно для UI). graceful при 404/пусто.
+export interface PermissionAction {
+  action: string;
+  selector_keys?: string[];
+}
+export interface PermissionResource {
+  resource: string;
+  actions: PermissionAction[];
+}
+export interface PermissionCatalogReply {
+  items: PermissionResource[];
+}
+
 export type ServiceView = components['schemas']['ServiceView'];
 export type ServiceListReply = components['schemas']['ServiceListReply'];
 export type ServiceRegisterRequest = components['schemas']['ServiceRegisterRequest'];
@@ -550,6 +567,10 @@ export const keeperApi = {
         `/v1/roles/${encodeURIComponent(name)}/operators/${encodeURIComponent(aid)}`,
         'DELETE',
       ),
+  },
+
+  permissions: {
+    list: () => apiGet<PermissionCatalogReply>('/v1/permissions'),
   },
 
   services: {

@@ -6,3 +6,4 @@ export { Cell } from './Cell';
 export { Footer } from './Footer';
 export { Badge } from './Badge';
 export { Modal } from './Modal';
+export { Pager } from './Pager';

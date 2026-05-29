@@ -4,7 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Modal } from '../../components/primitives';
-import { keeperApi } from '../../api/keeper';
+import { keeperApi, type PermissionResource } from '../../api/keeper';
 import { roleCreateSchema, type RoleCreateFormValues } from './schemas';
 import { PermissionsEditor } from './PermissionsEditor';
 import { prettyRbacError } from './errors';
@@ -13,7 +13,7 @@ import styles from '../common.module.css';
 interface Props {
   open: boolean;
   onClose: () => void;
-  catalog: readonly string[];
+  catalog: readonly PermissionResource[];
 }
 
 export function CreateRoleModal({ open, onClose, catalog }: Props) {
@@ -110,7 +110,7 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
           ) : null}
         </label>
         <div style={{ height: 12 }} />
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13 }}>Permissions</span>
           <Controller
             name="permissions"
@@ -120,7 +120,6 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
                 value={field.value ?? []}
                 onChange={field.onChange}
                 catalog={catalog}
-                placeholder={t('admin:rbacPermissionsPlaceholderCreate')}
                 ariaLabel={t('admin:rbacPermissionsAria')}
               />
             )}
@@ -128,7 +127,7 @@ export function CreateRoleModal({ open, onClose, catalog }: Props) {
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {t('admin:rbacPermissionsHint')}
           </span>
-        </label>
+        </div>
         {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert">{serverError}</div> : null}
       </form>
     </Modal>

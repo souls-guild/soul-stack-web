@@ -116,9 +116,9 @@ export function ArchonDetail() {
           <div className={styles.meta}>
             <span className={styles.metaKey}>AID</span>
             <span className={styles.metaVal}>{op.aid}</span>
-            <span className={styles.metaKey}>Display name</span>
+            <span className={styles.metaKey}>{t('pages:archonDisplayName')}</span>
             <span className={styles.metaVal}>{op.display_name}</span>
-            <span className={styles.metaKey}>Auth method</span>
+            <span className={styles.metaKey}>{t('pages:archonAuthMethod')}</span>
             <span className={styles.metaVal}>{op.auth_method}</span>
             <span className={styles.metaKey}>Created at</span>
             <span className={styles.metaVal}>{op.created_at}</span>

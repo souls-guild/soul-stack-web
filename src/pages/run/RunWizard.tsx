@@ -914,21 +914,24 @@ function Step3ScenarioIncarnations({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usePerField, inputSchema]);
 
-  // Компиляция regex. Пустая regex → совпадают ВСЕ incarnations сервиса
-  // (явный «запуск на всём сервисе»). Невалидная regex → 0 совпадений, подсказка.
+  // Компиляция regex.
+  // `*` (ровно один символ) → специальный кейс «все»: матчит все incarnations сервиса.
+  // Пустая строка (или только пробелы) → не задано, НЕВАЛИДНО (блокирует «Далее»).
+  // Невалидная regex → 0 совпадений + ошибка.
   const filterRe = useMemo(() => {
     const r = value.incarnationRegex.trim();
-    if (!r) return { re: null as RegExp | null, error: null as string | null, empty: true };
+    if (!r) return { re: null as RegExp | null, error: null as string | null, empty: true, matchAll: false };
+    if (r === '*') return { re: null as RegExp | null, error: null as string | null, empty: false, matchAll: true };
     try {
-      return { re: new RegExp(r), error: null as string | null, empty: false };
+      return { re: new RegExp(r), error: null as string | null, empty: false, matchAll: false };
     } catch (err) {
-      return { re: null, error: err instanceof Error ? err.message : String(err), empty: false };
+      return { re: null, error: err instanceof Error ? err.message : String(err), empty: false, matchAll: false };
     }
   }, [value.incarnationRegex]);
 
   const matched = useMemo(() => {
-    if (filterRe.error) return [];
-    if (filterRe.empty) return incarnationNames;
+    if (filterRe.error || filterRe.empty) return [];
+    if (filterRe.matchAll) return incarnationNames;
     return incarnationNames.filter((n) => filterRe.re!.test(n));
   }, [incarnationNames, filterRe]);
 
@@ -958,6 +961,7 @@ function Step3ScenarioIncarnations({
           aria-label="Incarnation regex"
         />
         <span className={styles.hint}>{t('run:incarnationRegexHint')}</span>
+        {filterRe.empty ? <span className={styles.warn}>{t('run:incarnationRegexEmptyHint')}</span> : null}
         {filterRe.error ? <span className={styles.warn}>{t('run:incarnationRegexInvalid')}</span> : null}
       </label>
 

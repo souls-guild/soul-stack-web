@@ -30,9 +30,3 @@ export const editPermissionsSchema = z.object({
 });
 
 export type EditPermissionsFormValues = z.infer<typeof editPermissionsSchema>;
-
-// Возвращает i18n-ключ ошибки или null. Caller локализует через t().
-export function validatePermission(token: string): string | null {
-  if (!PERMISSION.test(token)) return 'admin:rbacErrPermissionFormat';
-  return null;
-}

@@ -9,7 +9,7 @@ import {
   type TideStatus,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge } from '../../components/primitives';
+import { Badge, Pager } from '../../components/primitives';
 import { tideStatusTone } from './status';
 import styles from '../common.module.css';
 
@@ -171,25 +171,7 @@ export function TidesList() {
               ))}
             </tbody>
           </table>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
-            <button
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - limit))}
-              style={pagerStyle(offset === 0)}
-            >
-              ← Prev
-            </button>
-            <span>
-              {offset + 1}–{offset + items.length} of {total}
-            </span>
-            <button
-              disabled={offset + limit >= total}
-              onClick={() => setOffset(offset + limit)}
-              style={pagerStyle(offset + limit >= total)}
-            >
-              Next →
-            </button>
-          </div>
+          <Pager offset={offset} limit={limit} total={total} shown={items.length} onChange={setOffset} />
         </>
       ) : null}
     </div>
@@ -215,15 +197,5 @@ function chipStyle(active: boolean) {
     color: active ? 'var(--text)' : 'var(--text-muted)',
     borderRadius: 'var(--radius)',
     cursor: 'pointer',
-  } as const;
-}
-
-function pagerStyle(disabled: boolean) {
-  return {
-    padding: '4px 10px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    background: 'transparent',
-    cursor: disabled ? 'not-allowed' : 'pointer',
   } as const;
 }

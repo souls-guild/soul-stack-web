@@ -25,6 +25,31 @@ const SAMPLE = {
   ],
 };
 
+const PERMISSIONS_SAMPLE = {
+  items: [
+    {
+      resource: 'soul',
+      actions: [
+        { action: 'list', selector_keys: ['coven', 'sid'] },
+        { action: 'read', selector_keys: ['coven', 'sid'] },
+        { action: 'exec', selector_keys: ['coven', 'sid'] },
+      ],
+    },
+    {
+      resource: 'incarnation',
+      actions: [
+        { action: 'list' },
+        { action: 'read' },
+        { action: 'run' },
+      ],
+    },
+    {
+      resource: 'audit',
+      actions: [{ action: 'read' }],
+    },
+  ],
+};
+
 const OPERATORS_SAMPLE = {
   items: [
     { aid: 'archon-bootstrap', display_name: 'Boot', auth_method: 'jwt', created_at: '2026-05-01', created_by_aid: null, revoked_at: null, bootstrap_initial: true },
@@ -48,6 +73,7 @@ interface Call {
 function recordingFetch(opts: {
   rolesList: typeof SAMPLE;
   operators?: typeof OPERATORS_SAMPLE;
+  permissions?: typeof PERMISSIONS_SAMPLE;
   // Конфликт-симулятор: если url == path и method == method — отдадим status и detail.
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
@@ -70,6 +96,11 @@ function recordingFetch(opts: {
       );
     }
 
+    if (url.startsWith('/v1/permissions') && method === 'GET') {
+      return new Response(JSON.stringify(opts.permissions ?? PERMISSIONS_SAMPLE), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
     if (url.startsWith('/v1/roles') && method === 'GET') {
       return new Response(JSON.stringify(opts.rolesList), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -152,8 +183,9 @@ describe('RbacPage', () => {
     const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
     const nameInput = within(dialog).getByPlaceholderText('soul-operator');
     await user.type(nameInput, 'log-reader');
-    const permsInput = within(dialog).getByPlaceholderText(/soul\.list/);
-    await user.type(permsInput, 'audit.read,');
+    // Каталог permissions подгружается из GET /v1/permissions — отмечаем audit.read.
+    const auditRead = await within(dialog).findByRole('checkbox', { name: 'audit.read' });
+    await user.click(auditRead);
     await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
 
     await waitFor(() => {
@@ -222,11 +254,11 @@ describe('RbacPage', () => {
     await user.click(editButtons[1]);
 
     const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
-    // Удаляем soul.exec (есть кнопка "удалить soul.exec").
-    await user.click(within(dialog).getByRole('button', { name: /удалить soul\.exec/i }));
-    // PermissionsEditor рендерит <input list="...">, что даёт role="combobox".
-    const input = within(dialog).getByRole('combobox');
-    await user.type(input, 'incarnation.read,');
+    // Каталог из GET /v1/permissions: снимаем soul.exec, отмечаем incarnation.read.
+    const soulExec = await within(dialog).findByRole('checkbox', { name: 'soul.exec' });
+    expect(soulExec).toBeChecked();
+    await user.click(soulExec);
+    await user.click(within(dialog).getByRole('checkbox', { name: 'incarnation.read' }));
     await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
 
     await waitFor(() => {
@@ -359,6 +391,45 @@ describe('RbacPage', () => {
         (c) => c.method === 'DELETE' && c.url === '/v1/roles/soul-operator/operators/archon-alice',
       );
       expect(del).toBeDefined();
+    });
+  });
+
+  it('Permissions-picker: рендерит каталог из GET /v1/permissions сгруппированно', async () => {
+    recordingFetch({ rolesList: SAMPLE });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
+    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
+    // Чекбоксы из каталога: resource.action как полное право.
+    expect(await within(dialog).findByRole('checkbox', { name: 'soul.list' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'soul.read' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'incarnation.run' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'audit.read' })).toBeInTheDocument();
+    // resource-группы видны как legend.
+    expect(within(dialog).getByText('incarnation')).toBeInTheDocument();
+  });
+
+  it('Permissions-picker: каталог недоступен (404) → graceful, права роли сохраняются', async () => {
+    // /v1/permissions отдаёт 599 (нет хэндлера) — recordingFetch с пустым каталогом.
+    const calls = recordingFetch({ rolesList: SAMPLE, permissions: { items: [] } });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
+
+    const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
+    await user.click(editButtons[1]);
+    const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
+    // Каталог пуст — hint виден, существующие права как preserved-чипы.
+    expect(within(dialog).getByText(/Каталог permissions недоступен/i)).toBeInTheDocument();
+    expect(within(dialog).getByText('soul.exec')).toBeInTheDocument();
+    // Save без каталога не дропает существующие права (replace-семантика).
+    await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
+    await waitFor(() => {
+      const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
+      expect(patch).toBeDefined();
+      expect(patch!.body).toContain('soul.exec');
     });
   });
 });

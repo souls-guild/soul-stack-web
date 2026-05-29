@@ -9,7 +9,7 @@ import { CreateRoleModal } from './CreateRoleModal';
 import { DeleteRoleModal } from './DeleteRoleModal';
 import { EditPermissionsModal } from './EditPermissionsModal';
 import { AssignRoleModal } from './AssignRoleModal';
-import { buildPermissionCatalog } from './permissions';
+import { normalizePermissionCatalog } from './permissions';
 import { prettyRbacError } from './errors';
 import styles from '../common.module.css';
 
@@ -291,7 +291,17 @@ export function RbacPage() {
   const roles = useMemo(() => rolesQ.data?.items ?? [], [rolesQ.data]);
   const operators = operatorsQ.data?.items ?? [];
 
-  const catalog = useMemo(() => buildPermissionCatalog(roles), [roles]);
+  // Каталог permissions — из backend. Недоступен/пуст → graceful (picker
+  // покажет hint, save всё равно сохранит уже имеющиеся права через preserved).
+  const permsQ = useQuery({
+    queryKey: ['rbac.permissions'],
+    queryFn: () => keeperApi.permissions.list(),
+    retry: false,
+  });
+  const catalog = useMemo(
+    () => normalizePermissionCatalog(permsQ.data?.items),
+    [permsQ.data],
+  );
 
   return (
     <div className={styles.page}>
