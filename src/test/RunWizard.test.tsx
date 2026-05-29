@@ -111,6 +111,10 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
       const cap = { url, body };
       ref.posted = cap;
       ref.posts.push(cap);
+      // Tide-режим (наличие `wave` в body) → tide_id; иначе classic apply_id.
+      if (body && typeof body === 'object' && 'wave' in (body as Record<string, unknown>)) {
+        return json({ tide_id: 'td-01HZ00000000', incarnation: 'redis-prod', scenario: 'restart' }, 202);
+      }
       return json({ apply_id: 'ap-01HZ00000000' }, 202);
     }
 
@@ -559,6 +563,80 @@ describe('RunWizard', () => {
     await user.type(greetingField, 'hi');
     await waitFor(() => expect(screen.queryByTestId('field-required-greeting')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
+  });
+
+  it('Scenario Tide-режим: wave.size + target-override в POST, redirect /tides/:id', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('redis-prod'));
+
+    // Step 3 → 4. По умолчанию — Classic; submit без wave недоступен в Tide.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+
+    // Переключаемся в Tide-режим.
+    await user.click(screen.getByTestId('run-mode-tide'));
+
+    // wave size пуст → submit заблокирован.
+    expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Wave size'), '2');
+
+    // Advanced target-override: coven + where.
+    fireEvent.change(screen.getByLabelText('Target coven override'), { target: { value: 'prod' } });
+    fireEvent.change(screen.getByLabelText('Target where override'), {
+      target: { value: 'soulprint.self.os.family == "debian"' },
+    });
+
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('tide-detail')).toBeInTheDocument());
+
+    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/redis-prod\/scenarios\/restart$/);
+    const body = stub.posted?.body as {
+      wave?: { size: number; on_failure: string };
+      target?: { coven?: string[]; where?: string };
+      concurrency?: number;
+    };
+    expect(body.wave?.size).toBe(2);
+    expect(body.wave?.on_failure).toBe('abort');
+    expect(body.target?.coven).toEqual(['prod']);
+    expect(body.target?.where).toBe('soulprint.self.os.family == "debian"');
+    expect(body.concurrency).toBe(50);
+  });
+
+  it('Scenario Classic-режим (default): без wave, redirect /incarnations/:name', async () => {
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('redis-prod')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('redis-prod'));
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Classic выбран по умолчанию — поля Tide скрыты.
+    expect(screen.queryByLabelText('Wave size')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect('wave' in body).toBe(false);
+    expect('target' in body).toBe(false);
   });
 
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {

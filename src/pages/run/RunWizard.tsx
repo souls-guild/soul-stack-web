@@ -106,10 +106,18 @@ interface CommandStateValues {
 // «cmd-модули» — core shell/exec: params пусты, форма = cmd-textarea.
 const CMD_FIELD_MODULES = new Set(['core.cmd', 'core.exec']);
 
+// Режим запуска scenario-workload: classic single-run / Tide (волнами, ADR-040).
+// Command-workload всегда «classic» в этом смысле (Tide для него не применяется).
+type RunMode = 'classic' | 'tide';
+
 interface OptionsState {
+  runMode: RunMode;
   waveSize: string;
   concurrency: string;
   onFailure: ErrandRunOnFailure;
+  // Tide invocation-time target-override (опционально). Пустые → не шлём.
+  targetCoven: string;
+  targetWhere: string;
   dryRun: boolean;
   wait: boolean;
 }
@@ -239,9 +247,12 @@ export function RunWizard() {
 
   const [options, setOptions] = useState<OptionsState>(
     draft?.options ?? {
+      runMode: 'classic',
       waveSize: '',
       concurrency: '50',
       onFailure: 'abort',
+      targetCoven: '',
+      targetWhere: '',
       dryRun: false,
       wait: false,
     },
@@ -426,11 +437,18 @@ export function RunWizard() {
         ? serializeFields(inputSchema, scenarioState.fields)
         : scenarioState.inputObj;
     const body: IncarnationRunRequest = { input: inputObj };
-    const waveSize = parseIntOrEmpty(options.waveSize);
-    if (waveSize && waveSize > 0) {
-      body.wave = { size: waveSize, on_failure: options.onFailure };
-      const c = parseIntOrEmpty(options.concurrency);
-      if (c && c > 0) body.concurrency = c;
+    // Tide-режим активируется наличием `wave` в body. В classic — поле не шлём,
+    // backend отвечает classic single-run reply.
+    if (options.runMode === 'tide') {
+      const waveSize = parseIntOrEmpty(options.waveSize);
+      // Submit заблокирован, пока waveSize невалиден (canSubmit), но защищаемся.
+      if (waveSize && waveSize > 0) {
+        body.wave = { size: waveSize, on_failure: options.onFailure };
+        const c = parseIntOrEmpty(options.concurrency);
+        if (c && c > 0) body.concurrency = c;
+        const target = buildTargetOverride(options.targetCoven, options.targetWhere);
+        if (target) body.target = target;
+      }
     }
     return body;
   }
@@ -496,7 +514,14 @@ export function RunWizard() {
     return `/errand-runs/${encodeURIComponent(reply.errand_run_id)}`;
   }
 
-  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && !submitMu.isPending;
+  // В Tide-режиме (scenario) wave size обязателен и должен быть >=1.
+  const tideValid = useMemo(() => {
+    if (workload !== 'scenario' || options.runMode !== 'tide') return true;
+    const n = parseIntOrEmpty(options.waveSize);
+    return Boolean(n && n >= 1);
+  }, [workload, options.runMode, options.waveSize]);
+
+  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && tideValid && !submitMu.isPending;
 
   return (
     <div className={pageStyles.page}>
@@ -1168,9 +1193,39 @@ function Step4Options({
   workload: Workload;
 }) {
   const { t } = useTranslation();
+  const tideMode = workload === 'scenario' && value.runMode === 'tide';
   return (
     <>
       {workload === 'scenario' ? (
+        <div className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>{t('run:runModeLabel')}</span>
+          <div className={styles.modeRow} role="radiogroup" aria-label="Run mode">
+            <button
+              type="button"
+              className={`${styles.modeChip} ${value.runMode === 'classic' ? styles.modeChipActive : ''}`}
+              aria-pressed={value.runMode === 'classic'}
+              onClick={() => onChange({ ...value, runMode: 'classic' })}
+              data-testid="run-mode-classic"
+            >
+              {t('run:runModeClassic')}
+            </button>
+            <button
+              type="button"
+              className={`${styles.modeChip} ${value.runMode === 'tide' ? styles.modeChipActive : ''}`}
+              aria-pressed={value.runMode === 'tide'}
+              onClick={() => onChange({ ...value, runMode: 'tide' })}
+              data-testid="run-mode-tide"
+            >
+              {t('run:runModeTide')}
+            </button>
+          </div>
+          <span className={styles.hint}>
+            {tideMode ? t('run:runModeTideHint') : t('run:runModeClassicHint')}
+          </span>
+        </div>
+      ) : null}
+
+      {tideMode ? (
         <label className={styles.fieldRow}>
           <span className={styles.fieldLabel}>{t('run:waveSizeLabel')}</span>
           <input
@@ -1184,7 +1239,7 @@ function Step4Options({
           />
         </label>
       ) : null}
-      {workload === 'command' || (workload === 'scenario' && value.waveSize) ? (
+      {workload === 'command' || tideMode ? (
         <label className={styles.fieldRow}>
           <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
           <input
@@ -1198,33 +1253,68 @@ function Step4Options({
           />
         </label>
       ) : null}
-      <fieldset
-        style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
-      >
-        <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>On-failure</legend>
-        <div style={{ display: 'flex', gap: 14 }}>
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="on_failure"
-              value="abort"
-              checked={value.onFailure === 'abort'}
-              onChange={() => onChange({ ...value, onFailure: 'abort' })}
-            />
-            abort
-          </label>
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="on_failure"
-              value="continue"
-              checked={value.onFailure === 'continue'}
-              onChange={() => onChange({ ...value, onFailure: 'continue' })}
-            />
-            continue
-          </label>
-        </div>
-      </fieldset>
+
+      {tideMode ? (
+        <details>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
+            {t('run:targetOverrideSummary')}
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-4)', marginTop: 10 }}>
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:targetCovenLabel')}</span>
+              <input
+                type="text"
+                className={styles.field}
+                value={value.targetCoven}
+                onChange={(e) => onChange({ ...value, targetCoven: e.target.value })}
+                placeholder={t('run:targetCovenPlaceholder')}
+                aria-label="Target coven override"
+              />
+            </label>
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:targetWhereLabel')}</span>
+              <input
+                type="text"
+                className={styles.field}
+                value={value.targetWhere}
+                onChange={(e) => onChange({ ...value, targetWhere: e.target.value })}
+                placeholder={t('run:targetWherePlaceholder')}
+                aria-label="Target where override"
+              />
+            </label>
+            <span className={styles.hint}>{t('run:targetOverrideHint')}</span>
+          </div>
+        </details>
+      ) : null}
+      {workload === 'command' || tideMode ? (
+        <fieldset
+          style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
+        >
+          <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>On-failure</legend>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <input
+                type="radio"
+                name="on_failure"
+                value="abort"
+                checked={value.onFailure === 'abort'}
+                onChange={() => onChange({ ...value, onFailure: 'abort' })}
+              />
+              abort
+            </label>
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <input
+                type="radio"
+                name="on_failure"
+                value="continue"
+                checked={value.onFailure === 'continue'}
+                onChange={() => onChange({ ...value, onFailure: 'continue' })}
+              />
+              continue
+            </label>
+          </div>
+        </fieldset>
+      ) : null}
       {workload === 'scenario' ? (
         <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
           <input
@@ -1276,6 +1366,22 @@ function splitCsv(raw: string): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+// Сборка опционального invocation-time target-override (Tide). coven — CSV →
+// массив kebab-меток; where — raw CEL-строка. Возвращает undefined, если оба
+// пусты (override не задан). AND-merge со scenario on:/where: — на backend.
+function buildTargetOverride(
+  covenCsv: string,
+  where: string,
+): NonNullable<IncarnationRunRequest['target']> | undefined {
+  const coven = splitCsv(covenCsv);
+  const w = where.trim();
+  if (coven.length === 0 && !w) return undefined;
+  const target: NonNullable<IncarnationRunRequest['target']> = {};
+  if (coven.length > 0) target.coven = coven;
+  if (w) target.where = w;
+  return target;
 }
 
 function parseIntOrEmpty(s: string): number | undefined {
