@@ -126,6 +126,11 @@ export async function apiSend<T>(
 ): Promise<T> {
   const res = await rawRequest(path, { ...opts, method });
   await throwIfNotOk(res);
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Пустое тело — успех без полезной нагрузки (204 No Content, но также
+  // 201 Created без сериализованного объекта — контракт role.create).
+  // Прямой res.json() упал бы на пустом потоке («Unexpected end of JSON
+  // input»), поэтому сперва читаем текст и парсим только непустой.
+  const text = await res.text();
+  if (text === '') return undefined as T;
+  return JSON.parse(text) as T;
 }

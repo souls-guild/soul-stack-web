@@ -164,6 +164,52 @@ describe('RbacPage', () => {
     });
   });
 
+  it('Create role: 201 с пустым телом не падает на .json() и закрывает модалку', async () => {
+    // Регрессия: role.create отдаёт 201 без тела (контракт backend).
+    // Клиент не должен звать .json() на пустом потоке («Unexpected end of
+    // JSON input»). Успех = mutation отрабатывает onSuccess → модалка закрыта.
+    recordingFetch({ rolesList: SAMPLE });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
+    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
+    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'log-reader');
+    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
+
+    // onSuccess закрывает модалку; ошибки парсинга тела нет.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /Создать роль/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('Create role 409 already-exists → human-readable error', async () => {
+    recordingFetch({
+      rolesList: SAMPLE,
+      conflict: {
+        path: /^\/v1\/roles$/,
+        method: 'POST',
+        status: 409,
+        type: 'https://soul-stack.io/errors/role-already-exists',
+        detail: 'role log-reader already exists',
+      },
+    });
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
+    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
+    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'log-reader');
+    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent(/уже существует|already exists/i);
+    // Модалка остаётся открытой — оператор видит ошибку.
+    expect(screen.getByRole('dialog', { name: /Создать роль/i })).toBeInTheDocument();
+  });
+
   it('Edit permissions: PATCH /v1/roles/{name}/permissions с новым набором', async () => {
     const calls = recordingFetch({ rolesList: SAMPLE });
     renderWithProviders(<RbacPage />, '/rbac');
