@@ -55,6 +55,8 @@ tags:
     description: Реестр Service-ов service_registry (ADR-028-паттерн RBAC-storage).
   - name: Module
     description: Каталог модулей (core registry + активные plugin) для UI Run→Command module-search.
+  - name: Permission
+    description: Машиночитаемый каталог RBAC-permissions (источник — rbac.catalog.go) для UI назначения прав роли.
   - name: Augur
     description: Реестры Augur — Omen (внешняя система) и Rite (grant) (ADR-025, augur.md).
   - name: Oracle
@@ -249,7 +251,7 @@ paths:
           required: false
           schema:
             type: string
-            pattern: '^archon-[a-z0-9-]{1,62}$'
+            pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID Архонта-инициатора (exact match).
         - in: query
           name: correlation_id
@@ -2063,6 +2065,45 @@ paths:
         '500': { $ref: '#/components/responses/Problem500' }
         '502': { $ref: '#/components/responses/Problem502' }
 
+  /v1/services/{name}/dependencies:
+    get:
+      tags: [Service]
+      operationId: ListServiceDependencies
+      summary: git-зависимости сервиса (destiny + modules, для UI Service Detail).
+      description: |
+        Permission: service.list. Возвращает git-зависимости сервиса из
+        материализованного снапшота git-репо Service-а: задекларированные в
+        `service.yml` destiny-кирпичики (`destiny:`) и custom-модули
+        (`modules:`), каждый со своим git-ref-ом (ADR-007: версия = git
+        tag/branch). Поле `git` присутствует только при per-entry override
+        полного URL (поддержан лишь для destiny[]). Content самих
+        destiny/модулей НЕ грузится — только `{name, ref}`. Параметр
+        `?ref=<git-ref>` опционален: по умолчанию используется ref из реестра
+        Service-а. Кеш на стороне Keeper-а — TTL 60s, ключ (name, ref).
+        Read-only, без audit. 502 bad-gateway — loader упал (git-clone /
+        парсинг манифеста).
+      parameters:
+        - $ref: '#/components/parameters/ServiceNamePath'
+        - in: query
+          name: ref
+          required: false
+          schema: { type: string }
+          description: |
+            git-ref для проверки. Если не задан — берётся ref из реестра
+            Service-а.
+      responses:
+        '200':
+          description: git-зависимости сервиса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDependenciesReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+        '502': { $ref: '#/components/responses/Problem502' }
+
   /v1/modules:
     get:
       tags: [Module]
@@ -2123,6 +2164,31 @@ paths:
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/permissions:
+    get:
+      tags: [Permission]
+      operationId: ListPermissions
+      summary: Каталог RBAC-permissions (источник правды — rbac.catalog.go).
+      description: |
+        RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
+        каталог самоописывающий (требование права на чтение списка прав даёт
+        курицу-яйцо). Назначение — UI назначения прав роли (`PATCH /v1/roles/
+        {name}/permissions`): UI фетчит реальные имена из каталога вместо
+        хардкода. Сгруппировано по resource (сортировка по resource, внутри —
+        по action). Read-only, без audit (паттерн health/meta).
+
+        selector_keys — ОБЩИЙ список допустимых ключей скоупа (service / coven /
+        incarnation / host): per-permission-метаданных скоупа в каталоге MVP нет.
+      responses:
+        '200':
+          description: Каталог permissions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionCatalogReply'
+        '401': { $ref: '#/components/responses/Problem401' }
         '500': { $ref: '#/components/responses/Problem500' }
 
   /v1/augur/omens:
@@ -2803,7 +2869,7 @@ components:
       required: true
       schema:
         type: string
-        pattern: '^archon-[a-z0-9-]{1,62}$'
+        pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
       description: AID Архонта (naming-rules.md).
     IncarnationNamePath:
       name: name
@@ -3113,7 +3179,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID нового Архонта (naming-rules.md).
         display_name:
           type: string
@@ -3140,7 +3206,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         display_name:
           type: string
         created_at:
@@ -3148,7 +3214,7 @@ components:
           format: date-time
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID Архонта, выполнившего запрос (из JWT.sub).
         roles:
           type: array
@@ -3173,7 +3239,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         display_name:
           type: string
         auth_method:
@@ -3184,7 +3250,7 @@ components:
           format: date-time
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           nullable: true
           description: null для первого bootstrap-Архонта (ADR-013).
         revoked_at:
@@ -3236,7 +3302,7 @@ components:
           enum: [signal, api, mcp, keeper_internal, soul_grpc, background]
         archon_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           nullable: true
           description: AID инициатора (null для signal/keeper_internal/soul_grpc/background).
         correlation_id:
@@ -3274,7 +3340,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID Архонта для отзыва (echo из path-param для MCP).
         reason:
           type: string
@@ -3301,7 +3367,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID Архонта (echo из path-param для MCP).
 
     IssueTokenReply:
@@ -3312,7 +3378,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         jwt:
           type: string
           description: |
@@ -3365,7 +3431,7 @@ components:
           type: array
           items:
             type: string
-            pattern: '^archon-[a-z0-9-]{1,62}$'
+            pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID операторов — членов роли (пустой массив, если их нет).
       required: [name, builtin, permissions, operators]
 
@@ -3398,7 +3464,7 @@ components:
       properties:
         aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID оператора, назначаемого в роль (naming-rules.md).
       required: [aid]
 
@@ -3458,11 +3524,11 @@ components:
           description: duration авто-refresh; отсутствует, если не задан.
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID создателя; отсутствует у seed/системных записей.
         updated_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID последнего правщика; отсутствует, если не задан.
         created_at:
           type: string
@@ -3635,6 +3701,57 @@ components:
             Найденные шаги цепочки миграций (metadata-only), sorted by `to` ASC.
       required: [service, ref, state_schema_version, migrations]
 
+    ServiceDependency:
+      type: object
+      description: |
+        Одна запись `destiny[]` / `modules[]` манифеста `service.yml`
+        (metadata-only): имя зависимости и её git-ref (ADR-007: версия = git
+        tag/branch). Content самой destiny/модуля не парсится.
+      properties:
+        name:
+          type: string
+          description: |
+            Имя зависимости: kebab-case destiny (`redis`) или двухуровневый
+            `<namespace>.<module>` для custom-модуля (`wb.redis-failover`).
+        ref:
+          type: string
+          description: git-ref зависимости (tag или branch, ADR-007).
+        git:
+          type: string
+          description: |
+            Опц. per-entry override полного git-URL зависимости. Присутствует
+            только если задан в манифесте (поддержан лишь для destiny[]).
+      required: [name, ref]
+
+    ServiceDependenciesReply:
+      type: object
+      description: |
+        Ответ `GET /v1/services/{name}/dependencies`: git-зависимости сервиса
+        на конкретном ref-е. `destiny` / `modules` — задекларированные в
+        `service.yml` блоки `destiny:` / `modules:` (каждая запись со своим
+        git-ref-ом). Оба массива non-nil (сервис без зависимостей валиден →
+        `[]`, не null).
+      properties:
+        service:
+          type: string
+          description: Имя Service-а (дубль path-параметра).
+        ref:
+          type: string
+          description: |
+            git-ref, на котором составлен listing (значение query-параметра
+            либо ref из реестра Service-а, если query не задан).
+        destiny:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceDependency'
+          description: destiny-кирпичики из `service.yml::destiny:`.
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceDependency'
+          description: custom-модули из `service.yml::modules:`.
+      required: [service, ref, destiny, modules]
+
     OmenCreateRequest:
       type: object
       description: |
@@ -3676,7 +3793,7 @@ components:
           description: vault-ref на master-cred; сам секрет не возвращается.
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID создателя; отсутствует у системных записей.
         created_at:
           type: string
@@ -3759,7 +3876,7 @@ components:
           type: integer
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         created_at:
           type: string
           format: date-time
@@ -3832,7 +3949,7 @@ components:
           type: boolean
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID создателя; отсутствует у системных записей.
         created_at:
           type: string
@@ -3937,7 +4054,7 @@ components:
           type: boolean
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         created_at:
           type: string
           format: date-time
@@ -4017,7 +4134,7 @@ components:
           pattern: '^[0-9a-f]{64}$'
         allowed_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID Архонта, допустившего плагин.
         allowed_at:
           type: string
@@ -4097,6 +4214,43 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ModuleCatalogItem'
+      required: [items]
+
+    PermissionAction:
+      type: object
+      description: |
+        Один action в составе resource. selector_keys — ОБЩИЙ список допустимых
+        ключей скоупа (per-permission-метаданных в каталоге MVP нет).
+      properties:
+        action:
+          type: string
+          description: Action permission-а (`<resource>.<action>`, может содержать дефис — `ssh-target-update`).
+        selector_keys:
+          type: array
+          items: { type: string }
+          description: Общий список допустимых ключей скоупа (service / coven / incarnation / host).
+      required: [action, selector_keys]
+
+    PermissionCatalogItem:
+      type: object
+      description: Группа actions одного resource в каталоге RBAC-permissions.
+      properties:
+        resource:
+          type: string
+          description: Resource permission-а (`<resource>.<action>`).
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionAction'
+      required: [resource, actions]
+
+    PermissionCatalogReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionCatalogItem'
       required: [items]
 
     SigilKeyIntroduceRequest:
@@ -4470,7 +4624,7 @@ components:
           description: Детали ошибки, если status локирующий.
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         created_at:
           type: string
           format: date-time
@@ -4576,7 +4730,7 @@ components:
           additionalProperties: true
         changed_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         apply_id:
           type: string
           pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
@@ -4610,7 +4764,7 @@ components:
           $ref: '#/components/schemas/IncarnationStatus'
         unlocked_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         unlocked_at:
           type: string
           format: date-time
@@ -4827,7 +4981,7 @@ components:
           format: date-time
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
           description: AID Архонта, выполнившего запрос (из JWT.sub).
         bootstrap_token:
           type: string
@@ -5406,7 +5560,7 @@ components:
           description: Отсутствует пока статус pending/running.
         started_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         summary_counts:
           $ref: '#/components/schemas/PushSummaryCounts'
       required: [apply_id, inventory_sids, destiny_ref, cleanup_stale, status, started_at]
@@ -5460,7 +5614,7 @@ components:
           description: Отсутствует пока статус pending/running.
         started_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         summary:
           type: object
           additionalProperties: true
@@ -5569,7 +5723,7 @@ components:
             Структурный output read-safe-модулей. Для shell/exec — null.
         started_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         started_at:
           type: string
           format: date-time
@@ -5727,7 +5881,7 @@ components:
           type: integer
         started_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
         started_at:
           type: string
           format: date-time
@@ -5828,7 +5982,7 @@ components:
           format: date-time
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
       required: [name, type, region, credentials_ref, created_at, created_by_aid]
 
     ProfileCreateRequest:
@@ -5867,5 +6021,5 @@ components:
           format: date-time
         created_by_aid:
           type: string
-          pattern: '^archon-[a-z0-9-]{1,62}$'
+          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
       required: [name, provider, params, created_at, created_by_aid]

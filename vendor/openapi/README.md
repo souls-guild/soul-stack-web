@@ -1,9 +1,9 @@
 # Vendored OpenAPI
 
-Sync from core-repo: github.com/co-cy/soul-stack (commit `157ee27`, 2026-05-26).
+Sync from core-repo: github.com/co-cy/soul-stack (2026-05-29).
 Manual sync via cp; future — published artifact (ADR-035 отложенное).
 
-При update — `cp core-repo/docs/keeper/openapi.yaml vendor/openapi/keeper.yaml && npm run gen:api`.
+При update — `cp <core-repo>/keeper/internal/api/meta/openapi.yaml vendor/openapi/keeper.yaml && npm run gen:api`.
 
 ## Iteration 3 (2026-05-26): API gaps round 2 закрыты
 
@@ -30,7 +30,16 @@ UI iteration 3 закрывает placeholder-ы `/audit`, `/archons`, `/archons
 - `POST /v1/operators`, `POST /v1/operators/{aid}/revoke`,
   `POST /v1/operators/{aid}/issue-token` — Archon admin (create/revoke/reissue).
 
+## Iteration 4 (2026-05-29): permissions catalog + новый AID-формат
+
+Из core keeper/internal/api/meta/openapi.yaml (2026-05-29):
+
+- `GET /v1/permissions` — каталог RBAC-permissions (ADR-042); схемы
+  `PermissionAction`/`PermissionCatalogItem`/`PermissionCatalogReply` теперь
+  в codegen (ручные типы в keeper.ts заменены на `components['schemas'][...]`).
+- AID-паттерн операторов обновлён: `^[a-z0-9][a-z0-9._@-]{1,127}$`
+  (вместо `^archon-[a-z0-9-]{1,62}$`).
+
 ## Known gaps
 
-Все gap-ы iteration 1/2 закрыты в iteration 3 (commit core `157ee27`).
 Текущий status — sync clean.

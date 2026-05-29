@@ -180,22 +180,13 @@ export type RoleCreateRequest = components['schemas']['RoleCreateRequest'];
 export type RolePermissionsUpdateRequest = components['schemas']['RolePermissionsUpdateRequest'];
 export type GrantOperatorRequest = components['schemas']['GrantOperatorRequest'];
 
-// Каталог permissions (GET /v1/permissions, ADR-042). В vendored openapi-спеке
-// ещё не зафиксирован — типизируем вручную узким контрактом (types.gen.ts руками
-// не правим). Полное право = `resource.action` (напр. soul.list, incarnation.run);
-// action отдаётся БЕЗ resource-префикса. selector_keys — допустимые ключи
-// target.where для этого действия (информативно для UI). graceful при 404/пусто.
-export interface PermissionAction {
-  action: string;
-  selector_keys?: string[];
-}
-export interface PermissionResource {
-  resource: string;
-  actions: PermissionAction[];
-}
-export interface PermissionCatalogReply {
-  items: PermissionResource[];
-}
+// Каталог permissions (GET /v1/permissions, ADR-042).
+// Типы берём из сгенерированного types.gen.ts (gen:api синхронизировал vendor/openapi).
+export type PermissionAction = components['schemas']['PermissionAction'];
+// PermissionCatalogItem — имя из схемы. PermissionResource — alias для компонентов.
+export type PermissionCatalogItem = components['schemas']['PermissionCatalogItem'];
+export type PermissionResource = PermissionCatalogItem;
+export type PermissionCatalogReply = components['schemas']['PermissionCatalogReply'];
 
 export type ServiceView = components['schemas']['ServiceView'];
 export type ServiceListReply = components['schemas']['ServiceListReply'];

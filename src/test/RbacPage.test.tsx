@@ -38,14 +38,14 @@ const PERMISSIONS_SAMPLE = {
     {
       resource: 'incarnation',
       actions: [
-        { action: 'list' },
-        { action: 'read' },
-        { action: 'run' },
+        { action: 'list', selector_keys: [] },
+        { action: 'read', selector_keys: [] },
+        { action: 'run', selector_keys: [] },
       ],
     },
     {
       resource: 'audit',
-      actions: [{ action: 'read' }],
+      actions: [{ action: 'read', selector_keys: [] }],
     },
   ],
 };
