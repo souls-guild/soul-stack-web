@@ -12,26 +12,19 @@ import { EMPTY_DATE_RANGE, inDateRange, type DateRange } from './dateRange';
 import { DateRangeFilter } from './DateRangeFilter';
 import styles from '../common.module.css';
 
-// Unified /runs feed (W2) — UNION-view всех run-типов (Tide / Push / Errand-run /
-// Errand) в одном списке. Каждый тип имеет свой list-endpoint; здесь они
-// мержатся клиент-сайд по started_at DESC. Фильтр по типу (multi-chip) +
-// статусу (свободный exact-match). Polling 5s, пока в выборке есть running.
+// Unified /runs feed — UNION-view всех run-типов в одном списке.
 //
-// Каждый list-endpoint опционален: на 404/501 (старый Keeper, или фича не
-// задеплоена) соответствующая секция тихо пропускается, остальные показываются.
-// Это сводный read-only вход; per-type страницы (/tides, /push-runs, ...)
-// остаются для детальной фильтрации/пагинации.
+// Источники (мержатся client-side по created_at/started_at DESC):
+//   PRIMARY  — /v1/voyages (kind=scenario + kind=command, ADR-043 S5).
+//   PERMANENT — /v1/push-runs, /v1/errands (не deprecate-ятся).
+//
+// Каждый endpoint опционален: 404/501 → тихо пропускается. Polling 5s при наличии
+// running-прогонов.
 
-type RunType = 'tide' | 'push' | 'errand-run' | 'errand';
+type RunType = 'voyage-scenario' | 'voyage-command' | 'push' | 'errand';
 
-const TYPE_LABEL: Record<RunType, string> = {
-  tide: 'Tide',
-  push: 'Push',
-  'errand-run': 'Errand-run',
-  errand: 'Errand',
-};
-
-const TYPE_ORDER: RunType[] = ['tide', 'push', 'errand-run', 'errand'];
+// Порядок отображения типов прогонов в шапке фида.
+const TYPE_ORDER: RunType[] = ['voyage-scenario', 'voyage-command', 'push', 'errand'];
 
 interface FeedRow {
   type: RunType;
@@ -66,17 +59,15 @@ function relative(ts: string | undefined): string {
   }
 }
 
-// Tide → /tides/:id, Push → /push-runs/:id, ErrandRun → /errand-runs/:id,
-// Errand → /errands/:id.
+// Voyage → /voyages/:id; Push → /push-runs/:id; Errand → /errands/:id.
 function detailPath(type: RunType, id: string): string {
   const enc = encodeURIComponent(id);
   switch (type) {
-    case 'tide':
-      return `/tides/${enc}`;
+    case 'voyage-scenario':
+    case 'voyage-command':
+      return `/voyages/${enc}`;
     case 'push':
       return `/push-runs/${enc}`;
-    case 'errand-run':
-      return `/errand-runs/${enc}`;
     case 'errand':
       return `/errands/${enc}`;
   }
@@ -103,32 +94,36 @@ const STATUS_GROUP_MATCH: Record<StatusGroup, (status: string) => boolean> = {
 
 export function RunsFeed() {
   const { t } = useTranslation();
+
+  function typeLabel(type: RunType): string {
+    switch (type) {
+      case 'voyage-scenario': return t('runhistory:voyageScenarioTypeLabel');
+      case 'voyage-command': return t('runhistory:voyageCommandTypeLabel');
+      case 'push': return 'Push';
+      case 'errand': return 'Errand';
+    }
+  }
   const [typeSet, setTypeSet] = useState<Set<RunType>>(new Set());
   const [statusSet, setStatusSet] = useState<Set<StatusGroup>>(new Set());
   // Клиентский фильтр по диапазону дат старта (см. dateRange.ts) — поверх
   // загруженной страницы, не серверный.
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
 
-  // 4 параллельных list-запроса. Polling 5s, если в выборке есть running.
-  const tidesQ = useQuery({
-    queryKey: ['runs-feed', 'tides'],
-    queryFn: () => keeperApi.tides.list({ limit: LIMIT }),
+  // PRIMARY: /v1/voyages (ADR-043 S5). Polling 5s при running.
+  const voyagesQ = useQuery({
+    queryKey: ['runs-feed', 'voyages'],
+    queryFn: () => keeperApi.voyages.list({ limit: LIMIT }),
     refetchInterval: (q) =>
-      q.state.data ? (q.state.data.items.some((t) => isRunning(t.status)) ? 5000 : false) : false,
+      q.state.data ? (q.state.data.items.some((v) => isRunning(v.status)) ? 5000 : false) : false,
     retry: false,
   });
+
+  // PERMANENT: push-runs + errands (не deprecate-ятся).
   const pushQ = useQuery({
     queryKey: ['runs-feed', 'push'],
     queryFn: () => keeperApi.pushRuns.list({ limit: LIMIT }),
     refetchInterval: (q) =>
       q.state.data ? (q.state.data.items.some((p) => isRunning(p.status)) ? 5000 : false) : false,
-    retry: false,
-  });
-  const errandRunsQ = useQuery({
-    queryKey: ['runs-feed', 'errand-runs'],
-    queryFn: () => keeperApi.errandRuns.list({ limit: LIMIT }),
-    refetchInterval: (q) =>
-      q.state.data ? (q.state.data.items.some((e) => isRunning(e.status)) ? 5000 : false) : false,
     retry: false,
   });
   const errandsQ = useQuery({
@@ -142,9 +137,8 @@ export function RunsFeed() {
   // Жёсткие ошибки (не 404/501) — собираем для отображения; optional-miss молчим.
   const errors: string[] = [];
   for (const [label, q] of [
-    ['Tides', tidesQ],
+    ['Voyages', voyagesQ],
     ['Push runs', pushQ],
-    ['Errand runs', errandRunsQ],
     ['Errands', errandsQ],
   ] as const) {
     if (q.error && !isOptionalMiss(q.error)) {
@@ -159,17 +153,25 @@ export function RunsFeed() {
   const allRows = useMemo<FeedRow[]>(() => {
     const rows: FeedRow[] = [];
 
-    for (const t of tidesQ.data?.items ?? []) {
+    // PRIMARY: Voyages.
+    for (const v of voyagesQ.data?.items ?? []) {
+      const type: RunType = v.kind === 'scenario' ? 'voyage-scenario' : 'voyage-command';
+      const target =
+        v.kind === 'scenario'
+          ? (v.scenario_name ?? v.voyage_id)
+          : (v.module ?? v.voyage_id);
       rows.push({
-        type: 'tide',
-        id: t.tide_id,
-        to: detailPath('tide', t.tide_id),
-        target: `${t.incarnation_name} · ${t.scenario_name}`,
-        status: t.status,
-        startedAt: t.started_at,
-        finishedAt: t.finished_at,
+        type,
+        id: v.voyage_id,
+        to: detailPath(type, v.voyage_id),
+        target,
+        status: v.status,
+        startedAt: v.started_at ?? v.created_at,
+        finishedAt: v.finished_at,
       });
     }
+
+    // PERMANENT: push-runs.
     for (const p of pushQ.data?.items ?? []) {
       rows.push({
         type: 'push',
@@ -181,17 +183,7 @@ export function RunsFeed() {
         finishedAt: p.finished_at,
       });
     }
-    for (const e of errandRunsQ.data?.items ?? []) {
-      rows.push({
-        type: 'errand-run',
-        id: e.errand_run_id,
-        to: detailPath('errand-run', e.errand_run_id),
-        target: e.target_preview ?? e.module,
-        status: e.status,
-        startedAt: e.started_at,
-        finishedAt: e.finished_at,
-      });
-    }
+    // PERMANENT: errands.
     for (const e of errandsQ.data?.items ?? []) {
       rows.push({
         type: 'errand',
@@ -204,14 +196,14 @@ export function RunsFeed() {
       });
     }
 
-    // started_at DESC (отсутствующий started_at — в конец).
+    // created_at/started_at DESC (отсутствующий → в конец).
     rows.sort((a, b) => {
       const ta = a.startedAt ? Date.parse(a.startedAt) : 0;
       const tb = b.startedAt ? Date.parse(b.startedAt) : 0;
       return tb - ta;
     });
     return rows;
-  }, [tidesQ.data, pushQ.data, errandRunsQ.data, errandsQ.data]);
+  }, [voyagesQ.data, pushQ.data, errandsQ.data]);
 
   const filtered = useMemo(() => {
     return allRows.filter((r) => {
@@ -227,13 +219,13 @@ export function RunsFeed() {
     });
   }, [allRows, typeSet, statusSet, dateRange]);
 
-  const anyLoading = tidesQ.isLoading || pushQ.isLoading || errandRunsQ.isLoading || errandsQ.isLoading;
+  const anyLoading = voyagesQ.isLoading || pushQ.isLoading || errandsQ.isLoading;
 
-  function toggleType(t: RunType) {
+  function toggleType(rt: RunType) {
     setTypeSet((prev) => {
       const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
+      if (next.has(rt)) next.delete(rt);
+      else next.add(rt);
       return next;
     });
   }
@@ -263,17 +255,17 @@ export function RunsFeed() {
         <div>
           <div className={styles.metaKey}>{t('runhistory:filterTypeLabel')}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
-            {TYPE_ORDER.map((t) => {
-              const active = typeSet.has(t);
+            {TYPE_ORDER.map((rt) => {
+              const active = typeSet.has(rt);
               return (
                 <button
-                  key={t}
+                  key={rt}
                   type="button"
-                  onClick={() => toggleType(t)}
+                  onClick={() => toggleType(rt)}
                   aria-pressed={active}
                   style={chipStyle(active)}
                 >
-                  {TYPE_LABEL[t]}
+                  {typeLabel(rt)}
                 </button>
               );
             })}
@@ -340,7 +332,7 @@ export function RunsFeed() {
             {filtered.map((r) => (
               <tr key={`${r.type}:${r.id}`}>
                 <td>
-                  <Badge tone="info">{TYPE_LABEL[r.type]}</Badge>
+                  <Badge tone="info">{typeLabel(r.type)}</Badge>
                 </td>
                 <td>
                   <Link to={r.to} title={r.id}>

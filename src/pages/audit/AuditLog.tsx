@@ -44,6 +44,13 @@ function sourceTone(s: AuditEventSource | string | undefined):
   }
 }
 
+// Маппинг dot-нотации event-типов в i18n-ключи admin-namespace.
+// Точки заменяются на _ для совместимости с JSON-ключами (i18next не поддерживает
+// вложенные точки в flat-namespace; graceful fallback — отсутствующий ключ → undefined).
+function auditEventLabelKey(type: string): string {
+  return `admin:auditEventLabel_${type.replace(/\./g, '_')}`;
+}
+
 const PAYLOAD_LIMIT_CHARS = 64_000;
 
 // Большие/binary-подобные payload-ы рендерим обрезанными — UI не должен
@@ -88,6 +95,14 @@ function EventCard({ ev }: { ev: AuditEvent }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { value, truncated } = useMemo(() => maybeTruncatePayload(ev.payload), [ev.payload]);
+  // Получаем лейбл через i18n (graceful: если ключ не найден — undefined).
+  const evLabel = useMemo(() => {
+    if (!ev.type) return undefined;
+    const key = auditEventLabelKey(ev.type);
+    const raw = t(key);
+    // i18next возвращает сам ключ если перевода нет → проверяем совпадение.
+    return raw !== key ? raw : undefined;
+  }, [ev.type, t]);
   return (
     <div className={styles.timelineItem}>
       <div
@@ -107,6 +122,11 @@ function EventCard({ ev }: { ev: AuditEvent }) {
           <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <Badge tone={sourceTone(ev.source)}>{ev.source}</Badge>
             <span className="mono">{ev.type}</span>
+            {evLabel ? (
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                — {evLabel}
+              </span>
+            ) : null}
           </span>
           <span style={{ color: 'var(--text-muted)' }}>{ev.created_at}</span>
         </div>

@@ -98,6 +98,7 @@ export function runStatusTone(s: string | undefined): 'ok' | 'warn' | 'danger' |
       return 'danger';
     case 'running':
     case 'pending':
+    case 'scheduled':
     case 'claimed':
     case 'planned':
     case 'applying':

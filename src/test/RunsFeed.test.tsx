@@ -6,28 +6,6 @@ import { RunsFeed } from '../pages/runs/RunsFeed';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-const TIDES = {
-  items: [
-    {
-      tide_id: '01TIDE00000000000000000001',
-      incarnation_name: 'redis-prod',
-      scenario_name: 'rolling-restart',
-      status: 'running',
-      total_surges: 3,
-      current_surge_index: 1,
-      surge_size: 10,
-      scope_size: 30,
-      on_surge_failure: 'abort',
-      attempt: 1,
-      started_by_aid: 'archon-alice',
-      started_at: '2026-05-27T15:00:00Z',
-    },
-  ],
-  offset: 0,
-  limit: 50,
-  total: 1,
-};
-
 const PUSH = {
   items: [
     {
@@ -38,23 +16,6 @@ const PUSH = {
       status: 'success',
       started_at: '2026-05-27T14:00:00Z',
       finished_at: '2026-05-27T14:01:00Z',
-    },
-  ],
-  offset: 0,
-  limit: 50,
-  total: 1,
-};
-
-const ERRAND_RUNS = {
-  items: [
-    {
-      errand_run_id: '01ERUN00000000000000000001',
-      module: 'core.cmd.shell',
-      status: 'failed',
-      scope_size: 5,
-      target_preview: 'coven=dev',
-      started_at: '2026-05-27T16:00:00Z',
-      finished_at: '2026-05-27T16:00:30Z',
     },
   ],
   offset: 0,
@@ -79,11 +40,47 @@ const ERRANDS = {
   total: 1,
 };
 
+const VOYAGES = {
+  items: [
+    {
+      voyage_id: '01VSCY0000000000000000001',
+      kind: 'scenario',
+      scenario_name: 'rolling-restart',
+      status: 'running',
+      scope_size: 3,
+      total_batches: 1,
+      current_batch_index: 0,
+      dry_run: false,
+      attempt: 1,
+      started_by_aid: 'archon-alice',
+      created_at: '2026-05-27T17:00:00Z',
+      started_at: '2026-05-27T17:00:00Z',
+    },
+    {
+      voyage_id: '01VCMD0000000000000000002',
+      kind: 'command',
+      module: 'core.cmd.shell',
+      status: 'succeeded',
+      scope_size: 2,
+      total_batches: 1,
+      current_batch_index: 0,
+      dry_run: false,
+      attempt: 1,
+      started_by_aid: 'archon-alice',
+      created_at: '2026-05-27T17:30:00Z',
+      started_at: '2026-05-27T17:30:00Z',
+      finished_at: '2026-05-27T17:30:10Z',
+    },
+  ],
+  offset: 0,
+  limit: 50,
+  total: 2,
+};
+
 function mockAll() {
   installFetchMock([
-    { method: 'GET', url: '/v1/tides', body: TIDES },
+    { method: 'GET', url: '/v1/voyages', body: VOYAGES },
     { method: 'GET', url: '/v1/push-runs', body: PUSH },
-    { method: 'GET', url: '/v1/errand-runs', body: ERRAND_RUNS },
     { method: 'GET', url: '/v1/errands', body: ERRANDS },
   ]);
 }
@@ -99,16 +96,17 @@ describe('RunsFeed', () => {
     tokenStore.clear();
   });
 
-  it('мержит 4 run-типа и сортирует по started_at DESC', async () => {
+  it('мержит voyage+push+errand и сортирует по started_at DESC', async () => {
     mockAll();
     renderWithProviders(<RunsFeed />, '/runs');
+    // 2 voyages + 1 push + 1 errand = 4.
     await waitFor(() => {
       expect(dataRows()).toHaveLength(4);
     });
     const rows = dataRows();
-    // DESC: errand-run(16:00) > tide(15:00) > push(14:00) > errand(13:00).
-    expect(within(rows[0]).getByText('Errand-run')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('Tide')).toBeInTheDocument();
+    // DESC: voyage-command(17:30) > voyage-scenario(17:00) > push(14:00) > errand(13:00).
+    expect(within(rows[0]).getByText('Command')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Scenario')).toBeInTheDocument();
     expect(within(rows[2]).getByText('Push')).toBeInTheDocument();
     expect(within(rows[3]).getByText('Errand')).toBeInTheDocument();
   });
@@ -117,30 +115,30 @@ describe('RunsFeed', () => {
     mockAll();
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(dataRows()).toHaveLength(4));
-    expect(screen.getByText('01TIDE0000…').closest('a')).toHaveAttribute('href', '/tides/01TIDE00000000000000000001');
+    expect(screen.getByText('01VSCY0000…').closest('a')).toHaveAttribute('href', '/voyages/01VSCY0000000000000000001');
     expect(screen.getByText('01PUSH0000…').closest('a')).toHaveAttribute('href', '/push-runs/01PUSH00000000000000000001');
-    expect(screen.getByText('01ERUN0000…').closest('a')).toHaveAttribute('href', '/errand-runs/01ERUN00000000000000000001');
     expect(screen.getByText('01ERR00000…').closest('a')).toHaveAttribute('href', '/errands/01ERR000000000000000000001');
   });
 
-  it('filter by type chip → остаётся только Tide', async () => {
+  it('filter by type chip → остаётся только Push', async () => {
     mockAll();
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Tide' }));
+    await user.click(screen.getByRole('button', { name: 'Push' }));
     await waitFor(() => expect(dataRows()).toHaveLength(1));
-    expect(within(dataRows()[0]).getByText('Tide')).toBeInTheDocument();
+    expect(within(dataRows()[0]).getByText('Push')).toBeInTheDocument();
   });
 
-  it('filter by status chip (failed) → только failed-прогон', async () => {
+  it('filter by status chip (running) → только running-прогон', async () => {
     mockAll();
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     const user = userEvent.setup();
-    await user.click(screen.getByTestId('status-filter-failed'));
+    await user.click(screen.getByTestId('status-filter-running'));
+    // voyage-scenario имеет status=running; остальные → скрыты.
     await waitFor(() => expect(dataRows()).toHaveLength(1));
-    expect(within(dataRows()[0]).getByText('Errand-run')).toBeInTheDocument();
+    expect(within(dataRows()[0]).getByText('Scenario')).toBeInTheDocument();
   });
 
   it('multi-select status chips (success+running) → объединение', async () => {
@@ -148,55 +146,36 @@ describe('RunsFeed', () => {
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     const user = userEvent.setup();
-    // success: push + errand; running: tide → 3 строки (failed errand-run скрыт).
+    // running: voyage-scenario(running) = 1.
+    // success: push(success) + errand(success) + voyage-command(succeeded) = 3.
+    // Итого 4 (все показываются).
     await user.click(screen.getByTestId('status-filter-success'));
     await user.click(screen.getByTestId('status-filter-running'));
-    await waitFor(() => expect(dataRows()).toHaveLength(3));
+    await waitFor(() => expect(dataRows()).toHaveLength(4));
   });
 
   it('optional-miss (push-runs 404) пропускается, остальные показываются', async () => {
     installFetchMock([
-      { method: 'GET', url: '/v1/tides', body: TIDES },
+      { method: 'GET', url: '/v1/voyages', body: VOYAGES },
       { method: 'GET', url: '/v1/push-runs', status: 404, body: { title: 'not found' } },
-      { method: 'GET', url: '/v1/errand-runs', body: ERRAND_RUNS },
       { method: 'GET', url: '/v1/errands', body: ERRANDS },
     ]);
     renderWithProviders(<RunsFeed />, '/runs');
-    // 3 строки вместо 4, без error-box.
+    // 3 строки (4 без push-miss), без error-box.
     await waitFor(() => expect(dataRows()).toHaveLength(3));
     expect(screen.queryByText(/ошибка/)).not.toBeInTheDocument();
   });
 
   it('статус-бейдж: succeeded и success дают один tone-класс (унификация)', async () => {
-    // errand-run отдаёт `succeeded` (раньше оставался серым), errand — `success`.
+    // voyage-command отдаёт `succeeded`, errand — `success`.
     // После унификации оба → один зелёный tone (одинаковый className).
     installFetchMock([
-      { method: 'GET', url: '/v1/tides', body: { items: [], offset: 0, limit: 50, total: 0 } },
+      { method: 'GET', url: '/v1/voyages', body: VOYAGES },
       { method: 'GET', url: '/v1/push-runs', body: { items: [], offset: 0, limit: 50, total: 0 } },
-      {
-        method: 'GET',
-        url: '/v1/errand-runs',
-        body: {
-          items: [
-            {
-              errand_run_id: '01ERUN00000000000000000099',
-              module: 'core.cmd.shell',
-              status: 'succeeded',
-              scope_size: 1,
-              target_preview: 'coven=dev',
-              started_at: '2026-05-27T16:00:00Z',
-              finished_at: '2026-05-27T16:00:30Z',
-            },
-          ],
-          offset: 0,
-          limit: 50,
-          total: 1,
-        },
-      },
       { method: 'GET', url: '/v1/errands', body: ERRANDS },
     ]);
     renderWithProviders(<RunsFeed />, '/runs');
-    await waitFor(() => expect(dataRows()).toHaveLength(2));
+    await waitFor(() => expect(dataRows()).toHaveLength(3));
     const table = screen.getByRole('table');
     // Внутри таблицы (не среди status-filter-чипов): по одному бейджу на статус.
     const succeededBadge = within(table).getByText('succeeded');
@@ -210,7 +189,7 @@ describe('RunsFeed', () => {
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(dataRows()).toHaveLength(4));
     const user = userEvent.setup();
-    // Все 4 прогона — 27 мая 2026. Сужаем «до» 26 мая → ничего не остаётся.
+    // Все прогоны — 27 мая 2026. Сужаем «до» 26 мая → ничего не остаётся.
     await user.clear(screen.getByTestId('date-to'));
     await user.type(screen.getByTestId('date-to'), '2026-05-26');
     await waitFor(() => {
@@ -228,14 +207,43 @@ describe('RunsFeed', () => {
   it('пустой feed → empty-state', async () => {
     const empty = { items: [], offset: 0, limit: 50, total: 0 };
     installFetchMock([
-      { method: 'GET', url: '/v1/tides', body: empty },
+      { method: 'GET', url: '/v1/voyages', body: empty },
       { method: 'GET', url: '/v1/push-runs', body: empty },
-      { method: 'GET', url: '/v1/errand-runs', body: empty },
       { method: 'GET', url: '/v1/errands', body: empty },
     ]);
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => {
       expect(screen.getByText(/Ещё не было прогонов/)).toBeInTheDocument();
     });
+  });
+
+  it('voyages primary: voyage-scenario/voyage-command отображаются с корректными лейблами', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/voyages', body: VOYAGES },
+      { method: 'GET', url: '/v1/push-runs', body: { items: [], offset: 0, limit: 50, total: 0 } },
+      { method: 'GET', url: '/v1/errands', body: { items: [], offset: 0, limit: 50, total: 0 } },
+    ]);
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(dataRows()).toHaveLength(2));
+    // Command-voyage первый (17:30), Scenario-voyage второй (17:00).
+    expect(within(dataRows()[0]).getByText('Command')).toBeInTheDocument();
+    expect(within(dataRows()[1]).getByText('Scenario')).toBeInTheDocument();
+    // Links → /voyages/:id (command voyage первым — новее).
+    expect(screen.getByText('01VCMD0000…').closest('a')).toHaveAttribute(
+      'href', '/voyages/01VCMD0000000000000000002'
+    );
+  });
+
+  it('voyages 404 (optional-miss) → не показываем ошибку, push-запись показывается', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/voyages', status: 404, body: { title: 'not found' } },
+      { method: 'GET', url: '/v1/push-runs', body: PUSH },
+      { method: 'GET', url: '/v1/errands', body: { items: [], offset: 0, limit: 50, total: 0 } },
+    ]);
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(dataRows()).toHaveLength(1));
+    expect(within(dataRows()[0]).getByText('Push')).toBeInTheDocument();
+    // Нет error-box (graceful miss).
+    expect(screen.queryByText(/ошибка/)).not.toBeInTheDocument();
   });
 });

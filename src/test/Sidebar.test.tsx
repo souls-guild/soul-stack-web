@@ -12,10 +12,10 @@ function renderSidebar() {
 }
 
 describe('Sidebar navigation', () => {
-  it('ErrandRuns — primary ad-hoc-вход «Command runs» в History', () => {
+  it('Tides и Command runs убраны из навигации (Voyage-only cutover)', () => {
     renderSidebar();
-    const link = screen.getByRole('link', { name: /Command runs/ });
-    expect(link).toHaveAttribute('href', '/errand-runs');
+    expect(screen.queryByRole('link', { name: /Tides/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Command runs/ })).not.toBeInTheDocument();
   });
 
   it('standalone «Errands» убран из верхней History-навигации', () => {

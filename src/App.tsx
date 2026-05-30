@@ -29,14 +29,11 @@ import { DecreesList } from './pages/beacons/DecreesList';
 import { DecreeDetail } from './pages/beacons/DecreeDetail';
 import { DecreeNewForm } from './pages/beacons/DecreeNewForm';
 import { OracleFiresList } from './pages/beacons/OracleFiresList';
-import { TidesList } from './pages/tides/TidesList';
-import { TideDetail } from './pages/tides/TideDetail';
 import { PushRunsList } from './pages/pushRuns/PushRunsList';
 import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
 import { RunWizard } from './pages/run/RunWizard';
-import { ErrandRunsList } from './pages/errandRuns/ErrandRunsList';
-import { ErrandRunDetail } from './pages/errandRuns/ErrandRunDetail';
 import { RunsFeed } from './pages/runs/RunsFeed';
+import { VoyageDetail } from './pages/voyages/VoyageDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,7 +56,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 // Default landing — `/runs` (unified feed), с возможностью запомнить иной маршрут
 // в localStorage('landing'). Валидируем сохранённое значение (только known-маршрут),
 // иначе fallback на /runs.
-const KNOWN_LANDINGS = new Set(['/runs', '/incarnations', '/run', '/souls', '/tides']);
+const KNOWN_LANDINGS = new Set(['/runs', '/incarnations', '/run', '/souls']);
 function landingTarget(): string {
   try {
     const saved = localStorage.getItem('landing');
@@ -106,14 +103,11 @@ export function App() {
             <Route path="/decrees/new" element={<Protected><DecreeNewForm /></Protected>} />
             <Route path="/decrees/:name" element={<Protected><DecreeDetail /></Protected>} />
             <Route path="/oracle/fires" element={<Protected><OracleFiresList /></Protected>} />
-            <Route path="/tides" element={<Protected><TidesList /></Protected>} />
-            <Route path="/tides/:id" element={<Protected><TideDetail /></Protected>} />
             <Route path="/push-runs" element={<Protected><PushRunsList /></Protected>} />
             <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
             <Route path="/run" element={<Protected><RunWizard /></Protected>} />
             <Route path="/runs" element={<Protected><RunsFeed /></Protected>} />
-            <Route path="/errand-runs" element={<Protected><ErrandRunsList /></Protected>} />
-            <Route path="/errand-runs/:id" element={<Protected><ErrandRunDetail /></Protected>} />
+            <Route path="/voyages/:id" element={<Protected><VoyageDetail /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

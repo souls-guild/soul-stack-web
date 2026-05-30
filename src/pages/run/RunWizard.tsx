@@ -5,14 +5,13 @@ import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import type {
-  ErrandRunOnFailure,
-  IncarnationRunRequest,
   ModuleCatalogItem,
   ModuleKind,
   ModuleParam,
   ScenarioInputSchema,
   ServiceScenarioInfo,
   SoulListEntry,
+  VoyageOnFailure,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
@@ -120,10 +119,8 @@ interface OptionsState {
   runMode: RunMode;
   waveSize: string;
   concurrency: string;
-  onFailure: ErrandRunOnFailure;
-  // Tide invocation-time target-override (опционально). Пустые → не шлём.
-  targetCoven: string;
-  targetWhere: string;
+  // VoyageOnFailure = 'abort' | 'continue' (супerset ErrandRunOnFailure).
+  onFailure: VoyageOnFailure;
   dryRun: boolean;
   wait: boolean;
 }
@@ -139,7 +136,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 3;
+const DRAFT_VERSION = 4;
 
 interface WizardDraft {
   v: number;
@@ -182,8 +179,6 @@ const DEFAULT_OPTIONS: OptionsState = {
   waveSize: '',
   concurrency: '50',
   onFailure: 'abort',
-  targetCoven: '',
-  targetWhere: '',
   dryRun: false,
   wait: false,
 };
@@ -520,63 +515,31 @@ export function RunWizard() {
     },
   });
 
-  function buildScenarioBody(): IncarnationRunRequest {
+  async function submitScenario(): Promise<string> {
     const inputObj =
       usePerField && inputSchema
         ? serializeFields(inputSchema, scenarioState.fields)
         : scenarioState.inputObj;
-    const body: IncarnationRunRequest = { input: inputObj };
-    // Tide-режим активируется наличием `wave` в body. В classic — поле не шлём,
-    // backend отвечает classic single-run reply.
-    if (options.runMode === 'tide') {
-      const waveSize = parseIntOrEmpty(options.waveSize);
-      // Submit заблокирован, пока waveSize невалиден (canSubmit), но защищаемся.
-      if (waveSize && waveSize > 0) {
-        body.wave = { size: waveSize, on_failure: options.onFailure };
-        const c = parseIntOrEmpty(options.concurrency);
-        if (c && c > 0) body.concurrency = c;
-        const target = buildTargetOverride(options.targetCoven, options.targetWhere);
-        if (target) body.target = target;
-      }
-    }
-    return body;
-  }
 
-  async function submitScenario(): Promise<string> {
-    const body = buildScenarioBody();
     const names = scenarioState.incarnations;
-    // dry_run несовместим с Tide: шлём только в classic-режиме (canonical
-    // `?dry_run=true`, как soulctl). В Tide-режиме чекбокс недоступен (см. Step4).
-    const runOpts = options.runMode === 'classic' && options.dryRun ? { dryRun: true } : undefined;
+    const c = parseIntOrEmpty(options.concurrency);
+    const batchSize = options.runMode === 'tide' ? parseIntOrEmpty(options.waveSize) : undefined;
 
-    // Single — обычный single-вызов, redirect на результат.
-    if (names.length === 1) {
-      const reply = await keeperApi.incarnations.runScenario(names[0], scenarioState.scenario, body, runOpts);
-      if (reply.tide_id) return `/tides/${encodeURIComponent(reply.tide_id)}`;
-      return `/incarnations/${encodeURIComponent(names[0])}`;
-    }
-
-    // Multi — client-side fan-out: по запросу на каждую incarnation.
-    const results = await Promise.allSettled(
-      names.map((name) => keeperApi.incarnations.runScenario(name, scenarioState.scenario, body, runOpts)),
-    );
-    const launched = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.length - launched;
-    if (launched === 0) {
-      // Все упали — пробрасываем первую ошибку для отображения.
-      const first = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
-      throw first?.reason ?? new Error('fan-out failed');
-    }
-    if (failed > 0) {
-      setSubmitError(t('run:fanoutPartial', { launched, total: names.length }));
-    }
-    // Если хоть один прогон обернулся в Tide — ведём на этот Tide; иначе на incarnations list.
-    for (const r of results) {
-      if (r.status === 'fulfilled' && r.value.tide_id) {
-        return `/tides/${encodeURIComponent(r.value.tide_id)}`;
-      }
-    }
-    return '/incarnations';
+    // Target: явный список incarnations (UI уже резолвил regex → имена).
+    // dry_run только в classic-режиме (в Tide-режиме чекбокс скрыт, но state
+    // мог остаться true при переключении режима → явно игнорируем в Tide).
+    const dryRun = options.runMode === 'classic' && options.dryRun ? true : undefined;
+    const reply = await keeperApi.voyages.create({
+      kind: 'scenario',
+      scenario_name: scenarioState.scenario,
+      input: Object.keys(inputObj).length > 0 ? inputObj : undefined,
+      target: { incarnations: names },
+      batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
+      concurrency: c && c > 0 ? c : 50,
+      dry_run: dryRun,
+      on_failure: options.onFailure,
+    });
+    return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
 
   async function submitCommand(): Promise<string> {
@@ -594,16 +557,16 @@ export function RunWizard() {
     } else {
       input = commandState.customInput;
     }
-    // UI уже резолвил rich-criteria в явный список SID — шлём sids.
-    const reply = await keeperApi.errandRuns.create({
+    // UI уже резолвил rich-criteria в явный список SID — шлём через target.sids.
+    const reply = await keeperApi.voyages.create({
+      kind: 'command',
       module: moduleName,
-      input,
-      timeout_seconds: commandState.timeoutSeconds > 0 ? commandState.timeoutSeconds : undefined,
+      input: Object.keys(input).length > 0 ? input : undefined,
       target: { sids: resolvedSids },
       concurrency: c && c > 0 ? c : 50,
       on_failure: options.onFailure,
     });
-    return `/errand-runs/${encodeURIComponent(reply.errand_run_id)}`;
+    return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
 
   // В Tide-режиме (scenario) wave size обязателен и должен быть >=1.
@@ -1393,38 +1356,6 @@ function Step4Options({
         </label>
       ) : null}
 
-      {tideMode ? (
-        <details>
-          <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)' }}>
-            {t('run:targetOverrideSummary')}
-          </summary>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-4)', marginTop: 10 }}>
-            <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{t('run:targetCovenLabel')}</span>
-              <input
-                type="text"
-                className={styles.field}
-                value={value.targetCoven}
-                onChange={(e) => onChange({ ...value, targetCoven: e.target.value })}
-                placeholder={t('run:targetCovenPlaceholder')}
-                aria-label="Target coven override"
-              />
-            </label>
-            <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{t('run:targetWhereLabel')}</span>
-              <input
-                type="text"
-                className={styles.field}
-                value={value.targetWhere}
-                onChange={(e) => onChange({ ...value, targetWhere: e.target.value })}
-                placeholder={t('run:targetWherePlaceholder')}
-                aria-label="Target where override"
-              />
-            </label>
-            <span className={styles.hint}>{t('run:targetOverrideHint')}</span>
-          </div>
-        </details>
-      ) : null}
       {workload === 'command' || tideMode ? (
         <fieldset
           style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
@@ -1507,21 +1438,6 @@ function splitCsv(raw: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-// Сборка опционального invocation-time target-override (Tide). coven — CSV →
-// массив kebab-меток; where — raw CEL-строка. Возвращает undefined, если оба
-// пусты (override не задан). AND-merge со scenario on:/where: — на backend.
-function buildTargetOverride(
-  covenCsv: string,
-  where: string,
-): NonNullable<IncarnationRunRequest['target']> | undefined {
-  const coven = splitCsv(covenCsv);
-  const w = where.trim();
-  if (coven.length === 0 && !w) return undefined;
-  const target: NonNullable<IncarnationRunRequest['target']> = {};
-  if (coven.length > 0) target.coven = coven;
-  if (w) target.where = w;
-  return target;
-}
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

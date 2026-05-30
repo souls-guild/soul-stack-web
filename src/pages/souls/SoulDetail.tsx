@@ -301,16 +301,15 @@ function SoulHistoryTab({ sid }: { sid: string }) {
 }
 
 // Ссылка по записи timeline:
-//   scenario → /tides/:tide_id (если прогон шёл волнами Tide) иначе /incarnations/:incarnation;
-//   errand   → /errand-runs/:errand_run_id (fan-out из ErrandRun) иначе /errands/:id.
+//   scenario → /incarnations/:incarnation (tide_id есть, но роут /tides/:id удалён — Wave 5 добавит voyage_id);
+//   errand   → не кликабельно (errand_run_id есть, но роут /errand-runs/:id удалён — Wave 5 добавит voyage_id).
 function historyLink(item: SoulHistoryItem): string | null {
   if (item.type === 'scenario') {
-    if (item.tide_id) return `/tides/${encodeURIComponent(item.tide_id)}`;
+    // tide_id не кликабелен — роут /tides/:id удалён; voyage_id появится в Wave 5.
     if (item.incarnation) return `/incarnations/${encodeURIComponent(item.incarnation)}`;
     return null;
   }
-  if (item.errand_run_id) return `/errand-runs/${encodeURIComponent(item.errand_run_id)}`;
-  if (item.id) return `/errands/${encodeURIComponent(item.id)}`;
+  // errand_run_id не кликабелен — роут /errand-runs/:id удалён; voyage_id появится в Wave 5.
   return null;
 }
 

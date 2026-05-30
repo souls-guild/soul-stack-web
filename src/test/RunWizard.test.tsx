@@ -25,10 +25,9 @@ function renderWizardWithRoutes(initialPath = '/run') {
   return render(
     <Routes>
       <Route path="/run" element={<RunWizard />} />
-      <Route path="/errand-runs/:id" element={<div data-testid="errand-run-detail" />} />
+      <Route path="/voyages/:id" element={<div data-testid="voyage-detail" />} />
       <Route path="/incarnations" element={<div data-testid="incarnations-list" />} />
       <Route path="/incarnations/:name" element={<div data-testid="incarnation-detail" />} />
-      <Route path="/tides/:id" element={<div data-testid="tide-detail" />} />
     </Routes>,
     { wrapper: Wrap },
   );
@@ -101,6 +100,21 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     const json = (obj: unknown, status = 200) =>
       new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 
+    // PRIMARY: POST /v1/voyages (ADR-043 S5).
+    if (method === 'POST' && (url.endsWith('/v1/voyages') || url.includes('/v1/voyages?'))) {
+      const cap = { url, body };
+      ref.posted = cap;
+      ref.posts.push(cap);
+      const kind = (body as Record<string, unknown>)?.kind ?? 'scenario';
+      return json({
+        voyage_id: `voy-01HZ00000000-${kind}`,
+        kind,
+        scope_size: 1,
+        status: 'pending',
+        location: `/v1/voyages/voy-01HZ00000000-${kind}`,
+      }, 202);
+    }
+    // Legacy stubs (kept for any old test paths; no longer triggered by wizard).
     if (method === 'POST' && url.includes('/v1/errand-runs')) {
       const cap = { url, body };
       ref.posted = cap;
@@ -111,7 +125,6 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
       const cap = { url, body };
       ref.posted = cap;
       ref.posts.push(cap);
-      // Tide-режим (наличие `wave` в body) → tide_id; иначе classic apply_id.
       if (body && typeof body === 'object' && 'wave' in (body as Record<string, unknown>)) {
         return json({ tide_id: 'td-01HZ00000000', incarnation: 'redis-prod', scenario: 'restart' }, 202);
       }
@@ -259,15 +272,18 @@ describe('RunWizard', () => {
     });
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
 
-    // Step 3 → 4 → submit (fan-out на обе incarnations).
+    // Step 3 → 4 → submit → POST /v1/voyages с incarnations=[redis-prod, redis-staging].
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnations-list')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    const scenarioPosts = stub.posts.filter((p) => /\/scenarios\//.test(p.url));
-    expect(scenarioPosts).toHaveLength(2);
-    expect(scenarioPosts.map((p) => p.url).some((u) => /redis-prod\/scenarios\/restart$/.test(u))).toBe(true);
-    expect(scenarioPosts.map((p) => p.url).some((u) => /redis-staging\/scenarios\/restart$/.test(u))).toBe(true);
+    // Один POST на /v1/voyages (не fan-out).
+    const voyagePosts = stub.posts.filter((p) => p.url.includes('/v1/voyages'));
+    expect(voyagePosts).toHaveLength(1);
+    const vBody = voyagePosts[0].body as { kind: string; scenario_name: string; target: { incarnations: string[] } };
+    expect(vBody.kind).toBe('scenario');
+    expect(vBody.scenario_name).toBe('restart');
+    expect(vBody.target.incarnations.sort()).toEqual(['redis-prod', 'redis-staging']);
   });
 
   it('Scenario regex-фильтр: совпавшее подмножество → fan-out по совпавшим', async () => {
@@ -293,13 +309,14 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnations-list')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    const scenarioPosts = stub.posts.filter((p) => /\/scenarios\//.test(p.url));
-    expect(scenarioPosts).toHaveLength(2);
-    expect(scenarioPosts.map((p) => p.url).some((u) => /redis-a\/scenarios\/restart$/.test(u))).toBe(true);
-    expect(scenarioPosts.map((p) => p.url).some((u) => /redis-b\/scenarios\/restart$/.test(u))).toBe(true);
-    expect(scenarioPosts.map((p) => p.url).some((u) => /pg-1\/scenarios\//.test(u))).toBe(false);
+    // Один POST /v1/voyages с только совпавшими incarnations (redis-a, redis-b).
+    const voyagePosts = stub.posts.filter((p) => p.url.includes('/v1/voyages'));
+    expect(voyagePosts).toHaveLength(1);
+    const vBody = voyagePosts[0].body as { target: { incarnations: string[] } };
+    expect(vBody.target.incarnations.sort()).toEqual(['redis-a', 'redis-b']);
+    expect(vBody.target.incarnations).not.toContain('pg-1');
   });
 
   it('Scenario невалидная regex → 0 совпадений, submit заблокирован', async () => {
@@ -358,10 +375,14 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/hello-prod\/scenarios\/set_greeting$/);
-    expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({ greeting: 'hello world' });
+    expect(stub.posted?.url).toContain('/v1/voyages');
+    const vBody = stub.posted?.body as { kind: string; scenario_name: string; input: Record<string, unknown>; target: { incarnations: string[] } };
+    expect(vBody.kind).toBe('scenario');
+    expect(vBody.scenario_name).toBe('set_greeting');
+    expect(vBody.input).toEqual({ greeting: 'hello world' });
+    expect(vBody.target.incarnations).toContain('hello-prod');
   });
 
   it('Scenario без input_schema → DynamicInputBuilder, поля в POST.input', async () => {
@@ -393,7 +414,7 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({ shard: 'primary' });
   });
@@ -450,7 +471,7 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({
       redis_maxmemory: '256mb',
@@ -510,10 +531,11 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).toContain('/v1/errand-runs');
-    const body = stub.posted?.body as { module: string; input: { cmd: string }; target: { sids: string[] }; concurrency: number };
+    expect(stub.posted?.url).toContain('/v1/voyages');
+    const body = stub.posted?.body as { kind: string; module: string; input: { cmd: string }; target: { sids: string[] }; concurrency: number };
+    expect(body.kind).toBe('command');
     expect(body.module).toBe('core.cmd.shell');
     expect(body.input.cmd).toBe('uptime');
     expect(body.target.sids.sort()).toEqual(['db-1.example.com', 'db-2.example.com']);
@@ -543,7 +565,7 @@ describe('RunWizard', () => {
     await user.type(screen.getByLabelText('Command'), 'uptime');
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as { target: { sids: string[] } };
     expect(body.target.sids.sort()).toEqual(['db-1.example.com', 'db-2.example.com']);
@@ -593,9 +615,10 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    const body = stub.posted?.body as { module: string; input: Record<string, unknown>; target: { sids: string[] } };
+    const body = stub.posted?.body as { kind: string; module: string; input: Record<string, unknown>; target: { sids: string[] } };
+    expect(body.kind).toBe('command');
     // Полный адрес модуля — name.state.
     expect(body.module).toBe('official.http.probe');
     expect(body.input).toEqual({ url: 'https://example.com' });
@@ -638,9 +661,10 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('errand-run-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    const body = stub.posted?.body as { module: string; input: Record<string, unknown> };
+    const body = stub.posted?.body as { kind: string; module: string; input: Record<string, unknown> };
+    expect(body.kind).toBe('command');
     // free-text без state-сегмента → имя как есть (core.http.probe).
     expect(body.module).toBe('core.http.probe');
     expect(body.input).toEqual({ url: 'https://example.com' });
@@ -713,7 +737,7 @@ describe('RunWizard', () => {
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
   });
 
-  it('Scenario Tide-режим: wave.size + target-override в POST, redirect /tides/:id', async () => {
+  it('Scenario Tide-режим: wave.size → batch_size в Voyage POST, redirect /voyages/:id', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -742,29 +766,28 @@ describe('RunWizard', () => {
 
     await user.type(screen.getByLabelText('Wave size'), '2');
 
-    // Advanced target-override: coven + where.
-    fireEvent.change(screen.getByLabelText('Target coven override'), { target: { value: 'prod' } });
-    fireEvent.change(screen.getByLabelText('Target where override'), {
-      target: { value: 'soulprint.self.os.family == "debian"' },
-    });
-
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('tide-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/redis-prod\/scenarios\/restart$/);
+    expect(stub.posted?.url).toContain('/v1/voyages');
     const body = stub.posted?.body as {
-      wave?: { size: number; on_failure: string };
-      target?: { coven?: string[]; where?: string };
+      kind: string;
+      scenario_name: string;
+      batch_size?: number;
+      on_failure?: string;
       concurrency?: number;
+      target: { incarnations: string[] };
     };
-    expect(body.wave?.size).toBe(2);
-    expect(body.wave?.on_failure).toBe('abort');
-    expect(body.target?.coven).toEqual(['prod']);
-    expect(body.target?.where).toBe('soulprint.self.os.family == "debian"');
+    expect(body.kind).toBe('scenario');
+    expect(body.scenario_name).toBe('restart');
+    // wave size (2) → batch_size.
+    expect(body.batch_size).toBe(2);
+    expect(body.on_failure).toBe('abort');
     expect(body.concurrency).toBe(50);
+    expect(body.target.incarnations).toContain('redis-prod');
   });
 
-  it('Scenario Classic-режим (default): без wave, redirect /incarnations/:name', async () => {
+  it('Scenario Classic-режим (default): без batch_size, redirect /voyages/:id', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -786,14 +809,16 @@ describe('RunWizard', () => {
     // Classic выбран по умолчанию — поля Tide скрыты.
     expect(screen.queryByLabelText('Wave size')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    expect('wave' in body).toBe(false);
-    expect('target' in body).toBe(false);
+    // Classic режим → batch_size не шлём.
+    expect('batch_size' in body).toBe(false);
+    // target содержит incarnations (не пустой).
+    expect((body.target as { incarnations: string[] }).incarnations).toContain('redis-prod');
   });
 
-  it('Scenario Classic + dry-run: POST несёт ?dry_run=true', async () => {
+  it('Scenario Classic + dry-run: Voyage POST несёт dry_run=true в body', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -815,12 +840,13 @@ describe('RunWizard', () => {
     // Classic-режим: dry-run чекбокс доступен.
     await user.click(screen.getByLabelText('dry_run'));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).toMatch(/\/v1\/incarnations\/redis-prod\/scenarios\/restart\?dry_run=true$/);
+    expect(stub.posted?.url).toContain('/v1/voyages');
+    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBe(true);
   });
 
-  it('Scenario Classic без dry-run: POST без ?dry_run', async () => {
+  it('Scenario Classic без dry-run: Voyage POST без dry_run в body', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -840,9 +866,10 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('incarnation-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).not.toContain('dry_run');
+    // dry_run не передан (undefined) — не присутствует в body.
+    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBeUndefined();
   });
 
   it('Scenario Tide-режим: dry-run чекбокс недоступен, dry_run не уходит', async () => {
@@ -872,9 +899,10 @@ describe('RunWizard', () => {
 
     await user.type(screen.getByLabelText('Wave size'), '2');
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('tide-detail')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect(stub.posted?.url).not.toContain('dry_run');
+    // В Tide-режиме dryRun не шлётся (false → undefined в submitScenario).
+    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBeUndefined();
   });
 
   it('Stale-черновик старой формы (без v / без incarnations) → визард грузится на дефолтах без краша', async () => {
@@ -912,12 +940,12 @@ describe('RunWizard', () => {
 
   it('Stale-черновик прошлой версии (v отличается) → отбрасывается, дефолты без краша', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
-    // Прошлая версия формы (v=2, scenarioState без incarnationRegex). loadDraft
+    // Прошлая версия формы (v=3, scenarioState без incarnationRegex). loadDraft
     // отбрасывает по несовпадению версии → визард стартует с дефолтов, без краша.
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 2,
+        v: 3,
         step: 3,
         workload: 'scenario',
         scenarioState: { service: 'redis', scenario: 'restart', incarnations: null, fields: {}, inputObj: {} },
@@ -932,12 +960,12 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (v=3, incarnationRegex) → state восстанавливается', async () => {
+  it('Валидный свежий черновик (v=4, incarnationRegex) → state восстанавливается', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 3,
+        v: 4,
         step: 3,
         workload: 'scenario',
         scenarioState: {
@@ -966,8 +994,6 @@ describe('RunWizard', () => {
           waveSize: '',
           concurrency: '50',
           onFailure: 'abort',
-          targetCoven: '',
-          targetWhere: '',
           dryRun: false,
           wait: false,
         },

@@ -15,6 +15,8 @@
   "builtinEditDenied": "builtin role — editing is denied by the server",
   "cancelErrandRunHint": "Active Errands will run to natural completion. No new Errands from the queue will be started.",
   "cancelErrandRunTitle": "Cancel Errand run?",
+  "cancelVoyageHint": "The run will be cancelled. Already started apply blocks may complete on their own.",
+  "cancelVoyageTitle": "Cancel Voyage?",
   "decreeNotFound": "Decree not found.",
   "deleteDecreeConfirm": "Delete Decree {{name}}? Cooldown state (oracle_fires) will be cascade-cleared.",
   "deleteVigilConfirm": "Delete Vigil {{name}}? Decrees are NOT cascaded.",

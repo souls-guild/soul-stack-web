@@ -174,15 +174,15 @@ describe('SoulDetail', () => {
       expect(screen.getByTestId('soul-history-table')).toBeInTheDocument();
     });
 
-    // scenario с tide_id → /tides/:tide_id
+    // scenario с tide_id — роут /tides/:id удалён, fallback → /incarnations/:incarnation
     const tideLink = screen.getByRole('link', { name: 'apply-tide-1' });
-    expect(tideLink).toHaveAttribute('href', '/tides/tide-abc');
+    expect(tideLink).toHaveAttribute('href', '/incarnations/redis-prod');
     // scenario без tide_id → /incarnations/:incarnation
     const incLink = screen.getByRole('link', { name: 'apply-plain-2' });
     expect(incLink).toHaveAttribute('href', '/incarnations/redis-prod');
-    // errand с errand_run_id → /errand-runs/:errand_run_id
-    const erunLink = screen.getByRole('link', { name: 'errand-9' });
-    expect(erunLink).toHaveAttribute('href', '/errand-runs/erun-xyz');
+    // errand с errand_run_id — роут /errand-runs/:id удалён, plain span (не ссылка)
+    expect(screen.queryByRole('link', { name: 'errand-9' })).toBeNull();
+    expect(screen.getByText('errand-9')).toBeInTheDocument();
     // module errand-записи виден
     expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
   });

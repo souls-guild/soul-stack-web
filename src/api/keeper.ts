@@ -172,6 +172,95 @@ export interface ErrandRunCreateReply {
   errand_run_id: string;
 }
 
+// Voyage — унифицированный батчевый прогон (ADR-043, S5). kind=scenario|command.
+// Статусы из openapi: scheduled/pending/running/succeeded/failed/partial_failed/cancelled.
+export type VoyageStatus = 'scheduled' | 'pending' | 'running' | 'succeeded' | 'failed' | 'partial_failed' | 'cancelled';
+export type VoyageKind = 'scenario' | 'command';
+export type VoyageOnFailure = 'abort' | 'continue';
+
+export interface VoyageTarget {
+  // scenario-режим:
+  incarnations?: string[];
+  service?: string;
+  // command-режим:
+  sids?: string[];
+  where?: string;
+  // общий:
+  coven?: string[];
+}
+
+export interface VoyageCreateRequest {
+  kind: VoyageKind;
+  scenario_name?: string;
+  module?: string;
+  input?: Record<string, unknown>;
+  target: VoyageTarget;
+  batch_size?: number;
+  concurrency?: number;
+  dry_run?: boolean;
+  schedule_at?: string;
+  inter_batch_interval_ms?: number;
+  on_failure?: VoyageOnFailure;
+}
+
+export interface VoyageCreateReply {
+  voyage_id: string;
+  kind: VoyageKind;
+  scope_size: number;
+  status: 'pending' | 'scheduled';
+  location: string;
+}
+
+export interface VoyageSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+  no_match?: number;
+}
+
+export interface Voyage {
+  voyage_id: string;
+  kind: VoyageKind;
+  scenario_name?: string;
+  module?: string;
+  status: VoyageStatus;
+  scope_size: number;
+  batch_size?: number;
+  concurrency?: number;
+  dry_run: boolean;
+  total_batches: number;
+  current_batch_index: number;
+  on_failure?: VoyageOnFailure;
+  target?: VoyageTarget;
+  schedule_at?: string;
+  attempt: number;
+  started_by_aid: string;
+  created_at: string;
+  started_at?: string;
+  finished_at?: string;
+  summary?: VoyageSummary;
+}
+
+export interface VoyageListReply {
+  items: Voyage[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
+export interface VoyageCancelReply {
+  voyage_id: string;
+  status: 'cancelled';
+}
+
+export interface ListVoyagesQuery {
+  kind?: VoyageKind;
+  status?: VoyageStatus[];
+  offset?: number;
+  limit?: number;
+}
+
 // Push-providers (ADR-032 amendment 2026-05-26, S7-2). Узкие алиасы.
 export type PushProvider = components['schemas']['PushProvider'];
 export type PushProviderListReply = components['schemas']['PushProviderListReply'];
@@ -722,6 +811,26 @@ export const keeperApi = {
       apiGet<PushProviderListReply>('/v1/push-providers', {
         query: { offset: q.offset, limit: q.limit },
       }),
+  },
+
+  // Voyages — унифицированный батчевый прогон (ADR-043, S5). Первичный endpoint
+  // для RunWizard и RunsFeed. kind=scenario → incarnation.run; kind=command → errand.run.
+  voyages: {
+    create: (body: VoyageCreateRequest) =>
+      apiSend<VoyageCreateReply>('/v1/voyages', 'POST', { body }),
+    list: (q: ListVoyagesQuery = {}) =>
+      apiGet<VoyageListReply>('/v1/voyages', {
+        query: {
+          kind: q.kind,
+          status: q.status,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+    get: (voyageId: string) =>
+      apiGet<Voyage>(`/v1/voyages/${encodeURIComponent(voyageId)}`),
+    cancel: (voyageId: string) =>
+      apiSend<VoyageCancelReply>(`/v1/voyages/${encodeURIComponent(voyageId)}`, 'DELETE'),
   },
 
   // Sigil-allow-list плагинов (ADR-026, вариант C). Полный путь записи — (namespace, name, ref).
