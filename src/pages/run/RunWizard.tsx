@@ -528,7 +528,7 @@ export function RunWizard() {
     // Target: явный список incarnations (UI уже резолвил regex → имена).
     // dry_run только в classic-режиме (в Tide-режиме чекбокс скрыт, но state
     // мог остаться true при переключении режима → явно игнорируем в Tide).
-    const dryRun = options.runMode === 'classic' && options.dryRun ? true : undefined;
+    const dryRun = options.runMode === 'classic' && Boolean(options.dryRun);
     const reply = await keeperApi.voyages.create({
       kind: 'scenario',
       scenario_name: scenarioState.scenario,
@@ -564,6 +564,7 @@ export function RunWizard() {
       input: Object.keys(input).length > 0 ? input : undefined,
       target: { sids: resolvedSids },
       concurrency: c && c > 0 ? c : 50,
+      dry_run: false,
       on_failure: options.onFailure,
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;

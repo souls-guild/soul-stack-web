@@ -868,8 +868,8 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    // dry_run не передан (undefined) — не присутствует в body.
-    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBeUndefined();
+    // dry_run явно false (gen-тип требует boolean, не undefined).
+    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBe(false);
   });
 
   it('Scenario Tide-режим: dry-run чекбокс недоступен, dry_run не уходит', async () => {
@@ -901,8 +901,8 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    // В Tide-режиме dryRun не шлётся (false → undefined в submitScenario).
-    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBeUndefined();
+    // В Tide-режиме dry_run явно false (gen-тип требует boolean; чекбокс скрыт → forced false).
+    expect((stub.posted?.body as Record<string, unknown>).dry_run).toBe(false);
   });
 
   it('Stale-черновик старой формы (без v / без incarnations) → визард грузится на дефолтах без краша', async () => {

@@ -617,13 +617,7 @@ paths:
       summary: Запустить scenario против incarnation.
       description: |
         Permission: incarnation.run. MCP-tool: keeper.incarnation.run.
-        Async-операция, 202.
-
-        Classic single-run (без `wave`) — 202 + `apply_id` (`IncarnationRunReply`).
-        Tide-режим (с `wave`, ADR-040) — 202 + `tide_id` + сводка
-        (`IncarnationRunTideReply`); per-Surge apply_run-ы живут под `tide_id` в
-        `apply_runs.tide_id`. Опт-поля `target`/`concurrency` допустимы только в
-        паре с `wave` (Tide-активатор).
+        Async-операция, 202 + `apply_id` (`IncarnationRunReply`).
       parameters:
         - $ref: '#/components/parameters/IncarnationNamePath'
         - name: scenario
@@ -640,13 +634,11 @@ paths:
               $ref: '#/components/schemas/IncarnationRunRequest'
       responses:
         '202':
-          description: Запуск scenario принят (classic single-run или Tide-режим).
+          description: Запуск scenario принят.
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/IncarnationRunReply'
-                  - $ref: '#/components/schemas/IncarnationRunTideReply'
+                $ref: '#/components/schemas/IncarnationRunReply'
         '400': { $ref: '#/components/responses/Problem400' }
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
@@ -985,146 +977,6 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
-  /v1/incarnations/{name}/tides:
-    get:
-      tags: [Tide]
-      operationId: ListIncarnationTides
-      summary: Список Tide-прогонов под incarnation (ADR-040 W-4).
-      description: |
-        Permission: incarnation.history (parity GET /history — read о
-        runtime-состоянии прогонов incarnation; отдельный `tide.read` perm
-        не вводится до запроса оператора, ADR-040 § RBAC reuse).
-        Сортировка `started_at DESC` (свежие первыми).
-      parameters:
-        - $ref: '#/components/parameters/IncarnationNamePath'
-        - $ref: '#/components/parameters/OffsetQuery'
-        - $ref: '#/components/parameters/LimitQuery'
-        - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [pending, running, succeeded, failed, partial_failed, cancelled]
-          description: Опциональный фильтр по статусу Tide.
-      responses:
-        '200':
-          description: Страница Tide-ов.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TideListReply'
-        '400': { $ref: '#/components/responses/Problem400' }
-        '401': { $ref: '#/components/responses/Problem401' }
-        '403': { $ref: '#/components/responses/Problem403' }
-        '404': { $ref: '#/components/responses/Problem404' }
-        '422': { $ref: '#/components/responses/Problem422' }
-        '500': { $ref: '#/components/responses/Problem500' }
-
-  /v1/tides:
-    get:
-      tags: [Tide]
-      operationId: ListTides
-      summary: Глобальный список Tide-прогонов (UI-4 Tide-runs page).
-      description: |
-        Permission: incarnation.history (parity с per-incarnation
-        `GET /v1/incarnations/{name}/tides`). Глобальный list поверх всех
-        incarnation-ов, сортировка `started_at DESC` (свежие первыми).
-
-        Для per-incarnation-scope (RBAC через `coven=`/`service=`) использовать
-        `GET /v1/incarnations/{name}/tides`.
-      parameters:
-        - $ref: '#/components/parameters/OffsetQuery'
-        - $ref: '#/components/parameters/LimitQuery'
-        - name: status
-          in: query
-          required: false
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
-              enum: [pending, running, succeeded, failed, partial_failed, cancelled]
-          description: |
-            Multi-value-фильтр по статусу Tide (повторяющийся `?status=`-параметр).
-            Несколько значений объединяются через OR. Невалидное значение → 422.
-        - name: incarnation
-          in: query
-          required: false
-          schema:
-            type: string
-            pattern: '^[a-z0-9][a-z0-9-]{0,62}$'
-          description: Exact-match-фильтр по incarnation_name.
-      responses:
-        '200':
-          description: Страница Tide-ов.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TideListReply'
-        '400': { $ref: '#/components/responses/Problem400' }
-        '401': { $ref: '#/components/responses/Problem401' }
-        '403': { $ref: '#/components/responses/Problem403' }
-        '422': { $ref: '#/components/responses/Problem422' }
-        '500': { $ref: '#/components/responses/Problem500' }
-
-  /v1/tides/{tide_id}:
-    get:
-      tags: [Tide]
-      operationId: GetTide
-      summary: Snapshot одного Tide-прогона (ADR-040 W-4).
-      description: |
-        Permission: incarnation.history (parity GET /history). UI делает
-        client-side polling до появления нативного progress-SSE-эндпоинта
-        (отложено, см. ADR-040 open Q «Tide-progress SSE для UI»).
-      parameters:
-        - name: tide_id
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-          description: ULID Tide.
-      responses:
-        '200':
-          description: Snapshot Tide.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Tide'
-        '400': { $ref: '#/components/responses/Problem400' }
-        '401': { $ref: '#/components/responses/Problem401' }
-        '403': { $ref: '#/components/responses/Problem403' }
-        '404': { $ref: '#/components/responses/Problem404' }
-        '500': { $ref: '#/components/responses/Problem500' }
-
-  # /v1/auth/login — TODO ADR-amendment к ADR-014 (см. open question
-  # «JWT issuance для UI-login flow»). Сейчас JWT выдаётся только через
-  # `keeper init --archon=<aid>` (bootstrap CLI) или
-  # POST /v1/operators/{aid}/issue-token (требует уже валидный JWT). UI
-  # вынужден просить оператора paste JWT из файла — это не UX.
-  #
-  # Расширение требует решения, какие credentials принимает endpoint:
-  # password? OIDC? PKCS? — outside MVP scope, проектируется отдельным ADR.
-  # Эндпоинт здесь намеренно закомментирован: spec-decl без реализации
-  # отлавливается openapi_drift_test, чтобы не плодить «опережающий MVP» dead-code.
-  #
-  # /v1/auth/login:
-  #   post:
-  #     tags: [Operator]
-  #     operationId: AuthLogin
-  #     summary: TODO — обмен credentials → JWT (требует ADR-amendment к ADR-014).
-  #     description: |
-  #       Сейчас JWT выдаётся только через `keeper init` (bootstrap первого
-  #       Архонта, ADR-013) или административный endpoint
-  #       POST /v1/operators/{aid}/issue-token (требует уже валидный JWT).
-  #       UI вынужден просить оператора paste JWT — это не UX.
-  #       Расширение требует решения: cred=password? cred=OIDC? cred=PKCS?
-  #       — outside MVP scope, оформляется отдельным ADR-amendment к ADR-014.
-  #     security: []
-  #     responses:
-  #       '501':
-  #         description: Not implemented (placeholder).
-
   /v1/souls:
     post:
       tags: [Soul]
@@ -1344,11 +1196,8 @@ paths:
         Агрегирует per-host строки двух источников в единый timeline,
         отсортированный started_at DESC:
           - scenario — `apply_runs` (scenario-задача, доехавшая до хоста в
-            рамках scenario-прогона инкарнации; tide_id если прогон шёл волнами
-            Tide, ADR-040);
-          - errand — `errands` (ad-hoc pull-exec одиночного модуля, ADR-033;
-            errand_run_id если Errand — fan-out из multi-target ErrandRun,
-            ADR-041).
+            рамках scenario-прогона инкарнации);
+          - errand — `errands` (ad-hoc pull-exec одиночного модуля, ADR-033).
         push_runs пока НЕ включён (per-host данные там в jsonb summary —
         follow-up).
       parameters:
@@ -1646,44 +1495,64 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
-  /v1/errand-runs:
+  /v1/voyages:
     post:
-      tags: [ErrandRun]
-      operationId: CreateErrandRun
-      summary: Создать ErrandRun — multi-target обвязку над Errand (ADR-041).
+      tags: [Voyage]
+      operationId: CreateVoyage
+      summary: Создать Voyage — унифицированный батчевый прогон (ADR-043).
       description: |
-        Permission: errand.run (reuse, ADR-041(9) — без новых RBAC-permissions).
-        Резолв `target` → SID[]-snapshot (AND-merge sids/coven/where; security
-        invariant ADR-040: invocation сужает scope, не расширяет). Fan-out
-        per-host под semaphore-cap concurrency (default 50, max 500). Async-by-
-        default: 202 + errand_run_id + Location; прогресс — polling GET либо
-        SSE-канал /events. Whitelist модулей enforced Soul-side per-Errand.
-        Audit: errand_run.invoked (source=api).
+        Унифицированный батчевый прогон (kind=scenario / kind=command).
+        Дискриминатор `kind`:
+        - `scenario` — применить named scenario к набору ИНКАРНАЦИЙ (батч = N
+          инкарнаций, per-incarnation state-commit, B1). Target резолвится в
+          имена инкарнаций (incarnations[] ∪ фильтр service/coven).
+        - `command` — выполнить whitelisted-модуль на наборе ХОСТОВ (батч = N
+          хостов, state не трогается). Target резолвится в SID-snapshot (AND-merge
+          sids/coven/where, security invariant ADR-040 → ADR-043 §5).
+
+        RBAC-by-kind (ADR-043 §6, security-критичный fail-closed guard):
+        scenario→permission `incarnation.run`, command→`errand.run`. Permission
+        выбирается ПО kind из тела + per-incarnation scope-check (scenario);
+        старт на цели вне permission-скоупа = privilege escalation → 403.
+
+        Batch (Leg) = N единиц (batch_size); между Leg-ами — inter_batch_interval;
+        on_failure ∈ {abort, continue}. schedule_at → отложенный старт (status
+        scheduled). Async-by-default: 202 + voyage_id + Location. Пустой
+        резолв-target → 422 voyage_empty_target. `input` НЕ логируется (audit
+        scenario_run.started/command_run.invoked, инвариант A ADR-027).
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ErrandRunCreateRequest'
+              $ref: '#/components/schemas/VoyageCreateRequest'
       responses:
         '202':
-          description: ErrandRun создан в статусе pending. ErrandRunWorker подберёт через claim-loop.
+          description: Voyage создан (pending/scheduled). VoyageWorker подберёт через claim-loop.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrandRunCreateReply'
+                $ref: '#/components/schemas/VoyageCreateReply'
         '400': { $ref: '#/components/responses/Problem400' }
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
     get:
-      tags: [ErrandRun]
-      operationId: ListErrandRuns
-      summary: Список ErrandRun-ов (фильтр + пагинация).
+      tags: [Voyage]
+      operationId: ListVoyages
+      summary: Список Voyage-прогонов (фильтр kind/status + пагинация).
       description: |
-        Permission: errand.list. Sort started_at DESC.
+        Permission: incarnation.history. Sort created_at DESC.
       parameters:
+        - in: query
+          name: kind
+          required: false
+          schema:
+            type: string
+            enum: [scenario, command]
+          description: Exact-match по kind.
         - in: query
           name: status
           required: false
@@ -1691,23 +1560,10 @@ paths:
             type: array
             items:
               type: string
-              enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+              enum: [scheduled, pending, running, succeeded, failed, partial_failed, cancelled]
           style: form
           explode: true
           description: Multi-value `?status=X&status=Y`; OR-семантика.
-        - in: query
-          name: module
-          required: false
-          schema:
-            type: string
-          description: Exact-match по module.
-        - in: query
-          name: started_after
-          required: false
-          schema:
-            type: string
-            format: date-time
-          description: Фильтр по началу (started_at > value).
         - in: query
           name: offset
           required: false
@@ -1723,25 +1579,25 @@ paths:
             maximum: 1000
       responses:
         '200':
-          description: Страница ErrandRun-ов под фильтром.
+          description: Страница Voyage-прогонов под фильтром.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrandRunListReply'
+                $ref: '#/components/schemas/VoyageListReply'
         '400': { $ref: '#/components/responses/Problem400' }
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
-  /v1/errand-runs/{id}:
+  /v1/voyages/{id}:
     get:
-      tags: [ErrandRun]
-      operationId: GetErrandRun
-      summary: Snapshot одного ErrandRun.
+      tags: [Voyage]
+      operationId: GetVoyage
+      summary: Snapshot одного Voyage (detail + summary).
       description: |
-        Permission: errand.list. Для running-row — текущий current_done без
-        summary; для терминала — Summary с per-SID ref-ами.
+        Permission: incarnation.history. Для running-row — current_batch_index
+        без summary; для терминала — Summary с агрегатами.
       parameters:
         - in: path
           name: id
@@ -1749,28 +1605,28 @@ paths:
           schema:
             type: string
             pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-          description: ULID ErrandRun-а.
+          description: ULID Voyage-а.
       responses:
         '200':
           description: Snapshot.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrandRun'
+                $ref: '#/components/schemas/Voyage'
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
     delete:
-      tags: [ErrandRun]
-      operationId: CancelErrandRun
-      summary: Отменить ErrandRun (fan-out CancelErrand на все running, ADR-041(12)).
+      tags: [Voyage]
+      operationId: CancelVoyage
+      summary: Отменить Voyage (pending/scheduled → cancelled, ADR-043 S5).
       description: |
-        Permission: errand.run (reuse). Fan-out CancelErrand на все running
-        дочерние Errand-ы (parity ADR-033 slice E5). 202 + status=cancelling.
-        Audit: errand_run.cancelled (source=api, archon_aid=JWT.sub).
-        409 — ErrandRun уже в терминальном статусе.
+        RBAC-by-kind (как у create): scenario→incarnation.run, command→errand.run.
+        Cancel pending/scheduled — простой перевод в cancelled. Running-abort —
+        post-MVP (409 voyage_running_cancel_unsupported). Уже terminal — 409
+        voyage_already_terminal. Audit: scenario_run.cancelled/command_run.cancelled.
       parameters:
         - in: path
           name: id
@@ -1780,11 +1636,11 @@ paths:
             pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
       responses:
         '202':
-          description: Cancel-signal fan-out отправлен (best-effort, per-Errand).
+          description: Voyage отменён (pending/scheduled → cancelled).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrandRunCancelReply'
+                $ref: '#/components/schemas/VoyageCancelReply'
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
@@ -1792,17 +1648,15 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
-  /v1/errand-runs/{id}/events:
+  /v1/voyages/{id}/targets:
     get:
-      tags: [ErrandRun]
-      operationId: StreamErrandRunEvents
-      summary: SSE live-progress ErrandRun (ADR-041, E6-4).
+      tags: [Voyage]
+      operationId: ListVoyageTargets
+      summary: All-runs drill — единицы Voyage-прогона (ADR-043 S5).
       description: |
-        Permission: errand.run. Server-Sent Events stream: `event:<kind>`
-        фреймы для kind ∈ {errand_run.invoked, errand_run.completed,
-        errand_run.partial_failed, errand_run.failed, errand_run.cancelled}.
-        Stream закрывается на любом terminal-kind. Heartbeat `:keepalive`
-        каждые 30s. Max-lifetime 30 мин (anti-leak; клиент переподключается).
+        Permission: incarnation.history. Per-target (batch_index, status,
+        back-link apply_id|errand_id) для two-level drill: scenario — инкарнации
+        → их хосты (через apply_id); command — сразу хосты (через errand_id).
       parameters:
         - in: path
           name: id
@@ -1812,13 +1666,11 @@ paths:
             pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
       responses:
         '200':
-          description: SSE-stream.
+          description: Единицы прогона.
           content:
-            text/event-stream:
+            application/json:
               schema:
-                type: string
-                description: |
-                  SSE frames `event: <kind>\nid: <errand_run_id>\ndata: <json>\n\n`.
+                $ref: '#/components/schemas/VoyageTargetsReply'
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
@@ -2766,8 +2618,8 @@ paths:
       operationId: ListPushRuns
       summary: Глобальный список push-прогонов (UI-4 Push-runs page).
       description: |
-        Permission: incarnation.history (push — это history-info, parity
-        с tide-list; отдельная permission `push.list` не вводится до
+        Permission: incarnation.history (push — это history-info; permission
+        переиспользуется; отдельная permission `push.list` не вводится до
         запроса оператора). Сортировка `started_at DESC` (свежие первыми).
 
         Per-id detail (с полным `summary.hosts[]`) — `GET /v1/push/{apply_id}`.
@@ -4530,49 +4382,6 @@ components:
           type: object
           additionalProperties: true
           description: Input scenario.
-        target:
-          type: object
-          additionalProperties: false
-          description: >-
-            Tide invocation-time target-override (ADR-040). AND-merge со
-            scenario on:/where: — только сужение, не расширение. Только в Tide-
-            режиме (требует `wave`).
-          properties:
-            coven:
-              type: array
-              items:
-                type: string
-                pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
-              description: Дополнительные Coven-метки фильтра.
-            where:
-              type: string
-              maxLength: 4096
-              description: CEL-предикат per-host.
-        wave:
-          type: object
-          additionalProperties: false
-          required: [size]
-          description: >-
-            Tide invocation-time wave config (ADR-040). Наличие активирует
-            Tide-режим (возвращается `tide_id`).
-          properties:
-            size:
-              type: integer
-              minimum: 1
-              description: Souls per Surge.
-            on_failure:
-              type: string
-              enum: [abort, continue]
-              description: Поведение orchestrator-а при failed Surge. Default — abort.
-        concurrency:
-          type: integer
-          minimum: 1
-          maximum: 500
-          description: >-
-            Tide invocation-time concurrency-override (ADR-040). REPLACE
-            scenario `serial:`. Только в Tide-режиме (требует `wave`).
-            Граница 1..500 (parity errand-runs).
-
     IncarnationRunReply:
       type: object
       description: Classic single-run reply (без `wave`-поля).
@@ -4585,170 +4394,6 @@ components:
         scenario:
           type: string
       required: [apply_id, incarnation, scenario]
-
-    IncarnationRunTideReply:
-      type: object
-      description: Tide-режим reply (с `wave`-полем, ADR-040 W-3).
-      properties:
-        tide_id:
-          type: string
-          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-          description: ULID Tide-прогона.
-        incarnation:
-          type: string
-        scenario:
-          type: string
-        scope_size:
-          type: integer
-          description: Размер snapshot SID[] (target_resolved_souls).
-        wave_size:
-          type: integer
-          description: Souls per Surge (echo).
-        surges_planned:
-          type: integer
-          description: ceil(scope_size / wave_size) — число запланированных Surge-волн.
-        failure_policy:
-          type: string
-          enum: [abort, continue]
-          description: Эффективный on_surge_failure (echo, default abort).
-      required: [tide_id, incarnation, scenario, scope_size, wave_size, surges_planned, failure_policy]
-
-    Tide:
-      type: object
-      description: |
-        Snapshot одного Tide-прогона (ADR-040 W-4). Поля snake_case, parity с
-        `tides`-строкой в PG. `scope_size = len(target_resolved_souls)` — UI
-        видит размер раскинутого target-а без 3–5 МБ JSON-массива SID[]
-        (snapshot SID[] наружу не отдаётся: get-эндпоинт MVP-форматный).
-      properties:
-        tide_id:
-          type: string
-          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-        incarnation_name:
-          type: string
-        scenario_name:
-          type: string
-        status:
-          type: string
-          enum: [pending, running, succeeded, failed, partial_failed, cancelled]
-        total_surges:
-          type: integer
-          description: Запланированное число Surge-волн (`ceil(scope_size / surge_size)`).
-        current_surge_index:
-          type: integer
-          description: |
-            1-based номер текущей Surge (0 = ничего не запущено / Tide pending).
-        surge_size:
-          type: integer
-          description: Souls per Surge (echo wave.size).
-        scope_size:
-          type: integer
-          description: Размер snapshot SID[] (target_resolved_souls).
-        on_surge_failure:
-          type: string
-          enum: [abort, continue]
-        target_coven_override:
-          type: array
-          items:
-            type: string
-            pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
-          description: Эхо `target.coven` invocation-time-override-а; отсутствует, если не задавался.
-        target_where_override:
-          type: string
-          description: Эхо `target.where` invocation-time-override-а; отсутствует, если не задавался.
-        concurrency_override:
-          type: integer
-          minimum: 1
-          description: Эхо REPLACE-override scenario `serial:`; отсутствует, если не задавался.
-        current_apply_id:
-          type: string
-          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-          description: ULID head apply_run-а текущей Surge; отсутствует, если Tide pending.
-        attempt:
-          type: integer
-          description: |
-            Сколько раз Tide подбирался TideWorker-ом (инкремент при reclaim
-            Reaper-правилом `reclaim_tides`).
-        started_by_aid:
-          type: string
-        started_at:
-          type: string
-          format: date-time
-        finished_at:
-          type: string
-          format: date-time
-          description: Время финализации (NULL для pending/running).
-        summary:
-          $ref: '#/components/schemas/TideSummary'
-      required:
-        - tide_id
-        - incarnation_name
-        - scenario_name
-        - status
-        - total_surges
-        - current_surge_index
-        - surge_size
-        - scope_size
-        - on_surge_failure
-        - attempt
-        - started_by_aid
-        - started_at
-
-    TideSummary:
-      type: object
-      description: Агрегированный итог прогона; пишется TideWorker-ом при финализации Tide.
-      properties:
-        surges:
-          type: array
-          items:
-            $ref: '#/components/schemas/TideSurgeRecord'
-      required: [surges]
-
-    TideSurgeRecord:
-      type: object
-      description: Итог одного Surge-а внутри Tide.
-      properties:
-        surge_index:
-          type: integer
-        apply_id:
-          type: string
-          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-        terminal:
-          type: string
-          description: |
-            Терминальный статус apply_run-а Surge-волны (success/failed/
-            cancelled/orphaned/no_match), строкой ради forward-compat.
-        started_at:
-          type: string
-          format: date-time
-        finished_at:
-          type: string
-          format: date-time
-        failed_souls:
-          type: integer
-          description: Число failed-Soul-ов внутри Surge; 0 — отсутствует в JSON (omitempty).
-        state_commit_error:
-          type: string
-          description: |
-            Per-Surge state-commit-ошибка (ADR-009 §7, ADR-040 amendment).
-            Соул-ы прошли, но коммит state не выполнен. Отсутствует, если коммит ок.
-      required: [surge_index, apply_id, terminal, started_at, finished_at]
-
-    TideListReply:
-      type: object
-      description: Страница Tide-прогонов (ADR-040 W-4).
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/Tide'
-        offset:
-          type: integer
-        limit:
-          type: integer
-        total:
-          type: integer
-      required: [items, offset, limit, total]
 
     IncarnationGetReply:
       type: object
@@ -5509,8 +5154,7 @@ components:
       description: |
         Одна запись per-host timeline. type-дискриминатор источника; поля,
         специфичные для одного источника, опускаются для другого
-        (incarnation/scenario/tide_id — scenario; module/errand_run_id —
-        errand).
+        (incarnation/scenario — scenario; module — errand).
       properties:
         type:
           type: string
@@ -5536,12 +5180,11 @@ components:
           type: string
           format: date-time
           description: Опускается, пока запись не терминальна.
-        errand_run_id:
+        voyage_id:
           type: string
-          description: errand-only back-link на parent ErrandRun (ADR-041).
-        tide_id:
-          type: string
-          description: scenario-only back-link на Tide (ADR-040).
+          description: >
+            Back-link на Voyage (ADR-043); опускается для не-Voyage / standalone /
+            исторических прогонов.
       required: [type, id, status, started_at]
 
     SoulprintFacts:
@@ -6049,93 +5692,101 @@ components:
           type: integer
       required: [items, offset, limit, total]
 
-    ErrandRunTarget:
+    VoyageTarget:
       type: object
       description: |
-        Declarative target ErrandRun — invocation-time scope. Минимум одно из
-        sids/coven/where. AND-merge: пересечение фильтров.
+        Declarative target Voyage (резолвится в snapshot единиц). scenario-режим
+        читает incarnations[]/service/coven; command-режим — sids[]/coven/where.
       properties:
+        incarnations:
+          type: array
+          items:
+            type: string
+          description: scenario — exact-match имена инкарнаций.
+        service:
+          type: string
+          description: scenario — фильтр incarnation.service (exact).
         sids:
           type: array
           items:
             type: string
-          description: Exact-match snapshot SID-ов (`sid = ANY($sids)`).
+          description: command — exact-match SID-снапшот.
+        where:
+          type: string
+          description: command — CEL-предикат (MVP сохраняется, не evaluate-ится).
         coven:
           type: array
           items:
             type: string
-          description: AND-семантика по `souls.coven` — хост обязан нести ВСЕ метки.
-        where:
-          type: string
-          maxLength: 4096
-          description: CEL-предикат по soulprint.self.*; в MVP сохраняется в `target_origin` без evaluate.
+          description: scenario — env-тег incarnation (any-of) / command — coven-метка хоста (AND).
 
-    ErrandRunCreateRequest:
+    VoyageCreateRequest:
       type: object
-      description: |
-        Body POST /v1/errand-runs (ADR-041(3)).
+      description: Body POST /v1/voyages (ADR-043 §4/§6).
       properties:
+        kind:
+          type: string
+          enum: [scenario, command]
+        scenario_name:
+          type: string
+          description: Обязательно для kind=scenario; запрещено для command.
         module:
           type: string
-          description: Имя core/community модуля для exec (whitelist enforced Soul-side).
+          description: Обязательно для kind=command; запрещено для scenario.
         input:
           type: object
           additionalProperties: true
-          description: Module-specific input (jsonb). Vault-refs резолвятся render-фазой Soul.
+          description: Параметры прогона (НЕ логируются в audit, инвариант A ADR-027).
         target:
-          $ref: '#/components/schemas/ErrandRunTarget'
-        timeout_seconds:
+          $ref: '#/components/schemas/VoyageTarget'
+        batch_size:
           type: integer
-          minimum: 0
-          maximum: 300
-          description: Per-Errand timeout. 0/missing → per-Errand default (30s).
+          minimum: 1
+          description: Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg.
         concurrency:
           type: integer
-          minimum: 0
+          minimum: 1
           maximum: 500
-          description: Semaphore-cap fan-out. 0/missing → default 50.
+          default: 50
+          description: Степень параллелизма внутри Leg.
+        dry_run:
+          type: boolean
+          default: false
+        schedule_at:
+          type: string
+          format: date-time
+          description: Отложенный старт (status=scheduled, S4).
+        inter_batch_interval_ms:
+          type: integer
+          minimum: 0
+          description: Пауза между Leg-ами в миллисекундах (контролируемая выкатка).
         on_failure:
           type: string
-          enum: [continue, abort]
-          description: ADR-041(7). Default — continue.
-      required: [module, target]
+          enum: [abort, continue]
+          default: continue
+      required: [kind, target]
 
-    ErrandRunCreateReply:
+    VoyageCreateReply:
       type: object
       properties:
-        errand_run_id:
+        voyage_id:
           type: string
           pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        kind:
+          type: string
+          enum: [scenario, command]
         scope_size:
           type: integer
-          description: len(target_resolved_souls) после AND-merge.
+          description: Число резолвнутых единиц (инкарнаций / хостов).
         status:
           type: string
-          enum: [pending]
+          enum: [pending, scheduled]
         location:
           type: string
-          description: REST path для get/poll.
-      required: [errand_run_id, scope_size, status, location]
+      required: [voyage_id, kind, scope_size, status, location]
 
-    ErrandRunRef:
+    VoyageSummary:
       type: object
-      description: Запись об одном дочернем Errand в Summary.
-      properties:
-        sid:
-          type: string
-        errand_id:
-          type: string
-          description: ULID; пуст, если Spawner упал до создания row (NotConnected).
-        status:
-          type: string
-          description: success | failed | cancelled | timed_out | module_not_allowed.
-        error_code:
-          type: string
-      required: [sid, status]
-
-    ErrandRunSummary:
-      type: object
-      description: Агрегированный итог ErrandRun (jsonb-колонка `summary`).
       properties:
         total:
           type: integer
@@ -6145,41 +5796,54 @@ components:
           type: integer
         cancelled:
           type: integer
-        errands:
-          type: array
-          items:
-            $ref: '#/components/schemas/ErrandRunRef'
-      required: [total, succeeded, failed, cancelled, errands]
+        no_match:
+          type: integer
+      required: [total, succeeded, failed, cancelled]
 
-    ErrandRun:
+    Voyage:
       type: object
-      description: |
-        Snapshot ErrandRun. SID-список (target_resolved_souls) НЕ кладётся:
-        scope_size — len; полный список доступен через summary.errands[] для
-        терминалов.
+      description: Snapshot Voyage-прогона (GET detail / list item).
       properties:
-        errand_run_id:
+        voyage_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        kind:
+          type: string
+          enum: [scenario, command]
+        scenario_name:
           type: string
         module:
           type: string
         status:
           type: string
-          enum: [pending, running, succeeded, failed, partial_failed, cancelled]
+          enum: [scheduled, pending, running, succeeded, failed, partial_failed, cancelled]
         scope_size:
           type: integer
-        current_done:
+        batch_size:
           type: integer
         concurrency:
           type: integer
+        dry_run:
+          type: boolean
+        total_batches:
+          type: integer
+        current_batch_index:
+          type: integer
         on_failure:
           type: string
+          enum: [abort, continue]
         target:
-          $ref: '#/components/schemas/ErrandRunTarget'
+          $ref: '#/components/schemas/VoyageTarget'
+        schedule_at:
+          type: string
+          format: date-time
         attempt:
           type: integer
         started_by_aid:
           type: string
-          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
+        created_at:
+          type: string
+          format: date-time
         started_at:
           type: string
           format: date-time
@@ -6187,16 +5851,16 @@ components:
           type: string
           format: date-time
         summary:
-          $ref: '#/components/schemas/ErrandRunSummary'
-      required: [errand_run_id, module, status, scope_size, current_done, concurrency, on_failure, attempt, started_by_aid, started_at]
+          $ref: '#/components/schemas/VoyageSummary'
+      required: [voyage_id, kind, status, scope_size, total_batches, current_batch_index, dry_run, attempt, started_by_aid, created_at]
 
-    ErrandRunListReply:
+    VoyageListReply:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/ErrandRun'
+            $ref: '#/components/schemas/Voyage'
         offset:
           type: integer
         limit:
@@ -6205,15 +5869,52 @@ components:
           type: integer
       required: [items, offset, limit, total]
 
-    ErrandRunCancelReply:
+    VoyageTargetEntry:
+      type: object
+      description: Одна строка voyage_targets (All-runs drill).
+      properties:
+        target_kind:
+          type: string
+          enum: [incarnation, sid]
+        target_id:
+          type: string
+        batch_index:
+          type: integer
+        status:
+          type: string
+          enum: [awaiting, running, succeeded, failed, cancelled, no_match]
+        apply_id:
+          type: string
+          description: back-link на apply_runs (kind=scenario).
+        errand_id:
+          type: string
+          description: back-link на errands (kind=command).
+        finished_at:
+          type: string
+          format: date-time
+      required: [target_kind, target_id, batch_index, status]
+
+    VoyageTargetsReply:
       type: object
       properties:
-        errand_run_id:
+        voyage_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoyageTargetEntry'
+      required: [voyage_id, targets]
+
+    VoyageCancelReply:
+      type: object
+      properties:
+        voyage_id:
           type: string
         status:
           type: string
-          enum: [cancelling]
-      required: [errand_run_id, status]
+          enum: [cancelled]
+      required: [voyage_id, status]
 
     PushCleanupRequest:
       type: object

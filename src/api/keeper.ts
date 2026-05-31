@@ -26,10 +26,8 @@ export type IncarnationCreateRequest = components['schemas']['IncarnationCreateR
 export type IncarnationCreateReply = components['schemas']['IncarnationCreateReply'];
 export type IncarnationRunRequest = components['schemas']['IncarnationRunRequest'];
 export type IncarnationRunReply = components['schemas']['IncarnationRunReply'];
-// Tide-режим reply (с `wave`-полем, ADR-040 W-3). API возвращает один из двух
-// shape-ов по наличию `wave` в request.
-export type IncarnationRunTideReply = components['schemas']['IncarnationRunTideReply'];
-export type IncarnationRunAnyReply = IncarnationRunReply | IncarnationRunTideReply;
+// Tide-режим удалён (ADR-043 Voyage заменяет Tide); IncarnationRunTideReply не экспортируется.
+export type IncarnationRunAnyReply = IncarnationRunReply;
 export type IncarnationUnlockRequest = components['schemas']['IncarnationUnlockRequest'];
 export type IncarnationUnlockReply = components['schemas']['IncarnationUnlockReply'];
 export type IncarnationUpgradeRequest = components['schemas']['IncarnationUpgradeRequest'];
@@ -83,12 +81,8 @@ export type PushRunListEntry = components['schemas']['PushRunListEntry'];
 export type PushSummaryCounts = components['schemas']['PushSummaryCounts'];
 export type PushRunStatus = NonNullable<PushRunListEntry['status']>;
 
-// Tide-runs (ADR-040 W-4). UI-страницы /tides и /tides/:id.
-export type Tide = components['schemas']['Tide'];
-export type TideListReply = components['schemas']['TideListReply'];
-export type TideSummary = components['schemas']['TideSummary'];
-export type TideSurgeRecord = components['schemas']['TideSurgeRecord'];
-export type TideStatus = NonNullable<Tide['status']>;
+// Tide-runs удалены из API (Voyage ADR-043 заменяет Tide, ADR-040 W-4 отозван).
+// Типы не экспортируются; keeperApi.tides сохранён как заглушка до очистки страниц.
 
 export type ErrandRunRequest = components['schemas']['ErrandRunRequest'];
 export type ErrandAccepted = components['schemas']['ErrandAccepted'];
@@ -172,87 +166,17 @@ export interface ErrandRunCreateReply {
   errand_run_id: string;
 }
 
-// Voyage — унифицированный батчевый прогон (ADR-043, S5). kind=scenario|command.
-// Статусы из openapi: scheduled/pending/running/succeeded/failed/partial_failed/cancelled.
-export type VoyageStatus = 'scheduled' | 'pending' | 'running' | 'succeeded' | 'failed' | 'partial_failed' | 'cancelled';
-export type VoyageKind = 'scenario' | 'command';
-export type VoyageOnFailure = 'abort' | 'continue';
-
-export interface VoyageTarget {
-  // scenario-режим:
-  incarnations?: string[];
-  service?: string;
-  // command-режим:
-  sids?: string[];
-  where?: string;
-  // общий:
-  coven?: string[];
-}
-
-export interface VoyageCreateRequest {
-  kind: VoyageKind;
-  scenario_name?: string;
-  module?: string;
-  input?: Record<string, unknown>;
-  target: VoyageTarget;
-  batch_size?: number;
-  concurrency?: number;
-  dry_run?: boolean;
-  schedule_at?: string;
-  inter_batch_interval_ms?: number;
-  on_failure?: VoyageOnFailure;
-}
-
-export interface VoyageCreateReply {
-  voyage_id: string;
-  kind: VoyageKind;
-  scope_size: number;
-  status: 'pending' | 'scheduled';
-  location: string;
-}
-
-export interface VoyageSummary {
-  total: number;
-  succeeded: number;
-  failed: number;
-  cancelled: number;
-  no_match?: number;
-}
-
-export interface Voyage {
-  voyage_id: string;
-  kind: VoyageKind;
-  scenario_name?: string;
-  module?: string;
-  status: VoyageStatus;
-  scope_size: number;
-  batch_size?: number;
-  concurrency?: number;
-  dry_run: boolean;
-  total_batches: number;
-  current_batch_index: number;
-  on_failure?: VoyageOnFailure;
-  target?: VoyageTarget;
-  schedule_at?: string;
-  attempt: number;
-  started_by_aid: string;
-  created_at: string;
-  started_at?: string;
-  finished_at?: string;
-  summary?: VoyageSummary;
-}
-
-export interface VoyageListReply {
-  items: Voyage[];
-  offset: number;
-  limit: number;
-  total: number;
-}
-
-export interface VoyageCancelReply {
-  voyage_id: string;
-  status: 'cancelled';
-}
+// Voyage — унифицированный батчевый прогон (ADR-043). Типы из gen (sources of truth).
+export type VoyageStatus = NonNullable<components['schemas']['Voyage']['status']>;
+export type VoyageKind = NonNullable<components['schemas']['Voyage']['kind']>;
+export type VoyageOnFailure = NonNullable<components['schemas']['VoyageCreateRequest']['on_failure']>;
+export type VoyageTarget = components['schemas']['VoyageTarget'];
+export type VoyageCreateRequest = components['schemas']['VoyageCreateRequest'];
+export type VoyageCreateReply = components['schemas']['VoyageCreateReply'];
+export type VoyageSummary = components['schemas']['VoyageSummary'];
+export type Voyage = components['schemas']['Voyage'];
+export type VoyageListReply = components['schemas']['VoyageListReply'];
+export type VoyageCancelReply = components['schemas']['VoyageCancelReply'];
 
 export interface ListVoyagesQuery {
   kind?: VoyageKind;
@@ -421,7 +345,7 @@ export const keeperApi = {
       body: IncarnationRunRequest = {},
       opts: { dryRun?: boolean } = {},
     ) =>
-      apiSend<IncarnationRunReply & Partial<IncarnationRunTideReply>>(
+      apiSend<IncarnationRunReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/scenarios/${encodeURIComponent(scenario)}`,
         'POST',
         { body, query: opts.dryRun ? { dry_run: true } : undefined },
@@ -643,26 +567,7 @@ export const keeperApi = {
   },
 
   // Tide-runs (ADR-040 W-4). Глобальный list + detail-snapshot.
-  // Per-incarnation list живёт под incarnations.listTides.
-  tides: {
-    list: (q: ListTidesQuery = {}) =>
-      apiGet<TideListReply>('/v1/tides', {
-        query: {
-          status: q.status,
-          incarnation: q.incarnation,
-          offset: q.offset,
-          limit: q.limit,
-        },
-      }),
-    get: (tideId: string) => apiGet<Tide>(`/v1/tides/${encodeURIComponent(tideId)}`),
-    listByIncarnation: (name: string, q: ListByIncarnationTidesQuery = {}) =>
-      apiGet<TideListReply>(
-        `/v1/incarnations/${encodeURIComponent(name)}/tides`,
-        {
-          query: { status: q.status, offset: q.offset, limit: q.limit },
-        },
-      ),
-  },
+  // Tide-API удалён (Voyage заменяет Tide, ADR-043).
 
   operators: {
     // 200 → OperatorListReply (paged + auth_method/revoked фильтры).
@@ -909,20 +814,6 @@ export interface ListOperatorsQuery {
   auth_method?: OperatorAuthMethod;
   // Default server-side = false (только активные). true — включая revoked.
   revoked?: boolean;
-  offset?: number;
-  limit?: number;
-}
-
-export interface ListTidesQuery {
-  // Multi-value `?status=` — exact-match OR (openapi commit 795ceba).
-  status?: TideStatus[];
-  incarnation?: string;
-  offset?: number;
-  limit?: number;
-}
-
-export interface ListByIncarnationTidesQuery {
-  status?: TideStatus;
   offset?: number;
   limit?: number;
 }

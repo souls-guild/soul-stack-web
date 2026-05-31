@@ -116,16 +116,18 @@ describe('SoulDetail', () => {
           sid: 'host01.example.com',
           items: [
             {
+              // scenario с voyage_id → /voyages/:voyage_id
               type: 'scenario',
-              id: 'apply-tide-1',
+              id: 'apply-voyage-1',
               incarnation: 'redis-prod',
               scenario: 'add_user',
               status: 'succeeded',
               started_at: '2026-05-27T10:00:00Z',
               finished_at: '2026-05-27T10:01:00Z',
-              tide_id: 'tide-abc',
+              voyage_id: 'voyage-abc',
             },
             {
+              // scenario без voyage_id → /incarnations/:incarnation
               type: 'scenario',
               id: 'apply-plain-2',
               incarnation: 'redis-prod',
@@ -135,18 +137,28 @@ describe('SoulDetail', () => {
               finished_at: '2026-05-27T09:00:30Z',
             },
             {
+              // errand с voyage_id → /voyages/:voyage_id
+              type: 'errand',
+              id: 'errand-10',
+              module: 'core.cmd.shell',
+              status: 'succeeded',
+              started_at: '2026-05-27T08:30:00Z',
+              finished_at: '2026-05-27T08:30:05Z',
+              voyage_id: 'voyage-abc',
+            },
+            {
+              // errand без voyage_id → не кликабельно (standalone)
               type: 'errand',
               id: 'errand-9',
               module: 'core.cmd.shell',
               status: 'failed',
               started_at: '2026-05-27T08:00:00Z',
               finished_at: '2026-05-27T08:00:05Z',
-              errand_run_id: 'erun-xyz',
             },
           ],
           offset: 0,
           limit: 50,
-          total: 3,
+          total: 4,
         },
       },
       {
@@ -174,17 +186,20 @@ describe('SoulDetail', () => {
       expect(screen.getByTestId('soul-history-table')).toBeInTheDocument();
     });
 
-    // scenario с tide_id — роут /tides/:id удалён, fallback → /incarnations/:incarnation
-    const tideLink = screen.getByRole('link', { name: 'apply-tide-1' });
-    expect(tideLink).toHaveAttribute('href', '/incarnations/redis-prod');
-    // scenario без tide_id → /incarnations/:incarnation
+    // scenario с voyage_id → /voyages/:voyage_id
+    const voyageLink1 = screen.getByRole('link', { name: 'apply-voyage-1' });
+    expect(voyageLink1).toHaveAttribute('href', '/voyages/voyage-abc');
+    // scenario без voyage_id → /incarnations/:incarnation
     const incLink = screen.getByRole('link', { name: 'apply-plain-2' });
     expect(incLink).toHaveAttribute('href', '/incarnations/redis-prod');
-    // errand с errand_run_id — роут /errand-runs/:id удалён, plain span (не ссылка)
+    // errand с voyage_id → /voyages/:voyage_id
+    const voyageLink2 = screen.getByRole('link', { name: 'errand-10' });
+    expect(voyageLink2).toHaveAttribute('href', '/voyages/voyage-abc');
+    // errand без voyage_id → plain span (не ссылка)
     expect(screen.queryByRole('link', { name: 'errand-9' })).toBeNull();
     expect(screen.getByText('errand-9')).toBeInTheDocument();
     // module errand-записи виден
-    expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
+    expect(screen.getAllByText('core.cmd.shell').length).toBeGreaterThan(0);
   });
 
   it('History-вкладка: фильтр по type зовёт endpoint с ?type=errand', async () => {
