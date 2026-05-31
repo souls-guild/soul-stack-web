@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Layers } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge, Button, Dot, Modal } from '../../components/primitives';
+import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { useServiceRefs } from './refs';
 import { EditServiceModal } from './EditServiceModal';
@@ -21,7 +21,6 @@ export function ServiceDetail() {
   const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const [tab, setTab] = useState<Tab>('overview');
-  const [yamlScenario, setYamlScenario] = useState<ServiceScenarioInfo | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deregisterOpen, setDeregisterOpen] = useState(false);
 
@@ -281,23 +280,13 @@ export function ServiceDetail() {
                           {t('admin:svcReservedScenario')}
                         </span>
                       ) : (
-                        <>
-                          <Link
-                            to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
-                            aria-label={`${t('runScenario')} ${s.name}`}
-                          >
-                            <Button type="button" variant="primary">{t('admin:svcRunThisScenario')}</Button>
-                          </Link>
-                          <Link
-                            to={`/incarnations/new?service=${encodeURIComponent(row.name)}`}
-                          >
-                            <Button type="button" variant="secondary">{t('admin:svcUseInIncarnation')}</Button>
-                          </Link>
-                        </>
+                        <Link
+                          to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
+                          aria-label={`${t('runScenario')} ${s.name}`}
+                        >
+                          <Button type="button" variant="primary">{t('admin:svcRunThisScenario')}</Button>
+                        </Link>
                       )}
-                      <Button type="button" variant="ghost" onClick={() => setYamlScenario(s)}>
-                        {t('admin:svcView')}
-                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -364,44 +353,6 @@ export function ServiceDetail() {
       ) : null}
 
       {tab === 'schema' ? <ServiceSchemaTab name={row.name} serviceRef={row.ref} /> : null}
-
-      {yamlScenario ? (
-        <Modal
-          open={true}
-          title={`scenario: ${yamlScenario.name}`}
-          onClose={() => setYamlScenario(null)}
-          wide
-        >
-          {yamlScenario.description ? (
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-              {yamlScenario.description}
-            </p>
-          ) : null}
-          {yamlScenario.input_schema ? (
-            <>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-                input_schema
-              </div>
-              <pre
-                style={{
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: 12,
-                  fontSize: 12,
-                  fontFamily: 'var(--font-mono)',
-                  overflow: 'auto',
-                  maxHeight: 480,
-                }}
-              >
-                {JSON.stringify(yamlScenario.input_schema, null, 2)}
-              </pre>
-            </>
-          ) : (
-            <div className={styles.empty}>{t('admin:svcScenarioNoInputSchema')}</div>
-          )}
-        </Modal>
-      ) : null}
 
       {editOpen ? (
         <EditServiceModal open={editOpen} service={row} onClose={() => setEditOpen(false)} />

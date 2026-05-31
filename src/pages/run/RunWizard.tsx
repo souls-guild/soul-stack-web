@@ -111,18 +111,17 @@ interface CommandStateValues {
 // «cmd-модули» — core shell/exec: params пусты, форма = cmd-textarea.
 const CMD_FIELD_MODULES = new Set(['core.cmd', 'core.exec']);
 
-// Режим запуска scenario-workload: classic single-run / Tide (волнами, ADR-040).
-// Command-workload всегда «classic» в этом смысле (Tide для него не применяется).
-type RunMode = 'classic' | 'tide';
-
 interface OptionsState {
-  runMode: RunMode;
-  waveSize: string;
+  // Опциональный размер батча (Leg): N инкарнаций/хостов за раз.
+  // Пусто/0 — весь scope одним прогоном. Доступно для обоих workload.
+  batchSize: string;
   concurrency: string;
   // VoyageOnFailure = 'abort' | 'continue' (супerset ErrandRunOnFailure).
   onFailure: VoyageOnFailure;
   dryRun: boolean;
   wait: boolean;
+  // Отложенный старт (ISO-8601). Пусто → немедленный старт.
+  scheduleAt: string;
 }
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -136,7 +135,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 4;
+const DRAFT_VERSION = 5;
 
 interface WizardDraft {
   v: number;
@@ -175,12 +174,12 @@ const DEFAULT_COMMAND_STATE: CommandStateValues = {
 };
 
 const DEFAULT_OPTIONS: OptionsState = {
-  runMode: 'classic',
-  waveSize: '',
+  batchSize: '',
   concurrency: '50',
   onFailure: 'abort',
   dryRun: false,
   wait: false,
+  scheduleAt: '',
 };
 
 function loadDraft(): WizardDraft | null {
@@ -523,12 +522,8 @@ export function RunWizard() {
 
     const names = scenarioState.incarnations;
     const c = parseIntOrEmpty(options.concurrency);
-    const batchSize = options.runMode === 'tide' ? parseIntOrEmpty(options.waveSize) : undefined;
+    const batchSize = parseIntOrEmpty(options.batchSize);
 
-    // Target: явный список incarnations (UI уже резолвил regex → имена).
-    // dry_run только в classic-режиме (в Tide-режиме чекбокс скрыт, но state
-    // мог остаться true при переключении режима → явно игнорируем в Tide).
-    const dryRun = options.runMode === 'classic' && Boolean(options.dryRun);
     const reply = await keeperApi.voyages.create({
       kind: 'scenario',
       scenario_name: scenarioState.scenario,
@@ -536,8 +531,9 @@ export function RunWizard() {
       target: { incarnations: names },
       batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
       concurrency: c && c > 0 ? c : 50,
-      dry_run: dryRun,
+      dry_run: Boolean(options.dryRun),
       on_failure: options.onFailure,
+      schedule_at: options.scheduleAt.trim() || undefined,
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
@@ -557,27 +553,38 @@ export function RunWizard() {
     } else {
       input = commandState.customInput;
     }
+    const batchSize = parseIntOrEmpty(options.batchSize);
     // UI уже резолвил rich-criteria в явный список SID — шлём через target.sids.
     const reply = await keeperApi.voyages.create({
       kind: 'command',
       module: moduleName,
       input: Object.keys(input).length > 0 ? input : undefined,
       target: { sids: resolvedSids },
+      batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
       concurrency: c && c > 0 ? c : 50,
       dry_run: false,
       on_failure: options.onFailure,
+      schedule_at: options.scheduleAt.trim() || undefined,
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
 
-  // В Tide-режиме (scenario) wave size обязателен и должен быть >=1.
-  const tideValid = useMemo(() => {
-    if (workload !== 'scenario' || options.runMode !== 'tide') return true;
-    const n = parseIntOrEmpty(options.waveSize);
+  // batchSize — опциональное поле; если задано, должно быть целым >= 1.
+  const batchSizeValid = useMemo(() => {
+    const s = options.batchSize.trim();
+    if (!s) return true; // пусто — ok (весь scope одним прогоном)
+    const n = parseIntOrEmpty(s);
     return Boolean(n && n >= 1);
-  }, [workload, options.runMode, options.waveSize]);
+  }, [options.batchSize]);
 
-  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && tideValid && !submitMu.isPending;
+  // scheduleAt — опциональное поле; если задано, должно быть в будущем.
+  const scheduleAtValid = useMemo(() => {
+    const s = options.scheduleAt.trim();
+    if (!s) return true; // пусто — немедленный запуск, валидно
+    return new Date(s) > new Date();
+  }, [options.scheduleAt]);
+
+  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchSizeValid && scheduleAtValid && !submitMu.isPending;
 
   // Самый дальний достижимый шаг по валидации (gate каждого шага). Stepper красит
   // «done» только реально пройденные шаги и запрещает прыжок вперёд за невалидный
@@ -648,7 +655,7 @@ export function RunWizard() {
         ) : null}
 
         {step === 4 ? (
-          <Step4Options value={options} onChange={setOptions} workload={workload} />
+          <Step4Options value={options} onChange={setOptions} workload={workload} scheduleAtValid={scheduleAtValid} />
         ) : null}
 
         {submitError ? <div className={pageStyles.errorBox}>{submitError}</div> : null}
@@ -1290,103 +1297,96 @@ function Step4Options({
   value,
   onChange,
   workload,
+  scheduleAtValid,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
   workload: Workload;
+  scheduleAtValid: boolean;
 }) {
   const { t } = useTranslation();
-  const tideMode = workload === 'scenario' && value.runMode === 'tide';
+
+  // Вычисляем UTC-эквивалент заполненного поля для отображения рядом с hint.
+  const scheduleAtUtc = useMemo(() => {
+    const s = value.scheduleAt.trim();
+    if (!s) return null;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    return d.toUTCString();
+  }, [value.scheduleAt]);
+
   return (
     <>
-      {workload === 'scenario' ? (
-        <div className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:runModeLabel')}</span>
-          <div className={styles.modeRow} role="radiogroup" aria-label="Run mode">
-            <button
-              type="button"
-              className={`${styles.modeChip} ${value.runMode === 'classic' ? styles.modeChipActive : ''}`}
-              aria-pressed={value.runMode === 'classic'}
-              onClick={() => onChange({ ...value, runMode: 'classic' })}
-              data-testid="run-mode-classic"
-            >
-              {t('run:runModeClassic')}
-            </button>
-            <button
-              type="button"
-              className={`${styles.modeChip} ${value.runMode === 'tide' ? styles.modeChipActive : ''}`}
-              aria-pressed={value.runMode === 'tide'}
-              onClick={() => onChange({ ...value, runMode: 'tide' })}
-              data-testid="run-mode-tide"
-            >
-              {t('run:runModeTide')}
-            </button>
-          </div>
-          <span className={styles.hint}>
-            {tideMode ? t('run:runModeTideHint') : t('run:runModeClassicHint')}
-          </span>
+      <label className={styles.fieldRow}>
+        <span className={styles.fieldLabel}>{t('run:batchSizeLabel')}</span>
+        <input
+          type="number"
+          className={styles.field}
+          min={1}
+          value={value.batchSize}
+          onChange={(e) => onChange({ ...value, batchSize: e.target.value })}
+          placeholder={t('run:batchSizePlaceholder')}
+          aria-label="Batch size"
+        />
+        <span className={styles.hint}>{t('run:batchSizeHint')}</span>
+      </label>
+
+      <label className={styles.fieldRow}>
+        <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
+        <input
+          type="number"
+          className={styles.field}
+          min={1}
+          max={500}
+          value={value.concurrency}
+          onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
+          aria-label="Concurrency"
+        />
+      </label>
+
+      <fieldset
+        style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
+      >
+        <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>On-failure</legend>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+            <input
+              type="radio"
+              name="on_failure"
+              value="abort"
+              checked={value.onFailure === 'abort'}
+              onChange={() => onChange({ ...value, onFailure: 'abort' })}
+            />
+            abort
+          </label>
+          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+            <input
+              type="radio"
+              name="on_failure"
+              value="continue"
+              checked={value.onFailure === 'continue'}
+              onChange={() => onChange({ ...value, onFailure: 'continue' })}
+            />
+            continue
+          </label>
         </div>
-      ) : null}
+      </fieldset>
 
-      {tideMode ? (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:waveSizeLabel')}</span>
-          <input
-            type="number"
-            className={styles.field}
-            min={1}
-            value={value.waveSize}
-            onChange={(e) => onChange({ ...value, waveSize: e.target.value })}
-            placeholder={t('run:waveSizePlaceholder')}
-            aria-label="Wave size"
-          />
-        </label>
-      ) : null}
-      {workload === 'command' || tideMode ? (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
-          <input
-            type="number"
-            className={styles.field}
-            min={1}
-            max={500}
-            value={value.concurrency}
-            onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
-            aria-label="Concurrency"
-          />
-        </label>
-      ) : null}
+      <label className={styles.fieldRow}>
+        <span className={styles.fieldLabel}>{t('run:scheduleAtLabel')}</span>
+        <input
+          type="datetime-local"
+          className={styles.field}
+          value={value.scheduleAt}
+          onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
+          aria-label="Schedule at"
+        />
+        <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
+        {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
+        {!scheduleAtValid ? <span className={styles.warn}>{t('run:scheduleAtPastError')}</span> : null}
+      </label>
 
-      {workload === 'command' || tideMode ? (
-        <fieldset
-          style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
-        >
-          <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>On-failure</legend>
-          <div style={{ display: 'flex', gap: 14 }}>
-            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-              <input
-                type="radio"
-                name="on_failure"
-                value="abort"
-                checked={value.onFailure === 'abort'}
-                onChange={() => onChange({ ...value, onFailure: 'abort' })}
-              />
-              abort
-            </label>
-            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-              <input
-                type="radio"
-                name="on_failure"
-                value="continue"
-                checked={value.onFailure === 'continue'}
-                onChange={() => onChange({ ...value, onFailure: 'continue' })}
-              />
-              continue
-            </label>
-          </div>
-        </fieldset>
-      ) : null}
-      {workload === 'scenario' && !tideMode ? (
+      {workload === 'scenario' ? (
         <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
           <input
             type="checkbox"
