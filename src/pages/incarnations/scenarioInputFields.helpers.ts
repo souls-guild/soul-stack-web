@@ -26,8 +26,17 @@ export function isSupportedInputSchema(
   return true;
 }
 
+// Typed list (ADR-045 S8b): type=array + items → рендерится числовым/строковым
+// списком с +/- кнопками, НЕ JSON-textarea. Значение в state — JSON-строка массива.
+export function isTypedListField(prop: ScenarioInputSchemaProperty): boolean {
+  return prop.type === 'array' && prop.items != null;
+}
+
 // Составной тип (array/object) — рендерится per-field JSON-textarea.
+// Исключение: type=array с items → типизированный список (list[int]/list[string]/list[sid]);
+// такие поля рендерятся кастомным компонентом, не JSON-textarea.
 export function isCompositeType(prop: ScenarioInputSchemaProperty): boolean {
+  if (isTypedListField(prop)) return false;
   return prop.type === 'array' || prop.type === 'object';
 }
 
@@ -63,7 +72,12 @@ export function missingRequiredFields(
     if (!prop?.required) continue;
     if (prop.type === 'boolean') continue;
     const v = state[key];
-    if (v === undefined || (typeof v === 'string' && v.trim() === '')) out.push(key);
+    if (v === undefined || (typeof v === 'string' && v.trim() === '')) { out.push(key); continue; }
+    // Typed list: пустой массив [] считается незаполненным для required-поля.
+    if (isTypedListField(prop) && typeof v === 'string') {
+      const parsed = tryParseJson(v);
+      if (parsed.ok && Array.isArray(parsed.value) && parsed.value.length === 0) out.push(key);
+    }
   }
   return out;
 }
@@ -80,6 +94,28 @@ export function serializeFields(
   for (const [key, prop] of Object.entries(schema)) {
     const raw = state[key];
     if (raw === undefined || raw === '') continue;
+    // Typed list (ADR-045 S8b): хранится как JSON-строка сырых строк ["", "123"].
+    // Конвертируем элементы: int → parseInt (NaN фильтруется), иначе → строка.
+    if (isTypedListField(prop)) {
+      const parsed = tryParseJson(String(raw));
+      if (parsed.ok && Array.isArray(parsed.value)) {
+        const itemsType = prop.items?.type ?? 'string';
+        if (itemsType === 'integer') {
+          const nums = (parsed.value as unknown[])
+            .map((s) => parseInt(String(s), 10))
+            .filter((n) => !Number.isNaN(n));
+          out[key] = nums;
+        } else if (itemsType === 'number') {
+          const nums = (parsed.value as unknown[])
+            .map((s) => parseFloat(String(s)))
+            .filter((n) => !Number.isNaN(n));
+          out[key] = nums;
+        } else {
+          out[key] = (parsed.value as unknown[]).map((s) => String(s)).filter((s) => s !== '');
+        }
+      }
+      continue;
+    }
     if (isCompositeType(prop)) {
       const parsed = tryParseJson(String(raw));
       if (parsed.ok) out[key] = parsed.value;

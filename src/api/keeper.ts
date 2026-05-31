@@ -255,6 +255,11 @@ export interface ScenarioInputSchemaProperty {
   format?: string;
   /** Каталог-источник для SID-picker (ADR-045). */
   source?: ModuleInputSource;
+  /**
+   * Тип элемента списка (ADR-045 S8b). Присутствует для type=array.
+   * Содержит вложенный ScenarioInputSchemaProperty (рекурсивно).
+   */
+  items?: ScenarioInputSchemaProperty;
   [key: string]: unknown;
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;

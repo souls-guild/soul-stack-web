@@ -2243,11 +2243,23 @@ paths:
                     type: boolean
                     description: true → результат обрезан по cap, есть ещё.
         "400":
-          $ref: '#/components/responses/Problem400'
+          description: Нечитаемое тело / неизвестные поля.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "422":
-          $ref: '#/components/responses/Problem422'
+          description: source не задан / задан более одного / пустые координаты.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "500":
-          $ref: '#/components/responses/Problem500'
+          description: Сбой резолва.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
 
   /v1/permissions:
     get:
@@ -4277,6 +4289,12 @@ components:
           description: Семантический формат строки (hostname/fqdn/ipv4/.../sid).
         source:
           $ref: '#/components/schemas/ModuleInputSource'
+        items:
+          allOf:
+            - $ref: '#/components/schemas/ModuleParam'
+          description: >-
+            Тип элементов списка (ADR-045 S7); присутствует для type=list/array,
+            строит типизированный список в форме (напр. list[int]).
       required: [name, required]
 
     ModuleInputSource:

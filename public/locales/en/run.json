@@ -120,5 +120,8 @@
   "sidPickerFallbackHint": "no incarnation context — enter SID manually",
   "sidPickerRemove": "remove",
   "patternError": "does not match pattern: {{pattern}}",
-  "advancedLabel": "Advanced"
+  "advancedLabel": "Advanced",
+  "listAddItem": "add",
+  "listRemoveItem": "−",
+  "listIntError": "not an integer"
 }

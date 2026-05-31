@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import type { ScenarioInputSchema, ScenarioInputSchemaProperty } from '../../api/keeper';
 import {
   isCompositeType,
+  isTypedListField,
   type ScenarioFieldValue,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
@@ -164,6 +165,45 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
+  // ADR-045 S8b: type=array + items.format=sid + source → multi SID-picker.
+  if (isTypedListField(prop) && prop.items?.format === 'sid' && prop.items?.source) {
+    return (
+      <div data-testid={`field-sid-multi-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {labelText}
+        </span>
+        <SidPicker
+          value={value === undefined ? undefined : String(value)}
+          onChange={(v) => onChange(v)}
+          source={prop.items.source}
+          incarnationContext={incarnationContext}
+          moduleName={moduleName ?? ''}
+          multi
+          missing={missing}
+        />
+        {prop.description ? (
+          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        ) : null}
+        {missingMsg}
+      </div>
+    );
+  }
+
+  // ADR-045 S8b: type=array + items.type=int|string → типизированный список с +/-.
+  if (isTypedListField(prop)) {
+    return (
+      <TypedListField
+        name={name}
+        labelText={labelText}
+        prop={prop}
+        value={value}
+        onChange={onChange}
+        missing={missing}
+        baseStyle={baseStyle}
+      />
+    );
+  }
+
   // Составной тип (array/object): per-field JSON-textarea. Значение хранится
   // raw-строкой; невалидный JSON подсвечивается inline (submit блокируется
   // caller-ом через invalidCompositeFields).
@@ -295,6 +335,132 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
       ) : null}
       {missingMsg}
     </label>
+  );
+}
+
+// ADR-045 S8b: Типизированный список (list[int]/list[string]) — набор числовых
+// или строковых инпутов с кнопками добавить/удалить. Значение хранится как
+// JSON-строка массива (для совместимости с serializeFields).
+interface TypedListFieldProps {
+  name: string;
+  labelText: string;
+  prop: ScenarioInputSchemaProperty;
+  value: ScenarioFieldValue;
+  onChange: (v: ScenarioFieldValue) => void;
+  missing: boolean;
+  baseStyle: React.CSSProperties;
+}
+
+function TypedListField({ name, labelText, prop, value, onChange, missing, baseStyle }: TypedListFieldProps) {
+  const { t } = useTranslation();
+  const itemsType = prop.items?.type ?? 'string';
+  const isInt = itemsType === 'integer';
+
+  // Разбираем текущее значение в массив строк (для отображения в инпутах).
+  function parseItems(): string[] {
+    if (value === undefined || value === '') return [];
+    try {
+      const parsed = JSON.parse(String(value));
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {
+      // ignore
+    }
+    return [];
+  }
+
+  const items = parseItems();
+
+  function commit(next: string[]) {
+    // Всегда сохраняем сырые строки — валидация inline, серилизация при submit
+    // (serializeFields парсит JSON-строку и конвертирует числа).
+    onChange(JSON.stringify(next));
+  }
+
+  function handleItemChange(idx: number, v: string) {
+    const next = [...items];
+    next[idx] = v;
+    commit(next);
+  }
+
+  function handleAdd() {
+    commit([...items, '']);
+  }
+
+  function handleRemove(idx: number) {
+    const next = items.filter((_, i) => i !== idx);
+    commit(next);
+  }
+
+  const intErrors: boolean[] = isInt
+    ? items.map((s) => s.trim() !== '' && Number.isNaN(parseInt(s, 10)))
+    : items.map(() => false);
+
+  return (
+    <div data-testid={`field-typedlist-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+        {labelText}{' '}
+        <span style={{ color: 'var(--text-faint)' }}>
+          ({isInt ? 'list[int]' : 'list[string]'})
+        </span>
+      </span>
+      {items.map((item, idx) => (
+        <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            type={isInt ? 'number' : 'text'}
+            step={isInt ? 1 : undefined}
+            data-testid={`field-typedlist-item-${name}-${idx}`}
+            value={item}
+            onChange={(e) => handleItemChange(idx, e.target.value)}
+            style={{
+              ...baseStyle,
+              flex: 1,
+              border: `1px solid ${intErrors[idx] ? 'var(--danger)' : 'var(--border)'}`,
+            }}
+          />
+          <button
+            type="button"
+            data-testid={`field-typedlist-remove-${name}-${idx}`}
+            onClick={() => handleRemove(idx)}
+            style={{
+              padding: '4px 8px',
+              fontSize: 14,
+              cursor: 'pointer',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+            }}
+            title={t('run:listRemoveItem')}
+          >
+            {t('run:listRemoveItem')}
+          </button>
+          {intErrors[idx] ? (
+            <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('run:listIntError')}</span>
+          ) : null}
+        </div>
+      ))}
+      <button
+        type="button"
+        data-testid={`field-typedlist-add-${name}`}
+        onClick={handleAdd}
+        style={{
+          alignSelf: 'flex-start',
+          padding: '4px 10px',
+          fontSize: 13,
+          cursor: 'pointer',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+        }}
+      >
+        + {t('run:listAddItem')}
+      </button>
+      {prop.description ? (
+        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+      ) : null}
+      {missing ? (
+        <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
+      ) : null}
+    </div>
   );
 }
 

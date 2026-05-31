@@ -33,11 +33,19 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
       description: p.description,
       // secret-флаг прокидываем для возможной маскировки/подсказки в UI.
       secret: Boolean(p.secret),
-      // ADR-045: UI-форма расширений — enum/pattern/format/source.
+      // ADR-045: UI-форма расширений — enum/pattern/format/source/items.
       ...(p.enum != null ? { enum: p.enum } : {}),
       ...(p.pattern != null ? { pattern: p.pattern } : {}),
       ...(p.format != null ? { format: p.format } : {}),
       ...(p.source != null ? { source: p.source } : {}),
+      // S8b: items описывает тип элемента списка (list[int]/list[sid]/…).
+      ...(p.items != null ? { items: {
+        type: normalizeType(p.items.type),
+        format: p.items.format,
+        pattern: p.items.pattern,
+        source: p.items.source,
+        enum: p.items.enum,
+      } } : {}),
     };
   }
   return out;

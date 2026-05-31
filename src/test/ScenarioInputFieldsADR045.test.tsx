@@ -221,4 +221,99 @@ describe('paramsToInputSchema — нормализация типов ADR-045', 
     const schema = paramsToInputSchema(params);
     expect(schema.target.source).toEqual({ incarnation_hosts: true });
   });
+
+  it('S8b: пробрасывает items с нормализацией типа int → integer', () => {
+    const params: ModuleParam[] = [
+      { name: 'codes', type: 'list', required: false, items: { name: '', required: false, type: 'int' } },
+    ];
+    const schema = paramsToInputSchema(params);
+    expect(schema.codes.type).toBe('array');
+    expect(schema.codes.items?.type).toBe('integer');
+  });
+
+  it('S8b: пробрасывает items.format=sid для list[sid]', () => {
+    const params: ModuleParam[] = [
+      {
+        name: 'sids', type: 'list', required: false,
+        items: { name: '', required: false, type: 'string', format: 'sid', source: { incarnation_hosts: true } },
+      },
+    ];
+    const schema = paramsToInputSchema(params);
+    expect(schema.sids.items?.format).toBe('sid');
+    expect(schema.sids.items?.source).toEqual({ incarnation_hosts: true });
+  });
+});
+
+describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
+  it('list[int]: рендерит числовой список с кнопками +/-', () => {
+    const schema: ScenarioInputSchema = {
+      status_codes: {
+        type: 'array',
+        required: true,
+        items: { type: 'integer' },
+      },
+    };
+    renderFields(schema);
+    expect(screen.getByTestId('field-typedlist-status_codes')).toBeTruthy();
+    const addBtn = screen.getByTestId('field-typedlist-add-status_codes');
+    expect(addBtn).toBeTruthy();
+    // Добавляем элемент
+    fireEvent.click(addBtn);
+    expect(screen.getByTestId('field-typedlist-item-status_codes-0')).toBeTruthy();
+  });
+
+  it('list[int]: число вводится корректно, невалидная строка показывает ошибку', () => {
+    const schema: ScenarioInputSchema = {
+      codes: { type: 'array', required: false, items: { type: 'integer' } },
+    };
+    renderFields(schema);
+    fireEvent.click(screen.getByTestId('field-typedlist-add-codes'));
+    const input = screen.getByTestId('field-typedlist-item-codes-0') as HTMLInputElement;
+    expect(input.type).toBe('number');
+  });
+
+  it('list[string]: рендерит строковый список, не JSON-textarea', () => {
+    const schema: ScenarioInputSchema = {
+      tags: { type: 'array', required: false, items: { type: 'string' } },
+    };
+    renderFields(schema);
+    // Не должно быть JSON-textarea
+    expect(screen.queryByTestId('field-composite-tags')).toBeNull();
+    // Должен быть typed list
+    expect(screen.getByTestId('field-typedlist-tags')).toBeTruthy();
+  });
+
+  it('list[sid] via items: рендерит SidPicker multi (items.format=sid + items.source)', () => {
+    const schema: ScenarioInputSchema = {
+      sids: {
+        type: 'array',
+        required: false,
+        items: { type: 'string', format: 'sid', source: { incarnation_hosts: true } },
+      },
+    };
+    renderFields(schema, { incarnationContext: 'redis-prod', moduleName: 'official.redis' });
+    expect(screen.getByTestId('field-sid-multi-sids')).toBeTruthy();
+  });
+
+  it('list без items: fallback на JSON-textarea', () => {
+    const schema: ScenarioInputSchema = {
+      raw: { type: 'array', required: false },
+    };
+    renderFields(schema);
+    expect(screen.getByTestId('field-composite-raw')).toBeTruthy();
+    expect(screen.queryByTestId('field-typedlist-raw')).toBeNull();
+  });
+
+  it('кнопка удалить убирает элемент', () => {
+    const schema: ScenarioInputSchema = {
+      nums: { type: 'array', required: false, items: { type: 'integer' } },
+    };
+    renderFields(schema);
+    fireEvent.click(screen.getByTestId('field-typedlist-add-nums'));
+    fireEvent.click(screen.getByTestId('field-typedlist-add-nums'));
+    expect(screen.getByTestId('field-typedlist-item-nums-0')).toBeTruthy();
+    expect(screen.getByTestId('field-typedlist-item-nums-1')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('field-typedlist-remove-nums-0'));
+    expect(screen.queryByTestId('field-typedlist-item-nums-1')).toBeNull();
+  });
 });
