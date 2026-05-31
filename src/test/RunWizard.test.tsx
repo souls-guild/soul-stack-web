@@ -1199,6 +1199,95 @@ describe('RunWizard', () => {
     });
   });
 
+  it('Batch size: невалидное значение → inline-ошибка видна, submit заблокирован', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
+    // Невалидное значение (не целое).
+    await user.type(screen.getByLabelText('Batch size'), '0');
+
+    // Inline-ошибка появилась.
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+      ).toBeInTheDocument(),
+    );
+    // Submit заблокирован.
+    expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
+  });
+
+  it('Batch size: валидное значение → ошибки нет, submit не заблокирован', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Batch size'), '5');
+
+    expect(
+      screen.queryByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
+  });
+
+  it('Batch size: пустое поле → ошибки нет (поле опциональное)', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
+    // Не вводим ничего — поле пустое.
+
+    expect(
+      screen.queryByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
+  });
+
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
     setupFetchStub({ souls: [{ sid: 'host-a.example.com', covens: ['prod'] }] });
     renderWizardWithRoutes('/run?workload=command&target_coven=prod');

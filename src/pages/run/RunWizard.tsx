@@ -665,7 +665,7 @@ export function RunWizard() {
         ) : null}
 
         {step === 4 ? (
-          <Step4Options value={options} onChange={setOptions} workload={workload} scheduleAtValid={scheduleAtValid} />
+          <Step4Options value={options} onChange={setOptions} workload={workload} scheduleAtValid={scheduleAtValid} batchSizeValid={batchSizeValid} />
         ) : null}
 
         {submitError ? <div className={pageStyles.errorBox}>{submitError}</div> : null}
@@ -1141,6 +1141,9 @@ function Step2CommandHosts({
                 ) : null}
               </div>
             ) : null}
+            {!soulsLoading && resolvedSouls.length === 0 ? (
+              <span className={styles.warn}>{t('run:targetEmptyError')}</span>
+            ) : null}
           </>
         )}
       </div>
@@ -1308,11 +1311,13 @@ function Step4Options({
   onChange,
   workload,
   scheduleAtValid,
+  batchSizeValid,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
   workload: Workload;
   scheduleAtValid: boolean;
+  batchSizeValid: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -1339,6 +1344,9 @@ function Step4Options({
           aria-label="Batch size"
         />
         <span className={styles.hint}>{t('run:batchSizeHint')}</span>
+        {!batchSizeValid && value.batchSize.trim() ? (
+          <span className={styles.warn}>{t('run:batchSizeError')}</span>
+        ) : null}
       </label>
 
       <label className={styles.fieldRow}>
