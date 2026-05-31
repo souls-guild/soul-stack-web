@@ -28,30 +28,60 @@ export function ScenarioInputFields({
   incarnationContext,
   moduleName,
 }: Props) {
+  const { t } = useTranslation();
   const entries = Object.entries(schema ?? {});
   if (entries.length === 0) return null;
 
+  // Разделяем на обязательные (required=true, не boolean) и опциональные.
+  // Boolean-поля считаются опциональными (всегда имеют дефолт false).
+  const requiredEntries = entries.filter(([, prop]) => Boolean(prop.required) && prop.type !== 'boolean');
+  const optionalEntries = entries.filter(([, prop]) => !prop.required || prop.type === 'boolean');
+
+  function renderField(key: string, prop: ScenarioInputSchemaProperty) {
+    const isRequired = Boolean(prop.required) && prop.type !== 'boolean';
+    const v = value[key];
+    const empty = v === undefined || (typeof v === 'string' && v.trim() === '');
+    const missing = showErrors && isRequired && empty;
+    return (
+      <ScenarioInputOneField
+        key={key}
+        name={key}
+        required={isRequired}
+        missing={missing}
+        prop={prop}
+        value={v}
+        onChange={(nv) => onChange({ ...value, [key]: nv })}
+        incarnationContext={incarnationContext}
+        moduleName={moduleName}
+      />
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {entries.map(([key, prop]) => {
-        const required = Boolean(prop.required) && prop.type !== 'boolean';
-        const v = value[key];
-        const empty = v === undefined || (typeof v === 'string' && v.trim() === '');
-        const missing = showErrors && required && empty;
-        return (
-          <ScenarioInputOneField
-            key={key}
-            name={key}
-            required={Boolean(prop.required)}
-            missing={missing}
-            prop={prop}
-            value={v}
-            onChange={(nv) => onChange({ ...value, [key]: nv })}
-            incarnationContext={incarnationContext}
-            moduleName={moduleName}
-          />
-        );
-      })}
+      {requiredEntries.map(([key, prop]) => renderField(key, prop))}
+      {optionalEntries.length > 0 ? (
+        <details data-testid="advanced-collapse">
+          <summary
+            style={{
+              cursor: 'pointer',
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              userSelect: 'none',
+              marginBottom: 0,
+              listStyle: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span>&#9654;</span> {t('run:advancedLabel')}
+          </summary>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {optionalEntries.map(([key, prop]) => renderField(key, prop))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

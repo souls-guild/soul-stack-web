@@ -119,5 +119,6 @@
   "sidPickerNoResults": "— нет совпадений —",
   "sidPickerFallbackHint": "контекст incarnation не задан — введите SID вручную",
   "sidPickerRemove": "убрать",
-  "patternError": "не совпадает с паттерном: {{pattern}}"
+  "patternError": "не совпадает с паттерном: {{pattern}}",
+  "advancedLabel": "Дополнительно"
 }

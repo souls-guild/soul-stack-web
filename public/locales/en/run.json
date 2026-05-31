@@ -119,5 +119,6 @@
   "sidPickerNoResults": "— no matches —",
   "sidPickerFallbackHint": "no incarnation context — enter SID manually",
   "sidPickerRemove": "remove",
-  "patternError": "does not match pattern: {{pattern}}"
+  "patternError": "does not match pattern: {{pattern}}",
+  "advancedLabel": "Advanced"
 }
