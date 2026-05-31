@@ -662,6 +662,7 @@ export function RunWizard() {
             value={commandState}
             onChange={setCommandState}
             missingRequired={commandMissingRequired}
+            incarnationContext={hostCriteria.incarnations[0]}
           />
         ) : null}
 
@@ -1158,10 +1159,12 @@ function Step3CommandParams({
   value,
   onChange,
   missingRequired,
+  incarnationContext,
 }: {
   value: CommandStateValues;
   onChange: (next: CommandStateValues) => void;
   missingRequired: string[];
+  incarnationContext?: string;
 }) {
   const { t } = useTranslation();
   const [catalogUnavailable, setCatalogUnavailable] = useState(false);
@@ -1230,6 +1233,8 @@ function Step3CommandParams({
             value={value.paramFields}
             onChange={(next) => onChange({ ...value, paramFields: next })}
             showErrors={missingRequired.length > 0}
+            incarnationContext={incarnationContext}
+            moduleName={value.moduleName}
           />
         </div>
       ) : showCmdFields ? (

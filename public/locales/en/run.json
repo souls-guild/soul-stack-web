@@ -112,5 +112,12 @@
   "builderInvalidJson": "invalid JSON",
   "builderDuplicateKey": "duplicate key",
   "builderNotInteger": "not an integer",
-  "builderNotNumber": "not a number"
+  "builderNotNumber": "not a number",
+  "sidPickerPlaceholder": "start typing a SID…",
+  "sidPickerTruncated": "showing first results — refine your query",
+  "sidPickerLoading": "loading…",
+  "sidPickerNoResults": "— no matches —",
+  "sidPickerFallbackHint": "no incarnation context — enter SID manually",
+  "sidPickerRemove": "remove",
+  "patternError": "does not match pattern: {{pattern}}"
 }

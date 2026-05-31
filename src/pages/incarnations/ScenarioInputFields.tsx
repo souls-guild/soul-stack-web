@@ -5,6 +5,7 @@ import {
   type ScenarioFieldValue,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
+import { SidPicker } from './SidPicker';
 
 interface Props {
   schema: ScenarioInputSchema;
@@ -13,9 +14,20 @@ interface Props {
   // Показать inline-ошибку под пустыми required-полями (после попытки submit
   // или при включённой live-валидации).
   showErrors?: boolean;
+  // ADR-045: контекст для SID-picker (incarnation_hosts source).
+  incarnationContext?: string;
+  // Имя модуля для form-prep (нужно SidPicker-у).
+  moduleName?: string;
 }
 
-export function ScenarioInputFields({ schema, value, onChange, showErrors = false }: Props) {
+export function ScenarioInputFields({
+  schema,
+  value,
+  onChange,
+  showErrors = false,
+  incarnationContext,
+  moduleName,
+}: Props) {
   const entries = Object.entries(schema ?? {});
   if (entries.length === 0) return null;
 
@@ -35,6 +47,8 @@ export function ScenarioInputFields({ schema, value, onChange, showErrors = fals
             prop={prop}
             value={v}
             onChange={(nv) => onChange({ ...value, [key]: nv })}
+            incarnationContext={incarnationContext}
+            moduleName={moduleName}
           />
         );
       })}
@@ -49,9 +63,11 @@ interface OneProps {
   prop: ScenarioInputSchemaProperty;
   value: ScenarioFieldValue;
   onChange: (v: ScenarioFieldValue) => void;
+  incarnationContext?: string;
+  moduleName?: string;
 }
 
-function ScenarioInputOneField({ name, required, missing, prop, value, onChange }: OneProps) {
+function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName }: OneProps) {
   const { t } = useTranslation();
   const labelText = `${name}${required ? ' *' : ''}`;
   const baseStyle: React.CSSProperties = {
@@ -70,6 +86,54 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
       {t('forms:required')}
     </span>
   ) : null;
+
+  // ADR-045 S4: format:sid + type:array → multi SID-picker.
+  if (prop.type === 'array' && prop.format === 'sid' && prop.source) {
+    return (
+      <div data-testid={`field-sid-multi-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {labelText}
+        </span>
+        <SidPicker
+          value={value === undefined ? undefined : String(value)}
+          onChange={(v) => onChange(v)}
+          source={prop.source}
+          incarnationContext={incarnationContext}
+          moduleName={moduleName ?? ''}
+          multi
+          missing={missing}
+        />
+        {prop.description ? (
+          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        ) : null}
+        {missingMsg}
+      </div>
+    );
+  }
+
+  // ADR-045 S4: format:sid + type:string → single SID-picker.
+  if (prop.format === 'sid' && prop.source) {
+    return (
+      <div data-testid={`field-sid-single-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          {labelText}
+        </span>
+        <SidPicker
+          value={value === undefined ? undefined : String(value)}
+          onChange={(v) => onChange(v)}
+          source={prop.source}
+          incarnationContext={incarnationContext}
+          moduleName={moduleName ?? ''}
+          missing={missing}
+        />
+        {prop.description ? (
+          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        ) : null}
+        {missingMsg}
+      </div>
+    );
+  }
+
   // Составной тип (array/object): per-field JSON-textarea. Значение хранится
   // raw-строкой; невалидный JSON подсвечивается inline (submit блокируется
   // caller-ом через invalidCompositeFields).
@@ -137,7 +201,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
       </label>
     );
   }
-  // string + enum fallback на select.
+  // string + enum → select (enum выше приоритетом pattern).
   if (prop.enum && Array.isArray(prop.enum) && prop.enum.length > 0) {
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -145,6 +209,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
           {labelText}
         </span>
         <select
+          data-testid={`field-enum-${name}`}
           value={value === undefined ? '' : String(value)}
           onChange={(e) => onChange(e.target.value)}
           style={baseStyle}
@@ -163,6 +228,18 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
       </label>
     );
   }
+  // ADR-045 S4: pattern → inline-валидация regex при вводе.
+  const strVal = value === undefined ? '' : String(value);
+  const patternError =
+    prop.pattern && strVal.trim() !== ''
+      ? (() => {
+          try {
+            return !new RegExp(prop.pattern).test(strVal);
+          } catch {
+            return false;
+          }
+        })()
+      : false;
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
@@ -170,12 +247,21 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange 
       </span>
       <input
         type="text"
-        value={value === undefined ? '' : String(value)}
+        data-testid={`field-text-${name}`}
+        value={strVal}
         onChange={(e) => onChange(e.target.value)}
-        style={baseStyle}
+        style={{ ...baseStyle, border: `1px solid ${missing || patternError ? 'var(--danger)' : 'var(--border)'}` }}
       />
       {prop.description ? (
         <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+      ) : null}
+      {patternError ? (
+        <span
+          data-testid={`field-pattern-error-${name}`}
+          style={{ color: 'var(--danger)', fontSize: 12 }}
+        >
+          {t('run:patternError', { pattern: prop.pattern })}
+        </span>
       ) : null}
       {missingMsg}
     </label>

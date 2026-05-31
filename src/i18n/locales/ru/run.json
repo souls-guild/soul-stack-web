@@ -112,5 +112,12 @@
   "builderInvalidJson": "невалидный JSON",
   "builderDuplicateKey": "дубликат ключа",
   "builderNotInteger": "не integer",
-  "builderNotNumber": "не number"
+  "builderNotNumber": "не number",
+  "sidPickerPlaceholder": "начните вводить SID…",
+  "sidPickerTruncated": "показаны первые результаты — уточните запрос",
+  "sidPickerLoading": "загрузка…",
+  "sidPickerNoResults": "— нет совпадений —",
+  "sidPickerFallbackHint": "контекст incarnation не задан — введите SID вручную",
+  "sidPickerRemove": "убрать",
+  "patternError": "не совпадает с паттерном: {{pattern}}"
 }

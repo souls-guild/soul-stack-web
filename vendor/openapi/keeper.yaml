@@ -2176,6 +2176,79 @@ paths:
         '404': { $ref: '#/components/responses/Problem404' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/modules/{name}/form-prep:
+    post:
+      tags:
+        - Modules
+      summary: Resolve UI-form source catalog to live SIDs (ADR-045 S3)
+      description: >-
+        Резолвер source-каталогов UI-формы модуля. По source
+        (incarnation_hosts / choir) возвращает живые SID-ы для автокомплита
+        поля формы. Cluster-wide (по реестру souls), prefix-фильтр + жёсткий
+        cap (truncated=true при упоре в cap). Permission incarnation.run
+        (подготовка прогона Run→Command).
+      operationId: moduleFormPrep
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Полное имя модуля без state-суффикса (per-module форма).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+              properties:
+                source:
+                  type: object
+                  description: Ровно один из incarnation_hosts / choir.
+                  properties:
+                    incarnation_hosts:
+                      type: string
+                      description: Имя incarnation — live SID-ы её хостов.
+                    choir:
+                      type: object
+                      required:
+                        - incarnation
+                        - name
+                      properties:
+                        incarnation:
+                          type: string
+                        name:
+                          type: string
+                prefix:
+                  type: string
+                  description: Префикс SID для автокомплита (LIKE prefix%).
+      responses:
+        "200":
+          description: Резолвленные SID-ы (отсортированы, ≤ cap).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - sids
+                  - truncated
+                properties:
+                  sids:
+                    type: array
+                    items:
+                      type: string
+                  truncated:
+                    type: boolean
+                    description: true → результат обрезан по cap, есть ещё.
+        "400":
+          $ref: '#/components/responses/Problem400'
+        "422":
+          $ref: '#/components/responses/Problem422'
+        "500":
+          $ref: '#/components/responses/Problem500'
+
   /v1/permissions:
     get:
       tags: [Permission]
@@ -4176,8 +4249,9 @@ components:
     ModuleParam:
       type: object
       description: |
-        Один параметр модуля. Заполняется только для plugin-модулей (из manifest
-        `spec.states[*].input`); для core пуст (input-схема не формализована).
+        Один параметр модуля из manifest-схемы (`spec.states[*].input`): для
+        plugin — из manifest.yaml, для core — из coremanifest-реестра. Поля
+        enum/pattern/format/source описывают UI-форму модуля (ADR-045).
       properties:
         name:
           type: string
@@ -4191,7 +4265,32 @@ components:
           description: Значение приходит через vault-ref (manifest secret-флаг).
         description:
           type: string
+        enum:
+          type: array
+          description: Допустимые значения поля (closed-set).
+          items: {}
+        pattern:
+          type: string
+          description: Regex-ограничение значения.
+        format:
+          type: string
+          description: Семантический формат строки (hostname/fqdn/ipv4/.../sid).
+        source:
+          $ref: '#/components/schemas/ModuleInputSource'
       required: [name, required]
+
+    ModuleInputSource:
+      type: object
+      description: |
+        Дискриминатор каталога-источника значений поля формы (ADR-044/ADR-045):
+        ровно один активный под-ключ.
+      properties:
+        incarnation_hosts:
+          type: boolean
+          description: Все SID текущей инкарнации.
+        choir:
+          type: string
+          description: SID-ы конкретной Choir-партии инкарнации.
 
     ModuleCatalogItem:
       type: object

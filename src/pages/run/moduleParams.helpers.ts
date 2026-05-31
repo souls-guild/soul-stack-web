@@ -1,22 +1,26 @@
-import type { ModuleParam, ScenarioInputSchema } from '../../api/keeper';
+import type { ModuleInputSource, ModuleParam, ScenarioInputSchema } from '../../api/keeper';
 
 // Маппинг ModuleParam[] (из каталога модулей) на flat-map ScenarioInputSchema,
 // чтобы переиспользовать ScenarioInputFields + scenarioInputFields.helpers
 // (serializeFields / missingRequiredFields / defaultsFromSchema). Типы input-DSL
-// (string/int/bool/list/map и синонимы) нормализуются в простые типы формы;
-// составные (list/map/array/object) → string-fallback (raw-ввод), как в
-// scenario per-field builder.
+// (string/int/bool/list/map и синонимы) нормализуются в простые типы формы.
+// ADR-045 S4: enum/pattern/format/source пробрасываются для расширенного UI
+// (SID-picker, pattern-валидация, dropdown).
 
 const INT_TYPES = new Set(['int', 'integer', 'int64', 'int32']);
 const NUMBER_TYPES = new Set(['number', 'float', 'float64', 'double']);
 const BOOL_TYPES = new Set(['bool', 'boolean']);
+// list/map/array/object → array (per-field JSON-textarea или SID-multi-picker).
+const ARRAY_TYPES = new Set(['list', 'array']);
+const OBJECT_TYPES = new Set(['map', 'object']);
 
 function normalizeType(raw: string | undefined): string {
   const t = (raw ?? '').toLowerCase();
   if (INT_TYPES.has(t)) return 'integer';
   if (NUMBER_TYPES.has(t)) return 'number';
   if (BOOL_TYPES.has(t)) return 'boolean';
-  // string + всё составное (list/map/...) → string-fallback (raw textbox).
+  if (ARRAY_TYPES.has(t)) return 'array';
+  if (OBJECT_TYPES.has(t)) return 'object';
   return 'string';
 }
 
@@ -29,10 +33,18 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
       description: p.description,
       // secret-флаг прокидываем для возможной маскировки/подсказки в UI.
       secret: Boolean(p.secret),
+      // ADR-045: UI-форма расширений — enum/pattern/format/source.
+      ...(p.enum != null ? { enum: p.enum } : {}),
+      ...(p.pattern != null ? { pattern: p.pattern } : {}),
+      ...(p.format != null ? { format: p.format } : {}),
+      ...(p.source != null ? { source: p.source } : {}),
     };
   }
   return out;
 }
+
+// Re-export для использования в SidPicker без прямого импорта api/keeper.
+export type { ModuleInputSource };
 
 // Есть ли у модуля формализованные параметры (plugin-модули). Пустой массив —
 // core-модуль без input-схемы (рендерим cmd-поля / dynamic builder).

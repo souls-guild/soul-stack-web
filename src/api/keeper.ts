@@ -242,12 +242,19 @@ export interface ServiceRefListReply {
 // Каждое property несёт собственный `required: boolean` (per-field, не top-level массив).
 // UI рендерит простые типы (string/integer/number/boolean) per-field; составные
 // (array/object/oneOf/…) → fallback на JSON textarea.
+// ADR-045 S4: pattern/format/source описывают UI-форму модуля (SID-picker, валидация).
 export interface ScenarioInputSchemaProperty {
   type?: string;
   description?: string;
   required?: boolean;
   default?: unknown;
   enum?: unknown[];
+  /** Regex-ограничение значения (ADR-045). */
+  pattern?: string;
+  /** Семантический формат строки (sid/hostname/…). */
+  format?: string;
+  /** Каталог-источник для SID-picker (ADR-045). */
+  source?: ModuleInputSource;
   [key: string]: unknown;
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
@@ -280,7 +287,21 @@ export type DecreeListReply = components['schemas']['DecreeListReply'];
 export type ModuleCatalogItem = components['schemas']['ModuleCatalogItem'];
 export type ModuleCatalogReply = components['schemas']['ModuleCatalogReply'];
 export type ModuleParam = components['schemas']['ModuleParam'];
+export type ModuleInputSource = components['schemas']['ModuleInputSource'];
 export type ModuleKind = NonNullable<ModuleCatalogItem['kind']>;
+
+// form-prep (ADR-045 S4): резолв live-SID по source (incarnation_hosts/choir) + prefix.
+export interface ModuleFormPrepRequest {
+  source: {
+    incarnation_hosts?: string;
+    choir?: { incarnation: string; name: string };
+  };
+  prefix?: string;
+}
+export interface ModuleFormPrepReply {
+  sids: string[];
+  truncated: boolean;
+}
 
 export type PluginSigilView = components['schemas']['PluginSigilView'];
 export type PluginSigilListReply = components['schemas']['PluginSigilListReply'];
@@ -708,6 +729,8 @@ export const keeperApi = {
       }),
     get: (name: string) =>
       apiGet<ModuleCatalogItem>(`/v1/modules/${encodeURIComponent(name)}`),
+    formPrep: (name: string, body: ModuleFormPrepRequest) =>
+      apiSend<ModuleFormPrepReply>(`/v1/modules/${encodeURIComponent(name)}/form-prep`, 'POST', { body }),
   },
 
   // Push-providers registry (ADR-032 amendment 2026-05-26, S7-2). Используется в /run Step 2 (Push).
