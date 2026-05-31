@@ -1288,6 +1288,37 @@ describe('RunWizard', () => {
     expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
   });
 
+  it('Batch size: выше верхней границы (10001) → inline-ошибка видна, submit заблокирован', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
+    // Выше верхней границы (10000 = max_scope-дефолт backend).
+    await user.type(screen.getByLabelText('Batch size'), '10001');
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
+  });
+
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
     setupFetchStub({ souls: [{ sid: 'host-a.example.com', covens: ['prod'] }] });
     renderWizardWithRoutes('/run?workload=command&target_coven=prod');

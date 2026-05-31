@@ -579,12 +579,13 @@ export function RunWizard() {
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
 
-  // batchSize — опциональное поле; если задано, должно быть целым >= 1.
+  // batchSize — опциональное поле; если задано, должно быть целым 1..10000
+  // (верхняя граница = max_scope-дефолт backend).
   const batchSizeValid = useMemo(() => {
     const s = options.batchSize.trim();
     if (!s) return true; // пусто — ok (весь scope одним прогоном)
     const n = parseIntOrEmpty(s);
-    return Boolean(n && n >= 1);
+    return Boolean(n && n >= 1 && n <= 10000);
   }, [options.batchSize]);
 
   // scheduleAt — опциональное поле; если задано, должно быть в будущем.

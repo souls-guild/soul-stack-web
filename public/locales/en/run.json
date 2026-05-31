@@ -89,7 +89,6 @@
   "scheduleAtUtc": "UTC: {{utc}}",
   "scheduleAtPastError": "Schedule time must be in the future",
   "batchSizeError": "Batch size must be an integer between 1 and 10000",
-  "inputsRequiredError": "Fill in all required fields",
   "targetEmptyError": "No hosts selected — refine the criteria",
   "concurrencyLabel": "Concurrency",
   "dryRunLabel": "Dry-run",
