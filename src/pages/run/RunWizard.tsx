@@ -514,6 +514,16 @@ export function RunWizard() {
     },
   });
 
+  /** Конвертирует datetime-local строку в ISO-8601 с зоной для OpenAPI date-time.
+   * Пустая строка → undefined. Invalid Date → undefined (guard, до submit не доходит). */
+  function scheduleAtIso(raw: string): string | undefined {
+    const s = raw.trim();
+    if (!s) return undefined;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return undefined;
+    return d.toISOString();
+  }
+
   async function submitScenario(): Promise<string> {
     const inputObj =
       usePerField && inputSchema
@@ -533,7 +543,7 @@ export function RunWizard() {
       concurrency: c && c > 0 ? c : 50,
       dry_run: Boolean(options.dryRun),
       on_failure: options.onFailure,
-      schedule_at: options.scheduleAt.trim() || undefined,
+      schedule_at: scheduleAtIso(options.scheduleAt),
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
@@ -564,7 +574,7 @@ export function RunWizard() {
       concurrency: c && c > 0 ? c : 50,
       dry_run: false,
       on_failure: options.onFailure,
-      schedule_at: options.scheduleAt.trim() || undefined,
+      schedule_at: scheduleAtIso(options.scheduleAt),
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }

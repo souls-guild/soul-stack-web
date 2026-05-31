@@ -627,7 +627,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    expect(body.schedule_at).toBe('2099-06-01T10:00');
+    expect(body.schedule_at).toBe(new Date('2099-06-01T10:00').toISOString());
   });
 
   it('Command: dry_run чекбокс недоступен (command-workload), тело без dry_run=true', async () => {
@@ -1005,7 +1005,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    expect(body.schedule_at).toBe('2099-12-31T23:59');
+    expect(body.schedule_at).toBe(new Date('2099-12-31T23:59').toISOString());
   });
 
   it('Scenario: пустой schedule_at → schedule_at не в теле Voyage POST', async () => {
@@ -1091,7 +1091,7 @@ describe('RunWizard', () => {
 
     await user.click(submitBtn);
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
-    expect((stub.posted?.body as Record<string, unknown>).schedule_at).toBe('2099-06-15T12:00');
+    expect((stub.posted?.body as Record<string, unknown>).schedule_at).toBe(new Date('2099-06-15T12:00').toISOString());
   });
 
   it('Stale-черновик старой формы (без v / без incarnations) → визард грузится на дефолтах без краша', async () => {
