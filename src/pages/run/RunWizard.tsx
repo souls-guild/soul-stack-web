@@ -105,9 +105,12 @@ interface CommandStateValues {
   customInput: Record<string, unknown>;
 }
 
+// Тип enum batch_mode берётся из types.gen через VoyageCreateRequest — не хардкодим строки.
+type VoyageBatchMode = NonNullable<import('../../api/types.gen').components['schemas']['VoyageCreateRequest']['batch_mode']>;
+
 interface OptionsState {
   // Опциональный размер батча (Leg): N инкарнаций/хостов за раз.
-  // Пусто/0 — весь scope одним прогоном. Доступно для обоих workload.
+  // Пусто/0 — весь scope одним прогоном. Доступно для обоих workload (window игнорирует его).
   batchSize: string;
   concurrency: string;
   // VoyageOnFailure = 'abort' | 'continue' (супerset ErrandRunOnFailure).
@@ -116,6 +119,20 @@ interface OptionsState {
   wait: boolean;
   // Отложенный старт (ISO-8601). Пусто → немедленный старт.
   scheduleAt: string;
+  // Режим батчинга (ADR-043). barrier = последовательные Leg-и (дефолт); window = скользящее окно.
+  batchMode: VoyageBatchMode;
+  // % от scope (1-100). Взаимоисключающий с batchSize.
+  // batchSizeMode = 'abs' | 'pct' — radio-выбор.
+  batchSizeMode: 'abs' | 'pct';
+  batchPercent: string;
+  // Порог провалов: остановить после N. Пусто = поведение по on_failure.
+  failThreshold: string;
+  // Пауза между Leg-ами в ms (barrier). Пусто = без паузы.
+  interBatchIntervalMs: string;
+  // Пауза между единицами окна в ms (window). Пусто = без паузы.
+  interUnitIntervalMs: string;
+  // Presence-фильтр: только живые хосты. Применяется к kind=command.
+  requireAlive: boolean;
 }
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -129,7 +146,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 6;
+const DRAFT_VERSION = 7;
 
 interface WizardDraft {
   v: number;
@@ -173,6 +190,13 @@ const DEFAULT_OPTIONS: OptionsState = {
   dryRun: false,
   wait: false,
   scheduleAt: '',
+  batchMode: 'barrier',
+  batchSizeMode: 'abs',
+  batchPercent: '',
+  failThreshold: '',
+  interBatchIntervalMs: '',
+  interUnitIntervalMs: '',
+  requireAlive: false,
 };
 
 function loadDraft(): WizardDraft | null {
@@ -532,6 +556,42 @@ export function RunWizard() {
     return d.toISOString();
   }
 
+  // Строит общую часть опций для обоих workload.
+  function buildOptionsPayload() {
+    const c = parseIntOrEmpty(options.concurrency);
+    const concurrency = c && c > 0 ? c : 50;
+    const batchMode = options.batchMode;
+
+    // XOR batch_size / batch_percent: шлём только активный режим.
+    // window не использует batch_size (ширина окна = concurrency) — не шлём.
+    const batchSize =
+      batchMode !== 'window' && options.batchSizeMode === 'abs'
+        ? parseIntOrEmpty(options.batchSize)
+        : undefined;
+    const batchPercent =
+      batchMode !== 'window' && options.batchSizeMode === 'pct'
+        ? parseIntOrEmpty(options.batchPercent)
+        : undefined;
+
+    const failThreshold = parseIntOrEmpty(options.failThreshold);
+    const interBatchMs =
+      batchMode === 'barrier' ? parseIntOrEmpty(options.interBatchIntervalMs) : undefined;
+    const interUnitMs =
+      batchMode === 'window' ? parseIntOrEmpty(options.interUnitIntervalMs) : undefined;
+
+    return {
+      concurrency,
+      batch_mode: batchMode,
+      batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
+      batch_percent: batchPercent && batchPercent >= 1 && batchPercent <= 100 ? batchPercent : undefined,
+      fail_threshold: failThreshold && failThreshold > 0 ? failThreshold : undefined,
+      inter_batch_interval_ms: interBatchMs && interBatchMs > 0 ? interBatchMs : undefined,
+      inter_unit_interval_ms: interUnitMs && interUnitMs > 0 ? interUnitMs : undefined,
+      on_failure: options.onFailure,
+      schedule_at: scheduleAtIso(options.scheduleAt),
+    };
+  }
+
   async function submitScenario(): Promise<string> {
     const inputObj =
       usePerField && inputSchema
@@ -539,25 +599,21 @@ export function RunWizard() {
         : scenarioState.inputObj;
 
     const names = scenarioState.incarnations;
-    const c = parseIntOrEmpty(options.concurrency);
-    const batchSize = parseIntOrEmpty(options.batchSize);
+    const opts = buildOptionsPayload();
 
     const reply = await keeperApi.voyages.create({
       kind: 'scenario',
       scenario_name: scenarioState.scenario,
       input: Object.keys(inputObj).length > 0 ? inputObj : undefined,
       target: { incarnations: names },
-      batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
-      concurrency: c && c > 0 ? c : 50,
       dry_run: Boolean(options.dryRun),
-      on_failure: options.onFailure,
-      schedule_at: scheduleAtIso(options.scheduleAt),
+      require_alive: options.requireAlive,
+      ...opts,
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
 
   async function submitCommand(): Promise<string> {
-    const c = parseIntOrEmpty(options.concurrency);
     // Полный адрес модуля — `<name>.<state>` (state опускается, если пуст —
     // free-text fallback мог не задать его).
     const moduleName = commandState.moduleState
@@ -569,30 +625,38 @@ export function RunWizard() {
     } else {
       input = commandState.customInput;
     }
-    const batchSize = parseIntOrEmpty(options.batchSize);
+    const opts = buildOptionsPayload();
     // UI уже резолвил rich-criteria в явный список SID — шлём через target.sids.
     const reply = await keeperApi.voyages.create({
       kind: 'command',
       module: moduleName,
       input: Object.keys(input).length > 0 ? input : undefined,
       target: { sids: resolvedSids },
-      batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
-      concurrency: c && c > 0 ? c : 50,
       dry_run: false,
-      on_failure: options.onFailure,
-      schedule_at: scheduleAtIso(options.scheduleAt),
+      require_alive: options.requireAlive,
+      ...opts,
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
 
   // batchSize — опциональное поле; если задано, должно быть целым 1..10000
-  // (верхняя граница = max_scope-дефолт backend).
+  // (верхняя граница = max_scope-дефолт backend). При window или batchSizeMode=pct — не валидируем.
   const batchSizeValid = useMemo(() => {
+    if (options.batchMode === 'window' || options.batchSizeMode !== 'abs') return true;
     const s = options.batchSize.trim();
     if (!s) return true; // пусто — ok (весь scope одним прогоном)
     const n = parseIntOrEmpty(s);
     return Boolean(n && n >= 1 && n <= 10000);
-  }, [options.batchSize]);
+  }, [options.batchSize, options.batchMode, options.batchSizeMode]);
+
+  // batchPercent — опционально; если задан, 1..100.
+  const batchPercentValid = useMemo(() => {
+    if (options.batchSizeMode !== 'pct') return true;
+    const s = options.batchPercent.trim();
+    if (!s) return true;
+    const n = parseIntOrEmpty(s);
+    return Boolean(n && n >= 1 && n <= 100);
+  }, [options.batchPercent, options.batchSizeMode]);
 
   // scheduleAt — опциональное поле; если задано, должно быть в будущем.
   const scheduleAtValid = useMemo(() => {
@@ -601,7 +665,7 @@ export function RunWizard() {
     return new Date(s) > new Date();
   }, [options.scheduleAt]);
 
-  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchSizeValid && scheduleAtValid && !submitMu.isPending;
+  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchSizeValid && batchPercentValid && scheduleAtValid && !submitMu.isPending;
 
   // Самый дальний достижимый шаг по валидации (gate каждого шага). Stepper красит
   // «done» только реально пройденные шаги и запрещает прыжок вперёд за невалидный
@@ -677,7 +741,7 @@ export function RunWizard() {
         ) : null}
 
         {step === 4 ? (
-          <Step4Options value={options} onChange={setOptions} workload={workload} scheduleAtValid={scheduleAtValid} batchSizeValid={batchSizeValid} />
+          <Step4Options value={options} onChange={setOptions} workload={workload} scheduleAtValid={scheduleAtValid} batchSizeValid={batchSizeValid} batchPercentValid={batchPercentValid} />
         ) : null}
 
         {submitError ? <div className={pageStyles.errorBox}>{submitError}</div> : null}
@@ -1345,14 +1409,17 @@ function Step4Options({
   workload,
   scheduleAtValid,
   batchSizeValid,
+  batchPercentValid,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
   workload: Workload;
   scheduleAtValid: boolean;
   batchSizeValid: boolean;
+  batchPercentValid: boolean;
 }) {
   const { t } = useTranslation();
+  const isWindow = value.batchMode === 'window';
 
   // Вычисляем UTC-эквивалент заполненного поля для отображения рядом с hint.
   const scheduleAtUtc = useMemo(() => {
@@ -1365,22 +1432,117 @@ function Step4Options({
 
   return (
     <>
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>{t('run:batchSizeLabel')}</span>
-        <input
-          type="number"
-          className={styles.field}
-          min={1}
-          value={value.batchSize}
-          onChange={(e) => onChange({ ...value, batchSize: e.target.value })}
-          placeholder={t('run:batchSizePlaceholder')}
-          aria-label="Batch size"
-        />
-        <span className={styles.hint}>{t('run:batchSizeHint')}</span>
-        {!batchSizeValid && value.batchSize.trim() ? (
-          <span className={styles.warn}>{t('run:batchSizeError')}</span>
-        ) : null}
-      </label>
+      {/* Batch mode */}
+      <fieldset
+        style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
+      >
+        <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>
+          {t('run:batchModeLabel')}
+        </legend>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+            <input
+              type="radio"
+              name="batch_mode"
+              value="barrier"
+              checked={value.batchMode === 'barrier'}
+              onChange={() => onChange({ ...value, batchMode: 'barrier' })}
+              aria-label="batch_mode_barrier"
+            />
+            barrier
+          </label>
+          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+            <input
+              type="radio"
+              name="batch_mode"
+              value="window"
+              checked={value.batchMode === 'window'}
+              onChange={() => onChange({ ...value, batchMode: 'window', batchSizeMode: 'abs' })}
+              aria-label="batch_mode_window"
+            />
+            window
+          </label>
+        </div>
+        <div className={styles.hint} style={{ marginTop: 6 }}>
+          {isWindow ? t('run:batchModeWindowHint') : t('run:batchModeBarrierHint')}
+        </div>
+      </fieldset>
+
+      {/* Batch size / percent — скрыть при window (не используется) */}
+      {!isWindow ? (
+        <>
+          {/* Radio: абсолютный / процент */}
+          <div className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>{t('run:batchSizeModeLabel')}</span>
+            <div style={{ display: 'flex', gap: 14 }}>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                <input
+                  type="radio"
+                  name="batch_size_mode"
+                  value="abs"
+                  checked={value.batchSizeMode === 'abs'}
+                  onChange={() => onChange({ ...value, batchSizeMode: 'abs', batchPercent: '' })}
+                  aria-label="batch_size_mode_abs"
+                />
+                {t('run:batchSizeModeAbs')}
+              </label>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                <input
+                  type="radio"
+                  name="batch_size_mode"
+                  value="pct"
+                  checked={value.batchSizeMode === 'pct'}
+                  onChange={() => onChange({ ...value, batchSizeMode: 'pct', batchSize: '' })}
+                  aria-label="batch_size_mode_pct"
+                />
+                {t('run:batchSizeModePct')}
+              </label>
+            </div>
+          </div>
+
+          {value.batchSizeMode === 'abs' ? (
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:batchSizeLabel')}</span>
+              <input
+                type="number"
+                className={styles.field}
+                min={1}
+                value={value.batchSize}
+                onChange={(e) => onChange({ ...value, batchSize: e.target.value })}
+                placeholder={t('run:batchSizePlaceholder')}
+                aria-label="Batch size"
+              />
+              <span className={styles.hint}>{t('run:batchSizeHint')}</span>
+              {!batchSizeValid && value.batchSize.trim() ? (
+                <span className={styles.warn}>{t('run:batchSizeError')}</span>
+              ) : null}
+            </label>
+          ) : (
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:batchPercentLabel')}</span>
+              <input
+                type="number"
+                className={styles.field}
+                min={1}
+                max={100}
+                value={value.batchPercent}
+                onChange={(e) => onChange({ ...value, batchPercent: e.target.value })}
+                placeholder={t('run:batchPercentPlaceholder')}
+                aria-label="Batch percent"
+              />
+              <span className={styles.hint}>{t('run:batchPercentHint')}</span>
+              {!batchPercentValid && value.batchPercent.trim() ? (
+                <span className={styles.warn}>{t('run:batchPercentError')}</span>
+              ) : null}
+            </label>
+          )}
+        </>
+      ) : (
+        // Window: batch_size не используется — пояснение
+        <div className={styles.hint} style={{ marginTop: 4 }}>
+          {t('run:batchSizeWindowHidden')}
+        </div>
+      )}
 
       <label className={styles.fieldRow}>
         <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
@@ -1393,7 +1555,9 @@ function Step4Options({
           onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
           aria-label="Concurrency"
         />
-        <span className={styles.hint}>{t('run:concurrencyHint')}</span>
+        <span className={styles.hint}>
+          {isWindow ? t('run:concurrencyWindowHint') : t('run:concurrencyHint')}
+        </span>
       </label>
 
       <fieldset
@@ -1424,6 +1588,55 @@ function Step4Options({
         </div>
       </fieldset>
 
+      {/* fail_threshold */}
+      <label className={styles.fieldRow}>
+        <span className={styles.fieldLabel}>{t('run:failThresholdLabel')}</span>
+        <input
+          type="number"
+          className={styles.field}
+          min={1}
+          value={value.failThreshold}
+          onChange={(e) => onChange({ ...value, failThreshold: e.target.value })}
+          placeholder={t('run:failThresholdPlaceholder')}
+          aria-label="Fail threshold"
+        />
+        <span className={styles.hint}>{t('run:failThresholdHint')}</span>
+      </label>
+
+      {/* inter_batch_interval_ms — только для barrier */}
+      {!isWindow ? (
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>{t('run:interBatchIntervalLabel')}</span>
+          <input
+            type="number"
+            className={styles.field}
+            min={0}
+            value={value.interBatchIntervalMs}
+            onChange={(e) => onChange({ ...value, interBatchIntervalMs: e.target.value })}
+            placeholder={t('run:interBatchIntervalPlaceholder')}
+            aria-label="Inter-batch interval ms"
+          />
+          <span className={styles.hint}>{t('run:interBatchIntervalHint')}</span>
+        </label>
+      ) : null}
+
+      {/* inter_unit_interval_ms — только для window */}
+      {isWindow ? (
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>{t('run:interUnitIntervalLabel')}</span>
+          <input
+            type="number"
+            className={styles.field}
+            min={0}
+            value={value.interUnitIntervalMs}
+            onChange={(e) => onChange({ ...value, interUnitIntervalMs: e.target.value })}
+            placeholder={t('run:interUnitIntervalPlaceholder')}
+            aria-label="Inter-unit interval ms"
+          />
+          <span className={styles.hint}>{t('run:interUnitIntervalHint')}</span>
+        </label>
+      ) : null}
+
       <label className={styles.fieldRow}>
         <span className={styles.fieldLabel}>{t('run:scheduleAtLabel')}</span>
         <input
@@ -1449,6 +1662,20 @@ function Step4Options({
           {t('run:dryRunLabel')}
         </label>
       ) : null}
+      <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+        <input
+          type="checkbox"
+          checked={value.requireAlive}
+          onChange={(e) => onChange({ ...value, requireAlive: e.target.checked })}
+          aria-label="require_alive"
+        />
+        {t('run:requireAliveLabel')}
+        {workload === 'scenario' ? (
+          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+            {' '}({t('run:requireAliveScenarioNote')})
+          </span>
+        ) : null}
+      </label>
       <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
         <input
           type="checkbox"

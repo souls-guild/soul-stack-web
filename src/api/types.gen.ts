@@ -936,10 +936,13 @@ export interface paths {
          *     выбирается ПО kind из тела + per-incarnation scope-check (scenario);
          *     старт на цели вне permission-скоупа = privilege escalation → 403.
          *
-         *     Batch (Leg) = N единиц (batch_size); между Leg-ами — inter_batch_interval;
-         *     on_failure ∈ {abort, continue}. schedule_at → отложенный старт (status
-         *     scheduled). Async-by-default: 202 + voyage_id + Location. Пустой
-         *     резолв-target → 422 voyage_empty_target. `input` НЕ логируется (audit
+         *     Batch (Leg) = N единиц (batch_size или batch_percent — взаимоисключающие,
+         *     оба → 422); между Leg-ами — inter_batch_interval; on_failure ∈ {abort,
+         *     continue} либо fail_threshold (порог числа провалов). schedule_at →
+         *     отложенный старт (status scheduled). Async-by-default: 202 + voyage_id +
+         *     Location. Пустой резолв-target → 422 voyage_empty_target. Эффективный
+         *     batch_size (barrier) или concurrency (window) выше voyage.max_batch_size →
+         *     422 voyage_batch_size_too_large. `input` НЕ логируется (audit
          *     scenario_run.started/command_run.invoked, инвариант A ADR-027).
          */
         post: operations["CreateVoyage"];
@@ -3575,13 +3578,21 @@ export interface components {
                 [key: string]: unknown;
             };
             target: components["schemas"]["VoyageTarget"];
-            /** @description Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg. */
+            /** @description Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg. Взаимоисключающий с batch_percent (оба заданы → 422). Не используется при batch_mode=window (ширина окна = concurrency); явно заданный с batch_mode=window → 422. */
             batch_size?: number;
+            /** @description Размер Leg как % от резолвнутого scope (ADR-043 amendment, parity Salt `-b 25%`). Эффективный batch_size = ceil(scope * pct/100). Взаимоисключающий с batch_size (оба заданы → 422). Осмыслен только для batch_mode=barrier; с batch_mode=window → 422. */
+            batch_percent?: number;
             /**
-             * @description Степень параллелизма внутри Leg.
+             * @description batch_mode=barrier — параллелизм внутри Leg; batch_mode=window — ширина скользящего окна (держать N активных).
              * @default 50
              */
             concurrency: number;
+            /**
+             * @description Режим батчинга (ADR-043 amendment). barrier — последовательные Leg-и с барьером между пачками (по умолчанию). window — скользящее окно по хостам (только kind=command в этом релизе): пул concurrency воркеров из общей очереди, без барьеров; batch_size не используется, batch_index=0 у всех единиц.
+             * @default barrier
+             * @enum {string}
+             */
+            batch_mode: "barrier" | "window";
             /** @default false */
             dry_run: boolean;
             /**
@@ -3589,8 +3600,17 @@ export interface components {
              * @description Отложенный старт (status=scheduled, S4).
              */
             schedule_at?: string;
-            /** @description Пауза между Leg-ами в миллисекундах (контролируемая выкатка). */
+            /** @description Пауза между Leg-ами в миллисекундах (контролируемая выкатка, batch_mode=barrier). */
             inter_batch_interval_ms?: number;
+            /** @description Per-unit пауза перед спавном следующей единицы окна, в миллисекундах (ADR-043 amendment, parity inter_batch_interval). Применима только к batch_mode=window; в barrier игнорируется. */
+            inter_unit_interval_ms?: number;
+            /** @description Порог абсолютного числа провалов: накоплено N провалов → прогон останавливается (новые Leg-и / единицы окна не стартуют). ADR-043 amendment. on_failure=abort ≡ fail_threshold=1; on_failure=continue ≡ отсутствие порога. Работает в обоих batch_mode. */
+            fail_threshold?: number;
+            /**
+             * @description Presence-фильтр живых (ADR-043 amendment): при true scope-резолв отсекает Soul-ы без живого presence-lease. Снимок после фильтра фиксируется в target_resolved. Применяется только к kind=command.
+             * @default false
+             */
+            require_alive: boolean;
             /**
              * @default continue
              * @enum {string}
@@ -3625,12 +3645,17 @@ export interface components {
             status: "scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled";
             scope_size: number;
             batch_size?: number;
+            batch_percent?: number;
+            /** @enum {string} */
+            batch_mode?: "barrier" | "window";
             concurrency?: number;
             dry_run: boolean;
             total_batches: number;
             current_batch_index: number;
             /** @enum {string} */
             on_failure?: "abort" | "continue";
+            fail_threshold?: number;
+            require_alive?: boolean;
             target?: components["schemas"]["VoyageTarget"];
             /** Format: date-time */
             schedule_at?: string;

@@ -1169,12 +1169,12 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (v=5, incarnationRegex) → state восстанавливается', async () => {
+  it('Валидный свежий черновик (v=7, incarnationRegex) → state восстанавливается', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 6,
+        v: 7,
         step: 3,
         workload: 'scenario',
         scenarioState: {
@@ -1204,6 +1204,13 @@ describe('RunWizard', () => {
           dryRun: false,
           wait: false,
           scheduleAt: '',
+          batchMode: 'barrier',
+          batchSizeMode: 'abs',
+          batchPercent: '',
+          failThreshold: '',
+          interBatchIntervalMs: '',
+          interUnitIntervalMs: '',
+          requireAlive: false,
         },
       }),
     );
@@ -1348,5 +1355,148 @@ describe('RunWizard', () => {
     // Coven-критерий pre-filled (chip 'prod').
     await waitFor(() => expect(screen.getByLabelText('Coven labels').textContent).toContain('prod'));
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+  });
+
+  // --- Новые тесты S-W5: batch_mode / batch_percent / fail_threshold / require_alive ---
+
+  async function reachStep4Command() {
+    const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    const covenChip = await screen.findByLabelText('Coven labels');
+    await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+    return { stub, user };
+  }
+
+  it('batch_mode=window → batch_size поле скрыто, concurrency-hint изменён', async () => {
+    await reachStep4Command();
+    // Дефолт barrier — batch_size виден.
+    expect(screen.getByLabelText('Batch size')).toBeInTheDocument();
+
+    // Переключаем на window.
+    await userEvent.setup().click(screen.getByLabelText('batch_mode_window'));
+    // batch_size поле скрыто.
+    expect(screen.queryByLabelText('Batch size')).not.toBeInTheDocument();
+    // concurrency hint содержит описание sliding window.
+    await waitFor(() => {
+      const hint = document.querySelector('[aria-label="Concurrency"]')?.closest('label')?.textContent ?? '';
+      expect(hint).toMatch(/окн|window/i);
+    });
+  });
+
+  it('batch_mode=window → batch_size не уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    await user.click(screen.getByLabelText('batch_mode_window'));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.batch_mode).toBe('window');
+    expect('batch_size' in body).toBe(false);
+  });
+
+  it('batch_mode=barrier (дефолт) → batch_mode=barrier в POST, без лишних полей', async () => {
+    const { stub, user } = await reachStep4Command();
+    // Дефолт barrier, ничего не трогаем.
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.batch_mode).toBe('barrier');
+    expect('batch_percent' in body).toBe(false);
+    expect('inter_unit_interval_ms' in body).toBe(false);
+  });
+
+  it('batch_percent radio → batch_size скрыт, batch_percent уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    // Переключаем на % режим.
+    await user.click(screen.getByLabelText('batch_size_mode_pct'));
+    // batch_size поле скрыто, batch_percent поле видно.
+    expect(screen.queryByLabelText('Batch size')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Batch percent')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Batch percent'), '25');
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.batch_percent).toBe(25);
+    expect('batch_size' in body).toBe(false);
+  });
+
+  it('batch_size radio → batch_percent не уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    // Дефолт abs — batch_size видно.
+    await user.type(screen.getByLabelText('Batch size'), '5');
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.batch_size).toBe(5);
+    expect('batch_percent' in body).toBe(false);
+  });
+
+  it('fail_threshold заполнен → уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    await user.type(screen.getByLabelText('Fail threshold'), '3');
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    expect((stub.posted?.body as Record<string, unknown>).fail_threshold).toBe(3);
+  });
+
+  it('fail_threshold пустой → не уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    expect('fail_threshold' in (stub.posted?.body as Record<string, unknown>)).toBe(false);
+  });
+
+  it('require_alive чекбокс → уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    await user.click(screen.getByLabelText('require_alive'));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    expect((stub.posted?.body as Record<string, unknown>).require_alive).toBe(true);
+  });
+
+  it('require_alive дефолт false → уходит в POST как false', async () => {
+    const { stub, user } = await reachStep4Command();
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    expect((stub.posted?.body as Record<string, unknown>).require_alive).toBe(false);
+  });
+
+  it('inter_unit_interval_ms поле виден только в window, уходит в POST', async () => {
+    const { stub, user } = await reachStep4Command();
+    // Дефолт barrier — inter_unit не виден.
+    expect(screen.queryByLabelText('Inter-unit interval ms')).not.toBeInTheDocument();
+    // inter_batch виден.
+    expect(screen.getByLabelText('Inter-batch interval ms')).toBeInTheDocument();
+
+    // Переключаем на window.
+    await user.click(screen.getByLabelText('batch_mode_window'));
+    expect(screen.getByLabelText('Inter-unit interval ms')).toBeInTheDocument();
+    // inter_batch скрыт при window.
+    expect(screen.queryByLabelText('Inter-batch interval ms')).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Inter-unit interval ms'), '500');
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.inter_unit_interval_ms).toBe(500);
+    expect('inter_batch_interval_ms' in body).toBe(false);
   });
 });
