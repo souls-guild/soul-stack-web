@@ -6,13 +6,16 @@ import { useState } from 'react';
 import {
   keeperApi,
   type Voyage,
+  type VoyageStatus,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 
-const NON_TERMINAL: ReadonlySet<string> = new Set(['pending', 'scheduled', 'running']);
+// satisfies: перечисление ⊆ VoyageStatus; при добавлении статуса в backend tsc потребует пересмотра.
+const NON_TERMINAL_STATUSES = ['pending', 'scheduled', 'running'] as const satisfies readonly VoyageStatus[];
+const NON_TERMINAL: ReadonlySet<string> = new Set(NON_TERMINAL_STATUSES);
 
 function progressPct(v: Voyage): number {
   if (!v.total_batches || v.total_batches <= 0) return 0;

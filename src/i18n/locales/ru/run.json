@@ -46,8 +46,6 @@
   "covenKebabError": "kebab-case: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
   "scenarioInputFieldsLabel": "Input (поля scenario {{scenario}})",
   "scenarioInputDynamicLabel": "Input (динамический form-builder без input_schema)",
-  "commandShellLabel": "Command (sh -c)",
-  "commandExecLabel": "Binary + args (одной строкой)",
   "customModuleOption": "— custom module —",
   "moduleNameLabel": "Module name",
   "moduleNamePlaceholder": "core.http.probe",
@@ -59,8 +57,6 @@
   "moduleCatalogUnavailable": "каталог модулей недоступен — введите имя модуля вручную.",
   "moduleParamsLabel": "Параметры ({{module}})",
   "moduleStateLabel": "State (verb модуля)",
-  "commandShellPlaceholder": "uptime && df -h",
-  "commandExecPlaceholder": "/usr/bin/uptime",
   "timeoutLabel": "Timeout (s)",
   "destinyRefLabel": "Destiny ref (<name>@<ref>)",
   "destinyRefPlaceholder": "redis-cluster@v2.0.0",
@@ -123,5 +119,9 @@
   "advancedLabel": "Дополнительно",
   "listAddItem": "добавить",
   "listRemoveItem": "−",
-  "listIntError": "не целое число"
+  "listIntError": "не целое число",
+  "mapAddPair": "добавить пару",
+  "mapRemovePair": "−",
+  "mapDuplicateKeyError": "дубликат ключа",
+  "mapIncompleteKeyError": "ключ не заполнен"
 }

@@ -2206,6 +2206,15 @@ export interface components {
              *     (`scenario/<name>/main.yml`).
              */
             path: string;
+            /**
+             * @description Дискриминатор сценария для UI (каталог, не хардкод имён):
+             *     `lifecycle` — keeper трактует его особо (create / destroy /
+             *     converge — bootstrap / teardown / drift-detect), `operational` —
+             *     обычная операция над state. Размечается keeper-ом по имени, фронт
+             *     читает поле, а не зашивает список lifecycle-имён.
+             * @enum {string}
+             */
+            kind: "lifecycle" | "operational";
             /** @description top-level `description:` scenario (если задан). */
             description?: string;
             /**
@@ -2560,7 +2569,7 @@ export interface components {
         /**
          * @description Один параметр модуля из manifest-схемы (`spec.states[*].input`): для
          *     plugin — из manifest.yaml, для core — из coremanifest-реестра. Поля
-         *     enum/pattern/format/source описывают UI-форму модуля (ADR-045).
+         *     enum/pattern/format/source/multiline/example описывают UI-форму модуля (ADR-045).
          */
         ModuleParam: {
             name: string;
@@ -2577,7 +2586,11 @@ export interface components {
             /** @description Семантический формат строки (hostname/fqdn/ipv4/.../sid). */
             format?: string;
             source?: components["schemas"]["ModuleInputSource"];
-            /** @description Тип элементов списка (ADR-045 S7); присутствует для type=list/array, строит типизированный список в форме (напр. list[int]). */
+            /** @description Поле = большое textarea (а не однострочный input). */
+            multiline?: boolean;
+            /** @description Пример значения для placeholder UI-формы. */
+            example?: string;
+            /** @description Описатель типа коллекции (ADR-045 S7 + amend). Для type=list/array — тип ЭЛЕМЕНТА (строит типизированный список, напр. list[int]). Для type=map/object — тип ЗНАЧЕНИЯ (map[string]<items>): при скалярном items.type UI рисует KEY→VALUE-редактор (виджет по items.type), без items / при items.type=map|object — JSON-редактор. Присутствует только если задан в манифесте. */
             items?: components["schemas"]["ModuleParam"];
         };
         /**

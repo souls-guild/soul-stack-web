@@ -31,11 +31,15 @@ function StatefulFields({
   incarnationContext,
   moduleName,
   showErrors,
+  onInvalidMapChange,
+  onPatternErrorChange,
 }: {
   schema: ScenarioInputSchema;
   incarnationContext?: string;
   moduleName?: string;
   showErrors?: boolean;
+  onInvalidMapChange?: (fields: string[]) => void;
+  onPatternErrorChange?: (fields: string[]) => void;
 }) {
   const [state, setState] = useState<ScenarioFieldsState>({});
   return (
@@ -46,13 +50,21 @@ function StatefulFields({
       showErrors={showErrors ?? false}
       incarnationContext={incarnationContext}
       moduleName={moduleName}
+      onInvalidMapChange={onInvalidMapChange}
+      onPatternErrorChange={onPatternErrorChange}
     />
   );
 }
 
 function renderFields(
   schema: ScenarioInputSchema,
-  opts?: { incarnationContext?: string; moduleName?: string; showErrors?: boolean },
+  opts?: {
+    incarnationContext?: string;
+    moduleName?: string;
+    showErrors?: boolean;
+    onInvalidMapChange?: (fields: string[]) => void;
+    onPatternErrorChange?: (fields: string[]) => void;
+  },
 ) {
   render(
     <StatefulFields
@@ -60,6 +72,8 @@ function renderFields(
       incarnationContext={opts?.incarnationContext}
       moduleName={opts?.moduleName}
       showErrors={opts?.showErrors}
+      onInvalidMapChange={opts?.onInvalidMapChange}
+      onPatternErrorChange={opts?.onPatternErrorChange}
     />,
   );
 }
@@ -190,10 +204,18 @@ describe('paramsToInputSchema — нормализация типов ADR-045', 
     expect(schema.hosts.type).toBe('array');
   });
 
-  it('нормализует map → object', () => {
+  it('нормализует map → object + isMap=true', () => {
     const params: ModuleParam[] = [{ name: 'tags', type: 'map', required: false }];
     const schema = paramsToInputSchema(params);
     expect(schema.tags.type).toBe('object');
+    expect(schema.tags.isMap).toBe(true);
+  });
+
+  it('object без map: isMap отсутствует', () => {
+    const params: ModuleParam[] = [{ name: 'cfg', type: 'object', required: false }];
+    const schema = paramsToInputSchema(params);
+    expect(schema.cfg.type).toBe('object');
+    expect(schema.cfg.isMap).toBeFalsy();
   });
 
   it('пробрасывает enum', () => {
@@ -315,5 +337,277 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(screen.getByTestId('field-typedlist-item-nums-1')).toBeTruthy();
     fireEvent.click(screen.getByTestId('field-typedlist-remove-nums-0'));
     expect(screen.queryByTestId('field-typedlist-item-nums-1')).toBeNull();
+  });
+});
+
+describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeholder', () => {
+  it('multiline=true → рендерит textarea с data-testid field-multiline', () => {
+    const schema: ScenarioInputSchema = {
+      script: { type: 'string', required: false, multiline: true },
+    };
+    renderFields(schema);
+    expect(screen.getByTestId('field-multiline-script')).toBeTruthy();
+    expect(screen.getByTestId('field-multiline-script').tagName).toBe('TEXTAREA');
+    // НЕ должно быть text-input
+    expect(screen.queryByTestId('field-text-script')).toBeNull();
+  });
+
+  it('multiline=true: ввод обновляет значение', () => {
+    const schema: ScenarioInputSchema = {
+      body: { type: 'string', required: false, multiline: true },
+    };
+    renderFields(schema);
+    const ta = screen.getByTestId('field-multiline-body') as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: 'hello\nworld' } });
+    expect(ta.value).toBe('hello\nworld');
+  });
+
+  it('example → placeholder на text input', () => {
+    const schema: ScenarioInputSchema = {
+      host: { type: 'string', required: false, example: 'db-01.example.com' },
+    };
+    renderFields(schema);
+    const input = screen.getByTestId('field-text-host') as HTMLInputElement;
+    expect(input.placeholder).toBe('db-01.example.com');
+  });
+
+  it('example → placeholder на multiline textarea', () => {
+    const schema: ScenarioInputSchema = {
+      cmd: { type: 'string', required: false, multiline: true, example: 'apt-get update' },
+    };
+    renderFields(schema);
+    const ta = screen.getByTestId('field-multiline-cmd') as HTMLTextAreaElement;
+    expect(ta.placeholder).toBe('apt-get update');
+  });
+
+  it('multiline=true: pattern-валидация продолжает работать', () => {
+    const schema: ScenarioInputSchema = {
+      slug: { type: 'string', required: false, multiline: true, pattern: '^[a-z-]+$' },
+    };
+    renderFields(schema);
+    const ta = screen.getByTestId('field-multiline-slug') as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: 'INVALID_123' } });
+    expect(screen.getByTestId('field-pattern-error-slug')).toBeTruthy();
+    fireEvent.change(ta, { target: { value: 'valid-slug' } });
+    expect(screen.queryByTestId('field-pattern-error-slug')).toBeNull();
+  });
+
+  it('paramsToInputSchema пробрасывает multiline и example', () => {
+    const params: ModuleParam[] = [
+      { name: 'cmd', type: 'string', required: true, multiline: true, example: 'uptime' },
+    ];
+    const schema = paramsToInputSchema(params);
+    expect(schema.cmd.multiline).toBe(true);
+    expect(schema.cmd.example).toBe('uptime');
+  });
+});
+
+import {
+  invalidCompositeFields,
+  serializeFields,
+} from '../pages/incarnations/scenarioInputFields.helpers';
+
+describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs fix)', () => {
+  const mapSchema: ScenarioInputSchema = {
+    env: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
+  };
+
+  it('дубль-ключ → показан field-map-error + onInvalidMapChange сигнализирует об ошибке', async () => {
+    const invalidMapFields: string[] = [];
+    renderFields(mapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
+    // Добавляем две пары
+    fireEvent.click(screen.getByTestId('field-map-add-env'));
+    fireEvent.click(screen.getByTestId('field-map-add-env'));
+    // Вводим одинаковые ключи
+    fireEvent.change(screen.getByTestId('field-map-key-env-0'), { target: { value: 'FOO' } });
+    fireEvent.change(screen.getByTestId('field-map-val-env-0'), { target: { value: '1' } });
+    fireEvent.change(screen.getByTestId('field-map-key-env-1'), { target: { value: 'FOO' } });
+    fireEvent.change(screen.getByTestId('field-map-val-env-1'), { target: { value: '2' } });
+    // Должен появиться inline-error
+    await waitFor(() => {
+      expect(screen.getAllByTestId('field-map-error-env').length).toBeGreaterThan(0);
+    });
+    // onInvalidMapChange сигнализирует об ошибке через отдельный канал (не sentinel-строка).
+    expect(invalidMapFields).toContain('env');
+  });
+
+  it('дубль-ключ: внешнее value — валидный JSON (last-wins, не sentinel)', async () => {
+    // Проверяем что значение НЕ портится в 'invalid-map': черновик переживает re-mount.
+    const values: Array<string | number | boolean | undefined> = [];
+    const schema: ScenarioInputSchema = {
+      env: { type: 'object', required: false, isMap: true, items: { type: 'string' } },
+    };
+    let capturedOnChange: ((next: import('../pages/incarnations/scenarioInputFields.helpers').ScenarioFieldsState) => void) | null = null;
+    function TrackingWrapper() {
+      const [state, setState] = useState<import('../pages/incarnations/scenarioInputFields.helpers').ScenarioFieldsState>({});
+      capturedOnChange = (next) => {
+        setState(next);
+        values.push(next.env);
+      };
+      return (
+        <ScenarioInputFields
+          schema={schema}
+          value={state}
+          onChange={capturedOnChange}
+        />
+      );
+    }
+    render(<TrackingWrapper />);
+    fireEvent.click(screen.getByTestId('field-map-add-env'));
+    fireEvent.click(screen.getByTestId('field-map-add-env'));
+    fireEvent.change(screen.getByTestId('field-map-key-env-0'), { target: { value: 'A' } });
+    fireEvent.change(screen.getByTestId('field-map-val-env-0'), { target: { value: '1' } });
+    fireEvent.change(screen.getByTestId('field-map-key-env-1'), { target: { value: 'A' } });
+    fireEvent.change(screen.getByTestId('field-map-val-env-1'), { target: { value: '2' } });
+    // Последнее записанное значение должно быть валидным JSON (last-wins дубля), не 'invalid-map'.
+    await waitFor(() => expect(values.length).toBeGreaterThan(0));
+    const lastVal = values[values.length - 1];
+    expect(lastVal).not.toBe('invalid-map');
+    // last-wins: A→2 (второй ключ выигрывает).
+    if (typeof lastVal === 'string' && lastVal !== '') {
+      const parsed = JSON.parse(lastVal);
+      expect(parsed).toMatchObject({ A: '2' });
+    }
+  });
+
+  it('пустой key + непустой value → warning + onInvalidMapChange сигнализирует об ошибке', async () => {
+    const invalidMapFields: string[] = [];
+    renderFields(mapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
+    fireEvent.click(screen.getByTestId('field-map-add-env'));
+    // key оставляем пустым, value заполняем
+    fireEvent.change(screen.getByTestId('field-map-val-env-0'), { target: { value: 'bar' } });
+    await waitFor(() => {
+      expect(screen.getAllByTestId('field-map-error-env').length).toBeGreaterThan(0);
+    });
+    expect(invalidMapFields).toContain('env');
+  });
+
+  it('bad-int value → warning + onInvalidMapChange сигнализирует об ошибке (major-2)', async () => {
+    const intMapSchema: ScenarioInputSchema = {
+      scores: { type: 'object', required: false, isMap: true, items: { type: 'integer' } },
+    };
+    const invalidMapFields: string[] = [];
+    renderFields(intMapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
+    fireEvent.click(screen.getByTestId('field-map-add-scores'));
+    fireEvent.change(screen.getByTestId('field-map-key-scores-0'), { target: { value: 'foo' } });
+    fireEvent.change(screen.getByTestId('field-map-val-scores-0'), { target: { value: 'abc' } });
+    // Должен появиться inline-error (field-map-error-scores).
+    await waitFor(() => {
+      expect(screen.getAllByTestId('field-map-error-scores').length).toBeGreaterThan(0);
+    });
+    // onInvalidMapChange сигнализирует об ошибке bad-int.
+    expect(invalidMapFields).toContain('scores');
+  });
+
+  it('полностью пустая пара (key=\'\', value=\'\') — НЕ ошибка, NOT сигнализирует', () => {
+    // Полностью пустые пары — affordance, не ошибка.
+    const blockedFields = invalidCompositeFields(mapSchema, { env: '' });
+    expect(blockedFields).not.toContain('env');
+  });
+
+  it('сквозной: две валидные пары → корректный body (string values)', () => {
+    const state = { env: JSON.stringify({ FOO: 'bar', BAZ: 'qux' }) };
+    const body = serializeFields(mapSchema, state);
+    expect(body).toEqual({ env: { FOO: 'bar', BAZ: 'qux' } });
+  });
+
+  it('сквозной: все пары удалены → env отсутствует в body (пустой map)', () => {
+    const body = serializeFields(mapSchema, { env: '' });
+    expect(body).not.toHaveProperty('env');
+  });
+
+  it('сквозной: map[string]int — значения конвертируются в числа', () => {
+    const intMapSchema: ScenarioInputSchema = {
+      scores: { type: 'object', required: false, isMap: true, items: { type: 'integer' } },
+    };
+    const state = { scores: JSON.stringify({ a: '1', b: '42' }) };
+    const body = serializeFields(intMapSchema, state);
+    expect(body).toEqual({ scores: { a: 1, b: 42 } });
+  });
+
+  it('pattern-violation → onPatternErrorChange сигнализирует (nit gate)', async () => {
+    const schema: ScenarioInputSchema = {
+      host: { type: 'string', required: false, pattern: '^[a-z]+$' },
+    };
+    const patternErrors: string[] = [];
+    renderFields(schema, { onPatternErrorChange: (f) => { patternErrors.length = 0; patternErrors.push(...f); } });
+    const input = screen.getByTestId('field-text-host');
+    fireEvent.change(input, { target: { value: 'INVALID_123' } });
+    await waitFor(() => expect(patternErrors).toContain('host'));
+    // После исправления — ошибка снимается.
+    fireEvent.change(input, { target: { value: 'valid' } });
+    await waitFor(() => expect(patternErrors).not.toContain('host'));
+  });
+});
+
+describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
+  it('map+items.string → рендерит MapEditor (field-map-*)', () => {
+    const schema: ScenarioInputSchema = {
+      labels: { type: 'object', required: false, isMap: true, items: { type: 'string' } },
+    };
+    renderFields(schema);
+    expect(screen.getByTestId('field-map-labels')).toBeTruthy();
+    // Не JSON-textarea
+    expect(screen.queryByTestId('field-composite-labels')).toBeNull();
+  });
+
+  it('map+items.string: добавить пару → появляются key/value инпуты', () => {
+    // required=true чтобы не попасть в details (advanced collapse)
+    const schema: ScenarioInputSchema = {
+      env_vars: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
+    };
+    renderFields(schema);
+    fireEvent.click(screen.getByTestId('field-map-add-env_vars'));
+    expect(screen.getByTestId('field-map-key-env_vars-0')).toBeTruthy();
+    expect(screen.getByTestId('field-map-val-env_vars-0')).toBeTruthy();
+  });
+
+  it('map+items.string: удалить пару', () => {
+    // required=true чтобы не попасть в details (advanced collapse)
+    const schema: ScenarioInputSchema = {
+      tags: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
+    };
+    renderFields(schema);
+    fireEvent.click(screen.getByTestId('field-map-add-tags'));
+    fireEvent.click(screen.getByTestId('field-map-add-tags'));
+    expect(screen.getByTestId('field-map-key-tags-0')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('field-map-remove-tags-0'));
+    // После удаления 0-й пары из двух остаётся одна, индекс 0 (не 1)
+    expect(screen.queryByTestId('field-map-key-tags-1')).toBeNull();
+    expect(screen.getByTestId('field-map-key-tags-0')).toBeTruthy();
+  });
+
+  it('map без items → JSON-textarea (деградация)', () => {
+    const schema: ScenarioInputSchema = {
+      profile: { type: 'object', required: false, isMap: true },
+    };
+    renderFields(schema);
+    // нет isMap+scalarItems → composite JSON-textarea
+    expect(screen.getByTestId('field-composite-profile')).toBeTruthy();
+    expect(screen.queryByTestId('field-map-profile')).toBeNull();
+  });
+
+  it('object без isMap → JSON-textarea', () => {
+    const schema: ScenarioInputSchema = {
+      config: { type: 'object', required: false },
+    };
+    renderFields(schema);
+    expect(screen.getByTestId('field-composite-config')).toBeTruthy();
+    expect(screen.queryByTestId('field-map-config')).toBeNull();
+  });
+
+  it('paramsToInputSchema: type=map+items → isMap=true + items пробрасываются', () => {
+    const params: ModuleParam[] = [
+      {
+        name: 'labels',
+        type: 'map',
+        required: false,
+        items: { name: '', required: false, type: 'string' },
+      },
+    ];
+    const schema = paramsToInputSchema(params);
+    expect(schema.labels.isMap).toBe(true);
+    expect(schema.labels.type).toBe('object');
+    expect(schema.labels.items?.type).toBe('string');
   });
 });

@@ -258,8 +258,16 @@ export interface ScenarioInputSchemaProperty {
   /**
    * Тип элемента списка (ADR-045 S8b). Присутствует для type=array.
    * Содержит вложенный ScenarioInputSchemaProperty (рекурсивно).
+   * Для type=map/object: тип значения карты — при скалярном items.type
+   * UI рисует KEY→VALUE-редактор; без items → JSON-textarea.
    */
   items?: ScenarioInputSchemaProperty;
+  /** Поле = большое textarea, а не однострочный input (ADR-045 B3). */
+  multiline?: boolean;
+  /** Пример значения для placeholder (ADR-045 B3). */
+  example?: string;
+  /** Признак типа map (type=map нормализован): при скалярном items.type → KEY→VALUE-редактор. */
+  isMap?: boolean;
   [key: string]: unknown;
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
@@ -268,6 +276,8 @@ export interface ServiceScenarioInfo {
   name: string;
   // Backend отдаёт `scenario/<name>/main.yml` — read-only справочно.
   path?: string;
+  /** Дискриминатор: lifecycle (create/destroy/converge) | operational. */
+  kind: 'lifecycle' | 'operational';
   description?: string;
   input_schema?: ScenarioInputSchema;
 }

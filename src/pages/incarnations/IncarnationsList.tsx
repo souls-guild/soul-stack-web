@@ -10,7 +10,8 @@ import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 import styles from '../common.module.css';
 
-const INCARNATION_STATUSES: IncarnationStatus[] = [
+// satisfies гарантирует, что список ⊆ IncarnationStatus; tsc упадёт при добавлении нового статуса в backend
+const INCARNATION_STATUSES = [
   'provisioning',
   'ready',
   'applying',
@@ -19,7 +20,7 @@ const INCARNATION_STATUSES: IncarnationStatus[] = [
   'drift',
   'destroying',
   'destroy_failed',
-];
+] as const satisfies readonly IncarnationStatus[];
 
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 

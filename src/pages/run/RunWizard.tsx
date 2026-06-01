@@ -84,7 +84,6 @@ interface ScenarioStateValues {
 // state (`shell`); полный адрес для submit — `<moduleName>.<moduleState>`.
 //
 // Ветвление формы параметров:
-//   - core cmd/exec (params пусты, errand-safe) → cmd-textarea (как было).
 //   - модуль с params[] → типизированная per-field форма (ScenarioInputFields).
 //   - каталог недоступен (404/501) → free-text имя + DynamicInputBuilder.
 interface CommandStateValues {
@@ -98,8 +97,6 @@ interface CommandStateValues {
   moduleKind: ModuleKind | '';
   // Параметры модуля из каталога (для авто-формы; пусты у core).
   moduleParams: ModuleParam[];
-  // shell/exec — cmd; для модулей с params не используется.
-  cmd: string;
   // Типизированные значения params-формы (для модулей с params[]).
   paramFields: ScenarioFieldsState;
   timeoutSeconds: number;
@@ -107,9 +104,6 @@ interface CommandStateValues {
   customModule: string;
   customInput: Record<string, unknown>;
 }
-
-// «cmd-модули» — core shell/exec: params пусты, форма = cmd-textarea.
-const CMD_FIELD_MODULES = new Set(['core.cmd', 'core.exec']);
 
 interface OptionsState {
   // Опциональный размер батча (Leg): N инкарнаций/хостов за раз.
@@ -135,7 +129,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 5;
+const DRAFT_VERSION = 6;
 
 interface WizardDraft {
   v: number;
@@ -166,7 +160,6 @@ const DEFAULT_COMMAND_STATE: CommandStateValues = {
   moduleStates: ['shell'],
   moduleKind: 'core',
   moduleParams: [],
-  cmd: '',
   paramFields: {},
   timeoutSeconds: 30,
   customModule: '',
@@ -226,7 +219,7 @@ export function RunWizard() {
   // сохранённый черновик (навигация away/back между шагами).
   const hasQueryIntent = useMemo(
     () =>
-      ['workload', 'service', 'scenario', 'incarnation', 'module', 'cmd', 'target_coven', 'target_regex', 'target_sids'].some(
+      ['workload', 'service', 'scenario', 'incarnation', 'module', 'target_coven', 'target_regex', 'target_sids'].some(
         (k) => searchParams.has(k),
       ),
     [searchParams],
@@ -243,7 +236,6 @@ export function RunWizard() {
   const initialScenario = searchParams.get('scenario') ?? '';
   const initialIncarnation = searchParams.get('incarnation') ?? '';
   const initialModuleParam = searchParams.get('module');
-  const initialCmd = searchParams.get('cmd') ?? '';
 
   // Pre-fill host-criteria из query (bulk-run actions со списочных страниц):
   //   target_sids → нет прямого mapping в criteria; кладём как sidRegex-anchor-OR
@@ -297,13 +289,13 @@ export function RunWizard() {
       };
     }
     const m = pickInitialCommandModule(initialModuleParam);
+    // Если задан ?module= с params → предзаполним paramFields при загрузке каталога.
     return {
       ...DEFAULT_COMMAND_STATE,
       moduleName: m.name,
       moduleState: m.state,
       moduleStates: m.state ? [m.state] : [],
       moduleKind: m.name.startsWith('core.') ? 'core' : initialModuleParam ? '' : 'core',
-      cmd: initialCmd,
     };
   });
 
@@ -325,6 +317,13 @@ export function RunWizard() {
   );
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Ошибки map-полей и pattern-полей (поднимаются из ScenarioInputFields).
+  // Включаются в submit-gate наряду с invalidCompositeFields/missingRequired.
+  const [scenarioInvalidMaps, setScenarioInvalidMaps] = useState<string[]>([]);
+  const [scenarioPatternErrors, setScenarioPatternErrors] = useState<string[]>([]);
+  const [commandInvalidMaps, setCommandInvalidMaps] = useState<string[]>([]);
+  const [commandPatternErrors, setCommandPatternErrors] = useState<string[]>([]);
 
   // Persist черновика на каждое изменение wizard-state. sessionStorage —
   // переживает навигацию внутри вкладки браузера, чистится при закрытии вкладки.
@@ -469,26 +468,35 @@ export function RunWizard() {
       return (
         scenarioState.incarnations.length > 0 &&
         scenarioMissingRequired.length === 0 &&
-        scenarioInvalidComposite.length === 0
+        scenarioInvalidComposite.length === 0 &&
+        scenarioInvalidMaps.length === 0 &&
+        scenarioPatternErrors.length === 0
       );
     }
     // command: Step3 — module+params.
     // Free-text fallback (каталог недоступен): нужно имя модуля.
     if (!commandState.moduleName.trim()) return false;
-    // Модуль с params — все required заполнены.
-    if (hasParams(commandState.moduleParams)) return commandMissingRequired.length === 0;
-    // cmd-модули (core.cmd/core.exec) — нужен непустой cmd.
-    if (CMD_FIELD_MODULES.has(commandState.moduleName)) return commandState.cmd.trim().length > 0;
-    // Прочие модули без формализованных params (free-text fallback или core
-    // без cmd-поля) — имени достаточно.
+    // Модуль с params — все required заполнены, нет map-ошибок и pattern-ошибок.
+    if (hasParams(commandState.moduleParams)) {
+      return (
+        commandMissingRequired.length === 0 &&
+        commandInvalidMaps.length === 0 &&
+        commandPatternErrors.length === 0
+      );
+    }
+    // Модуль без формализованных params (free-text fallback) — имени достаточно.
     return true;
   }, [
     workload,
     scenarioState.incarnations,
     scenarioMissingRequired,
     scenarioInvalidComposite,
+    scenarioInvalidMaps,
+    scenarioPatternErrors,
     commandState,
     commandMissingRequired,
+    commandInvalidMaps,
+    commandPatternErrors,
   ]);
 
   // --- Submit ---
@@ -558,8 +566,6 @@ export function RunWizard() {
     let input: Record<string, unknown>;
     if (hasParams(commandState.moduleParams)) {
       input = serializeFields(paramsToInputSchema(commandState.moduleParams), commandState.paramFields);
-    } else if (CMD_FIELD_MODULES.has(commandState.moduleName)) {
-      input = { cmd: commandState.cmd };
     } else {
       input = commandState.customInput;
     }
@@ -655,6 +661,8 @@ export function RunWizard() {
             selectedScenarioMeta={selectedScenarioMeta}
             missingRequired={scenarioMissingRequired}
             invalidComposite={scenarioInvalidComposite}
+            onInvalidMapChange={setScenarioInvalidMaps}
+            onPatternErrorChange={setScenarioPatternErrors}
           />
         ) : null}
         {step === 3 && workload === 'command' ? (
@@ -663,6 +671,8 @@ export function RunWizard() {
             onChange={setCommandState}
             missingRequired={commandMissingRequired}
             incarnationContext={hostCriteria.incarnations[0]}
+            onInvalidMapChange={setCommandInvalidMaps}
+            onPatternErrorChange={setCommandPatternErrors}
           />
         ) : null}
 
@@ -867,6 +877,8 @@ function Step3ScenarioIncarnations({
   selectedScenarioMeta,
   missingRequired,
   invalidComposite,
+  onInvalidMapChange,
+  onPatternErrorChange,
 }: {
   value: ScenarioStateValues;
   // Dispatch (а не plain-callback): два derived-эффекта ниже (defaults-seed и
@@ -881,6 +893,8 @@ function Step3ScenarioIncarnations({
   selectedScenarioMeta: ServiceScenarioInfo | undefined;
   missingRequired: string[];
   invalidComposite: string[];
+  onInvalidMapChange?: (fields: string[]) => void;
+  onPatternErrorChange?: (fields: string[]) => void;
 }) {
   const { t } = useTranslation();
 
@@ -1019,6 +1033,8 @@ function Step3ScenarioIncarnations({
             value={value.fields}
             onChange={(next) => onChange({ ...value, fields: next })}
             showErrors={missingRequired.length > 0 || invalidComposite.length > 0}
+            onInvalidMapChange={onInvalidMapChange}
+            onPatternErrorChange={onPatternErrorChange}
           />
           {selectedScenarioMeta?.description ? (
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
@@ -1160,14 +1176,40 @@ function Step3CommandParams({
   onChange,
   missingRequired,
   incarnationContext,
+  onInvalidMapChange,
+  onPatternErrorChange,
 }: {
   value: CommandStateValues;
   onChange: (next: CommandStateValues) => void;
   missingRequired: string[];
   incarnationContext?: string;
+  onInvalidMapChange?: (fields: string[]) => void;
+  onPatternErrorChange?: (fields: string[]) => void;
 }) {
   const { t } = useTranslation();
   const [catalogUnavailable, setCatalogUnavailable] = useState(false);
+
+  // При первом рендере moduleParams может быть пуст (state инициализирован дефолтом без
+  // обращения к каталогу). Подтягиваем params из React Query кэша когда каталог загрузится.
+  // queryKey совпадает с ModulePicker(errandSafe=true) → единый кэш, нет дублирующего запроса.
+  const catalogQ = useQuery({
+    queryKey: ['modules.catalog', true] as const,
+    queryFn: () => keeperApi.modules.list({ errand_safe: true }),
+    retry: false,
+  });
+  useEffect(() => {
+    if (!catalogQ.data || hasParams(value.moduleParams) || !value.moduleName) return;
+    const item = catalogQ.data.items.find((m) => m.name === value.moduleName);
+    if (!item || !hasParams(item.params)) return;
+    onChange({
+      ...value,
+      moduleStates: item.states ?? value.moduleStates,
+      moduleKind: item.kind,
+      moduleParams: item.params ?? [],
+      paramFields: defaultsFromSchema(paramsToInputSchema(item.params ?? [])),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogQ.data]);
 
   // Выбор модуля из каталога: применяем имя, kind, params и первый state.
   // Сбрасываем форму (cmd / paramFields), чтобы не нести значения старого модуля.
@@ -1180,16 +1222,13 @@ function Step3CommandParams({
       moduleStates: states,
       moduleKind: item.kind,
       moduleParams: item.params ?? [],
-      cmd: CMD_FIELD_MODULES.has(item.name) ? value.cmd : '',
       paramFields: hasParams(item.params) ? defaultsFromSchema(paramsToInputSchema(item.params)) : {},
     };
     onChange(next);
   }
 
-  const showCmdFields = CMD_FIELD_MODULES.has(value.moduleName) && !hasParams(value.moduleParams);
   const showParamsForm = hasParams(value.moduleParams);
   const paramsSchema = useMemo(() => paramsToInputSchema(value.moduleParams), [value.moduleParams]);
-  const isShellModule = value.moduleName === 'core.cmd';
 
   return (
     <>
@@ -1235,22 +1274,10 @@ function Step3CommandParams({
             showErrors={missingRequired.length > 0}
             incarnationContext={incarnationContext}
             moduleName={value.moduleName}
+            onInvalidMapChange={onInvalidMapChange}
+            onPatternErrorChange={onPatternErrorChange}
           />
         </div>
-      ) : showCmdFields ? (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>
-            {isShellModule ? t('run:commandShellLabel') : t('run:commandExecLabel')}
-          </span>
-          <textarea
-            className={styles.field}
-            rows={4}
-            value={value.cmd}
-            onChange={(e) => onChange({ ...value, cmd: e.target.value })}
-            placeholder={isShellModule ? t('run:commandShellPlaceholder') : t('run:commandExecPlaceholder')}
-            aria-label="Command"
-          />
-        </label>
       ) : value.moduleName ? (
         <div data-testid="module-dynamic-input">
           <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>

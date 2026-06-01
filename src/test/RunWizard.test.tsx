@@ -41,6 +41,7 @@ interface ScenarioStubProperty {
 }
 interface ScenarioStubEntry {
   name: string;
+  kind?: 'lifecycle' | 'operational';
   description?: string;
   input_schema?: Record<string, ScenarioStubProperty>;
 }
@@ -56,7 +57,7 @@ interface ModuleStub {
   description?: string;
   states: string[];
   errand_safe: boolean;
-  params?: Array<{ name: string; type?: string; required?: boolean; secret?: boolean; description?: string }>;
+  params?: Array<{ name: string; type?: string; required?: boolean; secret?: boolean; description?: string; multiline?: boolean; example?: string }>;
 }
 interface FetchStubOpts {
   serviceName?: string;
@@ -70,8 +71,22 @@ interface FetchStubOpts {
 }
 
 const DEFAULT_MODULES: ModuleStub[] = [
-  { name: 'core.cmd', kind: 'core', description: 'shell command', states: ['shell'], errand_safe: true, params: [] },
-  { name: 'core.exec', kind: 'core', description: 'binary + args', states: ['run'], errand_safe: true, params: [] },
+  {
+    name: 'core.cmd',
+    kind: 'core',
+    description: 'shell command',
+    states: ['shell'],
+    errand_safe: true,
+    params: [{ name: 'cmd', type: 'string', required: true, multiline: true, example: 'uptime' }],
+  },
+  {
+    name: 'core.exec',
+    kind: 'core',
+    description: 'binary + args',
+    states: ['run'],
+    errand_safe: true,
+    params: [{ name: 'cmd', type: 'string', required: true, multiline: true, example: '/usr/bin/uptime' }],
+  },
 ];
 
 interface CapturedPost {
@@ -84,8 +99,8 @@ interface CapturedPost {
 function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null; posts: CapturedPost[] } {
   const serviceName = opts.serviceName ?? 'redis';
   const scenarios: ScenarioStubEntry[] = opts.scenarios ?? [
-    { name: 'create', description: 'init', input_schema: {} },
-    { name: 'restart', description: 'restart workers', input_schema: {} },
+    { name: 'create', kind: 'lifecycle', description: 'init', input_schema: {} },
+    { name: 'restart', kind: 'operational', description: 'restart workers', input_schema: {} },
   ];
   const incarnationNames = opts.incarnationNames ?? ['redis-prod'];
   const souls: SoulStub[] = opts.souls ?? [];
@@ -347,6 +362,7 @@ describe('RunWizard', () => {
       scenarios: [
         {
           name: 'set_greeting',
+          kind: 'operational' as const,
           description: 'set greeting',
           input_schema: { greeting: { type: 'string', required: true, description: 'greet text' } },
         },
@@ -522,10 +538,10 @@ describe('RunWizard', () => {
     // Preview: 2 hosts match.
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
-    // Step 2 → 3 (module/params). Дефолтный модуль core.cmd.shell → cmd-textarea.
+    // Step 2 → 3 (module/params). Дефолтный модуль core.cmd.shell → params-форма с textarea cmd.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Command')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     // Step 3 → 4 → submit.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -559,8 +575,8 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Command')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
@@ -589,8 +605,8 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Command')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     // batch_size не заполняем.
@@ -616,8 +632,8 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Command')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
@@ -645,8 +661,8 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Command')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     // dry_run чекбокс не должен быть на шаге 4 для command-workload.
@@ -678,7 +694,8 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
@@ -791,14 +808,15 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Command → Step2 host → Step3 params, заполняем cmd.
+    // Command → Step2 host → Step3 params, заполняем cmd-поле.
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'db ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.type(screen.getByLabelText('Command'), 'uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     // Назад на Step1, переключаемся на Scenario и обратно на Command.
     await user.click(screen.getByRole('button', { name: /Назад/ }));
@@ -806,11 +824,12 @@ describe('RunWizard', () => {
     await user.click(screen.getByLabelText('Scenario apply'));
     await user.click(screen.getByLabelText('Command'));
 
-    // Идём вперёд до Step3 — cmd сохранился.
+    // Идём вперёд до Step3 — значение paramFields.cmd сохранилось через черновик.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    expect((screen.getByLabelText('Command') as HTMLTextAreaElement).value).toBe('uptime');
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    expect((screen.getByTestId('field-multiline-cmd') as HTMLTextAreaElement).value).toBe('uptime');
   });
 
   it('Scenario required-поле блокирует Далее/submit + inline-ошибка', async () => {
@@ -820,6 +839,7 @@ describe('RunWizard', () => {
       scenarios: [
         {
           name: 'set_greeting',
+          kind: 'operational' as const,
           description: 'set greeting',
           input_schema: { greeting: { type: 'string', required: true, description: 'greet text' } },
         },
@@ -1154,7 +1174,7 @@ describe('RunWizard', () => {
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 5,
+        v: 6,
         step: 3,
         workload: 'scenario',
         scenarioState: {
@@ -1171,7 +1191,6 @@ describe('RunWizard', () => {
           moduleStates: ['shell'],
           moduleKind: 'core',
           moduleParams: [],
-          cmd: '',
           paramFields: {},
           timeoutSeconds: 30,
           customModule: '',

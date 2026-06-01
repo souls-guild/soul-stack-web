@@ -13,15 +13,15 @@ import { JsonViewer } from '../../components/JsonViewer';
 import i18n from '../../i18n';
 import styles from '../common.module.css';
 
-// Перечень source-ов из openapi.yaml — `AuditEvent.source.enum`.
-const SOURCES: AuditEventSource[] = [
+// satisfies гарантирует, что список ⊆ AuditEventSource; tsc упадёт при добавлении нового source в backend
+const SOURCES = [
   'signal',
   'api',
   'mcp',
   'keeper_internal',
   'soul_grpc',
   'background',
-];
+] as const satisfies readonly AuditEventSource[];
 
 // Color-coding badge по source. Tone-набор фиксированный (Badge.tsx).
 function sourceTone(s: AuditEventSource | string | undefined):

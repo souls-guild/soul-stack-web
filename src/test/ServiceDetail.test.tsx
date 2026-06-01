@@ -75,6 +75,7 @@ describe('ServiceDetail', () => {
           scenarios: [
             {
               name: 'create',
+              kind: 'lifecycle',
               path: 'scenario/create/main.yml',
               description: 'Создаёт redis incarnation',
               input_schema: {

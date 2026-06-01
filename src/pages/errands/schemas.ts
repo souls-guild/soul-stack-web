@@ -94,12 +94,15 @@ export const errandSchema = z.discriminatedUnion('module', [
 ]);
 export type KnownErrandInput = z.infer<typeof errandSchema>;
 
-// Известные core-модули с типизированной формой.
-export const KNOWN_MODULES = ['core.cmd.shell', 'core.exec.run'] as const;
-export type KnownModule = (typeof KNOWN_MODULES)[number];
+// Модули, для которых есть typed-форма с отдельными полями (вместо JSON-fallback).
+// Это UI-решение (какие формы реализованы), НЕ политика whitelist — actual whitelist
+// определяется backend-ом через GET /v1/modules?errand_safe=true.
+export type KnownModule = 'core.cmd.shell' | 'core.exec.run';
+
+const TYPED_MODULES: readonly KnownModule[] = ['core.cmd.shell', 'core.exec.run'];
 
 export function isKnownModule(m: string): m is KnownModule {
-  return (KNOWN_MODULES as readonly string[]).includes(m);
+  return (TYPED_MODULES as readonly string[]).includes(m);
 }
 
 // Маппинг формы → ErrandRunRequest.input (Record<string, unknown>).

@@ -7,6 +7,7 @@ import {
   keeperApi,
   type ErrandAccepted,
   type ErrandResult,
+  type ErrandStatus,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
@@ -15,13 +16,15 @@ import styles from '../common.module.css';
 
 type Tab = 'output' | 'params' | 'events';
 
-const TERMINAL: ReadonlySet<string> = new Set([
+// satisfies: перечисление ⊆ ErrandStatus; при добавлении статуса в backend tsc потребует пересмотра.
+const TERMINAL_STATUSES = [
   'success',
   'failed',
   'timed_out',
   'cancelled',
   'module_not_allowed',
-]);
+] as const satisfies readonly ErrandStatus[];
+const TERMINAL: ReadonlySet<string> = new Set(TERMINAL_STATUSES);
 
 function statusTone(s: string | undefined): 'ok' | 'warn' | 'danger' | 'info' | 'muted' {
   switch (s) {

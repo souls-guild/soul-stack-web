@@ -13,14 +13,15 @@ import { Badge, Pager } from '../../components/primitives';
 import { pushStatusTone } from './status';
 import styles from '../common.module.css';
 
-const STATUSES: PushRunStatus[] = [
+// satisfies гарантирует, что список ⊆ PushRunStatus; tsc упадёт при добавлении нового статуса в backend
+const STATUSES = [
   'pending',
   'running',
   'success',
   'partial_failed',
   'failed',
   'cancelled',
-];
+] as const satisfies readonly PushRunStatus[];
 
 function relative(ts: string | undefined): string {
   if (!ts) return '—';

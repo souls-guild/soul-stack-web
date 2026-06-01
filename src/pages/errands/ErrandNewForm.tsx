@@ -17,7 +17,6 @@ import { keeperApi, type ErrandRunRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
 import {
-  KNOWN_MODULES,
   isKnownModule,
   shellSchema,
   execSchema,
@@ -43,6 +42,16 @@ function pickKindFromQuery(m: string | null): ModuleKind {
   if (m && isKnownModule(m)) return m;
   if (m) return 'custom';
   return 'core.cmd.shell';
+}
+
+// Для non-known errand-safe модулей из каталога — формируем select-value
+// в виде `__m:<name>` чтобы отличать от literal 'custom' и из onChange
+// восстанавливать имя модуля для prefill CustomForm.
+function encodeNonKnown(name: string): string {
+  return `__m:${name}`;
+}
+function decodeNonKnown(v: string): string | null {
+  return v.startsWith('__m:') ? v.slice(4) : null;
 }
 
 const selectStyle: CSSProperties = {
@@ -71,6 +80,19 @@ export function ErrandNewForm() {
   const prefilledModule = params.get('module');
 
   const [kind, setKind] = useState<ModuleKind>(() => pickKindFromQuery(prefilledModule));
+  // Имя модуля для CustomForm: из query-prefill или из выбора non-known в каталоге.
+  const [customModuleName, setCustomModuleName] = useState<string>(() =>
+    prefilledModule && !isKnownModule(prefilledModule) ? prefilledModule : '',
+  );
+
+  // errand-safe модули из каталога — backend-политика, не хардкод.
+  const moduleCatalog = useQuery({
+    queryKey: ['modules.catalog', true] as const,
+    queryFn: () => keeperApi.modules.list({ errand_safe: true }),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const errandSafeModules = moduleCatalog.data?.items ?? [];
 
   // souls list — для dropdown подсказок. Подгружаем только когда sid не задан через query.
   const souls = useQuery({
@@ -111,17 +133,35 @@ export function ErrandNewForm() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 320 }}>
           <span className={styles.metaKey}>Module</span>
           <select
-            value={kind === 'custom' ? '__custom__' : kind}
+            value={
+              kind === 'custom'
+                ? customModuleName
+                  ? encodeNonKnown(customModuleName)
+                  : '__custom__'
+                : kind
+            }
             aria-label="Module kind"
             onChange={(e) => {
               const v = e.target.value;
-              setKind(v === '__custom__' ? 'custom' : (v as ModuleKind));
+              if (v === '__custom__') {
+                setKind('custom');
+                setCustomModuleName('');
+              } else if (isKnownModule(v)) {
+                setKind(v);
+                setCustomModuleName('');
+              } else {
+                const decoded = decodeNonKnown(v);
+                setKind('custom');
+                setCustomModuleName(decoded ?? '');
+              }
             }}
             style={selectStyle}
           >
-            {KNOWN_MODULES.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            {errandSafeModules.map((m) => (
+              // Known-модули: option.value = имя (typed-форма).
+              // Non-known errand-safe: value = __m:<name> → CustomForm с prefill.
+              <option key={m.name} value={isKnownModule(m.name) ? m.name : encodeNonKnown(m.name)}>
+                {m.name}
               </option>
             ))}
             <option value="__custom__">{t('runhistory:customOption')}</option>
@@ -172,7 +212,7 @@ export function ErrandNewForm() {
       {kind === 'custom' ? (
         <CustomForm
           prefilledSid={prefilledSid}
-          prefilledModule={prefilledModule && !isKnownModule(prefilledModule) ? prefilledModule : ''}
+          prefilledModule={customModuleName}
           soulsOptions={soulsOptions}
           pending={exec.isPending}
           error={exec.error}

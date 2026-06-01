@@ -32,11 +32,24 @@ export function isTypedListField(prop: ScenarioInputSchemaProperty): boolean {
   return prop.type === 'array' && prop.items != null;
 }
 
+const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
+
+// B2: type=object + isMap=true + items.type скалярный → KEY→VALUE-редактор.
+// cloud.profile (map без items / items.type=map|object) → JSON-textarea.
+export function isMapWithScalarItems(prop: ScenarioInputSchemaProperty): boolean {
+  return (
+    prop.type === 'object' &&
+    Boolean(prop.isMap) &&
+    prop.items != null &&
+    SCALAR_TYPES.has(prop.items.type ?? '')
+  );
+}
+
 // Составной тип (array/object) — рендерится per-field JSON-textarea.
-// Исключение: type=array с items → типизированный список (list[int]/list[string]/list[sid]);
-// такие поля рендерятся кастомным компонентом, не JSON-textarea.
+// Исключения: type=array+items → TypedListField; type=object+isMap+scalarItems → MapEditor.
 export function isCompositeType(prop: ScenarioInputSchemaProperty): boolean {
   if (isTypedListField(prop)) return false;
+  if (isMapWithScalarItems(prop)) return false;
   return prop.type === 'array' || prop.type === 'object';
 }
 
@@ -116,6 +129,33 @@ export function serializeFields(
       }
       continue;
     }
+    // B2: map+scalar items — хранится как JSON-строка объекта {"key":"val",...}.
+    // Конвертируем значения по items.type (int → parseInt).
+    if (isMapWithScalarItems(prop)) {
+      const parsed = tryParseJson(String(raw));
+      if (parsed.ok && typeof parsed.value === 'object' && parsed.value !== null && !Array.isArray(parsed.value)) {
+        const itemsType = prop.items?.type ?? 'string';
+        const obj = parsed.value as Record<string, unknown>;
+        if (itemsType === 'integer') {
+          const converted: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(obj)) {
+            const n = parseInt(String(v), 10);
+            if (!Number.isNaN(n)) converted[k] = n;
+          }
+          out[key] = converted;
+        } else if (itemsType === 'number') {
+          const converted: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(obj)) {
+            const n = parseFloat(String(v));
+            if (!Number.isNaN(n)) converted[k] = n;
+          }
+          out[key] = converted;
+        } else {
+          out[key] = obj;
+        }
+      }
+      continue;
+    }
     if (isCompositeType(prop)) {
       const parsed = tryParseJson(String(raw));
       if (parsed.ok) out[key] = parsed.value;
@@ -138,6 +178,7 @@ export function serializeFields(
 
 // Имена составных полей, чьё непустое raw-значение не парсится в JSON. Caller
 // блокирует submit/«Далее», пока есть невалидные (как required-валидация).
+// Включает JSON-textarea (isCompositeType) и MapEditor (isMapWithScalarItems).
 export function invalidCompositeFields(
   schema: ScenarioInputSchema | undefined | null,
   state: ScenarioFieldsState,
@@ -145,7 +186,7 @@ export function invalidCompositeFields(
   if (!schema || typeof schema !== 'object') return [];
   const out: string[] = [];
   for (const [key, prop] of Object.entries(schema)) {
-    if (!isCompositeType(prop)) continue;
+    if (!isCompositeType(prop) && !isMapWithScalarItems(prop)) continue;
     const raw = state[key];
     if (raw === undefined || (typeof raw === 'string' && raw.trim() === '')) continue;
     if (!tryParseJson(String(raw)).ok) out.push(key);

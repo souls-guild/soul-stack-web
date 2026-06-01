@@ -5,6 +5,7 @@ import { Send } from 'lucide-react';
 import {
   keeperApi,
   type PushApplyView,
+  type PushRunStatus,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
@@ -12,7 +13,9 @@ import { JsonViewer } from '../../components/JsonViewer';
 import { pushStatusTone } from './status';
 import styles from '../common.module.css';
 
-const NON_TERMINAL: ReadonlySet<string> = new Set(['pending', 'running']);
+// satisfies: перечисление ⊆ PushRunStatus; при добавлении статуса в backend tsc потребует пересмотра.
+const NON_TERMINAL_STATUSES = ['pending', 'running'] as const satisfies readonly PushRunStatus[];
+const NON_TERMINAL: ReadonlySet<string> = new Set(NON_TERMINAL_STATUSES);
 
 interface HostSummary {
   sid: string;

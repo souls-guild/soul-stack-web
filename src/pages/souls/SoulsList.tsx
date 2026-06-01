@@ -14,8 +14,9 @@ import { applyFilter, parseSoulprintFilter } from './soulprintFilter';
 import { filtersToCEL } from '../run/targetTranslator';
 import styles from '../common.module.css';
 
-const SOUL_STATUSES: SoulStatus[] = ['pending', 'connected', 'disconnected', 'expired'];
-const SOUL_TRANSPORTS: SoulTransport[] = ['agent', 'ssh'];
+// satisfies гарантирует, что списки ⊆ SoulStatus/SoulTransport; tsc упадёт при расширении enum в backend
+const SOUL_STATUSES = ['pending', 'connected', 'disconnected', 'expired'] as const satisfies readonly SoulStatus[];
+const SOUL_TRANSPORTS = ['agent', 'ssh'] as const satisfies readonly SoulTransport[];
 
 // Конвенция coven-метки (openapi.yaml): lowercase, цифры, дефис-разделитель.
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;

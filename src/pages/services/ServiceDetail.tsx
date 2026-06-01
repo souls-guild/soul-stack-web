@@ -3,15 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Layers } from 'lucide-react';
-import { keeperApi } from '../../api/keeper';
+import { keeperApi, type ServiceScenarioInfo } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { useServiceRefs } from './refs';
 import { EditServiceModal } from './EditServiceModal';
 import { DeregisterServiceModal } from './DeregisterServiceModal';
-import type { ServiceScenarioInfo } from '../../api/keeper';
-import { isReservedScenario } from '../incarnations/reservedScenarios';
+import { isLifecycleScenario } from '../incarnations/reservedScenarios';
 import { extractFields, isSchemaDegraded } from '../incarnations/stateSchema';
 import styles from '../common.module.css';
 
@@ -275,7 +274,7 @@ export function ServiceDetail() {
                       {scenarioInputSummary(s)}
                     </td>
                     <td style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {isReservedScenario(s.name) ? (
+                      {isLifecycleScenario(s) ? (
                         <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
                           {t('admin:svcReservedScenario')}
                         </span>

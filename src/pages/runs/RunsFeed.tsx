@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Activity } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
-import { keeperApi } from '../../api/keeper';
+import { keeperApi, type VoyageStatus, type PushRunStatus, type ErrandStatus } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
@@ -36,7 +36,12 @@ interface FeedRow {
   finishedAt?: string;
 }
 
-const TERMINAL: ReadonlySet<string> = new Set([
+// Объединённый набор терминальных статусов всех run-типов (Voyage | Push | Errand).
+// satisfies: каждый статус должен присутствовать хотя бы в одном из трёх типов —
+// это не полный набор, а явное пересечение; при расширении enum в backend
+// tsc не сломается сам (новый статус добавляется сюда вручную после проверки семантики).
+type AnyRunStatus = VoyageStatus | PushRunStatus | ErrandStatus;
+const TERMINAL_STATUSES = [
   'success',
   'succeeded',
   'partial_failed',
@@ -44,7 +49,8 @@ const TERMINAL: ReadonlySet<string> = new Set([
   'cancelled',
   'timed_out',
   'module_not_allowed',
-]);
+] as const satisfies readonly AnyRunStatus[];
+const TERMINAL: ReadonlySet<string> = new Set(TERMINAL_STATUSES);
 
 function isRunning(status: string): boolean {
   return !TERMINAL.has(status);

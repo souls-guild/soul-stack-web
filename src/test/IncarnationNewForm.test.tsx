@@ -44,12 +44,13 @@ describe('IncarnationNewForm', () => {
           scenarios: [
             {
               name: 'create',
+              kind: 'lifecycle',
               path: 'scenario/create/main.yml',
               description: 'init redis',
               input_schema: { maxmemory: { type: 'string', required: true, description: 'memory cap' } },
             },
-            { name: 'converge', path: 'scenario/converge/main.yml', input_schema: {} },
-            { name: 'restart', path: 'scenario/restart/main.yml', input_schema: {} },
+            { name: 'converge', kind: 'lifecycle', path: 'scenario/converge/main.yml', input_schema: {} },
+            { name: 'restart', kind: 'operational', path: 'scenario/restart/main.yml', input_schema: {} },
           ],
         },
       },
