@@ -87,6 +87,7 @@
   "batchSizeError": "Batch size must be an integer between 1 and 10000",
   "targetEmptyError": "No hosts selected — refine the criteria",
   "concurrencyLabel": "Concurrency",
+  "concurrencyHint": "How many targets run in parallel within a single batch. batch_size sets the batch window; concurrency limits parallelism inside it. Default 50.",
   "dryRunLabel": "Dry-run",
   "waitLabel": "Wait for terminal (polling on the detail page)",
   "submitErrorPrefix": "Error {{status}}: {{message}}",

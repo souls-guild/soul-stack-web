@@ -87,6 +87,7 @@
   "batchSizeError": "Размер батча — целое число от 1 до 10000",
   "targetEmptyError": "Не выбрано ни одного хоста — уточните критерии",
   "concurrencyLabel": "Concurrency",
+  "concurrencyHint": "Сколько целей выполняется параллельно внутри одного батча. batch_size задаёт размер пачки, concurrency — параллелизм внутри неё. По умолчанию 50.",
   "dryRunLabel": "Dry-run",
   "waitLabel": "Ждать терминала (polling на detail-странице)",
   "submitErrorPrefix": "Ошибка {{status}}: {{message}}",

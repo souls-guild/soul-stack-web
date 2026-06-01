@@ -177,6 +177,9 @@ export type VoyageSummary = components['schemas']['VoyageSummary'];
 export type Voyage = components['schemas']['Voyage'];
 export type VoyageListReply = components['schemas']['VoyageListReply'];
 export type VoyageCancelReply = components['schemas']['VoyageCancelReply'];
+export type VoyageTargetEntry = components['schemas']['VoyageTargetEntry'];
+export type VoyageTargetStatus = VoyageTargetEntry['status'];
+export type VoyageTargetsReply = components['schemas']['VoyageTargetsReply'];
 
 export interface ListVoyagesQuery {
   kind?: VoyageKind;
@@ -774,6 +777,8 @@ export const keeperApi = {
       apiGet<Voyage>(`/v1/voyages/${encodeURIComponent(voyageId)}`),
     cancel: (voyageId: string) =>
       apiSend<VoyageCancelReply>(`/v1/voyages/${encodeURIComponent(voyageId)}`, 'DELETE'),
+    targets: (voyageId: string) =>
+      apiGet<VoyageTargetsReply>(`/v1/voyages/${encodeURIComponent(voyageId)}/targets`),
   },
 
   // Sigil-allow-list плагинов (ADR-026, вариант C). Полный путь записи — (namespace, name, ref).

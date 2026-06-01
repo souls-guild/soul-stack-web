@@ -12,6 +12,7 @@ import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
+import { VoyageTargets } from './VoyageTargets';
 
 // satisfies: перечисление ⊆ VoyageStatus; при добавлении статуса в backend tsc потребует пересмотра.
 const NON_TERMINAL_STATUSES = ['pending', 'scheduled', 'running'] as const satisfies readonly VoyageStatus[];
@@ -227,6 +228,11 @@ export function VoyageDetail() {
           </div>
         </section>
       )}
+
+      <section className={styles.section} aria-label="Voyage targets">
+        <h2 className={styles.sectionTitle}>{t('runhistory:voyageTargetsTitle')}</h2>
+        <VoyageTargets voyageId={id} refetchInterval={isRunning ? 3000 : false} />
+      </section>
 
       {cancelOpen ? (
         <div

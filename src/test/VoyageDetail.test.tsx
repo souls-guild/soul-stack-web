@@ -60,7 +60,9 @@ describe('VoyageDetail', () => {
   });
 
   it('рендерит scenario-voyage с метаданными и summary', async () => {
+    // ВАЖНО: /targets должен идти ДО /voyages/{id} — fetchMock матчит по startsWith.
     installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: { voyage_id: VOYAGE_ID, targets: [] } },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
     ]);
     renderWithProviders(
@@ -84,6 +86,7 @@ describe('VoyageDetail', () => {
 
   it('рендерит command-voyage с target.sids', async () => {
     installFetchMock([
+      { method: 'GET', url: '/v1/voyages/01VCMD0000000000000000002/targets', body: { voyage_id: '01VCMD0000000000000000002', targets: [] } },
       { method: 'GET', url: '/v1/voyages/01VCMD0000000000000000002', body: SAMPLE_VOYAGE_COMMAND },
     ]);
     renderWithProviders(
@@ -118,6 +121,7 @@ describe('VoyageDetail', () => {
 
   it('progress bar рассчитывается корректно', async () => {
     installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: { voyage_id: VOYAGE_ID, targets: [] } },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
     ]);
     renderWithProviders(

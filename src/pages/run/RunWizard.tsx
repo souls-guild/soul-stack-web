@@ -1393,6 +1393,7 @@ function Step4Options({
           onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
           aria-label="Concurrency"
         />
+        <span className={styles.hint}>{t('run:concurrencyHint')}</span>
       </label>
 
       <fieldset
