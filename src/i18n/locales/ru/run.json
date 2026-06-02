@@ -115,6 +115,8 @@
   "sidPickerLoading": "загрузка…",
   "sidPickerNoResults": "— нет совпадений —",
   "sidPickerFallbackHint": "контекст incarnation не задан — введите SID вручную",
+  "sidPickerNoContextChoir": "Поле резолвит хосты choir-партии — требует выбора incarnation в прогоне. В свободном command-прогоне (по SID/coven) недоступно.",
+  "sidPickerNoContextIncarnationHosts": "Поле резолвит хосты инкарнации — требует выбора incarnation в прогоне. В свободном command-прогоне (по SID/coven) недоступно.",
   "sidPickerRemove": "убрать",
   "patternError": "не совпадает с паттерном: {{pattern}}",
   "advancedLabel": "Дополнительно",

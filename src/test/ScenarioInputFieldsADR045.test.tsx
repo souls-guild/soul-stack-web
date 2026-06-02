@@ -161,7 +161,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     expect(screen.getByTestId('field-sid-multi-target_sids')).toBeTruthy();
   });
 
-  it('fallback на text-input если нет incarnationContext', () => {
+  it('source:incarnation_hosts без incarnationContext → показана подсказка incarnation_hosts (не choir)', () => {
     const schema: ScenarioInputSchema = {
       target_sid: {
         type: 'string',
@@ -170,12 +170,49 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
         source: { incarnation_hosts: true },
       },
     };
-    // Без incarnationContext — деградирует в text input (нет picker dropdown).
     renderFields(schema, { incarnationContext: undefined, moduleName: 'official.redis' });
     const wrapper = screen.getByTestId('field-sid-single-target_sid');
-    // SidPicker fallback — рендерит обычный input без dropdown.
-    const input = wrapper.querySelector('input');
+    const hint = wrapper.querySelector('[data-testid="sid-picker-no-context"]');
+    expect(hint).toBeTruthy();
+    expect(wrapper.querySelector('input')).toBeNull();
+    // Должен быть именно incarnation_hosts-текст (содержит «инкарнации», НЕ «choir»).
+    expect(hint!.textContent).toMatch(/инкарнаци/i);
+    expect(hint!.textContent).not.toMatch(/choir/i);
+  });
+
+  it('source:choir без incarnationContext → показана подсказка choir (не incarnation_hosts-текст)', () => {
+    const schema: ScenarioInputSchema = {
+      target_sid: {
+        type: 'string',
+        required: false,
+        format: 'sid',
+        source: { choir: 'primaries' },
+      },
+    };
+    renderFields(schema, { incarnationContext: undefined, moduleName: 'official.redis' });
+    const wrapper = screen.getByTestId('field-sid-single-target_sid');
+    const hint = wrapper.querySelector('[data-testid="sid-picker-no-context"]');
+    expect(hint).toBeTruthy();
+    expect(wrapper.querySelector('input')).toBeNull();
+    // Должен быть choir-специфичный текст («choir»), а НЕ incarnation_hosts-текст.
+    expect(hint!.textContent).toMatch(/choir/i);
+  });
+
+  it('source не задан + нет incarnationContext → легитимный text-input (не трогаем)', () => {
+    // format:sid без source не попадает в SidPicker-ветку — рендерится как обычный text-input.
+    const schema: ScenarioInputSchema = {
+      plain_sid: {
+        type: 'string',
+        required: false,
+        format: 'sid',
+        // source не задан → ScenarioInputFields рендерит field-text-*, не field-sid-single-*
+      },
+    };
+    renderFields(schema, { incarnationContext: undefined, moduleName: 'official.redis' });
+    // Нет source → не SidPicker-ветка, рендерится обычный text input
+    const input = screen.getByTestId('field-text-plain_sid');
     expect(input).toBeTruthy();
+    expect(screen.queryByTestId('sid-picker-no-context')).toBeNull();
   });
 
   it('загружает подсказки при фокусе (с incarnationContext)', async () => {

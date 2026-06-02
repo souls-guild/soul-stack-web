@@ -115,6 +115,8 @@
   "sidPickerLoading": "loading…",
   "sidPickerNoResults": "— no matches —",
   "sidPickerFallbackHint": "no incarnation context — enter SID manually",
+  "sidPickerNoContextChoir": "This field resolves choir-party hosts — requires an incarnation to be selected in the run. Not available in free command runs (by SID/coven).",
+  "sidPickerNoContextIncarnationHosts": "This field resolves incarnation hosts — requires an incarnation to be selected in the run. Not available in free command runs (by SID/coven).",
   "sidPickerRemove": "remove",
   "patternError": "does not match pattern: {{pattern}}",
   "advancedLabel": "Advanced",

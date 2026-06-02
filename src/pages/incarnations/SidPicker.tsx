@@ -52,11 +52,11 @@ export function SidPicker({
   // Текущий multi-список: парсим из raw-JSON-массива.
   const multiValues: string[] = multi ? parseMulti(value) : [];
 
+  // source задаёт привязку к инкарнации/choir — единый источник истины для обеих веток ниже.
+  const hasSource = Boolean(source?.incarnation_hosts || source?.choir);
+
   // Есть ли у нас контекст для form-prep.
-  const hasContext = Boolean(
-    incarnationContext &&
-      (source?.incarnation_hosts || source?.choir),
-  );
+  const hasContext = Boolean(incarnationContext && hasSource);
 
   // Строим body source для form-prep.
   function buildFormPrepSource(): ModuleFormPrepRequest['source'] {
@@ -112,7 +112,34 @@ export function SidPicker({
     boxSizing: 'border-box',
   };
 
-  // Нет контекста — fallback на простой text input.
+  // Source задан, но нет incarnationContext (свободный command-прогон).
+  // Text-ввод здесь бесполезен — backend не сможет резолвить произвольный SID
+  // для source:choir/incarnation_hosts без привязки к инкарнации.
+  // Показываем понятное пояснение вместо вводимого поля.
+  if (!hasContext && hasSource) {
+    const hintKey = source?.choir
+      ? 'sidPickerNoContextChoir'
+      : 'sidPickerNoContextIncarnationHosts';
+    return (
+      <div
+        data-testid="sid-picker-no-context"
+        style={{
+          padding: '8px 10px',
+          borderRadius: 'var(--radius)',
+          border: `1px solid ${missing ? 'var(--danger)' : 'var(--border)'}`,
+          background: 'var(--surface-raised)',
+          fontSize: 13,
+          color: 'var(--text-muted)',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        {t(hintKey)}
+      </div>
+    );
+  }
+
+  // Нет source (обычное поле sid без source) — легитимный text-ввод.
   if (!hasContext) {
     return (
       <div>
