@@ -15,6 +15,8 @@ export function CadencesList() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [confirmEnable, setConfirmEnable] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDisable, setConfirmDisable] = useState<{ id: string; name: string } | null>(null);
 
   const q = useQuery({
     queryKey: ['cadences.list'],
@@ -23,12 +25,18 @@ export function CadencesList() {
 
   const enableMu = useMutation({
     mutationFn: (id: string) => keeperApi.cadences.enable(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cadences.list'] }),
+    onSuccess: () => {
+      setConfirmEnable(null);
+      qc.invalidateQueries({ queryKey: ['cadences.list'] });
+    },
   });
 
   const disableMu = useMutation({
     mutationFn: (id: string) => keeperApi.cadences.disable(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cadences.list'] }),
+    onSuccess: () => {
+      setConfirmDisable(null);
+      qc.invalidateQueries({ queryKey: ['cadences.list'] });
+    },
   });
 
   const deleteMu = useMutation({
@@ -115,25 +123,27 @@ export function CadencesList() {
                   {relative(c.last_run_at)}
                 </td>
                 <td>
-                  <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={c.enabled}
-                      aria-label={c.enabled ? t('cadences:disableAriaLabel') : t('cadences:enableAriaLabel')}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          enableMu.mutate(c.cadence_id);
-                        } else {
-                          disableMu.mutate(c.cadence_id);
-                        }
-                      }}
-                    />
-                    {c.enabled ? (
+                  {c.enabled ? (
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      aria-label={t('cadences:disableAriaLabel')}
+                      onClick={() => setConfirmDisable({ id: c.cadence_id, name: c.name })}
+                      style={{ padding: '2px 6px' }}
+                    >
                       <Badge tone="ok">{t('cadences:enabled')}</Badge>
-                    ) : (
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      aria-label={t('cadences:enableAriaLabel')}
+                      onClick={() => setConfirmEnable({ id: c.cadence_id, name: c.name })}
+                      style={{ padding: '2px 6px' }}
+                    >
                       <Badge tone="muted">{t('cadences:disabled')}</Badge>
-                    )}
-                  </label>
+                    </Button>
+                  )}
                 </td>
                 <td>
                   <Button
@@ -150,6 +160,68 @@ export function CadencesList() {
           </tbody>
         </table>
       )}
+
+      {/* Модалка подтверждения Enable */}
+      <Modal
+        open={confirmEnable !== null}
+        title={t('cadences:enableTitle')}
+        onClose={() => setConfirmEnable(null)}
+      >
+        <p style={{ margin: 0, fontSize: 13 }}>
+          {t('cadences:enableConfirm', { name: confirmEnable?.name ?? '' })}
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+          <Button variant="ghost" type="button" onClick={() => setConfirmEnable(null)} disabled={enableMu.isPending}>
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            type="button"
+            disabled={enableMu.isPending}
+            onClick={() => confirmEnable && enableMu.mutate(confirmEnable.id)}
+          >
+            {t('cadences:confirmBtn')}
+          </Button>
+        </div>
+        {enableMu.isError ? (
+          <div className={styles.errorBox} style={{ marginTop: 8 }}>
+            {enableMu.error instanceof ApiError
+              ? t('errors:generic', { status: enableMu.error.status, detail: enableMu.error.message })
+              : String(enableMu.error)}
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* Модалка подтверждения Disable */}
+      <Modal
+        open={confirmDisable !== null}
+        title={t('cadences:disableTitle')}
+        onClose={() => setConfirmDisable(null)}
+      >
+        <p style={{ margin: 0, fontSize: 13 }}>
+          {t('cadences:disableConfirm', { name: confirmDisable?.name ?? '' })}
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+          <Button variant="ghost" type="button" onClick={() => setConfirmDisable(null)} disabled={disableMu.isPending}>
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            type="button"
+            disabled={disableMu.isPending}
+            onClick={() => confirmDisable && disableMu.mutate(confirmDisable.id)}
+          >
+            {t('cadences:confirmBtn')}
+          </Button>
+        </div>
+        {disableMu.isError ? (
+          <div className={styles.errorBox} style={{ marginTop: 8 }}>
+            {disableMu.error instanceof ApiError
+              ? t('errors:generic', { status: disableMu.error.status, detail: disableMu.error.message })
+              : String(disableMu.error)}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={deleteId !== null}

@@ -65,6 +65,8 @@ function setupMocks(opts: { items?: unknown[]; runs?: unknown[]; deleteStatus?: 
     { method: 'GET', url: '/v1/cadences/cad-01', body: CADENCE_INTERVAL },
     { method: 'POST', url: '/v1/cadences/cad-01/enable', body: { cadence_id: 'cad-01', enabled: true } },
     { method: 'POST', url: '/v1/cadences/cad-01/disable', body: { cadence_id: 'cad-01', enabled: false } },
+    { method: 'POST', url: '/v1/cadences/cad-02/enable', body: { cadence_id: 'cad-02', enabled: true } },
+    { method: 'POST', url: '/v1/cadences/cad-02/disable', body: { cadence_id: 'cad-02', enabled: false } },
     { method: 'DELETE', url: '/v1/cadences/cad-01', status: opts.deleteStatus ?? 204, body: null },
     { method: 'GET', url: '/v1/cadences', body: { items, offset: 0, limit: 100, total: items.length } },
   ]);
@@ -108,7 +110,7 @@ describe('CadencesList', () => {
     );
   });
 
-  it('toggle enable/disable — вызывает правильный endpoint', async () => {
+  it('клик disable-тоггла открывает модалку, не вызывает mutate сразу', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderWithProviders(
@@ -118,25 +120,131 @@ describe('CadencesList', () => {
       '/cadences',
     );
 
-    // ждём появления таблицы
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
-    // Первый чекбокс — redis-hourly (enabled=true). Клик → disable.
-    const checkboxes = screen.getAllByRole('checkbox');
-    const firstCheckbox = checkboxes[0];
-    expect(firstCheckbox).toBeChecked();
-    await user.click(firstCheckbox);
+    // redis-hourly enabled=true — кнопка-тоггл для disable
+    const disableBtn = screen.getByRole('button', { name: /Выключить/i });
+    await user.click(disableBtn);
 
-    // Проверяем что POST /v1/cadences/cad-01/disable был вызван.
+    // Модалка открылась — нет мгновенного mutate
+    await waitFor(() =>
+      expect(screen.getByText('Выключить расписание?')).toBeInTheDocument(),
+    );
+    // Текст с предупреждением о последствии
+    expect(screen.getByText(/ПЕРЕСТАНЕТ спавнить прогоны/)).toBeInTheDocument();
+    // Имя фигурирует
+    expect(screen.getAllByText(/redis-hourly/).length).toBeGreaterThan(0);
+
+    // disable-запрос ещё НЕ был отправлен
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    const disableCallBefore = calls.find(([input, init]) => {
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      return url.includes('/disable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
+    });
+    expect(disableCallBefore).toBeUndefined();
+  });
+
+  it('подтверждение disable → POST /disable', async () => {
+    const user = userEvent.setup();
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Выключить/i }));
+    await waitFor(() => expect(screen.getByText('Выключить расписание?')).toBeInTheDocument());
+
+    // Подтверждаем
+    await user.click(screen.getByRole('button', { name: /Подтвердить/i }));
+
     await waitFor(() => {
       const calls = vi.mocked(globalThis.fetch).mock.calls;
-      const disableCall = calls.find(
-        ([input, init]) => {
-          const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-          return url.includes('/v1/cadences/cad-01/disable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
-        },
-      );
+      const disableCall = calls.find(([input, init]) => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        return url.includes('/v1/cadences/cad-01/disable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
+      });
       expect(disableCall).toBeDefined();
+    });
+  });
+
+  it('отмена disable → нет POST /disable', async () => {
+    const user = userEvent.setup();
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Выключить/i }));
+    await waitFor(() => expect(screen.getByText('Выключить расписание?')).toBeInTheDocument());
+
+    // Отменяем
+    await user.click(screen.getByRole('button', { name: /Отмена/i }));
+
+    // Модалка закрылась
+    await waitFor(() =>
+      expect(screen.queryByText('Выключить расписание?')).not.toBeInTheDocument(),
+    );
+
+    // disable-запрос так и не был отправлен
+    const calls = vi.mocked(globalThis.fetch).mock.calls;
+    const disableCall = calls.find(([input, init]) => {
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      return url.includes('/disable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
+    });
+    expect(disableCall).toBeUndefined();
+  });
+
+  it('клик enable-тоггла открывает модалку, подтверждение → POST /enable', async () => {
+    const user = userEvent.setup();
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    await waitFor(() => expect(screen.getByText('db-backup')).toBeInTheDocument());
+
+    // db-backup enabled=false — кнопка-тоггл для enable
+    const enableBtn = screen.getByRole('button', { name: /Включить/i });
+    await user.click(enableBtn);
+
+    // Модалка открылась с правильным текстом
+    await waitFor(() =>
+      expect(screen.getByText('Включить расписание?')).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/начнёт спавнить прогоны/)).toBeInTheDocument();
+    expect(screen.getAllByText(/db-backup/).length).toBeGreaterThan(0);
+
+    // enable-запрос ещё не был отправлен
+    const callsBefore = vi.mocked(globalThis.fetch).mock.calls;
+    const enableCallBefore = callsBefore.find(([input, init]) => {
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      return url.includes('/enable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
+    });
+    expect(enableCallBefore).toBeUndefined();
+
+    // Подтверждаем
+    await user.click(screen.getByRole('button', { name: /Подтвердить/i }));
+
+    await waitFor(() => {
+      const calls = vi.mocked(globalThis.fetch).mock.calls;
+      const enableCall = calls.find(([input, init]) => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        return url.includes('/v1/cadences/cad-02/enable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
+      });
+      expect(enableCall).toBeDefined();
     });
   });
 
