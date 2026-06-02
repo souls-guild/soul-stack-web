@@ -37,6 +37,64 @@ const INCS = {
   total: 1,
 };
 
+// Инкарнации со state для проверки динамических колонок версий.
+const INCS_WITH_STATE = {
+  items: [
+    {
+      name: 'redis-prod',
+      service: 'redis',
+      service_version: 'v2.0.0',
+      state_schema_version: 3,
+      covens: ['prod'],
+      status: 'ready',
+      created_by_aid: 'archon-alice',
+      created_at: '2026-04-15T00:00:00Z',
+      updated_at: '2026-05-15T00:00:00Z',
+      state: {
+        redis_version: '7.2.4',
+        node_exporter_version: '1.7.0',
+        redis_users: ['default', 'admin'],  // составное — array
+      },
+    },
+    {
+      name: 'redis-staging',
+      service: 'redis',
+      service_version: 'v2.0.0',
+      state_schema_version: 3,
+      covens: ['staging'],
+      status: 'applying',
+      created_by_aid: 'archon-alice',
+      created_at: '2026-04-20T00:00:00Z',
+      updated_at: '2026-05-20T00:00:00Z',
+      state: {
+        redis_version: '7.0.0',
+        // node_exporter_version отсутствует → «—»
+        redis_users: [],
+      },
+    },
+  ],
+  offset: 0,
+  limit: 200,
+  total: 2,
+};
+
+// state_schema с двумя скалярными полями (string) и одним составным (array).
+const STATE_SCHEMA_WITH_FIELDS = {
+  service: 'redis',
+  ref: 'v2.0.0',
+  state_schema_version: 3,
+  schema: {
+    type: 'object',
+    required: ['redis_version'],
+    properties: {
+      redis_version: { type: 'string' },
+      node_exporter_version: { type: 'string' },
+      redis_users: { type: 'array' },
+    },
+  },
+  migrations: [],
+};
+
 describe('ServiceDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
@@ -248,6 +306,110 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('redis-prod')).toBeInTheDocument();
     });
+  });
+
+  it('таб Incarnations: динамические колонки из state_schema (скалярные)', async () => {
+    installFetchMock([
+      // state-schema специфичнее /v1/services/redis → первым
+      { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_WITH_FIELDS },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+      { method: 'GET', url: '/v1/incarnations', body: INCS_WITH_STATE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Incarnations/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-inc-table')).toBeInTheDocument();
+    });
+    // Заголовки динамических колонок — из schema, не хардкод.
+    expect(screen.getByRole('columnheader', { name: 'redis_version' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'node_exporter_version' })).toBeInTheDocument();
+    // Значение redis_version из state.
+    expect(screen.getByText('7.2.4')).toBeInTheDocument();
+    expect(screen.getByText('7.0.0')).toBeInTheDocument();
+    // node_exporter_version отсутствует в redis-staging → «—».
+    const cells = screen.getAllByRole('cell', { name: '—' });
+    expect(cells.length).toBeGreaterThan(0);
+  });
+
+  it('таб Incarnations: составное поле (array) не создаёт отдельную колонку версии', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_WITH_FIELDS },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+      { method: 'GET', url: '/v1/incarnations', body: INCS_WITH_STATE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Incarnations/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-inc-table')).toBeInTheDocument();
+    });
+    // redis_users — array, не должно быть отдельным columnheader.
+    expect(screen.queryByRole('columnheader', { name: 'redis_users' })).not.toBeInTheDocument();
+    // Но показывается как «N items» в составной колонке.
+    expect(screen.getByText(/2 items/)).toBeInTheDocument();
+  });
+
+  it('таб Incarnations: пустой state (инкарнация без применения) → «—» без краша', async () => {
+    const emptyStateIncs = {
+      ...INCS_WITH_STATE,
+      items: [{ ...INCS_WITH_STATE.items[0], state: undefined }],
+    };
+    installFetchMock([
+      { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_WITH_FIELDS },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+      { method: 'GET', url: '/v1/incarnations', body: emptyStateIncs },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Incarnations/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-inc-table')).toBeInTheDocument();
+    });
+    // Колонки есть, значения — «—».
+    expect(screen.getByRole('columnheader', { name: 'redis_version' })).toBeInTheDocument();
+    const dashCells = screen.getAllByRole('cell', { name: '—' });
+    expect(dashCells.length).toBeGreaterThan(0);
+  });
+
+  it('таб Incarnations: state_schema 404 → базовые колонки без crash', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/services/redis/state-schema', status: 404, body: { title: 'not found' } },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+      { method: 'GET', url: '/v1/incarnations', body: INCS },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Incarnations/i }));
+    await waitFor(() => {
+      expect(screen.getByText('redis-prod')).toBeInTheDocument();
+    });
+    // Без динамических колонок — нет redis_version в заголовках.
+    expect(screen.queryByRole('columnheader', { name: 'redis_version' })).not.toBeInTheDocument();
   });
 
   it('таб Dependencies рендерит destiny с ref', async () => {

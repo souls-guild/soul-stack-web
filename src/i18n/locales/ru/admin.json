@@ -25,6 +25,8 @@
   "svcGitPlaceholder": "https://git.example.com/service-redis.git",
   "svcIncEmpty": "Инкарнаций этого сервиса пока нет. Создаётся через scenario",
   "svcIncTitle": "Incarnation-ы сервиса",
+  "svcIncColRef": "Service ref",
+  "svcIncColState": "State (составные)",
   "svcScenariosTitle": "Scenarios каталог",
   "svcScenariosUnavailable": "Каталог сценариев пока не выставлен (endpoint",
   "svcScenariosUnavailable2": "вернул",

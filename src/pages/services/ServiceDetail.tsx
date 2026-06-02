@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Layers } from 'lucide-react';
-import { keeperApi, type ServiceScenarioInfo, type ServiceDependency, type ServiceDependenciesReply } from '../../api/keeper';
+import { keeperApi, type ServiceScenarioInfo, type ServiceDependency, type ServiceDependenciesReply, type IncarnationListReply, type ServiceStateSchemaReply } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
@@ -11,7 +11,7 @@ import { useServiceRefs } from './refs';
 import { EditServiceModal } from './EditServiceModal';
 import { DeregisterServiceModal } from './DeregisterServiceModal';
 import { isLifecycleScenario } from '../incarnations/reservedScenarios';
-import { extractFields, isSchemaDegraded } from '../incarnations/stateSchema';
+import { extractFields, isSchemaDegraded, type SchemaField } from '../incarnations/stateSchema';
 import styles from '../common.module.css';
 
 type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs' | 'schema' | 'dependencies';
@@ -33,6 +33,13 @@ export function ServiceDetail() {
     queryKey: ['service.incarnations', name],
     queryFn: () => keeperApi.incarnations.list({ service: name, limit: 200 }),
     enabled: Boolean(name) && tab === 'incarnations',
+  });
+
+  const stateSchema = useQuery({
+    queryKey: ['service-state-schema-inc', name],
+    queryFn: () => keeperApi.services.getStateSchema(name),
+    enabled: Boolean(name) && tab === 'incarnations',
+    retry: false,
   });
 
   const scenarios = useQuery({
@@ -199,54 +206,10 @@ export function ServiceDetail() {
       ) : null}
 
       {tab === 'incarnations' ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t('admin:svcIncTitle')}</h2>
-          {incs.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
-          {incs.error ? (
-            <div className={styles.errorBox}>
-              {incs.error instanceof ApiError
-                ? t('errors:generic', { status: incs.error.status, detail: incs.error.message })
-                : String(incs.error)}
-            </div>
-          ) : null}
-          {incs.data && incs.data.items.length === 0 ? (
-            <div className={styles.empty}>
-              {t('admin:svcIncEmpty')}{' '}
-              <code className="mono">create</code>.
-            </div>
-          ) : null}
-          {incs.data && incs.data.items.length > 0 ? (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Service ref</th>
-                  <th>Status</th>
-                  <th>Covens</th>
-                  <th>Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {incs.data.items.map((inc) => (
-                  <tr key={inc.name}>
-                    <td>
-                      <Link to={`/incarnations/${encodeURIComponent(inc.name)}`}>{inc.name}</Link>
-                    </td>
-                    <td className="mono">{inc.service_version}</td>
-                    <td>
-                      <span className={styles.statusCell}>
-                        <Dot kind={incarnationDot(inc.status)} title={inc.status} />
-                        <Badge tone={incarnationTone(inc.status)}>{inc.status}</Badge>
-                      </span>
-                    </td>
-                    <td className="mono">{inc.covens.join(', ') || '—'}</td>
-                    <td className="mono">{inc.updated_at}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : null}
-        </section>
+        <IncarnationsTab
+          incs={incs}
+          stateSchema={stateSchema}
+        />
       ) : null}
 
       {tab === 'scenarios' ? (
@@ -418,6 +381,139 @@ function GitUrl({ git }: { git: string }) {
       {git}
       <ExternalLink size={11} style={{ verticalAlign: '-1px', marginLeft: 4 }} />
     </a>
+  );
+}
+
+// Возвращает скалярные поля (string/integer) из list SchemaField — идут в колонки.
+// Составные (object/array) — отдельная группа для компактного отображения.
+function partitionFields(fields: SchemaField[]): {
+  scalar: SchemaField[];
+  composite: SchemaField[];
+} {
+  const scalar: SchemaField[] = [];
+  const composite: SchemaField[] = [];
+  for (const f of fields) {
+    if (f.type === 'string' || f.type === 'integer' || f.type === 'number' || f.type === 'boolean') {
+      scalar.push(f);
+    } else {
+      composite.push(f);
+    }
+  }
+  return { scalar, composite };
+}
+
+// Форматирует значение составного поля для компактного показа в ячейке.
+function compositeCell(val: unknown): string {
+  if (val === undefined || val === null) return '—';
+  if (Array.isArray(val)) return val.length === 0 ? '—' : `${val.length} items`;
+  if (typeof val === 'object') {
+    const keys = Object.keys(val as object).length;
+    return keys === 0 ? '—' : `{${keys} keys}`;
+  }
+  return String(val);
+}
+
+// Форматирует скалярное значение; null/undefined → «—».
+function scalarCell(val: unknown): string {
+  if (val === undefined || val === null) return '—';
+  return String(val);
+}
+
+// MAX_SCALAR_COLS — сколько state-колонок до горизонтального скролла.
+const MAX_SCALAR_COLS = 6;
+
+type IncarnationsTabProps = {
+  incs: ReturnType<typeof useQuery<IncarnationListReply>>;
+  stateSchema: ReturnType<typeof useQuery<ServiceStateSchemaReply>>;
+};
+
+function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
+  const { t } = useTranslation();
+
+  // Вычисляем колонки из state_schema (graceful: если schema недоступна — только базовые колонки).
+  const allFields = stateSchema.data
+    ? extractFields(stateSchema.data.schema as Record<string, unknown> | undefined)
+    : null;
+  const { scalar: scalarFields, composite: compositeFields } = allFields
+    ? partitionFields(allFields)
+    : { scalar: [], composite: [] };
+
+  // Показываем горизонтальный скролл при более чем MAX_SCALAR_COLS скалярных колонок.
+  const needsScroll = scalarFields.length > MAX_SCALAR_COLS;
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>{t('admin:svcIncTitle')}</h2>
+      {(incs.isLoading || stateSchema.isLoading) ? (
+        <div className={styles.loading}>{t('admin:svcLoading')}</div>
+      ) : null}
+      {incs.error ? (
+        <div className={styles.errorBox}>
+          {incs.error instanceof ApiError
+            ? t('errors:generic', { status: incs.error.status, detail: incs.error.message })
+            : String(incs.error)}
+        </div>
+      ) : null}
+      {incs.data && incs.data.items.length === 0 ? (
+        <div className={styles.empty}>
+          {t('admin:svcIncEmpty')}{' '}
+          <code className="mono">create</code>.
+        </div>
+      ) : null}
+      {incs.data && incs.data.items.length > 0 ? (
+        <div style={needsScroll ? { overflowX: 'auto' } : undefined}>
+          <table className={styles.table} data-testid="svc-inc-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>{t('admin:svcIncColRef')}</th>
+                <th>Status</th>
+                <th>Covens</th>
+                {scalarFields.map((f) => (
+                  <th key={f.name} className="mono">{f.name}</th>
+                ))}
+                {compositeFields.length > 0 ? (
+                  <th>{t('admin:svcIncColState')}</th>
+                ) : null}
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {incs.data.items.map((inc) => (
+                <tr key={inc.name}>
+                  <td>
+                    <Link to={`/incarnations/${encodeURIComponent(inc.name)}`}>{inc.name}</Link>
+                  </td>
+                  <td className="mono">{inc.service_version}</td>
+                  <td>
+                    <span className={styles.statusCell}>
+                      <Dot kind={incarnationDot(inc.status)} title={inc.status} />
+                      <Badge tone={incarnationTone(inc.status)}>{inc.status}</Badge>
+                    </span>
+                  </td>
+                  <td className="mono">{inc.covens.join(', ') || '—'}</td>
+                  {scalarFields.map((f) => (
+                    <td key={f.name} className="mono">
+                      {scalarCell((inc.state as Record<string, unknown> | undefined)?.[f.name])}
+                    </td>
+                  ))}
+                  {compositeFields.length > 0 ? (
+                    <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {compositeFields.map((f) => (
+                        <span key={f.name} style={{ display: 'block' }}>
+                          {f.name}: {compositeCell((inc.state as Record<string, unknown> | undefined)?.[f.name])}
+                        </span>
+                      ))}
+                    </td>
+                  ) : null}
+                  <td className="mono">{inc.updated_at}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
