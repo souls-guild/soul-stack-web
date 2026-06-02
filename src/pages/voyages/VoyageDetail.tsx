@@ -19,9 +19,27 @@ const NON_TERMINAL_STATUSES = ['pending', 'scheduled', 'running'] as const satis
 const NON_TERMINAL: ReadonlySet<string> = new Set(NON_TERMINAL_STATUSES);
 
 function progressPct(v: Voyage): number {
+  if (v.batch_mode === 'window') {
+    if (!v.scope_size || v.scope_size <= 0) return 0;
+    const done = windowDone(v);
+    return Math.round((done / v.scope_size) * 100);
+  }
   if (!v.total_batches || v.total_batches <= 0) return 0;
   const done = Math.max(0, Math.min(v.current_batch_index, v.total_batches));
   return Math.round((done / v.total_batches) * 100);
+}
+
+/** Число завершённых targets для window-режима: succeeded+failed+cancelled из summary */
+function windowDone(v: Voyage): number {
+  if (!v.summary) return 0;
+  return (v.summary.succeeded ?? 0) + (v.summary.failed ?? 0) + (v.summary.cancelled ?? 0);
+}
+
+/** Tone бейджа summary-счётчика по статусу и числу. */
+function summaryTone(s: 'succeeded' | 'failed' | 'cancelled', n: number): 'ok' | 'danger' | 'warn' | 'muted' {
+  if (s === 'succeeded') return 'ok';
+  if (s === 'failed') return n > 0 ? 'danger' : 'muted';
+  return n > 0 ? 'warn' : 'muted';
 }
 
 export function VoyageDetail() {
@@ -29,6 +47,7 @@ export function VoyageDetail() {
   const { id = '' } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const q = useQuery({
     queryKey: ['voyage.get', id],
@@ -189,10 +208,15 @@ export function VoyageDetail() {
 
       <section className={styles.section} aria-label="Voyage progress">
         <h2 className={styles.sectionTitle}>
-          {t('runhistory:voyageProgressTitle', {
-            current: voyage.current_batch_index,
-            total: voyage.total_batches,
-          })}
+          {voyage.batch_mode === 'window'
+            ? t('runhistory:voyageProgressTitleWindow', {
+                done: windowDone(voyage),
+                total: voyage.scope_size,
+              })
+            : t('runhistory:voyageProgressTitle', {
+                current: voyage.current_batch_index,
+                total: voyage.total_batches,
+              })}
         </h2>
         <div aria-label="progress" style={progressOuter}>
           <div style={{ ...progressInner, width: `${pct}%` }} />
@@ -204,19 +228,36 @@ export function VoyageDetail() {
         <section className={styles.section} aria-label="Voyage summary">
           <h2 className={styles.sectionTitle}>{t('runhistory:voyageSummaryTitle')}</h2>
           <div data-testid="voyage-summary-counts" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Badge tone="ok">{t('runhistory:countSucceeded', { n: summary.succeeded })}</Badge>
-            <Badge tone={summary.failed > 0 ? 'danger' : 'muted'}>
-              {t('runhistory:countFailed', { n: summary.failed })}
-            </Badge>
-            <Badge tone={summary.cancelled > 0 ? 'warn' : 'muted'}>
-              {t('runhistory:countCancelled', { n: summary.cancelled })}
-            </Badge>
+            {(['succeeded', 'failed', 'cancelled'] as const).map((s) => {
+              const n = summary[s] ?? 0;
+              const isActive = statusFilter === s;
+              const tone = summaryTone(s, n);
+              return (
+                <span
+                  key={s}
+                  data-filter={s}
+                  data-active={isActive ? 'true' : undefined}
+                  onClick={() => setStatusFilter(isActive ? null : s)}
+                  style={{ cursor: 'pointer', outline: isActive ? '2px solid var(--accent)' : undefined, borderRadius: 'var(--radius)' }}
+                >
+                  <Badge tone={isActive ? 'info' : tone}>
+                    {t(`runhistory:count${s.charAt(0).toUpperCase()}${s.slice(1)}` as Parameters<typeof t>[0], { n })}
+                  </Badge>
+                </span>
+              );
+            })}
             {summary.no_match !== undefined ? (
               <Badge tone="muted">
                 {t('runhistory:countNoMatch', { n: summary.no_match })}
               </Badge>
             ) : null}
-            <Badge tone="muted">{t('runhistory:countTotal', { n: summary.total })}</Badge>
+            <span
+              data-filter="total"
+              onClick={() => setStatusFilter(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              <Badge tone="muted">{t('runhistory:countTotal', { n: summary.total })}</Badge>
+            </span>
           </div>
         </section>
       ) : (
@@ -231,7 +272,7 @@ export function VoyageDetail() {
 
       <section className={styles.section} aria-label="Voyage targets">
         <h2 className={styles.sectionTitle}>{t('runhistory:voyageTargetsTitle')}</h2>
-        <VoyageTargets voyageId={id} refetchInterval={isRunning ? 3000 : false} />
+        <VoyageTargets voyageId={id} refetchInterval={isRunning ? 3000 : false} statusFilter={statusFilter} />
       </section>
 
       {cancelOpen ? (

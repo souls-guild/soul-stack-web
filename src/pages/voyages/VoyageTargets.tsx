@@ -20,9 +20,11 @@ interface Props {
   voyageId: string;
   /** Рефетч-интервал: передаётся из VoyageDetail (пока voyage running — 3000, иначе false). */
   refetchInterval: number | false;
+  /** Активный фильтр по статусу. null = все. */
+  statusFilter?: string | null;
 }
 
-export function VoyageTargets({ voyageId, refetchInterval }: Props) {
+export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props) {
   const { t } = useTranslation('runhistory');
 
   const q = useQuery({
@@ -36,10 +38,17 @@ export function VoyageTargets({ voyageId, refetchInterval }: Props) {
     return <div className={styles.loading}>{t('voyageTargetsLoading')}</div>;
   }
 
-  const targets = q.data?.targets ?? [];
+  const allTargets = q.data?.targets ?? [];
+  const targets = statusFilter
+    ? allTargets.filter((e) => e.status === statusFilter)
+    : allTargets;
 
-  if (targets.length === 0) {
+  if (allTargets.length === 0) {
     return <div className={styles.empty}>{t('voyageTargetsEmpty')}</div>;
+  }
+
+  if (statusFilter && targets.length === 0) {
+    return <div className={styles.empty}>{t('voyageTargetsNoneForStatus', { status: statusFilter })}</div>;
   }
 
   // Группировка по batch_index (сортируем индексы для предсказуемого порядка).

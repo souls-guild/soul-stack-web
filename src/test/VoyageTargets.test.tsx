@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
 import { VoyageDetail } from '../pages/voyages/VoyageDetail';
+import { VoyageTargets } from '../pages/voyages/VoyageTargets';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
@@ -16,6 +17,7 @@ const VOYAGE_BASE = {
   scope_size: 3,
   batch_size: 1,
   concurrency: 50,
+  batch_mode: 'barrier',
   on_failure: 'abort',
   dry_run: false,
   total_batches: 3,
@@ -187,5 +189,39 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     await waitFor(() => {
       expect(screen.getByText(/Targets ещё не появились/)).toBeInTheDocument();
     });
+  });
+
+  it('statusFilter=succeeded → отображает только succeeded targets, остальные скрыты', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },
+    ]);
+
+    renderWithProviders(
+      <VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} statusFilter="succeeded" />,
+    );
+
+    // Только succeeded target виден
+    await waitFor(() => expect(screen.getByText('pg-prod-1')).toBeInTheDocument());
+
+    // failed и cancelled отсеяны
+    expect(screen.queryByText('pg-prod-2')).toBeNull();
+    expect(screen.queryByText('pg-prod-3')).toBeNull();
+  });
+
+  it('statusFilter с 0 совпадений → сообщение "нет targets с таким статусом"', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },
+    ]);
+
+    renderWithProviders(
+      <VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} statusFilter="awaiting" />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/awaiting/)).toBeInTheDocument(),
+    );
+
+    // Таблицы нет
+    expect(screen.queryByText('pg-prod-1')).toBeNull();
   });
 });
