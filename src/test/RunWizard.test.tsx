@@ -1169,14 +1169,16 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (v=7, incarnationRegex) → state восстанавливается', async () => {
+  it('Валидный свежий черновик (v=8, incarnationRegex) → state восстанавливается', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 7,
+        v: 8,
         step: 3,
         workload: 'scenario',
+        runMode: 'voyage',
+        cadenceState: { cadenceName: '', scheduleKind: 'interval', intervalSeconds: '3600', cronExpr: '', overlapPolicy: 'skip' },
         scenarioState: {
           service: 'redis',
           scenario: 'restart',

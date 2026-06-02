@@ -13,6 +13,7 @@ import {
   Play,
   Activity,
   HelpCircle,
+  CalendarClock,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
 import { HelpModal } from './HelpModal';
@@ -59,6 +60,7 @@ const ORACLE: NavItem[] = [
 
 const HISTORY: NavItem[] = [
   { to: '/runs', label: 'All runs', icon: Activity, matchPrefix: '/runs' },
+  { to: '/cadences', label: 'Cadences', icon: CalendarClock, matchPrefix: '/cadences' },
 ];
 
 const BOTTOM: NavItem[] = [

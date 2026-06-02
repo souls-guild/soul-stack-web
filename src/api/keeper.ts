@@ -166,6 +166,16 @@ export interface ErrandRunCreateReply {
   errand_run_id: string;
 }
 
+// Cadence — регулярный запуск Voyage по расписанию (ADR-046). Типы из gen.
+export type Cadence = components['schemas']['Cadence'];
+export type CadenceCreateRequest = components['schemas']['CadenceCreateRequest'];
+export type CadencePatchRequest = components['schemas']['CadencePatchRequest'];
+export type CadenceCreateReply = components['schemas']['CadenceCreateReply'];
+export type CadenceEnabledReply = components['schemas']['CadenceEnabledReply'];
+export type CadenceListReply = components['schemas']['CadenceListReply'];
+export type CadenceScheduleKind = NonNullable<Cadence['schedule_kind']>;
+export type CadenceOverlapPolicy = NonNullable<Cadence['overlap_policy']>;
+
 // Voyage — унифицированный батчевый прогон (ADR-043). Типы из gen (sources of truth).
 export type VoyageStatus = NonNullable<components['schemas']['Voyage']['status']>;
 export type VoyageKind = NonNullable<components['schemas']['Voyage']['kind']>;
@@ -789,6 +799,35 @@ export const keeperApi = {
       apiGet<VoyageTargetsReply>(`/v1/voyages/${encodeURIComponent(voyageId)}/targets`),
   },
 
+  // Cadence — регулярные прогоны по расписанию (ADR-046).
+  cadences: {
+    create: (body: CadenceCreateRequest) =>
+      apiSend<CadenceCreateReply>('/v1/cadences', 'POST', { body }),
+    list: (q: ListCadencesQuery = {}) =>
+      apiGet<CadenceListReply>('/v1/cadences', {
+        query: {
+          enabled: q.enabled,
+          kind: q.kind,
+          offset: q.offset,
+          limit: q.limit,
+        },
+      }),
+    get: (id: string) =>
+      apiGet<Cadence>(`/v1/cadences/${encodeURIComponent(id)}`),
+    patch: (id: string, body: CadencePatchRequest) =>
+      apiSend<Cadence>(`/v1/cadences/${encodeURIComponent(id)}`, 'PATCH', { body }),
+    delete: (id: string) =>
+      apiSend<void>(`/v1/cadences/${encodeURIComponent(id)}`, 'DELETE'),
+    enable: (id: string) =>
+      apiSend<CadenceEnabledReply>(`/v1/cadences/${encodeURIComponent(id)}/enable`, 'POST'),
+    disable: (id: string) =>
+      apiSend<CadenceEnabledReply>(`/v1/cadences/${encodeURIComponent(id)}/disable`, 'POST'),
+    runs: (id: string, q: ListPagedQuery = {}) =>
+      apiGet<VoyageListReply>(`/v1/cadences/${encodeURIComponent(id)}/runs`, {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+  },
+
   // Sigil-allow-list плагинов (ADR-026, вариант C). Полный путь записи — (namespace, name, ref).
   plugins: {
     sigils: {
@@ -888,4 +927,11 @@ export interface ListErrandRunsQuery {
 export interface ListModulesQuery {
   // true — только модули с хотя бы одним errand-safe state (Run→Command whitelist).
   errand_safe?: boolean;
+}
+
+export interface ListCadencesQuery {
+  enabled?: boolean;
+  kind?: 'scenario' | 'command';
+  offset?: number;
+  limit?: number;
 }

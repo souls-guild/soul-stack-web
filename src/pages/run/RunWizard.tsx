@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
-import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal } from 'lucide-react';
+import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import type {
+  CadenceScheduleKind,
+  CadenceOverlapPolicy,
   ModuleCatalogItem,
   ModuleKind,
   ModuleParam,
@@ -12,6 +14,7 @@ import type {
   ServiceScenarioInfo,
   SoulListEntry,
   VoyageOnFailure,
+  VoyageTarget,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
@@ -46,6 +49,9 @@ import styles from './WizardSteps.module.css';
 // Workload-тип Step 1. Push убран — он стал внутренним транспортом unified-Run,
 // больше не пользовательский тип (route /push остаётся deprecated).
 type Workload = 'scenario' | 'command';
+
+// Режим запуска: one-time Voyage или recurring Cadence.
+type RunMode = 'voyage' | 'cadence';
 
 // Stepper-определение. Семантика Step 2/3 различается по workload:
 //   Scenario: Step2=выбор scenario, Step3=incarnations, Step4=input+options.
@@ -137,6 +143,15 @@ interface OptionsState {
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
+// Cadence-специфичный state (используется только при runMode='cadence').
+interface CadenceState {
+  cadenceName: string;
+  scheduleKind: CadenceScheduleKind;
+  intervalSeconds: string;
+  cronExpr: string;
+  overlapPolicy: CadenceOverlapPolicy;
+}
+
 // Черновик wizard-а в sessionStorage: переживает навигацию away/back между шагами
 // и сменой workload (под-шаги пере-монтируются — без persist локальный state шага
 // терялся бы). Очищается после успешного submit.
@@ -146,16 +161,18 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 7;
+const DRAFT_VERSION = 8;
 
 interface WizardDraft {
   v: number;
   step: 1 | 2 | 3 | 4;
   workload: Workload;
+  runMode: RunMode;
   scenarioState: ScenarioStateValues;
   commandState: CommandStateValues;
   hostCriteria: HostCriteria;
   options: OptionsState;
+  cadenceState: CadenceState;
 }
 
 // Дефолты под-state-ов. Используются как база default-merge при восстановлении
@@ -197,6 +214,14 @@ const DEFAULT_OPTIONS: OptionsState = {
   interBatchIntervalMs: '',
   interUnitIntervalMs: '',
   requireAlive: false,
+};
+
+const DEFAULT_CADENCE_STATE: CadenceState = {
+  cadenceName: '',
+  scheduleKind: 'interval',
+  intervalSeconds: '3600',
+  cronExpr: '',
+  overlapPolicy: 'skip',
 };
 
 function loadDraft(): WizardDraft | null {
@@ -278,6 +303,11 @@ export function RunWizard() {
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(draft?.step ?? 1);
   const [workload, setWorkload] = useState<Workload>(draft?.workload ?? initialWorkload);
+  const [runMode, setRunMode] = useState<RunMode>(() => {
+    if (draft) return draft.runMode ?? 'voyage';
+    // deep-link ?recurrence=true → сразу открывает cadence-режим
+    return searchParams.get('recurrence') === 'true' ? 'cadence' : 'voyage';
+  });
 
   // Инициализация под-state-ов: при наличии черновика — default-merge на уровне
   // под-объекта (новое поле всегда имеет значение из дефолта, если в черновике
@@ -340,6 +370,10 @@ export function RunWizard() {
     draft ? { ...DEFAULT_OPTIONS, ...(draft.options ?? {}) } : DEFAULT_OPTIONS,
   );
 
+  const [cadenceState, setCadenceState] = useState<CadenceState>(() =>
+    draft ? { ...DEFAULT_CADENCE_STATE, ...(draft.cadenceState ?? {}) } : DEFAULT_CADENCE_STATE,
+  );
+
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Ошибки map-полей и pattern-полей (поднимаются из ScenarioInputFields).
@@ -352,13 +386,13 @@ export function RunWizard() {
   // Persist черновика на каждое изменение wizard-state. sessionStorage —
   // переживает навигацию внутри вкладки браузера, чистится при закрытии вкладки.
   useEffect(() => {
-    const payload: WizardDraft = { v: DRAFT_VERSION, step, workload, scenarioState, commandState, hostCriteria, options };
+    const payload: WizardDraft = { v: DRAFT_VERSION, step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState };
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
     } catch {
       // sessionStorage недоступен (private-mode/quota) — persist опционален, не падаем.
     }
-  }, [step, workload, scenarioState, commandState, hostCriteria, options]);
+  }, [step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState]);
 
   function goNext() {
     setStep((s) => (s < 4 ? ((s + 1) as 2 | 3 | 4) : s));
@@ -526,6 +560,7 @@ export function RunWizard() {
   // --- Submit ---
   const submitMu = useMutation({
     mutationFn: async () => {
+      if (runMode === 'cadence') return submitCadence();
       if (workload === 'scenario') return submitScenario();
       return submitCommand();
     },
@@ -592,20 +627,54 @@ export function RunWizard() {
     };
   }
 
+  interface RecipePayload {
+    kind: 'scenario' | 'command';
+    scenario_name?: string;
+    module?: string;
+    input?: Record<string, unknown>;
+    target: VoyageTarget;
+  }
+
+  /** Строит recipe-часть (kind + workload-поля + target), общую для voyage и cadence. */
+  function buildRecipePayload(): RecipePayload {
+    if (workload === 'scenario') {
+      const inputObj =
+        usePerField && inputSchema
+          ? serializeFields(inputSchema, scenarioState.fields)
+          : scenarioState.inputObj;
+      return {
+        kind: 'scenario',
+        scenario_name: scenarioState.scenario,
+        input: Object.keys(inputObj).length > 0 ? inputObj : undefined,
+        target: { incarnations: scenarioState.incarnations },
+      };
+    } else {
+      // Полный адрес модуля — `<name>.<state>` (state опускается, если пуст —
+      // free-text fallback мог не задать его).
+      const moduleName = commandState.moduleState
+        ? `${commandState.moduleName}.${commandState.moduleState}`
+        : commandState.moduleName;
+      let input: Record<string, unknown>;
+      if (hasParams(commandState.moduleParams)) {
+        input = serializeFields(paramsToInputSchema(commandState.moduleParams), commandState.paramFields);
+      } else {
+        input = commandState.customInput;
+      }
+      // UI уже резолвил rich-criteria в явный список SID — шлём через target.sids.
+      return {
+        kind: 'command',
+        module: moduleName,
+        input: Object.keys(input).length > 0 ? input : undefined,
+        target: { sids: resolvedSids },
+      };
+    }
+  }
+
   async function submitScenario(): Promise<string> {
-    const inputObj =
-      usePerField && inputSchema
-        ? serializeFields(inputSchema, scenarioState.fields)
-        : scenarioState.inputObj;
-
-    const names = scenarioState.incarnations;
+    const recipe = buildRecipePayload();
     const opts = buildOptionsPayload();
-
     const reply = await keeperApi.voyages.create({
-      kind: 'scenario',
-      scenario_name: scenarioState.scenario,
-      input: Object.keys(inputObj).length > 0 ? inputObj : undefined,
-      target: { incarnations: names },
+      ...recipe,
       dry_run: Boolean(options.dryRun),
       require_alive: options.requireAlive,
       ...opts,
@@ -614,29 +683,33 @@ export function RunWizard() {
   }
 
   async function submitCommand(): Promise<string> {
-    // Полный адрес модуля — `<name>.<state>` (state опускается, если пуст —
-    // free-text fallback мог не задать его).
-    const moduleName = commandState.moduleState
-      ? `${commandState.moduleName}.${commandState.moduleState}`
-      : commandState.moduleName;
-    let input: Record<string, unknown>;
-    if (hasParams(commandState.moduleParams)) {
-      input = serializeFields(paramsToInputSchema(commandState.moduleParams), commandState.paramFields);
-    } else {
-      input = commandState.customInput;
-    }
+    const recipe = buildRecipePayload();
     const opts = buildOptionsPayload();
-    // UI уже резолвил rich-criteria в явный список SID — шлём через target.sids.
     const reply = await keeperApi.voyages.create({
-      kind: 'command',
-      module: moduleName,
-      input: Object.keys(input).length > 0 ? input : undefined,
-      target: { sids: resolvedSids },
+      ...recipe,
       dry_run: false,
       require_alive: options.requireAlive,
       ...opts,
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
+  }
+
+  async function submitCadence(): Promise<string> {
+    const recipe = buildRecipePayload();
+    const opts = buildOptionsPayload();
+    const intervalSec = parseIntOrEmpty(cadenceState.intervalSeconds);
+    const reply = await keeperApi.cadences.create({
+      name: cadenceState.cadenceName,
+      enabled: true,
+      schedule_kind: cadenceState.scheduleKind,
+      interval_seconds: cadenceState.scheduleKind === 'interval' ? intervalSec : undefined,
+      cron_expr: cadenceState.scheduleKind === 'cron' ? cadenceState.cronExpr : undefined,
+      overlap_policy: cadenceState.overlapPolicy,
+      ...recipe,
+      ...opts,
+      require_alive: options.requireAlive,
+    });
+    return `/cadences/${encodeURIComponent(reply.cadence_id)}`;
   }
 
   // batchSize — опциональное поле; если задано, должно быть целым 1..10000
@@ -665,7 +738,19 @@ export function RunWizard() {
     return new Date(s) > new Date();
   }, [options.scheduleAt]);
 
-  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchSizeValid && batchPercentValid && scheduleAtValid && !submitMu.isPending;
+  // Cadence-специфичная валидация Step 4.
+  const cadenceValid = useMemo(() => {
+    if (runMode !== 'cadence') return true;
+    if (!cadenceState.cadenceName.trim()) return false;
+    if (cadenceState.scheduleKind === 'interval') {
+      const s = parseIntOrEmpty(cadenceState.intervalSeconds);
+      return Boolean(s && s >= 60);
+    }
+    // cron: непустая строка (формат проверяет backend)
+    return cadenceState.cronExpr.trim().length > 0;
+  }, [runMode, cadenceState]);
+
+  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchSizeValid && batchPercentValid && (runMode === 'cadence' ? cadenceValid : scheduleAtValid) && !submitMu.isPending;
 
   // Самый дальний достижимый шаг по валидации (gate каждого шага). Stepper красит
   // «done» только реально пройденные шаги и запрещает прыжок вперёд за невалидный
@@ -697,7 +782,14 @@ export function RunWizard() {
       />
 
       <div className={styles.body}>
-        {step === 1 ? <Step1 value={workload} onChange={setWorkload} /> : null}
+        {step === 1 ? (
+          <Step1
+            workload={workload}
+            onWorkloadChange={setWorkload}
+            runMode={runMode}
+            onRunModeChange={setRunMode}
+          />
+        ) : null}
 
         {step === 2 && workload === 'scenario' ? (
           <Step2ScenarioSelect value={scenarioState} onChange={setScenarioState} scenariosQ={scenariosQ} />
@@ -741,7 +833,18 @@ export function RunWizard() {
         ) : null}
 
         {step === 4 ? (
-          <Step4Options value={options} onChange={setOptions} workload={workload} scheduleAtValid={scheduleAtValid} batchSizeValid={batchSizeValid} batchPercentValid={batchPercentValid} />
+          <Step4Options
+            value={options}
+            onChange={setOptions}
+            workload={workload}
+            scheduleAtValid={scheduleAtValid}
+            batchSizeValid={batchSizeValid}
+            batchPercentValid={batchPercentValid}
+            runMode={runMode}
+            cadenceState={cadenceState}
+            onCadenceChange={setCadenceState}
+            cadenceValid={cadenceValid}
+          />
         ) : null}
 
         {submitError ? <div className={pageStyles.errorBox}>{submitError}</div> : null}
@@ -769,7 +872,15 @@ export function RunWizard() {
               }}
               disabled={!canSubmit}
             >
-              <Send size={14} /> {submitMu.isPending ? t('running') : t('run')}
+              {runMode === 'cadence' ? (
+                <>
+                  <CalendarClock size={14} /> {submitMu.isPending ? t('running') : t('run:cadenceSubmitBtn')}
+                </>
+              ) : (
+                <>
+                  <Send size={14} /> {submitMu.isPending ? t('running') : t('run')}
+                </>
+              )}
             </Button>
           )}
         </div>
@@ -827,32 +938,79 @@ function Stepper({
   );
 }
 
-function Step1({ value, onChange }: { value: Workload; onChange: (v: Workload) => void }) {
+function Step1({
+  workload,
+  onWorkloadChange,
+  runMode,
+  onRunModeChange,
+}: {
+  workload: Workload;
+  onWorkloadChange: (v: Workload) => void;
+  runMode: RunMode;
+  onRunModeChange: (v: RunMode) => void;
+}) {
   const { t } = useTranslation();
   return (
-    <div className={styles.radioRow} role="radiogroup" aria-label="Workload type">
-      {WORKLOADS.map((w) => {
-        const active = value === w.kind;
-        const Icon = w.icon;
-        return (
-          <label key={w.kind} className={`${styles.radioCard} ${active ? styles.radioCardActive : ''}`}>
-            <input
-              type="radio"
-              name="workload"
-              value={w.kind}
-              checked={active}
-              onChange={() => onChange(w.kind)}
-              aria-label={w.title}
-            />
-            <Icon size={18} style={{ marginTop: 2, color: 'var(--text-muted)' }} />
-            <div>
-              <div className={styles.radioTitle}>{w.title}</div>
-              <div className={styles.radioDesc}>{t(w.descKey)}</div>
-            </div>
-          </label>
-        );
-      })}
-    </div>
+    <>
+      {/* Режим запуска: One-time / Recurring */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <label className={`${styles.radioCard} ${runMode === 'voyage' ? styles.radioCardActive : ''}`} style={{ flex: 1 }}>
+          <input
+            type="radio"
+            name="run_mode"
+            value="voyage"
+            checked={runMode === 'voyage'}
+            onChange={() => onRunModeChange('voyage')}
+            aria-label={t('run:runModeVoyage')}
+          />
+          <Play size={18} style={{ marginTop: 2, color: 'var(--text-muted)' }} />
+          <div>
+            <div className={styles.radioTitle}>{t('run:runModeVoyage')}</div>
+            <div className={styles.radioDesc}>{t('run:runModeVoyageDesc')}</div>
+          </div>
+        </label>
+        <label className={`${styles.radioCard} ${runMode === 'cadence' ? styles.radioCardActive : ''}`} style={{ flex: 1 }}>
+          <input
+            type="radio"
+            name="run_mode"
+            value="cadence"
+            checked={runMode === 'cadence'}
+            onChange={() => onRunModeChange('cadence')}
+            aria-label={t('run:runModeCadence')}
+          />
+          <CalendarClock size={18} style={{ marginTop: 2, color: 'var(--text-muted)' }} />
+          <div>
+            <div className={styles.radioTitle}>{t('run:runModeCadence')}</div>
+            <div className={styles.radioDesc}>{t('run:runModeCadenceDesc')}</div>
+          </div>
+        </label>
+      </div>
+
+      {/* Выбор workload */}
+      <div className={styles.radioRow} role="radiogroup" aria-label="Workload type">
+        {WORKLOADS.map((w) => {
+          const active = workload === w.kind;
+          const Icon = w.icon;
+          return (
+            <label key={w.kind} className={`${styles.radioCard} ${active ? styles.radioCardActive : ''}`}>
+              <input
+                type="radio"
+                name="workload"
+                value={w.kind}
+                checked={active}
+                onChange={() => onWorkloadChange(w.kind)}
+                aria-label={w.title}
+              />
+              <Icon size={18} style={{ marginTop: 2, color: 'var(--text-muted)' }} />
+              <div>
+                <div className={styles.radioTitle}>{w.title}</div>
+                <div className={styles.radioDesc}>{t(w.descKey)}</div>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -1410,6 +1568,10 @@ function Step4Options({
   scheduleAtValid,
   batchSizeValid,
   batchPercentValid,
+  runMode,
+  cadenceState,
+  onCadenceChange,
+  cadenceValid,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
@@ -1417,6 +1579,10 @@ function Step4Options({
   scheduleAtValid: boolean;
   batchSizeValid: boolean;
   batchPercentValid: boolean;
+  runMode: RunMode;
+  cadenceState: CadenceState;
+  onCadenceChange: (next: CadenceState) => void;
+  cadenceValid: boolean;
 }) {
   const { t } = useTranslation();
   const isWindow = value.batchMode === 'window';
@@ -1637,19 +1803,124 @@ function Step4Options({
         </label>
       ) : null}
 
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>{t('run:scheduleAtLabel')}</span>
-        <input
-          type="datetime-local"
-          className={styles.field}
-          value={value.scheduleAt}
-          onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
-          aria-label="Schedule at"
-        />
-        <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
-        {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
-        {!scheduleAtValid ? <span className={styles.warn}>{t('run:scheduleAtPastError')}</span> : null}
-      </label>
+      {runMode === 'cadence' ? (
+        /* Cadence-поля вместо scheduleAt */
+        <fieldset
+          style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
+        >
+          <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>
+            {t('run:cadenceScheduleLabel')}
+          </legend>
+
+          {/* Имя Cadence */}
+          <label className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>{t('run:cadenceNameLabel')}</span>
+            <input
+              type="text"
+              className={styles.field}
+              value={cadenceState.cadenceName}
+              onChange={(e) => onCadenceChange({ ...cadenceState, cadenceName: e.target.value })}
+              placeholder={t('run:cadenceNamePlaceholder')}
+              aria-label="Cadence name"
+              data-testid="cadence-name"
+            />
+            {!cadenceState.cadenceName.trim() && !cadenceValid ? (
+              <span className={styles.warn}>{t('run:cadenceNameRequired')}</span>
+            ) : null}
+          </label>
+
+          {/* schedule_kind */}
+          <div className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>{t('run:cadenceKindLabel')}</span>
+            <div style={{ display: 'flex', gap: 14 }}>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                <input
+                  type="radio"
+                  name="schedule_kind"
+                  value="interval"
+                  checked={cadenceState.scheduleKind === 'interval'}
+                  onChange={() => onCadenceChange({ ...cadenceState, scheduleKind: 'interval' })}
+                  aria-label="schedule_kind_interval"
+                />
+                {t('run:cadenceKindInterval')}
+              </label>
+              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                <input
+                  type="radio"
+                  name="schedule_kind"
+                  value="cron"
+                  checked={cadenceState.scheduleKind === 'cron'}
+                  onChange={() => onCadenceChange({ ...cadenceState, scheduleKind: 'cron' })}
+                  aria-label="schedule_kind_cron"
+                />
+                {t('run:cadenceKindCron')}
+              </label>
+            </div>
+          </div>
+
+          {cadenceState.scheduleKind === 'interval' ? (
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:cadenceIntervalLabel')}</span>
+              <input
+                type="number"
+                className={styles.field}
+                min={60}
+                value={cadenceState.intervalSeconds}
+                onChange={(e) => onCadenceChange({ ...cadenceState, intervalSeconds: e.target.value })}
+                placeholder="3600"
+                aria-label="Interval seconds"
+                data-testid="cadence-interval"
+              />
+              <span className={styles.hint}>{t('run:cadenceIntervalHint')}</span>
+            </label>
+          ) : (
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:cadenceCronLabel')}</span>
+              <input
+                type="text"
+                className={styles.field}
+                value={cadenceState.cronExpr}
+                onChange={(e) => onCadenceChange({ ...cadenceState, cronExpr: e.target.value })}
+                placeholder="0 */6 * * *"
+                aria-label="Cron expression"
+                data-testid="cadence-cron"
+              />
+              <span className={styles.hint}>{t('run:cadenceCronHint')}</span>
+            </label>
+          )}
+
+          {/* overlap_policy */}
+          <label className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>{t('run:cadenceOverlapLabel')}</span>
+            <select
+              className={styles.field}
+              value={cadenceState.overlapPolicy}
+              onChange={(e) => onCadenceChange({ ...cadenceState, overlapPolicy: e.target.value as CadenceOverlapPolicy })}
+              aria-label="Overlap policy"
+              data-testid="cadence-overlap"
+            >
+              <option value="skip">{t('run:cadenceOverlapSkip')}</option>
+              <option value="queue">{t('run:cadenceOverlapQueue')}</option>
+              <option value="parallel">{t('run:cadenceOverlapParallel')}</option>
+            </select>
+            <span className={styles.hint}>{t(`run:cadenceOverlapHint_${cadenceState.overlapPolicy}`)}</span>
+          </label>
+        </fieldset>
+      ) : (
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>{t('run:scheduleAtLabel')}</span>
+          <input
+            type="datetime-local"
+            className={styles.field}
+            value={value.scheduleAt}
+            onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
+            aria-label="Schedule at"
+          />
+          <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
+          {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
+          {!scheduleAtValid ? <span className={styles.warn}>{t('run:scheduleAtPastError')}</span> : null}
+        </label>
+      )}
 
       {workload === 'scenario' ? (
         <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>

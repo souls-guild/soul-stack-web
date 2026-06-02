@@ -34,6 +34,8 @@ import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
 import { RunWizard } from './pages/run/RunWizard';
 import { RunsFeed } from './pages/runs/RunsFeed';
 import { VoyageDetail } from './pages/voyages/VoyageDetail';
+import { CadencesList } from './pages/cadences/CadencesList';
+import { CadenceDetail } from './pages/cadences/CadenceDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -108,6 +110,8 @@ export function App() {
             <Route path="/run" element={<Protected><RunWizard /></Protected>} />
             <Route path="/runs" element={<Protected><RunsFeed /></Protected>} />
             <Route path="/voyages/:id" element={<Protected><VoyageDetail /></Protected>} />
+            <Route path="/cadences" element={<Protected><CadencesList /></Protected>} />
+            <Route path="/cadences/:id" element={<Protected><CadenceDetail /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

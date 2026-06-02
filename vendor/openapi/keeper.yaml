@@ -67,6 +67,8 @@ tags:
     description: Cloud-провайдеры — Provider и Profile (docs/keeper/cloud.md).
   - name: Choir
     description: Топология хостов внутри инкарнации — Choir (партия) и Voice (членство SID) (ADR-044).
+  - name: Cadence
+    description: Регулярные запуски — расписание, спавнящее Voyage по времени (ADR-046).
 
 paths:
   /healthz:
@@ -1674,6 +1676,286 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VoyageTargetsReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/cadences:
+    post:
+      tags: [Cadence]
+      operationId: CreateCadence
+      summary: Создать Cadence — регулярный запуск Voyage по расписанию (ADR-046).
+      description: |
+        Cadence — расписание, по времени спавнящее обычный Voyage-прогон. Тело —
+        рецепт прогона (kind/scenario_name|module/target/input/batch-настройки, то
+        же множество, что VoyageCreateRequest) + правило повторения (schedule_kind
+        interval|cron; interval_seconds XOR cron_expr) + overlap_policy.
+
+        Двухуровневый RBAC (ADR-046 §7, security-критичный fail-closed):
+        - первый уровень — cadence.create (управляет самим расписанием);
+        - второй уровень — Voyage-permission по kind рецепта (scenario→
+          incarnation.run, command→errand.run, ADR-043 §6), иначе Cadence стала бы
+          privilege-escalation-обходом RBAC → 403.
+
+        next_run_at вычисляется при создании. created_by_aid = JWT.sub. enabled по
+        умолчанию true. `input` НЕ логируется (audit cadence.created, инвариант A
+        ADR-027).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadenceCreateRequest'
+      responses:
+        '201':
+          description: Cadence создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CadenceCreateReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Cadence]
+      operationId: ListCadences
+      summary: Список Cadence-расписаний (фильтр enabled/kind + пагинация).
+      description: |
+        Permission: cadence.list. Sort created_at DESC.
+      parameters:
+        - in: query
+          name: enabled
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: 'true → только enabled; false / опущен → все.'
+        - in: query
+          name: kind
+          required: false
+          schema:
+            type: string
+            enum: [scenario, command]
+          description: Exact-match по kind рецепта.
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+      responses:
+        '200':
+          description: Страница Cadence-расписаний под фильтром.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CadenceListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/cadences/{id}:
+    get:
+      tags: [Cadence]
+      operationId: GetCadence
+      summary: Деталь одного Cadence-расписания.
+      description: |
+        Permission: cadence.list. `input` рецепта НЕ отдаётся (инвариант A ADR-027).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+          description: ULID Cadence.
+      responses:
+        '200':
+          description: Деталь.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cadence'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    patch:
+      tags: [Cadence]
+      operationId: PatchCadence
+      summary: Обновить Cadence (рецепт / расписание / enabled-toggle, ADR-046 S4).
+      description: |
+        Permission: cadence.update. Read-modify-write: заданные поля перезаписывают,
+        опущенные сохраняются. Пересчёт next_run_at при смене расписания. kind НЕ
+        меняется (смена kind = delete + create). Audit: cadence.updated.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadencePatchRequest'
+      responses:
+        '200':
+          description: Cadence обновлён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cadence'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Cadence]
+      operationId: DeleteCadence
+      summary: Снять Cadence-расписание (ADR-046 §9).
+      description: |
+        Permission: cadence.delete. Порождённые Voyage остаются (FK
+        voyages.cadence_id ON DELETE SET NULL — история детей и ручные прогоны
+        сохраняются). Audit: cadence.deleted.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      responses:
+        '204':
+          description: Cadence снят.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/cadences/{id}/enable:
+    post:
+      tags: [Cadence]
+      operationId: EnableCadence
+      summary: Включить Cadence (возобновление расписания, ADR-046 S4).
+      description: |
+        Permission: cadence.update. Lightweight toggle без перезаписи рецепта.
+        Audit: cadence.updated.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      responses:
+        '200':
+          description: Cadence включён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CadenceEnabledReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/cadences/{id}/disable:
+    post:
+      tags: [Cadence]
+      operationId: DisableCadence
+      summary: Выключить Cadence (пауза расписания, ADR-046 S4).
+      description: |
+        Permission: cadence.update. Lightweight toggle без перезаписи рецепта.
+        Audit: cadence.updated.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      responses:
+        '200':
+          description: Cadence выключен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CadenceEnabledReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/cadences/{id}/runs:
+    get:
+      tags: [Cadence]
+      operationId: ListCadenceRuns
+      summary: Дочерние Voyage Cadence-расписания (ADR-046 §6).
+      description: |
+        Permission: incarnation.history (read runtime-состояния прогонов, parity
+        Voyage-list). Voyage WHERE cadence_id=$1; reuse Voyage-DTO. Drill
+        «расписание → его прогоны». 404 если Cadence не существует.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [scheduled, pending, running, succeeded, failed, partial_failed, cancelled]
+          style: form
+          explode: true
+          description: Multi-value `?status=X&status=Y`; OR-семантика.
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+      responses:
+        '200':
+          description: Страница дочерних Voyage-прогонов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoyageListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
@@ -6113,6 +6395,243 @@ components:
           type: string
           enum: [cancelled]
       required: [voyage_id, status]
+
+    CadenceCreateRequest:
+      type: object
+      description: |
+        Body POST /v1/cadences (ADR-046 §3/§7). Рецепт прогона (parity
+        VoyageCreateRequest) + правило повторения + overlap_policy.
+      properties:
+        name:
+          type: string
+          description: Человекочитаемое имя расписания.
+        enabled:
+          type: boolean
+          default: true
+          description: Включено ли расписание (default-ON; false → пауза).
+        schedule_kind:
+          type: string
+          enum: [interval, cron]
+          description: Вид правила повторения (interval XOR cron).
+        interval_seconds:
+          type: integer
+          minimum: 1
+          description: Период для schedule_kind=interval (XOR с cron_expr).
+        cron_expr:
+          type: string
+          description: 'Стандартное 5-полевое cron-выражение (UTC) для schedule_kind=cron (XOR с interval_seconds).'
+        overlap_policy:
+          type: string
+          enum: [skip, queue, parallel]
+          description: Поведение при наложении (предыдущий ребёнок ещё не терминален).
+        kind:
+          type: string
+          enum: [scenario, command]
+        scenario_name:
+          type: string
+          description: Обязательно для kind=scenario; запрещено для command.
+        module:
+          type: string
+          description: Обязательно для kind=command; запрещено для scenario.
+        input:
+          type: object
+          additionalProperties: true
+          description: Параметры прогона (НЕ логируются в audit, инвариант A ADR-027).
+        target:
+          $ref: '#/components/schemas/VoyageTarget'
+        batch_size:
+          type: integer
+          minimum: 1
+          description: Размер Leg (взаимоисключающий с batch_percent).
+        batch_percent:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Размер Leg как % от scope (взаимоисключающий с batch_size).
+        concurrency:
+          type: integer
+          minimum: 1
+          description: Параллелизм внутри Leg (barrier) / ширина окна (window).
+        batch_mode:
+          type: string
+          enum: [barrier, window]
+          description: Режим батчинга (NULL ⇒ barrier).
+        fail_threshold:
+          type: integer
+          minimum: 1
+          description: Порог абсолютного числа провалов → стоп.
+        inter_batch_interval_ms:
+          type: integer
+          minimum: 0
+          description: Пауза между Leg-ами, мс (batch_mode=barrier).
+        inter_unit_interval_ms:
+          type: integer
+          minimum: 0
+          description: Per-unit пауза, мс (batch_mode=window).
+        require_alive:
+          type: boolean
+          default: false
+          description: Presence-фильтр живых на резолве scope (kind=command).
+        on_failure:
+          type: string
+          enum: [abort, continue]
+      required: [name, schedule_kind, overlap_policy, kind, target]
+
+    CadencePatchRequest:
+      type: object
+      description: |
+        Body PATCH /v1/cadences/{id} (ADR-046 S4). Все поля опциональны: заданное —
+        перезапись, опущенное — текущее значение сохраняется. kind не меняется.
+      properties:
+        name:
+          type: string
+        enabled:
+          type: boolean
+        schedule_kind:
+          type: string
+          enum: [interval, cron]
+        interval_seconds:
+          type: integer
+          minimum: 1
+        cron_expr:
+          type: string
+        overlap_policy:
+          type: string
+          enum: [skip, queue, parallel]
+        scenario_name:
+          type: string
+        module:
+          type: string
+        input:
+          type: object
+          additionalProperties: true
+        target:
+          $ref: '#/components/schemas/VoyageTarget'
+        batch_size:
+          type: integer
+          minimum: 1
+        batch_percent:
+          type: integer
+          minimum: 1
+          maximum: 100
+        concurrency:
+          type: integer
+          minimum: 1
+        batch_mode:
+          type: string
+          enum: [barrier, window]
+        fail_threshold:
+          type: integer
+          minimum: 1
+        require_alive:
+          type: boolean
+        on_failure:
+          type: string
+          enum: [abort, continue]
+
+    CadenceCreateReply:
+      type: object
+      properties:
+        cadence_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        name:
+          type: string
+        enabled:
+          type: boolean
+        next_run_at:
+          type: string
+          format: date-time
+        location:
+          type: string
+      required: [cadence_id, name, enabled, location]
+
+    CadenceEnabledReply:
+      type: object
+      properties:
+        cadence_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        enabled:
+          type: boolean
+      required: [cadence_id, enabled]
+
+    Cadence:
+      type: object
+      description: Деталь / list-item Cadence-расписания (input НЕ отдаётся).
+      properties:
+        cadence_id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        name:
+          type: string
+        enabled:
+          type: boolean
+        schedule_kind:
+          type: string
+          enum: [interval, cron]
+        interval_seconds:
+          type: integer
+        cron_expr:
+          type: string
+        overlap_policy:
+          type: string
+          enum: [skip, queue, parallel]
+        kind:
+          type: string
+          enum: [scenario, command]
+        scenario_name:
+          type: string
+        module:
+          type: string
+        target:
+          $ref: '#/components/schemas/VoyageTarget'
+        batch_size:
+          type: integer
+        batch_percent:
+          type: integer
+        concurrency:
+          type: integer
+        batch_mode:
+          type: string
+          enum: [barrier, window]
+        fail_threshold:
+          type: integer
+        require_alive:
+          type: boolean
+        on_failure:
+          type: string
+          enum: [abort, continue]
+        next_run_at:
+          type: string
+          format: date-time
+        last_run_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [cadence_id, name, enabled, schedule_kind, overlap_policy, kind, created_by_aid, created_at, updated_at]
+
+    CadenceListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cadence'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
 
     PushCleanupRequest:
       type: object

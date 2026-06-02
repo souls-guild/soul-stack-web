@@ -1,0 +1,207 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Routes, Route } from 'react-router-dom';
+import { renderWithProviders } from './renderWithProviders';
+import { CadencesList } from '../pages/cadences/CadencesList';
+import { CadenceDetail } from '../pages/cadences/CadenceDetail';
+import { installFetchMock } from './fetchMock';
+import { tokenStore } from '../api/tokenStore';
+
+const CADENCE_INTERVAL = {
+  cadence_id: 'cad-01',
+  name: 'redis-hourly',
+  enabled: true,
+  schedule_kind: 'interval',
+  interval_seconds: 3600,
+  overlap_policy: 'skip',
+  kind: 'scenario',
+  scenario_name: 'restart',
+  created_by_aid: 'archon-alice',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  next_run_at: new Date(Date.now() + 3600_000).toISOString(),
+};
+
+const CADENCE_CRON = {
+  cadence_id: 'cad-02',
+  name: 'db-backup',
+  enabled: false,
+  schedule_kind: 'cron',
+  cron_expr: '0 3 * * *',
+  overlap_policy: 'queue',
+  kind: 'command',
+  module: 'core.cmd.shell',
+  created_by_aid: 'archon-alice',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+const VOYAGE_CHILD = {
+  voyage_id: 'voy-01',
+  kind: 'scenario',
+  status: 'succeeded',
+  scope_size: 3,
+  batch_size: null,
+  batch_mode: 'barrier',
+  dry_run: false,
+  total_batches: 1,
+  current_batch_index: 1,
+  on_failure: 'abort',
+  require_alive: false,
+  attempt: 1,
+  started_by_aid: 'archon-alice',
+  created_at: new Date().toISOString(),
+  started_at: new Date(Date.now() - 60_000).toISOString(),
+  finished_at: new Date().toISOString(),
+};
+
+function setupMocks(opts: { items?: unknown[]; runs?: unknown[]; deleteStatus?: number } = {}) {
+  const items = opts.items ?? [CADENCE_INTERVAL, CADENCE_CRON];
+  const runs = opts.runs ?? [VOYAGE_CHILD];
+  installFetchMock([
+    // Порядок важен: более специфичные пути РАНЬШЕ.
+    { method: 'GET', url: '/v1/cadences/cad-01/runs', body: { items: runs, offset: 0, limit: 50, total: runs.length } },
+    { method: 'GET', url: '/v1/cadences/cad-01', body: CADENCE_INTERVAL },
+    { method: 'POST', url: '/v1/cadences/cad-01/enable', body: { cadence_id: 'cad-01', enabled: true } },
+    { method: 'POST', url: '/v1/cadences/cad-01/disable', body: { cadence_id: 'cad-01', enabled: false } },
+    { method: 'DELETE', url: '/v1/cadences/cad-01', status: opts.deleteStatus ?? 204, body: null },
+    { method: 'GET', url: '/v1/cadences', body: { items, offset: 0, limit: 100, total: items.length } },
+  ]);
+}
+
+beforeEach(() => {
+  tokenStore.set('tok-test');
+});
+
+describe('CadencesList', () => {
+  it('рендерит список cadences из API', async () => {
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+        <Route path="/cadences/:id" element={<CadenceDetail />} />
+        <Route path="/run" element={<div data-testid="run-wizard" />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+    expect(screen.getByText('db-backup')).toBeInTheDocument();
+    // Interval schedule label
+    expect(screen.getByText('every 1h')).toBeInTheDocument();
+    // Cron schedule label
+    expect(screen.getByText('cron: 0 3 * * *')).toBeInTheDocument();
+  });
+
+  it('пустой список — показывает empty-state', async () => {
+    setupMocks({ items: [] });
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(/Расписаний нет/)).toBeInTheDocument(),
+    );
+  });
+
+  it('toggle enable/disable — вызывает правильный endpoint', async () => {
+    const user = userEvent.setup();
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    // ждём появления таблицы
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+
+    // Первый чекбокс — redis-hourly (enabled=true). Клик → disable.
+    const checkboxes = screen.getAllByRole('checkbox');
+    const firstCheckbox = checkboxes[0];
+    expect(firstCheckbox).toBeChecked();
+    await user.click(firstCheckbox);
+
+    // Проверяем что POST /v1/cadences/cad-01/disable был вызван.
+    await waitFor(() => {
+      const calls = vi.mocked(globalThis.fetch).mock.calls;
+      const disableCall = calls.find(
+        ([input, init]) => {
+          const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+          return url.includes('/v1/cadences/cad-01/disable') && (init?.method ?? 'GET').toUpperCase() === 'POST';
+        },
+      );
+      expect(disableCall).toBeDefined();
+    });
+  });
+
+  it('delete кнопка открывает подтверждение', async () => {
+    const user = userEvent.setup();
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences" element={<CadencesList />} />
+      </Routes>,
+      '/cadences',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+
+    // Кликаем кнопку delete первой строки
+    const deleteBtns = screen.getAllByRole('button', { name: /Удалить/i });
+    await user.click(deleteBtns[0]);
+
+    // Модалка открылась с заголовком
+    await waitFor(() =>
+      expect(screen.getByText('Удалить Cadence?')).toBeInTheDocument(),
+    );
+    // Имя Cadence фигурирует в подтверждении
+    expect(screen.getAllByText(/redis-hourly/).length).toBeGreaterThan(0);
+
+    // Кнопка Отмена закрывает модалку
+    await user.click(screen.getByRole('button', { name: /Отменить|Отмена/i }));
+    await waitFor(() =>
+      expect(screen.queryByText('Удалить Cadence?')).not.toBeInTheDocument(),
+    );
+  });
+});
+
+describe('CadenceDetail', () => {
+  it('показывает метаданные Cadence и список runs', async () => {
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences/:id" element={<CadenceDetail />} />
+        <Route path="/voyages/:id" element={<div data-testid="voyage-detail" />} />
+        <Route path="/cadences" element={<div data-testid="cadences-list" />} />
+      </Routes>,
+      '/cadences/cad-01',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+    // Метаданные
+    expect(screen.getByText('every 1h')).toBeInTheDocument();
+    // Дочерние Voyage
+    await waitFor(() => expect(screen.getByText('voy-01')).toBeInTheDocument());
+    expect(screen.getByText('succeeded')).toBeInTheDocument();
+  });
+
+  it('runs — пустой список — empty-state', async () => {
+    setupMocks({ runs: [] });
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences/:id" element={<CadenceDetail />} />
+        <Route path="/cadences" element={<div />} />
+      </Routes>,
+      '/cadences/cad-01',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Прогонов ещё нет/)).toBeInTheDocument());
+  });
+});

@@ -1002,6 +1002,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cadences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Cadence-расписаний (фильтр enabled/kind + пагинация).
+         * @description Permission: cadence.list. Sort created_at DESC.
+         */
+        get: operations["ListCadences"];
+        put?: never;
+        /**
+         * Создать Cadence — регулярный запуск Voyage по расписанию (ADR-046).
+         * @description Cadence — расписание, по времени спавнящее обычный Voyage-прогон. Тело —
+         *     рецепт прогона (kind/scenario_name|module/target/input/batch-настройки, то
+         *     же множество, что VoyageCreateRequest) + правило повторения (schedule_kind
+         *     interval|cron; interval_seconds XOR cron_expr) + overlap_policy.
+         *
+         *     Двухуровневый RBAC (ADR-046 §7, security-критичный fail-closed):
+         *     - первый уровень — cadence.create (управляет самим расписанием);
+         *     - второй уровень — Voyage-permission по kind рецепта (scenario→
+         *       incarnation.run, command→errand.run, ADR-043 §6), иначе Cadence стала бы
+         *       privilege-escalation-обходом RBAC → 403.
+         *
+         *     next_run_at вычисляется при создании. created_by_aid = JWT.sub. enabled по
+         *     умолчанию true. `input` НЕ логируется (audit cadence.created, инвариант A
+         *     ADR-027).
+         */
+        post: operations["CreateCadence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cadences/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Деталь одного Cadence-расписания.
+         * @description Permission: cadence.list. `input` рецепта НЕ отдаётся (инвариант A ADR-027).
+         */
+        get: operations["GetCadence"];
+        put?: never;
+        post?: never;
+        /**
+         * Снять Cadence-расписание (ADR-046 §9).
+         * @description Permission: cadence.delete. Порождённые Voyage остаются (FK
+         *     voyages.cadence_id ON DELETE SET NULL — история детей и ручные прогоны
+         *     сохраняются). Audit: cadence.deleted.
+         */
+        delete: operations["DeleteCadence"];
+        options?: never;
+        head?: never;
+        /**
+         * Обновить Cadence (рецепт / расписание / enabled-toggle, ADR-046 S4).
+         * @description Permission: cadence.update. Read-modify-write: заданные поля перезаписывают,
+         *     опущенные сохраняются. Пересчёт next_run_at при смене расписания. kind НЕ
+         *     меняется (смена kind = delete + create). Audit: cadence.updated.
+         */
+        patch: operations["PatchCadence"];
+        trace?: never;
+    };
+    "/v1/cadences/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Включить Cadence (возобновление расписания, ADR-046 S4).
+         * @description Permission: cadence.update. Lightweight toggle без перезаписи рецепта.
+         *     Audit: cadence.updated.
+         */
+        post: operations["EnableCadence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cadences/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Выключить Cadence (пауза расписания, ADR-046 S4).
+         * @description Permission: cadence.update. Lightweight toggle без перезаписи рецепта.
+         *     Audit: cadence.updated.
+         */
+        post: operations["DisableCadence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cadences/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Дочерние Voyage Cadence-расписания (ADR-046 §6).
+         * @description Permission: incarnation.history (read runtime-состояния прогонов, parity
+         *     Voyage-list). Voyage WHERE cadence_id=$1; reuse Voyage-DTO. Drill
+         *     «расписание → его прогоны». 404 если Cadence не существует.
+         */
+        get: operations["ListCadenceRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/plugins/sigils": {
         parameters: {
             query?: never;
@@ -3699,6 +3832,150 @@ export interface components {
             /** @enum {string} */
             status: "cancelled";
         };
+        /**
+         * @description Body POST /v1/cadences (ADR-046 §3/§7). Рецепт прогона (parity
+         *     VoyageCreateRequest) + правило повторения + overlap_policy.
+         */
+        CadenceCreateRequest: {
+            /** @description Человекочитаемое имя расписания. */
+            name: string;
+            /**
+             * @description Включено ли расписание (default-ON; false → пауза).
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * @description Вид правила повторения (interval XOR cron).
+             * @enum {string}
+             */
+            schedule_kind: "interval" | "cron";
+            /** @description Период для schedule_kind=interval (XOR с cron_expr). */
+            interval_seconds?: number;
+            /** @description Стандартное 5-полевое cron-выражение (UTC) для schedule_kind=cron (XOR с interval_seconds). */
+            cron_expr?: string;
+            /**
+             * @description Поведение при наложении (предыдущий ребёнок ещё не терминален).
+             * @enum {string}
+             */
+            overlap_policy: "skip" | "queue" | "parallel";
+            /** @enum {string} */
+            kind: "scenario" | "command";
+            /** @description Обязательно для kind=scenario; запрещено для command. */
+            scenario_name?: string;
+            /** @description Обязательно для kind=command; запрещено для scenario. */
+            module?: string;
+            /** @description Параметры прогона (НЕ логируются в audit, инвариант A ADR-027). */
+            input?: {
+                [key: string]: unknown;
+            };
+            target: components["schemas"]["VoyageTarget"];
+            /** @description Размер Leg (взаимоисключающий с batch_percent). */
+            batch_size?: number;
+            /** @description Размер Leg как % от scope (взаимоисключающий с batch_size). */
+            batch_percent?: number;
+            /** @description Параллелизм внутри Leg (barrier) / ширина окна (window). */
+            concurrency?: number;
+            /**
+             * @description Режим батчинга (NULL ⇒ barrier).
+             * @enum {string}
+             */
+            batch_mode?: "barrier" | "window";
+            /** @description Порог абсолютного числа провалов → стоп. */
+            fail_threshold?: number;
+            /** @description Пауза между Leg-ами, мс (batch_mode=barrier). */
+            inter_batch_interval_ms?: number;
+            /** @description Per-unit пауза, мс (batch_mode=window). */
+            inter_unit_interval_ms?: number;
+            /**
+             * @description Presence-фильтр живых на резолве scope (kind=command).
+             * @default false
+             */
+            require_alive: boolean;
+            /** @enum {string} */
+            on_failure?: "abort" | "continue";
+        };
+        /**
+         * @description Body PATCH /v1/cadences/{id} (ADR-046 S4). Все поля опциональны: заданное —
+         *     перезапись, опущенное — текущее значение сохраняется. kind не меняется.
+         */
+        CadencePatchRequest: {
+            name?: string;
+            enabled?: boolean;
+            /** @enum {string} */
+            schedule_kind?: "interval" | "cron";
+            interval_seconds?: number;
+            cron_expr?: string;
+            /** @enum {string} */
+            overlap_policy?: "skip" | "queue" | "parallel";
+            scenario_name?: string;
+            module?: string;
+            input?: {
+                [key: string]: unknown;
+            };
+            target?: components["schemas"]["VoyageTarget"];
+            batch_size?: number;
+            batch_percent?: number;
+            concurrency?: number;
+            /** @enum {string} */
+            batch_mode?: "barrier" | "window";
+            fail_threshold?: number;
+            require_alive?: boolean;
+            /** @enum {string} */
+            on_failure?: "abort" | "continue";
+        };
+        CadenceCreateReply: {
+            cadence_id: string;
+            name: string;
+            enabled: boolean;
+            /** Format: date-time */
+            next_run_at?: string;
+            location: string;
+        };
+        CadenceEnabledReply: {
+            cadence_id: string;
+            enabled: boolean;
+        };
+        /** @description Деталь / list-item Cadence-расписания (input НЕ отдаётся). */
+        Cadence: {
+            cadence_id: string;
+            name: string;
+            enabled: boolean;
+            /** @enum {string} */
+            schedule_kind: "interval" | "cron";
+            interval_seconds?: number;
+            cron_expr?: string;
+            /** @enum {string} */
+            overlap_policy: "skip" | "queue" | "parallel";
+            /** @enum {string} */
+            kind: "scenario" | "command";
+            scenario_name?: string;
+            module?: string;
+            target?: components["schemas"]["VoyageTarget"];
+            batch_size?: number;
+            batch_percent?: number;
+            concurrency?: number;
+            /** @enum {string} */
+            batch_mode?: "barrier" | "window";
+            fail_threshold?: number;
+            require_alive?: boolean;
+            /** @enum {string} */
+            on_failure?: "abort" | "continue";
+            /** Format: date-time */
+            next_run_at?: string;
+            /** Format: date-time */
+            last_run_at?: string;
+            created_by_aid: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CadenceListReply: {
+            items: components["schemas"]["Cadence"][];
+            offset: number;
+            limit: number;
+            total: number;
+        };
         PushCleanupRequest: {
             /** @description Список SID (FQDN) target-хостов. */
             inventory: string[];
@@ -5443,6 +5720,239 @@ export interface operations {
                     "application/json": components["schemas"]["VoyageTargetsReply"];
                 };
             };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListCadences: {
+        parameters: {
+            query?: {
+                /** @description true → только enabled; false / опущен → все. */
+                enabled?: "true" | "false";
+                /** @description Exact-match по kind рецепта. */
+                kind?: "scenario" | "command";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница Cadence-расписаний под фильтром. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceListReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    CreateCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CadenceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Cadence создан. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceCreateReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    GetCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID Cadence. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Деталь. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cadence"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    DeleteCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cadence снят. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    PatchCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CadencePatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Cadence обновлён. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cadence"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    EnableCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cadence включён. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceEnabledReply"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    DisableCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cadence выключен. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceEnabledReply"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListCadenceRuns: {
+        parameters: {
+            query?: {
+                /** @description Multi-value `?status=X&status=Y`; OR-семантика. */
+                status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[];
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница дочерних Voyage-прогонов. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyageListReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
             401: components["responses"]["Problem401"];
             403: components["responses"]["Problem403"];
             404: components["responses"]["Problem404"];
