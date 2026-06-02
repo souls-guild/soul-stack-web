@@ -249,4 +249,65 @@ describe('ServiceDetail', () => {
       expect(screen.getByText('redis-prod')).toBeInTheDocument();
     });
   });
+
+  it('таб Dependencies рендерит destiny с ref', async () => {
+    installFetchMock([
+      // /dependencies — специфичнее /v1/services/redis → первым
+      {
+        method: 'GET',
+        url: '/v1/services/redis/dependencies',
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          destiny: [
+            { name: 'base-linux', ref: 'v1.3.0' },
+            { name: 'firewall', ref: 'main', git: 'https://git.example.com/firewall.git' },
+          ],
+          modules: [{ name: 'wb.redis-failover', ref: 'v0.9.0' }],
+        },
+      },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Dependencies|Зависимости/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-deps-section')).toBeInTheDocument();
+    });
+    expect(screen.getByText('base-linux')).toBeInTheDocument();
+    expect(screen.getByText('v1.3.0')).toBeInTheDocument();
+    expect(screen.getByText('https://git.example.com/firewall.git')).toBeInTheDocument();
+    expect(screen.getByText('wb.redis-failover')).toBeInTheDocument();
+  });
+
+  it('таб Dependencies: пустой destiny + пустые modules → empty-state без crash', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/services/redis/dependencies',
+        body: { service: 'redis', ref: 'v2.0.0', destiny: [], modules: [] },
+      },
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Dependencies|Зависимости/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId('svc-deps-section')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Нет destiny-зависимостей|No destiny/i)).toBeInTheDocument();
+    expect(screen.getByText(/Нет custom-модулей|No custom/i)).toBeInTheDocument();
+  });
 });

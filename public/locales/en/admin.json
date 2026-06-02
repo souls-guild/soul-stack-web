@@ -56,6 +56,16 @@
   "svcSchemaUnavailable": "State-schema unavailable: endpoint returned {{status}} (old Keeper or repo unreachable).",
   "svcYesShort": "yes",
 
+  "svcDepsTitle": "Dependencies",
+  "svcDepsDestinySection": "Destiny",
+  "svcDepsModulesSection": "Modules",
+  "svcDepsColName": "Name",
+  "svcDepsColRef": "Ref (version)",
+  "svcDepsColGit": "Git override",
+  "svcDepsDestinyEmpty": "No destiny dependencies.",
+  "svcDepsModulesEmpty": "No custom modules.",
+  "svcDepsUnavailable": "Dependencies unavailable: endpoint returned {{status}}.",
+
   "pluginSigilDisabledTitle": "Sigil subsystem is not enabled",
   "pluginSigilDisabledBody": "The plugin allow-list (Sigil) is not active in this cluster. Sigil is enabled on the Keeper side — ask the Keeper administrator to enable SigilSvc in the configuration.",
   "pluginCrumbs": "Sigil allow-list of plugins (Keeper computes sha256 itself from the host's local cache)",

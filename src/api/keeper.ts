@@ -215,6 +215,10 @@ export type ServiceUpdateRequest = components['schemas']['ServiceUpdateRequest']
 export type ServiceStateSchemaReply = components['schemas']['ServiceStateSchemaReply'];
 export type StateSchemaMigration = components['schemas']['StateSchemaMigration'];
 
+// Зависимости сервиса (destiny + modules). GET /v1/services/{name}/dependencies.
+export type ServiceDependency = components['schemas']['ServiceDependency'];
+export type ServiceDependenciesReply = components['schemas']['ServiceDependenciesReply'];
+
 // Hosts-editing (PATCH /v1/incarnations/{name}/hosts).
 export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
 export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
@@ -682,6 +686,10 @@ export const keeperApi = {
         `/v1/services/${encodeURIComponent(name)}/state-schema`,
         { query: { ref } },
       ),
+    // GET /v1/services/{name}/dependencies — destiny- и module-зависимости сервиса
+    // с их git-ref-ами (ADR-007). Endpoint опционален — UI graceful-degraded на 404/501.
+    getDependencies: (name: string) =>
+      apiGet<ServiceDependenciesReply>(`/v1/services/${encodeURIComponent(name)}/dependencies`),
   },
 
   // Oracle: Vigil-реестр (Soul-side проверки beacons). ADR-030.

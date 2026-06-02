@@ -56,6 +56,16 @@
   "svcSchemaUnavailable": "State-schema недоступна: endpoint вернул {{status}} (старый Keeper или репо не достать).",
   "svcYesShort": "да",
 
+  "svcDepsTitle": "Зависимости",
+  "svcDepsDestinySection": "Destiny",
+  "svcDepsModulesSection": "Modules",
+  "svcDepsColName": "Имя",
+  "svcDepsColRef": "Ref (версия)",
+  "svcDepsColGit": "Git-override",
+  "svcDepsDestinyEmpty": "Нет destiny-зависимостей.",
+  "svcDepsModulesEmpty": "Нет custom-модулей.",
+  "svcDepsUnavailable": "Зависимости недоступны: endpoint вернул {{status}}.",
+
   "pluginSigilDisabledTitle": "Sigil-подсистема не включена",
   "pluginSigilDisabledBody": "Allow-list плагинов (Sigil) не активирован в этом кластере. Sigil включается на стороне Keeper — попросите администратора Keeper включить SigilSvc в конфигурации.",
   "pluginCrumbs": "Sigil-allow-list плагинов (Keeper считает sha256 сам по локальному кешу host-а)",

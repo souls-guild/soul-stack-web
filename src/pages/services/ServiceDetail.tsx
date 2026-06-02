@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Layers } from 'lucide-react';
-import { keeperApi, type ServiceScenarioInfo } from '../../api/keeper';
+import { keeperApi, type ServiceScenarioInfo, type ServiceDependency, type ServiceDependenciesReply } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
@@ -14,7 +14,7 @@ import { isLifecycleScenario } from '../incarnations/reservedScenarios';
 import { extractFields, isSchemaDegraded } from '../incarnations/stateSchema';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs' | 'schema';
+type Tab = 'overview' | 'incarnations' | 'scenarios' | 'refs' | 'schema' | 'dependencies';
 
 export function ServiceDetail() {
   const { t } = useTranslation();
@@ -43,6 +43,13 @@ export function ServiceDetail() {
   });
 
   const refs = useServiceRefs(name, tab === 'refs');
+
+  const deps = useQuery({
+    queryKey: ['service.dependencies', name],
+    queryFn: () => keeperApi.services.getDependencies(name),
+    enabled: Boolean(name) && tab === 'dependencies',
+    retry: false,
+  });
 
   if (detail.isLoading) return <div className={styles.loading}>{t('admin:svcLoading')}</div>;
   if (detail.error) {
@@ -167,6 +174,15 @@ export function ServiceDetail() {
           onClick={() => setTab('schema')}
         >
           Schema
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'dependencies'}
+          className={`${styles.tab} ${tab === 'dependencies' ? styles.tabActive : ''}`}
+          onClick={() => setTab('dependencies')}
+        >
+          {t('admin:svcDepsTitle')}
         </button>
       </div>
 
@@ -353,6 +369,10 @@ export function ServiceDetail() {
 
       {tab === 'schema' ? <ServiceSchemaTab name={row.name} serviceRef={row.ref} /> : null}
 
+      {tab === 'dependencies' ? (
+        <ServiceDepsTab deps={deps} />
+      ) : null}
+
       {editOpen ? (
         <EditServiceModal open={editOpen} service={row} onClose={() => setEditOpen(false)} />
       ) : null}
@@ -514,6 +534,88 @@ function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: stri
             status: q.error instanceof ApiError ? q.error.status : '—',
           })}
         </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DepTable({ items, emptyKey }: { items: ServiceDependency[]; emptyKey: string }) {
+  const { t } = useTranslation();
+  if (items.length === 0) {
+    return <div className={styles.empty}>{t(emptyKey)}</div>;
+  }
+  return (
+    <table className={styles.table}>
+      <thead>
+        <tr>
+          <th>{t('admin:svcDepsColName')}</th>
+          <th>{t('admin:svcDepsColRef')}</th>
+          <th>{t('admin:svcDepsColGit')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((dep) => (
+          <tr key={dep.name}>
+            <td className="mono">{dep.name}</td>
+            <td className="mono">{dep.ref}</td>
+            <td className="mono">{dep.git ?? '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function ServiceDepsTab({
+  deps,
+}: {
+  deps: ReturnType<typeof useQuery<ServiceDependenciesReply>>;
+}) {
+  const { t } = useTranslation();
+  const depsUnavailable =
+    deps.error instanceof ApiError &&
+    (deps.error.status === 404 || deps.error.status === 501 || deps.error.status >= 500);
+
+  return (
+    <section className={styles.section} data-testid="svc-deps-section">
+      <h2 className={styles.sectionTitle}>{t('admin:svcDepsTitle')}</h2>
+
+      {deps.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
+
+      {depsUnavailable ? (
+        <div className={styles.empty}>
+          {t('admin:svcDepsUnavailable', {
+            status: deps.error instanceof ApiError ? deps.error.status : '—',
+          })}
+        </div>
+      ) : null}
+
+      {deps.error && !depsUnavailable ? (
+        <div className={styles.errorBox}>
+          {deps.error instanceof ApiError
+            ? t('errors:generic', { status: deps.error.status, detail: deps.error.message })
+            : String(deps.error)}
+        </div>
+      ) : null}
+
+      {deps.data ? (
+        <>
+          <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 0 }}>
+            {t('admin:svcDepsDestinySection')}
+          </h3>
+          <DepTable
+            items={deps.data.destiny ?? []}
+            emptyKey="admin:svcDepsDestinyEmpty"
+          />
+
+          <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
+            {t('admin:svcDepsModulesSection')}
+          </h3>
+          <DepTable
+            items={deps.data.modules ?? []}
+            emptyKey="admin:svcDepsModulesEmpty"
+          />
+        </>
       ) : null}
     </section>
   );
