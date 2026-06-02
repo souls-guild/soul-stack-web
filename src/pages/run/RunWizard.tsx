@@ -635,8 +635,17 @@ export function RunWizard() {
     target: VoyageTarget;
   }
 
-  /** Строит recipe-часть (kind + workload-поля + target), общую для voyage и cadence. */
-  function buildRecipePayload(): RecipePayload {
+  /**
+   * Строит recipe-часть (kind + workload-поля + target).
+   *
+   * forCadence=true (command): шлёт declared-критерии (coven/where) вместо
+   * snapshot sids, чтобы backend резолвил target на каждом тике (late-binding).
+   *
+   * Исключение — если coven не задан и оператор использовал только
+   * regex/soulprint: fallback на snapshot sids (declared-target был бы пустым).
+   * UI предупреждает об этом плашкой cadenceSnapshotOnlyWarn.
+   */
+  function buildRecipePayload(forCadence = false): RecipePayload {
     if (workload === 'scenario') {
       const inputObj =
         usePerField && inputSchema
@@ -660,7 +669,26 @@ export function RunWizard() {
       } else {
         input = commandState.customInput;
       }
-      // UI уже резолвил rich-criteria в явный список SID — шлём через target.sids.
+
+      // Cadence (forCadence=true): отправляем declared coven-критерии для late-binding.
+      // Backend Voyage-resolver поддерживает `target.coven[]` для kind=command и
+      // резолвит их в snapshot хостов на каждом тике — новые coven-члены подхватятся.
+      //
+      // Исключение: если coven не задан (оператор задал только sidRegex/soulprint),
+      // declared-target будет пустым → fallback на snapshot sids (UI предупреждает).
+      if (forCadence && hostCriteria.covens.length > 0) {
+        const declaredTarget: VoyageTarget = { coven: hostCriteria.covens };
+        // where не evaluate-ится в MVP (backend сохраняет, не применяет), но
+        // передаём для будущей совместимости, если оператор задал его через UI.
+        return {
+          kind: 'command',
+          module: moduleName,
+          input: Object.keys(input).length > 0 ? input : undefined,
+          target: declaredTarget,
+        };
+      }
+
+      // Разовый Voyage или Cadence без coven: snapshot sids (корректно по ADR-043 §5/§8).
       return {
         kind: 'command',
         module: moduleName,
@@ -695,7 +723,7 @@ export function RunWizard() {
   }
 
   async function submitCadence(): Promise<string> {
-    const recipe = buildRecipePayload();
+    const recipe = buildRecipePayload(/* forCadence */ true);
     const opts = buildOptionsPayload();
     const intervalSec = parseIntOrEmpty(cadenceState.intervalSeconds);
     const reply = await keeperApi.cadences.create({
@@ -802,6 +830,7 @@ export function RunWizard() {
             soulsLoading={soulsListQ.isLoading || soulprintLoading}
             invalidSoulprint={parsedSoulprint.invalid}
             regexError={sidRegexComp.error}
+            runMode={runMode}
           />
         ) : null}
 
@@ -1289,6 +1318,7 @@ function Step2CommandHosts({
   soulsLoading,
   invalidSoulprint,
   regexError,
+  runMode,
 }: {
   value: HostCriteria;
   onChange: (next: HostCriteria) => void;
@@ -1296,10 +1326,23 @@ function Step2CommandHosts({
   soulsLoading: boolean;
   invalidSoulprint: string[];
   regexError: string | null;
+  runMode: RunMode;
 }) {
   const { t } = useTranslation();
   const sample = resolvedSouls.slice(0, 50);
   const active = hasAnyCriteria(value);
+
+  // Footgun-плашки для Cadence (late-binding предупреждения).
+  // earlyBinding: coven задан, но также есть regex/soulprint — они snapshot-only.
+  const cadenceEarlyBindingWarn =
+    runMode === 'cadence' &&
+    value.covens.length > 0 &&
+    (value.sidRegex.trim().length > 0 || value.soulprint.trim().length > 0);
+  // snapshotOnly: нет coven, но есть regex/soulprint — весь target будет snapshot.
+  const cadenceSnapshotOnlyWarn =
+    runMode === 'cadence' &&
+    value.covens.length === 0 &&
+    (value.sidRegex.trim().length > 0 || value.soulprint.trim().length > 0);
 
   return (
     <>
@@ -1359,6 +1402,18 @@ function Step2CommandHosts({
           </span>
         ) : null}
       </label>
+
+      {/* Footgun-предупреждения для Cadence: показываем над preview */}
+      {cadenceSnapshotOnlyWarn ? (
+        <div className={styles.warn} data-testid="cadence-snapshot-only-warn" style={{ marginBottom: 4 }}>
+          {t('run:cadenceSnapshotOnlyWarn')}
+        </div>
+      ) : null}
+      {cadenceEarlyBindingWarn ? (
+        <div className={styles.warn} data-testid="cadence-early-binding-warn" style={{ marginBottom: 4 }}>
+          {t('run:cadenceEarlyBindingWarn')}
+        </div>
+      ) : null}
 
       <div className={styles.preview} aria-label="Host preview">
         {!active ? (

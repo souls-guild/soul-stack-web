@@ -172,5 +172,7 @@
   "cadenceOverlapParallel": "Parallel — start regardless of previous run",
   "cadenceOverlapHint_skip": "A new run will not start while the previous one is not terminal. Skipped ticks do not accumulate.",
   "cadenceOverlapHint_queue": "A new run is queued and starts immediately after the previous one finishes.",
-  "cadenceOverlapHint_parallel": "Runs start independently — multiple runs may execute simultaneously."
+  "cadenceOverlapHint_parallel": "Runs start independently — multiple runs may execute simultaneously.",
+  "cadenceEarlyBindingWarn": "Regex/soulprint criteria are resolved as a snapshot at creation time. New hosts added later will not be picked up. Use coven for late-binding.",
+  "cadenceSnapshotOnlyWarn": "Only regex/soulprint criteria: host list is fixed as a snapshot at creation time (no coven set — late-binding unavailable)."
 }
