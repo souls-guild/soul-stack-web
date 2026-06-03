@@ -268,7 +268,7 @@ export function RunWizard() {
   // сохранённый черновик (навигация away/back между шагами).
   const hasQueryIntent = useMemo(
     () =>
-      ['workload', 'service', 'scenario', 'incarnation', 'module', 'target_coven', 'target_regex', 'target_sids'].some(
+      ['workload', 'service', 'scenario', 'incarnation', 'incarnation_regex', 'module', 'target_coven', 'target_regex', 'target_sids'].some(
         (k) => searchParams.has(k),
       ),
     [searchParams],
@@ -284,6 +284,9 @@ export function RunWizard() {
   const initialService = searchParams.get('service') ?? '';
   const initialScenario = searchParams.get('scenario') ?? '';
   const initialIncarnation = searchParams.get('incarnation') ?? '';
+  // incarnation_regex — сырой regex от snapshot-Run (IncarnationsList.handleRunSet).
+  // Передаётся как есть в incarnationRegex без повторного экранирования/обёртки.
+  const initialIncarnationRegex = searchParams.get('incarnation_regex') ?? '';
   const initialModuleParam = searchParams.get('module');
 
   // Pre-fill host-criteria из query (bulk-run actions со списочных страниц):
@@ -322,13 +325,18 @@ export function RunWizard() {
         incarnations: asArray(d.incarnations, DEFAULT_SCENARIO_STATE.incarnations),
       };
     }
+    // Приоритет: incarnation_regex (snapshot-OR, уже готовый regex) > incarnation (одиночная инкарнация).
+    const regexFromSnapshot = initialIncarnationRegex;
+    const regexFromSingle = initialIncarnation ? `^${escapeRegex(initialIncarnation)}$` : '';
+    const incarnationRegex = regexFromSnapshot || regexFromSingle;
+    // incarnations-пре-фил только для одиночного deep-link (snapshot-list резолвится в Step3).
+    const incarnations = initialIncarnation && !initialIncarnationRegex ? [initialIncarnation] : [];
     return {
       ...DEFAULT_SCENARIO_STATE,
       service: initialService,
       scenario: initialScenario,
-      // Deep-link на конкретную incarnation → anchored-exact regex (фан-аут на неё одну).
-      incarnationRegex: initialIncarnation ? `^${escapeRegex(initialIncarnation)}$` : '',
-      incarnations: initialIncarnation ? [initialIncarnation] : [],
+      incarnationRegex,
+      incarnations,
     };
   });
 

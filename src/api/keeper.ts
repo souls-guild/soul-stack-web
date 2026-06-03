@@ -351,12 +351,27 @@ export class SoulprintNotReceivedError extends Error {
 
 // --- API ---
 
+// Предикат фильтра по state-полям: state.<field>=<op>:<value>.
+// op ∈ eq | ne | gt | gte | lt | lte. Backend валидирует numeric op + нечисловое
+// значение → 422 (нечисло в numeric-op). UI обрабатывает 422 как field-level ошибку.
+export interface StateFilterPredicate {
+  field: string;
+  op: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
+  value: string;
+}
+
 export interface ListIncarnationsQuery {
   service?: string;
   status?: IncarnationStatus;
   coven?: string;
   offset?: number;
   limit?: number;
+  // Server-side сортировка: sort = имя колонки (name | status | created_at | state.<field>).
+  // sort_dir = asc | desc.
+  sort?: string;
+  sort_dir?: 'asc' | 'desc';
+  // Фильтры по state-полям. Сериализуются в state.<field>=<op>:<value>.
+  state_filters?: StateFilterPredicate[];
 }
 
 export interface ListSoulsQuery {
@@ -372,16 +387,29 @@ export const keeperApi = {
   ping: () => apiGet<IncarnationListReply>('/v1/incarnations', { query: { limit: 1 } }),
 
   incarnations: {
-    list: (q: ListIncarnationsQuery = {}) =>
-      apiGet<IncarnationListReply>('/v1/incarnations', {
+    list: (q: ListIncarnationsQuery = {}) => {
+      // Сериализуем state-предикаты в повторяющиеся query-параметры:
+      // state.<field>=<op>:<value>. buildUrl в client.ts поддерживает multi-value.
+      const stateParams: Record<string, string[]> = {};
+      for (const pred of q.state_filters ?? []) {
+        const key = `state.${pred.field}`;
+        const val = `${pred.op}:${pred.value}`;
+        if (!stateParams[key]) stateParams[key] = [];
+        stateParams[key].push(val);
+      }
+      return apiGet<IncarnationListReply>('/v1/incarnations', {
         query: {
           service: q.service,
           status: q.status,
           coven: q.coven,
           offset: q.offset,
           limit: q.limit,
+          sort: q.sort,
+          sort_dir: q.sort_dir,
+          ...stateParams,
         },
-      }),
+      });
+    },
     get: (name: string) =>
       apiGet<IncarnationGetReply>(`/v1/incarnations/${encodeURIComponent(name)}`),
     create: (body: IncarnationCreateRequest) =>
