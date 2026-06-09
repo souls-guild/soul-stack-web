@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
+import { CONSTRAINTS } from '../../api/constraints.gen';
 import type {
   CadenceScheduleKind,
   CadenceOverlapPolicy,
@@ -780,7 +781,7 @@ export function RunWizard() {
     if (!cadenceState.cadenceName.trim()) return false;
     if (cadenceState.scheduleKind === 'interval') {
       const s = parseIntOrEmpty(cadenceState.intervalSeconds);
-      return Boolean(s && s >= 60);
+      return Boolean(s && s >= CONSTRAINTS.cadenceIntervalSecondsMin);
     }
     // cron: непустая строка (формат проверяет backend)
     return cadenceState.cronExpr.trim().length > 0;
@@ -1927,14 +1928,14 @@ function Step4Options({
               <input
                 type="number"
                 className={styles.field}
-                min={60}
+                min={CONSTRAINTS.cadenceIntervalSecondsMin}
                 value={cadenceState.intervalSeconds}
                 onChange={(e) => onCadenceChange({ ...cadenceState, intervalSeconds: e.target.value })}
                 placeholder="3600"
                 aria-label="Interval seconds"
                 data-testid="cadence-interval"
               />
-              <span className={styles.hint}>{t('run:cadenceIntervalHint')}</span>
+              <span className={styles.hint}>{t('run:cadenceIntervalHint', { min: CONSTRAINTS.cadenceIntervalSecondsMin })}</span>
             </label>
           ) : (
             <label className={styles.fieldRow}>

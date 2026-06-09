@@ -7,6 +7,7 @@ import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { RunWizard } from '../pages/run/RunWizard';
 import { tokenStore } from '../api/tokenStore';
+import { CONSTRAINTS } from '../api/constraints.gen';
 
 function renderWizardWithRoutes(initialPath = '/run') {
   const qc = new QueryClient({
@@ -1500,5 +1501,78 @@ describe('RunWizard', () => {
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.inter_unit_interval_ms).toBe(500);
     expect('inter_batch_interval_ms' in body).toBe(false);
+  });
+
+  // --- Guard-тесты: Cadence interval floor (ADR-046/048) ---
+  // Инвариант: минимальный period = CONSTRAINTS.cadenceIntervalSecondsMin (30s из OpenAPI).
+  // Тесты ловят регресс «зашили 60» и «floor разъехался со спекой».
+  // Cadence radio находится на Step 4 (Options). Путь: Step1→2→3→4, там включаем Cadence.
+
+  async function reachStep4Cadence() {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Step 1: run_mode radio находится здесь; включаем cadence до перехода дальше.
+    await waitFor(() =>
+      expect(document.querySelector('input[name="run_mode"][value="cadence"]')).toBeInTheDocument(),
+    );
+    const cadenceRadioInput = document.querySelector('input[name="run_mode"][value="cadence"]') as HTMLInputElement;
+    await user.click(cadenceRadioInput);
+
+    // Step 1 → Step 2: workload=scenario (дефолт), жмём Далее.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Step 2 → выбираем сервис и scenario.
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Step 3 → incarnation regex.
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Step 4 → cadence-блок появляется в Options (runMode='cadence' = уже установлен).
+    await waitFor(() => expect(screen.getByTestId('cadence-interval')).toBeInTheDocument());
+
+    return { user };
+  }
+
+  it('Cadence: input[min] равен CONSTRAINTS.cadenceIntervalSecondsMin', async () => {
+    await reachStep4Cadence();
+
+    const intervalInput = screen.getByTestId('cadence-interval') as HTMLInputElement;
+    expect(Number(intervalInput.min)).toBe(CONSTRAINTS.cadenceIntervalSecondsMin);
+  });
+
+  it('Cadence: submit-валидация отвергает значение ниже floor', async () => {
+    const { user } = await reachStep4Cadence();
+
+    // Заполняем имя Cadence (обязательное поле) и вводим значение ниже floor.
+    const nameInput = screen.getByTestId('cadence-name') as HTMLInputElement;
+    await user.type(nameInput, 'test-cadence');
+
+    const intervalInput = screen.getByTestId('cadence-interval');
+    fireEvent.change(intervalInput, { target: { value: String(CONSTRAINTS.cadenceIntervalSecondsMin - 1) } });
+
+    // Submit должен быть заблокирован (ниже floor).
+    expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).toBeDisabled();
+  });
+
+  it('Cadence: submit-валидация принимает значение точно на floor', async () => {
+    const { user } = await reachStep4Cadence();
+
+    // Заполняем имя Cadence и вводим значение точно на floor.
+    const nameInput = screen.getByTestId('cadence-name') as HTMLInputElement;
+    await user.type(nameInput, 'test-cadence');
+
+    const intervalInput = screen.getByTestId('cadence-interval');
+    fireEvent.change(intervalInput, { target: { value: String(CONSTRAINTS.cadenceIntervalSecondsMin) } });
+
+    // Submit должен быть разблокирован (точно на floor).
+    expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).not.toBeDisabled();
   });
 });

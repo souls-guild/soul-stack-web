@@ -163,7 +163,7 @@
   "cadenceKindInterval": "Interval",
   "cadenceKindCron": "Cron",
   "cadenceIntervalLabel": "Interval (sec)",
-  "cadenceIntervalHint": "Minimum 60 seconds. Examples: 3600 = hourly, 86400 = daily.",
+  "cadenceIntervalHint": "Minimum {{min}} seconds. For sub-{{min}}s reactions use Beacons (Vigil/Oracle), not Cadence. Examples: 3600 = hourly, 86400 = daily.",
   "cadenceCronLabel": "Cron expression (UTC)",
   "cadenceCronHint": "5-field cron (UTC): \"minute hour day month weekday\". Example: 0 */6 * * * — every 6 hours.",
   "cadenceOverlapLabel": "On overlap",

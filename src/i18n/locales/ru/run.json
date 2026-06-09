@@ -163,7 +163,7 @@
   "cadenceKindInterval": "Интервал",
   "cadenceKindCron": "Cron",
   "cadenceIntervalLabel": "Интервал (сек)",
-  "cadenceIntervalHint": "Минимум 60 секунд. Примеры: 3600 = раз в час, 86400 = раз в сутки.",
+  "cadenceIntervalHint": "Минимум {{min}} секунд. Для реакции быстрее {{min}}s — это домен Beacons (Vigil/Oracle), не Cadence. Примеры: 3600 = раз в час, 86400 = раз в сутки.",
   "cadenceCronLabel": "Cron-выражение (UTC)",
   "cadenceCronHint": "5-полевой cron (UTC): «минута час день месяц день-недели». Пример: 0 */6 * * * — каждые 6 часов.",
   "cadenceOverlapLabel": "При наложении",
