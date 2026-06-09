@@ -310,6 +310,17 @@ export interface paths {
         /**
          * Список incarnation-ов.
          * @description Permission: incarnation.list. MCP-tool: keeper.incarnation.list.
+         *
+         *     Видимость scoped по RBAC (ADR-047 S3b-3): оператор видит только
+         *     incarnation-ы в своей scope-границе (Purview для `incarnation.list`).
+         *     Измерения объединяются OR-ом («всё мне доступное»): coven∪{name}
+         *     (covens incarnation пересекаются со scope-ковенами ИЛИ имя incarnation =
+         *     scope-coven, ADR-008 корневая метка) ∪ state-CEL (incarnation.state
+         *     удовлетворяет state-предикату scope). scope ПРОЗРАЧЕН для клиента —
+         *     деривируется из JWT, НЕ query-параметр; пользовательские фильтры сужают
+         *     ВНУТРИ scope (AND). `total` считается с тем же scope-WHERE (когерентен
+         *     выдаче — не учитывает incarnation вне scope). cluster-admin (`*`) /
+         *     bare-permission → весь список.
          */
         get: operations["ListIncarnations"];
         put?: never;
@@ -335,6 +346,13 @@ export interface paths {
         /**
          * Прочитать spec + state + status incarnation-а.
          * @description Permission: incarnation.get. MCP-tool: keeper.incarnation.get.
+         *
+         *     Видимость scoped по RBAC (ADR-047 S3b-3): incarnation вне scope-границы
+         *     оператора (Purview для `incarnation.get`) отдаётся как 404, НЕ 403 — мы
+         *     не палим существование чужой incarnation. В scope, если: cluster-admin
+         *     (`*`) / bare-permission; ЛИБО coven∪{name} (covens пересекаются со
+         *     scope-ковенами / имя = scope-coven); ЛИБО state-CEL scope истинен на
+         *     её state. fail-closed: пустой Purview → 404.
          */
         get: operations["GetIncarnation"];
         put?: never;
@@ -481,7 +499,7 @@ export interface paths {
         head?: never;
         /**
          * Править declared `spec.hosts[]` (UI Hosts editing, ADR-008).
-         * @description Permission: incarnation.update. MCP-tool: keeper.incarnation.hosts.update.
+         * @description Permission: incarnation.update-hosts. MCP-tool: keeper.incarnation.hosts.update.
          *
          *     Три mode-семантики над declared `spec.hosts[]`:
          *       - `replace` — полная замена списка переданным набором (включая пустой).
@@ -626,6 +644,13 @@ export interface paths {
          *     `soul.list` (паттерн service.list / omen.list / vigil.list /
          *     decree.list — одно permission на чтение реестра; `soul.get`
          *     сознательно отложен, rbac.md §Souls).
+         *
+         *     Видимость scoped по RBAC (ADR-047 S3b): оператор видит только хосты
+         *     в своей scope-границе (Purview для `soul.list`; в пилоте — coven-
+         *     измерение). scope ПРОЗРАЧЕН для клиента — деривируется из JWT, НЕ
+         *     query-параметр; coven-фильтр сужает ВНУТРИ scope (AND), не расширяет.
+         *     `total` считается с тем же scope-WHERE (когерентен выдаче — не учитывает
+         *     хосты вне scope). cluster-admin (`*`) / bare-permission → весь флот.
          */
         get: operations["ListSouls"];
         put?: never;
@@ -704,7 +729,10 @@ export interface paths {
          *     покрывает list и get — паттерн service.list / omen.list / vigil.list /
          *     decree.list; `soul.get` сознательно отложен, rbac.md §Souls). Селектор
          *     `host=<sid>` для будущих per-host scope-ролей.
-         *     404 not-found — записи нет.
+         *     Видимость scoped по RBAC (ADR-047 S3b, coven-измерение в пилоте): хост вне
+         *     scope-границы оператора отдаёт 404 (не 403) — существование чужого хоста
+         *     не раскрывается. fail-closed: нет прав / пустой Purview → 404.
+         *     404 not-found — записи нет ЛИБО хост вне scope оператора.
          */
         get: operations["GetSoul"];
         put?: never;
@@ -729,7 +757,10 @@ export interface paths {
          *     per-read, rbac.md §Souls).
          *     Возвращает `typed_facts` (proto SoulprintFacts, ADR-018) +
          *     collected_at (Soul-side) + received_at (Keeper-side).
-         *     404 not-found — Soul-а нет в реестре;
+         *     Видимость scoped по RBAC (ADR-047 S3b, тот же coven-гейт, что GET
+         *     /v1/souls/{sid}): хост вне scope-границы оператора отдаёт 404 (не 403)
+         *     ДО раскрытия фактов — существование чужого хоста не раскрывается.
+         *     404 not-found — Soul-а нет в реестре ЛИБО хост вне scope оператора;
          *     410 soulprint-not-received — Soul есть, но SoulprintReport ни разу не
          *     приходил (`transport: ssh` без агента, либо только что онбординг).
          */
@@ -1082,8 +1113,9 @@ export interface paths {
         put?: never;
         /**
          * Включить Cadence (возобновление расписания, ADR-046 S4).
-         * @description Permission: cadence.update. Lightweight toggle без перезаписи рецепта.
-         *     Audit: cadence.updated.
+         * @description Permission: cadence.enable ИЛИ cadence.update (backcompat — роли со
+         *     старым cadence.update сохраняют toggle, амендмент 2026-06-02).
+         *     Lightweight toggle без перезаписи рецепта. Audit: cadence.updated.
          */
         post: operations["EnableCadence"];
         delete?: never;
@@ -1103,8 +1135,9 @@ export interface paths {
         put?: never;
         /**
          * Выключить Cadence (пауза расписания, ADR-046 S4).
-         * @description Permission: cadence.update. Lightweight toggle без перезаписи рецепта.
-         *     Audit: cadence.updated.
+         * @description Permission: cadence.disable ИЛИ cadence.update (backcompat — роли со
+         *     старым cadence.update сохраняют toggle, амендмент 2026-06-02).
+         *     Lightweight toggle без перезаписи рецепта. Audit: cadence.updated.
          */
         post: operations["DisableCadence"];
         delete?: never;
@@ -1542,6 +1575,36 @@ export interface paths {
          *     incarnation / host): per-permission-метаданных скоупа в каталоге MVP нет.
          */
         get: operations["ListPermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Эффективные права текущего Архонта (permission-aware UI).
+         * @description RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
+         *     эндпоинт само-описывающий «свои права» (любой аутентифицированный видит
+         *     ИМЕННО СВОИ права; чужие не отдаёт — AID берётся из JWT-claims, не из
+         *     query). Отличие от `GET /v1/permissions`: тот отдаёт ВЕСЬ каталог
+         *     возможных прав, этот — ПОДМНОЖЕСТВО, реально выданное оператору
+         *     (распаковка его ролей).
+         *
+         *     Назначение — permission-aware UI (показывать/прятать кнопки по «можно ли
+         *     resource.action [в каком scope]»). wildcard=true → cluster-admin (можно
+         *     всё, resource/action/scope не несутся). Иначе resource.action + scope-
+         *     сводка (unrestricted / covens / regex / soulprint). Read-only, без audit.
+         */
+        get: operations["ListMyPermissions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2783,6 +2846,42 @@ export interface components {
             items: components["schemas"]["PermissionCatalogItem"][];
         };
         /**
+         * @description Scope-сводка одного эффективного права, достаточная для UI: либо
+         *     unrestricted, либо набор конкретных ограничений по измерениям. Поля-
+         *     измерения опускаются при пустоте. Пустой scope без unrestricted =
+         *     «ограничен, но без coven/regex/soulprint-вклада» (право в другом
+         *     измерении, например host=). regex/soulprint отдаются как есть — UI решает
+         *     отображение (RE2-паттерны по SID / CEL-предикаты `soulprint.self.*`).
+         */
+        MyPermissionScope: {
+            /** @description Нет scope-ограничений для этого права (bare / `*` / coven=*). */
+            unrestricted: boolean;
+            /** @description Конкретные coven-метки, на которые распространяется право. */
+            covens?: string[];
+            /** @description RE2-паттерны по SID (ADR-047 regex-измерение). */
+            regex?: string[];
+            /** @description CEL-предикаты `soulprint.self.*` (ADR-047 soulprint-измерение). */
+            soulprint?: string[];
+        };
+        /**
+         * @description Одно эффективное право текущего оператора. wildcard=true → cluster-admin
+         *     (`*`): resource/action/scope не несутся (UI трактует как «можно всё»).
+         *     Иначе resource.action (action может быть `*` — resource-wildcard) + scope.
+         */
+        MyPermission: {
+            /** @description Оператор имеет full-`*` (cluster-admin). При true остальные поля пусты. */
+            wildcard?: boolean;
+            /** @description Resource права (`incarnation`/`soul`/…). Пуст при wildcard. */
+            resource?: string;
+            /** @description Action права (`run`/`list`/…) или `*` (resource-wildcard). Пуст при wildcard. */
+            action?: string;
+            scope?: components["schemas"]["MyPermissionScope"];
+        };
+        /** @description Эффективные права текущего Архонта (`GET /v1/me/permissions`). */
+        MyPermissionsReply: {
+            permissions: components["schemas"]["MyPermission"][];
+        };
+        /**
          * @description Ввод нового ключа подписи Sigil. Тело опционально (пустое = make_primary
          *     false). Keypair генерируется Keeper-ом, клиент его НЕ передаёт.
          */
@@ -3242,14 +3341,42 @@ export interface components {
             limit: number;
             total: number;
         };
+        /**
+         * @description Страница списка Souls. Гибрид offset/keyset (ADR-047 S3b-2a): режим
+         *     выбирает СЕРВЕР из Purview оператора, не клиент.
+         *       - coven-only / cluster-admin → offset-режим: `total` точен,
+         *         `total_approximate` опущено (false), `next_cursor` отсутствует
+         *         (backward-compatible).
+         *       - есть regex-измерение → keyset-режим: `total` опущен (0),
+         *         `total_approximate:true`, `next_cursor` присутствует, пока БД не
+         *         пройдена (отсутствует ⟺ набор исчерпан).
+         */
         SoulListReply: {
             items: components["schemas"]["SoulListEntry"][];
             /** Format: int32 */
             offset: number;
             /** Format: int32 */
             limit: number;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Общее количество с учётом scope/фильтров. Значимо только когда
+             *     `total_approximate` отсутствует/false (offset-режим); в keyset-режиме
+             *     опущено (0).
+             */
             total: number;
+            /**
+             * @description `total` НЕ точен. Присутствует (true) только в keyset-режиме
+             *     (regex-scope) — клиент НЕ должен трактовать `total` как размер набора,
+             *     листает через `next_cursor`. В offset-режиме поле опущено (точный
+             *     total по умолчанию).
+             */
+            total_approximate?: boolean;
+            /**
+             * @description Opaque keyset-курсор следующей страницы (keyset-режим). Передаётся
+             *     обратно как `?cursor=`. Отсутствует в offset-режиме и когда набор
+             *     исчерпан.
+             */
+            next_cursor?: string;
         };
         /** @description Проекция реестра souls (docs/keeper/storage.md, docs/soul/identity.md). */
         SoulListEntry: {
@@ -3849,7 +3976,7 @@ export interface components {
              * @enum {string}
              */
             schedule_kind: "interval" | "cron";
-            /** @description Период для schedule_kind=interval (XOR с cron_expr). */
+            /** @description Период для schedule_kind=interval (XOR с cron_expr). Минимум 30s (floor-лимит, ADR-046 Pass B): для реакции быстрее 30s — Beacons (Vigil/Oracle, ADR-030). interval_seconds < 30 → 422. */
             interval_seconds?: number;
             /** @description Стандартное 5-полевое cron-выражение (UTC) для schedule_kind=cron (XOR с interval_seconds). */
             cron_expr?: string;
@@ -3903,6 +4030,7 @@ export interface components {
             enabled?: boolean;
             /** @enum {string} */
             schedule_kind?: "interval" | "cron";
+            /** @description Период для schedule_kind=interval. Минимум 30s (floor-лимит, ADR-046 Pass B): interval_seconds < 30 → 422 (для суб-30s — Beacons, ADR-030). */
             interval_seconds?: number;
             cron_expr?: string;
             /** @enum {string} */
@@ -4156,6 +4284,12 @@ export interface components {
         OffsetQuery: number;
         /** @description Размер страницы (1..1000, default 50). */
         LimitQuery: number;
+        /**
+         * @description Opaque keyset-курсор (ADR-047 S3b-2a): значение `next_cursor` из
+         *     предыдущего ответа. Взаимоисключающ с `offset>0` (одновременно → 422).
+         *     Битый курсор → 400.
+         */
+        CursorQuery: string;
         /** @description Namespace плагина (тип — cloud / ssh / mod). */
         PluginNamespacePath: string;
         /** @description Имя плагина (kebab-case, как в manifest.name). */
@@ -4624,6 +4758,34 @@ export interface operations {
                  *     пост-MVP (`?coven_any=`).
                  */
                 coven?: string;
+                /**
+                 * @description Фильтр по полю jsonb-колонки `state` (jsonb-pushdown, фаза 1).
+                 *     Семейство динамических query-параметров: `state.<field>=<value>`
+                 *     (равенство) либо `state.<field>=<op>:<value>` для сравнения, где
+                 *     `<op>` ∈ `eq|ne|gt|gte|lt|lte` (gt/gte/lt/lte — числовое сравнение
+                 *     через `::numeric`). Несколько `state.*`-параметров AND-комбинируются.
+                 *     `<field>` валидируется форматным whitelist-ом `^[a-z][a-z0-9_]*$`
+                 *     (только top-level ключи; вложенный путь — не MVP). Существование
+                 *     поля против service-specific state_schema НЕ проверяется:
+                 *     несуществующее поле даёт пустой результат. Невалидный `<field>`,
+                 *     `<op>` либо нечисловое `<value>` при числовом `<op>`
+                 *     (`gt/gte/lt/lte`) → 422. Примеры: `?state.redis_version=8.0`,
+                 *     `?state.memory_mb=gt:1000`.
+                 */
+                "state.{field}"?: string;
+                /**
+                 * @description Поле сортировки: базовая колонка `created_at` / `name` / `status` /
+                 *     `service` либо `state.<field>` (сортировка по jsonb-полю через
+                 *     `->>`, текстовое сравнение). По умолчанию (не задан) — порядок
+                 *     `created_at DESC, name ASC`. Tie-break по `name ASC` добавляется
+                 *     всегда (стабильная пагинация). Неизвестное поле → 422.
+                 */
+                sort?: string;
+                /**
+                 * @description Направление сортировки для `sort`. По умолчанию `asc`. Игнорируется
+                 *     без `sort`. Любое значение кроме `asc`/`desc` → 422.
+                 */
+                sort_dir?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -4643,6 +4805,7 @@ export interface operations {
             400: components["responses"]["Problem400"];
             401: components["responses"]["Problem401"];
             403: components["responses"]["Problem403"];
+            422: components["responses"]["Problem422"];
             500: components["responses"]["Problem500"];
         };
     };
@@ -5141,6 +5304,12 @@ export interface operations {
                 /** @description Размер страницы (1..1000, default 50). */
                 limit?: components["parameters"]["LimitQuery"];
                 /**
+                 * @description Opaque keyset-курсор (ADR-047 S3b-2a): значение `next_cursor` из
+                 *     предыдущего ответа. Взаимоисключающ с `offset>0` (одновременно → 422).
+                 *     Битый курсор → 400.
+                 */
+                cursor?: components["parameters"]["CursorQuery"];
+                /**
                  * @description Фильтр по coven-меткам (exact-match по любому значению из
                  *     souls.coven[]). Несколько значений — повторение query-параметра.
                  */
@@ -5168,6 +5337,7 @@ export interface operations {
             400: components["responses"]["Problem400"];
             401: components["responses"]["Problem401"];
             403: components["responses"]["Problem403"];
+            422: components["responses"]["Problem422"];
             500: components["responses"]["Problem500"];
         };
     };
@@ -5784,7 +5954,15 @@ export interface operations {
             400: components["responses"]["Problem400"];
             401: components["responses"]["Problem401"];
             403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
+            /** @description Невалидный рецепт/расписание: XOR interval/cron, enum overlap/kind, kind↔scenario_name/module, битый cron, sane-bounds, либо floor-лимит (interval_seconds < 30s, ADR-046 Pass B). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
             500: components["responses"]["Problem500"];
         };
     };
@@ -5869,7 +6047,15 @@ export interface operations {
             401: components["responses"]["Problem401"];
             403: components["responses"]["Problem403"];
             404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
+            /** @description Невалидный рецепт/расписание, либо floor-лимит (interval_seconds < 30s, ADR-046 Pass B) — в т.ч. при переводе расписания на interval. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
             500: components["responses"]["Problem500"];
         };
     };
@@ -6565,6 +6751,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermissionCatalogReply"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListMyPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Эффективные права текущего оператора. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPermissionsReply"];
                 };
             };
             401: components["responses"]["Problem401"];
