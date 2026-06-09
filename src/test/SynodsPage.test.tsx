@@ -35,6 +35,18 @@ const ROLES_SAMPLE = {
   ],
 };
 
+// Все архонты кластера для AddOperatorModal.
+const OPERATORS_SAMPLE = {
+  items: [
+    { aid: 'archon-alice', display_name: 'Alice', auth_method: 'jwt', revoked_at: null },
+    { aid: 'archon-bob', display_name: 'Bob', auth_method: 'jwt', revoked_at: null },
+    { aid: 'archon-charlie', display_name: 'Charlie', auth_method: 'jwt', revoked_at: null },
+    { aid: 'archon-dave', display_name: 'Dave', auth_method: 'jwt', revoked_at: null },
+    // revoked — должен быть отфильтрован
+    { aid: 'archon-revoked', display_name: 'Revoked', auth_method: 'jwt', revoked_at: '2025-01-01T00:00:00Z' },
+  ],
+};
+
 // Полные права (wildcard) для тестов, где права не ограничены.
 const MY_PERMS_WILDCARD = { permissions: [{ wildcard: true }] };
 // Права без synod.create.
@@ -91,6 +103,7 @@ function recordingFetch(opts: {
   synods?: typeof SYNODS_SAMPLE;
   myPerms?: typeof MY_PERMS_WILDCARD;
   roles?: typeof ROLES_SAMPLE;
+  operators?: typeof OPERATORS_SAMPLE;
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
   const calls: Call[] = [];
@@ -134,6 +147,12 @@ function recordingFetch(opts: {
     }
     if (url.startsWith('/v1/roles') && method === 'GET') {
       return new Response(JSON.stringify(opts.roles ?? ROLES_SAMPLE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.startsWith('/v1/operators') && method === 'GET') {
+      return new Response(JSON.stringify(opts.operators ?? OPERATORS_SAMPLE), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -315,7 +334,7 @@ describe('SynodsList', () => {
     expect(alert).toHaveTextContent(/lock-?out|администратора/i);
   });
 
-  it('Add-operator: POST /v1/synods/{name}/operators с {aid}', async () => {
+  it('Add-operator: POST /v1/synods/{name}/operators с {aid} (выбор из селекта)', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -324,7 +343,8 @@ describe('SynodsList', () => {
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
     const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
-    await user.type(within(dialog).getByTestId('add-operator-input'), 'archon-dave');
+    // archon-dave есть в OPERATORS_SAMPLE и не в ops-team.operators.
+    await user.selectOptions(within(dialog).getByTestId('add-operator-select'), 'archon-dave');
     await user.click(within(dialog).getByTestId('add-operator-submit'));
 
     await waitFor(() => {
@@ -334,6 +354,54 @@ describe('SynodsList', () => {
       expect(post).toBeDefined();
       expect(post!.body).toContain('archon-dave');
     });
+  });
+
+  it('[ФИЛЬТР] AddOperatorModal: текущие члены группы не появляются в селекте', async () => {
+    recordingFetch({});
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    // ops-team имеет operators: ['archon-alice', 'archon-bob']
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('add-operator-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const select = await within(dialog).findByTestId('add-operator-select');
+
+    // archon-charlie и archon-dave (не в группе) — должны быть в опциях.
+    expect(within(select).getByRole('option', { name: 'archon-charlie' })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'archon-dave' })).toBeInTheDocument();
+    // archon-alice, archon-bob (уже в группе) — не должны быть.
+    expect(within(select).queryByRole('option', { name: 'archon-alice' })).not.toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'archon-bob' })).not.toBeInTheDocument();
+    // archon-revoked — не должен быть (revoked_at заполнен).
+    expect(within(select).queryByRole('option', { name: 'archon-revoked' })).not.toBeInTheDocument();
+  });
+
+  it('[EMPTY-STATE] AddOperatorModal: empty-state и кнопка disabled если все уже в группе', async () => {
+    // ops-team members: archon-alice, archon-bob.
+    // Дадим операторов только alice и bob — оба уже в группе.
+    const twoOperators = {
+      items: [
+        { aid: 'archon-alice', display_name: 'Alice', auth_method: 'jwt', revoked_at: null },
+        { aid: 'archon-bob', display_name: 'Bob', auth_method: 'jwt', revoked_at: null },
+      ],
+    };
+    recordingFetch({ operators: twoOperators });
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('add-operator-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    // empty-state сообщение отображается, селекта нет.
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('add-operator-empty')).toBeInTheDocument(),
+    );
+    expect(within(dialog).queryByTestId('add-operator-select')).not.toBeInTheDocument();
+    // Кнопка submit задизейблена.
+    expect(within(dialog).getByTestId('add-operator-submit')).toBeDisabled();
   });
 
   it('Remove-operator: DELETE /v1/synods/{name}/operators/{aid} при клике ×', async () => {

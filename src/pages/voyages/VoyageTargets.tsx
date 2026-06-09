@@ -1,3 +1,4 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VoyageTargetEntry, type VoyageTargetStatus } from '../../api/keeper';
@@ -56,51 +57,45 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
   const sortedIndices = [...grouped.keys()].sort((a, b) => a - b);
 
   return (
-    <div>
-      {sortedIndices.map((batchIdx) => (
-        <div key={batchIdx} style={{ marginBottom: 20 }}>
-          <div
-            data-testid={`batch-heading-${batchIdx}`}
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              marginBottom: 6,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-            }}
-          >
-            {t('voyageTargetsBatchHeading', { index: batchIdx })}
-          </div>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>{t('voyageTargetsColTarget')}</th>
-                <th style={thStyle}>{t('voyageTargetsColStatus')}</th>
-                <th style={thStyle}>{t('voyageTargetsColFinishedAt')}</th>
+    <table style={tableStyle}>
+      <thead>
+        <tr>
+          <th style={thStyle}>{t('voyageTargetsColTarget')}</th>
+          <th style={thStyle}>{t('voyageTargetsColStatus')}</th>
+          <th style={{ ...thStyle, textAlign: 'right' }}>{t('voyageTargetsColFinishedAt')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sortedIndices.map((batchIdx) => (
+          <React.Fragment key={batchIdx}>
+            <tr>
+              <td
+                colSpan={3}
+                data-testid={`batch-heading-${batchIdx}`}
+                style={batchSepStyle}
+              >
+                {t('voyageTargetsBatchHeading', { index: batchIdx })}
+              </td>
+            </tr>
+            {(grouped.get(batchIdx) ?? []).map((entry) => (
+              <tr key={`${entry.target_kind}:${entry.target_id}`}>
+                <td style={tdStyle}>
+                  <span className="mono" style={{ fontSize: 13 }}>
+                    {entry.target_id}
+                  </span>
+                </td>
+                <td style={tdStyle}>
+                  <Badge tone={runStatusTone(entry.status)}>{entry.status}</Badge>
+                </td>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: 12, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                  {entry.finished_at ?? '—'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {(grouped.get(batchIdx) ?? []).map((entry) => (
-                <tr key={`${entry.target_kind}:${entry.target_id}`}>
-                  <td style={tdStyle}>
-                    <span className="mono" style={{ fontSize: 13 }}>
-                      {entry.target_id}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    <Badge tone={runStatusTone(entry.status)}>{entry.status}</Badge>
-                  </td>
-                  <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: 12 }}>
-                    {entry.finished_at ?? '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-    </div>
+            ))}
+          </React.Fragment>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -121,6 +116,7 @@ const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
   fontSize: 13,
+  tableLayout: 'fixed',
 };
 
 const thStyle: React.CSSProperties = {
@@ -135,4 +131,18 @@ const tdStyle: React.CSSProperties = {
   padding: '5px 8px',
   borderBottom: '1px solid var(--border)',
   verticalAlign: 'middle',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const batchSepStyle: React.CSSProperties = {
+  padding: '10px 8px 4px',
+  fontSize: 12,
+  fontWeight: 600,
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  background: 'var(--surface-2)',
+  borderBottom: '1px solid var(--border)',
 };

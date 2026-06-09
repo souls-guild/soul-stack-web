@@ -2464,6 +2464,14 @@ export interface components {
              *     permission → 422 validation-failed.
              */
             permissions?: string[];
+            /**
+             * @description Селектор scope роли (ADR-047 S1) формы `key=v1,v2,…`, где key ∈
+             *     service/coven/incarnation/host; наследуется bare-permission-ами
+             *     роли без своего `on <selector>`. omitted/null → роль без
+             *     scope-ограничения. Валидируется rbac.ParseDefaultScope; битая
+             *     форма → 422 validation-failed.
+             */
+            default_scope?: string | null;
         };
         /**
          * @description Проекция роли: метаданные, набор permissions и состав операторов
@@ -2481,6 +2489,11 @@ export interface components {
             permissions: string[];
             /** @description AID операторов — членов роли (пустой массив, если их нет). */
             operators: string[];
+            /**
+             * @description Селектор scope роли (ADR-047 S1) формы `key=v1,v2,…`. Опускается
+             *     в JSON, если NULL (роль без scope-ограничения).
+             */
+            default_scope?: string | null;
         };
         RoleListReply: {
             items: components["schemas"]["RoleView"][];
@@ -2495,6 +2508,15 @@ export interface components {
              *     422 validation-failed.
              */
             permissions: string[];
+            /**
+             * @description Селектор scope роли (ADR-047 S1) формы `key=v1,v2,…`. PATCH-
+             *     семантика по presence ключа: поле ОТСУТСТВУЕТ → scope роли не
+             *     трогается; присутствует (включая null) → заменяет (null снимает
+             *     scope). Различение omitted/null требует чтения сырого JSON и в
+             *     сгенерированном *string-поле не выражается. Валидируется
+             *     rbac.ParseDefaultScope; битая форма → 422 validation-failed.
+             */
+            default_scope?: string | null;
         };
         GrantOperatorRequest: {
             /** @description AID оператора, назначаемого в роль/группу (naming-rules.md). */

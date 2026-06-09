@@ -212,6 +212,7 @@ export function SynodDetail() {
       <AddOperatorModal
         open={addOpOpen}
         synodName={name}
+        currentMembers={synod.operators}
         onClose={() => setAddOpOpen(false)}
       />
       <GrantRoleModal

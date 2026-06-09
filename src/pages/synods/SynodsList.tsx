@@ -309,6 +309,7 @@ export function SynodsList() {
         <AddOperatorModal
           open={true}
           synodName={addingOpTo.name}
+          currentMembers={addingOpTo.operators}
           onClose={() => setAddingOpTo(null)}
         />
       ) : null}
