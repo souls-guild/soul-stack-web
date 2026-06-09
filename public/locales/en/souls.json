@@ -90,5 +90,12 @@
   "timeAgoSeconds": "{{n}}s ago",
   "timeAgoMinutes": "{{n}}m ago",
   "timeAgoHours": "{{n}}h ago",
-  "timeAgoDays": "{{n}}d ago"
+  "timeAgoDays": "{{n}}d ago",
+  "loadMore": "Load more",
+  "loadingMore": "Loading…",
+  "countExact": "{{count}} soul(s)",
+  "countApproximate": "≈{{count}} soul(s)",
+  "countShownOf": "Showing {{shown}} of {{total}}",
+  "countShownOfApproximate": "Showing {{shown}}, total ≈{{total}}",
+  "countFiltered": "Found: {{count}}"
 }

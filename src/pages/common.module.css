@@ -270,3 +270,9 @@
   font-size: 11.5px;
   color: var(--text-faint);
 }
+
+.loadMoreCenter {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}

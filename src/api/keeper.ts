@@ -380,6 +380,7 @@ export interface ListSoulsQuery {
   transport?: SoulTransport;
   offset?: number;
   limit?: number;
+  cursor?: string;
 }
 
 export const keeperApi = {
@@ -522,6 +523,7 @@ export const keeperApi = {
           transport: q.transport,
           offset: q.offset,
           limit: q.limit,
+          cursor: q.cursor,
         },
       }),
     get: (sid: string) => apiGet<SoulListEntry>(`/v1/souls/${encodeURIComponent(sid)}`),

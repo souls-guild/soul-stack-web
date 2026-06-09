@@ -90,5 +90,12 @@
   "timeAgoSeconds": "{{n}}с назад",
   "timeAgoMinutes": "{{n}}м назад",
   "timeAgoHours": "{{n}}ч назад",
-  "timeAgoDays": "{{n}}д назад"
+  "timeAgoDays": "{{n}}д назад",
+  "loadMore": "Загрузить ещё",
+  "loadingMore": "Загружаем…",
+  "countExact": "{{count}} soul(s)",
+  "countApproximate": "≈{{count}} soul(s)",
+  "countShownOf": "Показано {{shown}} из {{total}}",
+  "countShownOfApproximate": "Показано {{shown}}, всего ≈{{total}}",
+  "countFiltered": "Найдено: {{count}}"
 }

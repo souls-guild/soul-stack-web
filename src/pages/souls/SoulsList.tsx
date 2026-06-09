@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
@@ -20,6 +20,8 @@ const SOUL_TRANSPORTS = ['agent', 'ssh'] as const satisfies readonly SoulTranspo
 
 // Конвенция coven-метки (openapi.yaml): lowercase, цифры, дефис-разделитель.
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+const PAGE_LIMIT = 100;
 
 type SortKey = 'last_seen_at' | 'sid' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -87,19 +89,105 @@ export function SoulsList() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // accumulated — аккумулятор всех загруженных элементов.
+  const [accumulated, setAccumulated] = useState<SoulListEntry[]>([]);
+  // Флаги из последнего ответа: есть ли ещё страницы и приблизителен ли total.
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [totalApproximate, setTotalApproximate] = useState<boolean>(false);
+  const [serverTotal, setServerTotal] = useState<number>(0);
+  // loadMorePending: true пока загружается дополнительная страница (не первый запрос).
+  const [loadMorePending, setLoadMorePending] = useState(false);
+  // loadMoreError: ошибка при догрузке страницы (не первой).
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
   const parsed = useMemo(() => parseCovens(coven), [coven]);
   const covenFilter = parsed.valid.length > 0 ? parsed.valid : undefined;
 
+  // При смене серверных фильтров сбрасываем аккумулятор и курсор.
+  const serverFilterKey = JSON.stringify({ status, transport, coven: covenFilter });
+
+  // Первая страница — через useQuery без cursor.
+  // queryKey содержит serverFilterKey, чтобы при смене фильтров сбрасывался кеш.
+  // queryFn — чистая функция (только возвращает данные, без setState).
   const q = useQuery({
-    queryKey: ['souls', { status, transport, coven: covenFilter }],
-    queryFn: () =>
-      keeperApi.souls.list({
+    queryKey: ['souls-page0', serverFilterKey],
+    queryFn: async () => {
+      return keeperApi.souls.list({
         status: status || undefined,
         transport: transport || undefined,
         coven: covenFilter,
-        limit: 200,
-      }),
+        limit: PAGE_LIMIT,
+      });
+    },
   });
+
+  // filterKeyRef — синхронная ссылка на текущий serverFilterKey.
+  // Обновляется до setState в useEffect, поэтому после любого await в loadMore
+  // ref.current гарантированно содержит актуальный ключ (не stale-замыкание).
+  const filterKeyRef = useRef<string>('');
+
+  // Синхронизация аккумулятора с первой страницей через useEffect.
+  // Сбрасывает аккумулятор только при смене serverFilterKey (новый набор),
+  // но не при refetch того же ключа (reconnect не затирает накопленное).
+  useEffect(() => {
+    if (!q.data) return;
+    if (filterKeyRef.current !== serverFilterKey) {
+      // Сначала обновляем ref — до setState, чтобы loadMore увидел новый ключ
+      // немедленно, даже если рендер ещё не случился.
+      filterKeyRef.current = serverFilterKey;
+      setAccumulated(q.data.items);
+      setNextCursor(q.data.next_cursor ?? undefined);
+      setTotalApproximate(q.data.total_approximate ?? false);
+      setServerTotal(q.data.total);
+      setLoadMoreError(null);
+    }
+  }, [q.data, serverFilterKey]);
+
+  // «Загрузить ещё» — явный callback, не useQuery, т.к. это императивная догрузка.
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadMorePending) return;
+    // Захватываем актуальный ключ фильтра ДО await.
+    // После await сверяем с filterKeyRef.current — если фильтр сменился,
+    // отбрасываем результат (не подмешиваем старые souls в новый набор).
+    const requestedKey = filterKeyRef.current;
+    setLoadMorePending(true);
+    setLoadMoreError(null);
+    try {
+      const result = await keeperApi.souls.list({
+        status: status || undefined,
+        transport: transport || undefined,
+        coven: covenFilter,
+        limit: PAGE_LIMIT,
+        cursor: nextCursor,
+      });
+      // Проверка после await: фильтр мог смениться пока шёл запрос.
+      if (filterKeyRef.current !== requestedKey) {
+        // Фильтр устарел — отбрасываем результат целиком.
+        return;
+      }
+      setAccumulated((prev) => {
+        // Дедупликация по sid на случай двойного клика.
+        const existingSids = new Set(prev.map((it) => it.sid));
+        const fresh = result.items.filter((it) => !existingSids.has(it.sid));
+        return [...prev, ...fresh];
+      });
+      setNextCursor(result.next_cursor ?? undefined);
+      setTotalApproximate(result.total_approximate ?? false);
+      setServerTotal(result.total);
+    } catch (err) {
+      // Показываем ошибку только если фильтр не сменился — иначе она
+      // относится к старому набору и вводит оператора в заблуждение.
+      if (filterKeyRef.current === requestedKey) {
+        setLoadMoreError(
+          err instanceof ApiError
+            ? t('errors:generic', { status: err.status, detail: err.message })
+            : String(err),
+        );
+      }
+    } finally {
+      setLoadMorePending(false);
+    }
+  }, [nextCursor, loadMorePending, status, transport, covenFilter, t]);
 
   // Парсинг DSL soulprint-фильтра. Невалидные токены показываем inline-warn,
   // в фильтрацию идут только валидные правила.
@@ -107,15 +195,15 @@ export function SoulsList() {
   const soulprintRules = parsedSoulprint.rules;
   const soulprintFilterActive = soulprintRules.length > 0;
 
-  // Stage 1: server-side фильтры уже применены в q.data. Client-side SID-search + sort.
+  // Stage 1: server-side фильтры уже применены в accumulated. Client-side SID-search + sort.
   const prefiltered = useMemo<SoulListEntry[]>(() => {
-    if (!q.data) return [];
+    if (q.isLoading && accumulated.length === 0) return [];
     const needle = search.trim().toLowerCase();
     const filtered = needle
-      ? q.data.items.filter((it) => it.sid.toLowerCase().includes(needle))
-      : q.data.items;
+      ? accumulated.filter((it) => it.sid.toLowerCase().includes(needle))
+      : accumulated;
     return sortItems(filtered, sortKey, sortDir);
-  }, [q.data, search, sortKey, sortDir]);
+  }, [accumulated, q.isLoading, search, sortKey, sortDir]);
 
   // Stage 2: lazy fetch soulprint для каждого SID, только если soulprint-фильтр активен.
   // 410 (soulprint не получен) → null, ошибка → null, чтобы хост был исключён,
@@ -216,6 +304,38 @@ export function SoulsList() {
   function runOnFiltered() {
     if (!filteredWhereCEL) return;
     navigate(`/run?workload=command&target_where=${encodeURIComponent(filteredWhereCEL)}`);
+  }
+
+  // Счётчик загруженного набора с учётом приблизительности total.
+  // Показывается только когда данные есть и фильтр не активен (иначе matched-строка перекрывает).
+  // Логика:
+  //   - keyset-режим (totalApproximate=true): "Показано N, всего ≈M" пока есть nextCursor,
+  //     или "≈M soul(s)" когда всё загружено.
+  //   - offset-режим (totalApproximate=false): не показываем отдельный счётчик (UI не менялся).
+  function renderTotalBadge() {
+    if (!q.data || soulprintFilterActive) return null;
+    // При активном клиентском поиске: показываем только видимые строки, без серверного total.
+    if (search.trim()) {
+      return (
+        <div className={styles.metaKey} aria-live="polite" data-testid="count-filtered">
+          {t('souls:countFiltered', { count: visible.length })}
+        </div>
+      );
+    }
+    if (!totalApproximate) return null; // offset-режим: счётчик не нужен
+    if (nextCursor) {
+      return (
+        <div className={styles.metaKey} aria-live="polite" data-testid="count-approximate">
+          {t('souls:countShownOfApproximate', { shown: accumulated.length, total: serverTotal })}
+        </div>
+      );
+    }
+    // Всё загружено, показываем итог с маркером.
+    return (
+      <div className={styles.metaKey} aria-live="polite" data-testid="count-approximate">
+        {t('souls:countApproximate', { count: accumulated.length })}
+      </div>
+    );
   }
 
   return (
@@ -367,6 +487,8 @@ export function SoulsList() {
         </label>
       </div>
 
+      {renderTotalBadge()}
+
       {soulprintFilterActive ? (
         <div className={styles.metaKey} aria-live="polite">
           {soulprintLoading
@@ -501,6 +623,26 @@ export function SoulsList() {
             ))}
           </tbody>
         </table>
+      ) : null}
+
+      {/* «Загрузить ещё» — показывается только в keyset-режиме, пока есть nextCursor */}
+      {loadMoreError ? (
+        <div className={styles.errorBox} data-testid="load-more-error">
+          {loadMoreError}
+        </div>
+      ) : null}
+      {nextCursor ? (
+        <div className={styles.loadMoreCenter}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={loadMorePending}
+            onClick={loadMore}
+            data-testid="load-more-btn"
+          >
+            {loadMorePending ? t('souls:loadingMore') : t('souls:loadMore')}
+          </Button>
+        </div>
       ) : null}
 
       <CovenAssignModal
