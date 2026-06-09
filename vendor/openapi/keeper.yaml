@@ -2814,48 +2814,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - source
-              properties:
-                source:
-                  type: object
-                  description: Ровно один из incarnation_hosts / choir.
-                  properties:
-                    incarnation_hosts:
-                      type: string
-                      description: Имя incarnation — live SID-ы её хостов.
-                    choir:
-                      type: object
-                      required:
-                        - incarnation
-                        - name
-                      properties:
-                        incarnation:
-                          type: string
-                        name:
-                          type: string
-                prefix:
-                  type: string
-                  description: Префикс SID для автокомплита (LIKE prefix%).
+              $ref: '#/components/schemas/ModuleFormPrepRequest'
       responses:
         "200":
           description: Резолвленные SID-ы (отсортированы, ≤ cap).
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - sids
-                  - truncated
-                properties:
-                  sids:
-                    type: array
-                    items:
-                      type: string
-                  truncated:
-                    type: boolean
-                    description: true → результат обрезан по cap, есть ещё.
+                $ref: '#/components/schemas/ModuleFormPrepReply'
         "400":
           description: Нечитаемое тело / неизвестные поля.
           content:
@@ -5139,6 +5105,53 @@ components:
             $ref: '#/components/schemas/ModuleCatalogItem'
       required: [items]
 
+    ModuleFormPrepRequest:
+      type: object
+      description: |
+        Тело `POST /v1/modules/{name}/form-prep` (ADR-045 S3). source —
+        дискриминатор каталога-источника; prefix — опц. фильтр SID для
+        автокомплита (LIKE prefix%).
+      properties:
+        source:
+          $ref: '#/components/schemas/ModuleFormPrepSource'
+        prefix:
+          type: string
+          description: Префикс SID для автокомплита (LIKE prefix%).
+      required: [source]
+
+    ModuleFormPrepSource:
+      type: object
+      description: Ровно один из incarnation_hosts / choir.
+      properties:
+        incarnation_hosts:
+          type: string
+          description: Имя incarnation — live SID-ы её хостов.
+        choir:
+          $ref: '#/components/schemas/ModuleFormPrepChoirSource'
+
+    ModuleFormPrepChoirSource:
+      type: object
+      description: Координаты Choir-source — incarnation + имя Choir-а (ADR-044).
+      properties:
+        incarnation:
+          type: string
+        name:
+          type: string
+      required: [incarnation, name]
+
+    ModuleFormPrepReply:
+      type: object
+      description: Резолвленные SID-ы source-каталога формы (отсортированы, ≤ cap).
+      properties:
+        sids:
+          type: array
+          items:
+            type: string
+        truncated:
+          type: boolean
+          description: true → результат обрезан по cap, есть ещё.
+      required: [sids, truncated]
+
     PermissionAction:
       type: object
       description: |
@@ -5201,6 +5214,10 @@ components:
           type: array
           items: { type: string }
           description: CEL-предикаты `soulprint.self.*` (ADR-047 soulprint-измерение).
+        state:
+          type: array
+          items: { type: string }
+          description: CEL-предикаты state-scope (ADR-047 state-измерение).
       required: [unrestricted]
 
     MyPermission:

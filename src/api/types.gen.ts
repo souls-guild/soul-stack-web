@@ -3073,6 +3073,33 @@ export interface components {
             items: components["schemas"]["ModuleCatalogItem"][];
         };
         /**
+         * @description Тело `POST /v1/modules/{name}/form-prep` (ADR-045 S3). source —
+         *     дискриминатор каталога-источника; prefix — опц. фильтр SID для
+         *     автокомплита (LIKE prefix%).
+         */
+        ModuleFormPrepRequest: {
+            source: components["schemas"]["ModuleFormPrepSource"];
+            /** @description Префикс SID для автокомплита (LIKE prefix%). */
+            prefix?: string;
+        };
+        /** @description Ровно один из incarnation_hosts / choir. */
+        ModuleFormPrepSource: {
+            /** @description Имя incarnation — live SID-ы её хостов. */
+            incarnation_hosts?: string;
+            choir?: components["schemas"]["ModuleFormPrepChoirSource"];
+        };
+        /** @description Координаты Choir-source — incarnation + имя Choir-а (ADR-044). */
+        ModuleFormPrepChoirSource: {
+            incarnation: string;
+            name: string;
+        };
+        /** @description Резолвленные SID-ы source-каталога формы (отсортированы, ≤ cap). */
+        ModuleFormPrepReply: {
+            sids: string[];
+            /** @description true → результат обрезан по cap, есть ещё. */
+            truncated: boolean;
+        };
+        /**
          * @description Один action в составе resource. selector_keys — ОБЩИЙ список допустимых
          *     ключей скоупа (per-permission-метаданных в каталоге MVP нет).
          */
@@ -3108,6 +3135,8 @@ export interface components {
             regex?: string[];
             /** @description CEL-предикаты `soulprint.self.*` (ADR-047 soulprint-измерение). */
             soulprint?: string[];
+            /** @description CEL-предикаты state-scope (ADR-047 state-измерение). */
+            state?: string[];
         };
         /**
          * @description Одно эффективное право текущего оператора. wildcard=true → cluster-admin
@@ -7248,19 +7277,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @description Ровно один из incarnation_hosts / choir. */
-                    source: {
-                        /** @description Имя incarnation — live SID-ы её хостов. */
-                        incarnation_hosts?: string;
-                        choir?: {
-                            incarnation: string;
-                            name: string;
-                        };
-                    };
-                    /** @description Префикс SID для автокомплита (LIKE prefix%). */
-                    prefix?: string;
-                };
+                "application/json": components["schemas"]["ModuleFormPrepRequest"];
             };
         };
         responses: {
@@ -7270,11 +7287,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        sids: string[];
-                        /** @description true → результат обрезан по cap, есть ещё. */
-                        truncated: boolean;
-                    };
+                    "application/json": components["schemas"]["ModuleFormPrepReply"];
                 };
             };
             /** @description Нечитаемое тело / неизвестные поля. */
