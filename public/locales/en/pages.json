@@ -8,6 +8,8 @@
   "archonHideRevoked": "Hide revoked",
   "archonLimit": "Limit",
   "archonNoRoles": "The Archon has no roles. Assign them via RBAC → Archon assignments.",
+  "archonRevokeRoleAria": "unassign role {{role}}",
+  "archonRevokeRoleConfirm": "Unassign {{role}} from {{aid}}?",
   "archonRolesOptional": "Roles (optional)",
   "archonsCrumbs": "cluster operators",
   "backendUnsupported": "backend does not support this feature",

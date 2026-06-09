@@ -8,6 +8,8 @@
   "archonHideRevoked": "Скрыть отозванных",
   "archonLimit": "Лимит",
   "archonNoRoles": "Архонт не состоит ни в одной роли. Назначьте через RBAC → Archon assignments.",
+  "archonRevokeRoleAria": "снять роль {{role}}",
+  "archonRevokeRoleConfirm": "Снять {{role}} у {{aid}}?",
   "archonRolesOptional": "Роли (необязательно)",
   "archonsCrumbs": "операторы кластера",
   "backendUnsupported": "backend не поддерживает эту возможность",

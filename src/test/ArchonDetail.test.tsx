@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -139,6 +139,192 @@ describe('ArchonDetail', () => {
     await waitFor(() => {
       expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
     });
+  });
+
+  // ── Guard-тесты: назначение и снятие ролей ─────────────────────────────────
+
+  // Базовые данные для role-тестов
+  const ALICE_OP = {
+    aid: 'archon-alice',
+    display_name: 'Alice Ops',
+    auth_method: 'jwt',
+    created_at: '2026-05-10T10:00:00Z',
+    created_by_aid: 'archon-bootstrap',
+    revoked_at: null,
+    bootstrap_initial: false,
+    metadata: {},
+  };
+
+  const ROLES_WITH_ALICE = {
+    items: [
+      { name: 'cluster-admin', description: '', builtin: true, permissions: ['*'], operators: ['archon-alice'] },
+      { name: 'soul-operator', description: '', builtin: false, permissions: ['soul.list'], operators: [] },
+    ],
+  };
+
+  const ROLES_NO_ALICE = {
+    items: [
+      { name: 'cluster-admin', description: '', builtin: true, permissions: ['*'], operators: [] },
+      { name: 'soul-operator', description: '', builtin: false, permissions: ['soul.list'], operators: [] },
+    ],
+  };
+
+  // Гибкий mock с записью вызовов для role-тестов
+  function roleRecordingFetch(opts: {
+    op: typeof ALICE_OP;
+    roles: typeof ROLES_WITH_ALICE;
+    grantStatus?: number;
+    revokeStatus?: number;
+    revokeType?: string;
+    revokeDetail?: string;
+  }): { calls: Array<{ url: string; method: string; body: string | null }> } {
+    const calls: Array<{ url: string; method: string; body: string | null }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : null;
+      calls.push({ url, method, body });
+
+      if (url.startsWith('/v1/operators/') && method === 'GET') {
+        return new Response(JSON.stringify(opts.op), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.startsWith('/v1/roles') && method === 'GET') {
+        return new Response(JSON.stringify(opts.roles), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (/\/v1\/roles\/[^/]+\/operators$/.test(url) && method === 'POST') {
+        const status = opts.grantStatus ?? 204;
+        // jsdom не принимает пустое тело для 204, используем 200 с пустым телом в mock
+        return new Response(null, { status });
+      }
+      if (/\/v1\/roles\/[^/]+\/operators\/[^/]+$/.test(url) && method === 'DELETE') {
+        const status = opts.revokeStatus ?? 204;
+        if (status !== 204) {
+          return new Response(
+            JSON.stringify({ type: opts.revokeType ?? 'about:blank', status, detail: opts.revokeDetail ?? 'error' }),
+            { status, headers: { 'Content-Type': 'application/problem+json' } },
+          );
+        }
+        return new Response(null, { status: 204 });
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+    return { calls };
+  }
+
+  it('Guard: кнопка «Назначить роль» открывает AssignRoleModal с правильным aid', async () => {
+    roleRecordingFetch({ op: ALICE_OP, roles: ROLES_WITH_ALICE });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument();
+    });
+
+    const assignBtn = await screen.findByTestId('assign-role-btn');
+    const user = userEvent.setup();
+    await user.click(assignBtn);
+
+    // Модалка открылась с aid текущего архонта
+    const dialog = await screen.findByRole('dialog', { name: /Назначить роль: archon-alice/i });
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it('Guard: успешное назначение роли вызывает POST /v1/roles/{name}/operators и закрывает модалку', async () => {
+    const { calls } = roleRecordingFetch({ op: ALICE_OP, roles: ROLES_NO_ALICE });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    const assignBtn = await screen.findByTestId('assign-role-btn');
+    await user.click(assignBtn);
+
+    const dialog = await screen.findByRole('dialog', { name: /Назначить роль: archon-alice/i });
+    await user.selectOptions(dialog.querySelector('select')!, 'soul-operator');
+    await user.click(screen.getByRole('button', { name: /^Назначить$/ }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.method === 'POST' && c.url === '/v1/roles/soul-operator/operators');
+      expect(post).toBeDefined();
+      expect(post!.body).toContain('archon-alice');
+    });
+    // После успеха модалка закрывается (invalidateQueries отработал)
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /Назначить роль/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it('Guard: кнопка «×» рядом с ролью вызывает revokeOperator(role, aid) + рефетч', async () => {
+    // window.confirm автоматически подтверждаем
+    vi.stubGlobal('confirm', () => true);
+    const { calls } = roleRecordingFetch({ op: ALICE_OP, roles: ROLES_WITH_ALICE });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
+
+    // Ждём появления чипа с ролью
+    const revokeBtn = await screen.findByRole('button', { name: /снять роль cluster-admin/i });
+    const user = userEvent.setup();
+    await user.click(revokeBtn);
+
+    await waitFor(() => {
+      const del = calls.find(
+        (c) => c.method === 'DELETE' && c.url === '/v1/roles/cluster-admin/operators/archon-alice',
+      );
+      expect(del).toBeDefined();
+    });
+    // Ошибки нет — inline-error не показывается
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('Guard: 409 lockout → inline-ошибка видна, роль НЕ исчезает из списка', async () => {
+    vi.stubGlobal('confirm', () => true);
+    roleRecordingFetch({
+      op: ALICE_OP,
+      roles: ROLES_WITH_ALICE,
+      revokeStatus: 409,
+      revokeType: 'https://soul-stack.io/errors/would-lock-out-cluster',
+      revokeDetail: 'last cluster-admin cannot be removed',
+    });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
+
+    const revokeBtn = await screen.findByRole('button', { name: /снять роль cluster-admin/i });
+    const user = userEvent.setup();
+    await user.click(revokeBtn);
+
+    // Inline-ошибка появляется
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/lock-?out|self-lockout|admin/i);
+
+    // Роль всё ещё в DOM (не пропала)
+    expect(screen.getByRole('button', { name: /снять роль cluster-admin/i })).toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('Guard: 403 при снятии роли → понятное сообщение об ошибке', async () => {
+    vi.stubGlobal('confirm', () => true);
+    roleRecordingFetch({
+      op: ALICE_OP,
+      roles: ROLES_WITH_ALICE,
+      revokeStatus: 403,
+      revokeDetail: 'forbidden',
+    });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
+
+    const revokeBtn = await screen.findByRole('button', { name: /снять роль cluster-admin/i });
+    const user = userEvent.setup();
+    await user.click(revokeBtn);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/недостаточно прав|forbidden/i);
+
+    vi.unstubAllGlobals();
   });
 
   it('Activity-tab показывает link на /audit?archon_aid=<aid>', async () => {

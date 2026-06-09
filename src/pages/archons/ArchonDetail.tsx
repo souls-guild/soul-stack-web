@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import { keeperApi, type OperatorAuthMethod } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { RevokeArchonModal } from './RevokeArchonModal';
+import { AssignRoleModal } from '../rbac/AssignRoleModal';
+import { prettyRbacError } from '../rbac/errors';
 import styles from '../common.module.css';
 
 type Tab = 'info' | 'activity';
@@ -30,6 +33,10 @@ export function ArchonDetail() {
   const { aid = '' } = useParams<{ aid: string }>();
   const [tab, setTab] = useState<Tab>('info');
   const [revokeOpen, setRevokeOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [revokeRoleError, setRevokeRoleError] = useState<string | null>(null);
+
+  const qc = useQueryClient();
 
   const q = useQuery({
     queryKey: ['operator', aid],
@@ -47,6 +54,15 @@ export function ArchonDetail() {
     staleTime: 30_000,
   });
   const memberRoles = (rolesQ.data?.items ?? []).filter((r) => r.operators.includes(aid));
+
+  const revokeRoleMut = useMutation({
+    mutationFn: (roleName: string) => keeperApi.roles.revokeOperator(roleName, aid),
+    onSuccess: () => {
+      setRevokeRoleError(null);
+      qc.invalidateQueries({ queryKey: ['rbac.roles'] });
+    },
+    onError: (err) => setRevokeRoleError(prettyRbacError(err)),
+  });
 
   if (q.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (q.error) {
@@ -130,7 +146,25 @@ export function ArchonDetail() {
             <span className={styles.metaVal}>{op.bootstrap_initial ? 'true' : 'false'}</span>
           </div>
           <section className={styles.section} aria-label="roles">
-            <h2 className={styles.sectionTitle}>Roles</h2>
+            <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Roles</span>
+              <span style={{ flex: 1 }} />
+              {!revoked ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="assign-role-btn"
+                  onClick={() => setAssignOpen(true)}
+                >
+                  {t('assignRole')}
+                </Button>
+              ) : null}
+            </h2>
+            {revokeRoleError ? (
+              <div className={styles.errorBox} role="alert" style={{ marginBottom: 8 }}>
+                {revokeRoleError}
+              </div>
+            ) : null}
             {rolesQ.isLoading ? (
               <div className={styles.loading}>{t('loading')}</div>
             ) : memberRoles.length === 0 ? (
@@ -146,7 +180,7 @@ export function ArchonDetail() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 4,
-                      padding: '2px 8px',
+                      padding: '2px 6px 2px 8px',
                       background: 'var(--surface-2)',
                       border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-pill)',
@@ -156,6 +190,28 @@ export function ArchonDetail() {
                   >
                     {r.name}
                     {r.builtin ? <Badge tone="info">builtin</Badge> : null}
+                    <button
+                      type="button"
+                      aria-label={t('pages:archonRevokeRoleAria', { role: r.name })}
+                      title={t('pages:archonRevokeRoleAria', { role: r.name })}
+                      disabled={revokeRoleMut.isPending}
+                      onClick={() => {
+                        setRevokeRoleError(null);
+                        if (window.confirm(t('pages:archonRevokeRoleConfirm', { role: r.name, aid }))) {
+                          revokeRoleMut.mutate(r.name);
+                        }
+                      }}
+                      style={{
+                        border: 0,
+                        background: 'transparent',
+                        cursor: revokeRoleMut.isPending ? 'not-allowed' : 'pointer',
+                        color: 'var(--text-muted)',
+                        padding: 0,
+                        display: 'inline-flex',
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
                   </span>
                 ))}
               </div>
@@ -176,6 +232,13 @@ export function ArchonDetail() {
         aid={op.aid}
         open={revokeOpen}
         onClose={() => setRevokeOpen(false)}
+      />
+
+      <AssignRoleModal
+        open={assignOpen}
+        aid={op.aid}
+        roles={rolesQ.data?.items ?? []}
+        onClose={() => setAssignOpen(false)}
       />
 
       {tab === 'activity' ? (
