@@ -116,6 +116,15 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     const json = (obj: unknown, status = 200) =>
       new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 
+    // PRIMARY: POST /v1/voyages/preview (S6).
+    if (method === 'POST' && url.includes('/v1/voyages/preview')) {
+      return json({
+        kind: (body as Record<string, unknown>)?.kind ?? 'command',
+        scope_size: 1,
+        total_batches: 1,
+        batch_mode: 'barrier',
+      }, 200);
+    }
     // PRIMARY: POST /v1/voyages (ADR-043 S5).
     if (method === 'POST' && (url.endsWith('/v1/voyages') || url.includes('/v1/voyages?'))) {
       const cap = { url, body };
@@ -559,7 +568,7 @@ describe('RunWizard', () => {
     expect(body.concurrency).toBe(50);
   });
 
-  it('Command: batch_size заполнен → уходит в Voyage POST', async () => {
+  it('Command: batch (строка) заполнен → уходит в Voyage POST как сырая строка', async () => {
     const stub = setupFetchStub({
       souls: [
         { sid: 'db-1.example.com', covens: ['prod'] },
@@ -580,18 +589,22 @@ describe('RunWizard', () => {
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Batch size'), '3');
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    // Вводим строку «3» — шлём сырой string, не парсим на клиенте.
+    await user.type(screen.getByLabelText('Batch'), '3');
 
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.kind).toBe('command');
-    expect(body.batch_size).toBe(3);
+    // batch — строка, НЕ число; batch_size/batch_percent отсутствуют.
+    expect(body.batch).toBe('3');
+    expect('batch_size' in body).toBe(false);
+    expect('batch_percent' in body).toBe(false);
   });
 
-  it('Command: пустой batch_size → batch_size не в теле Voyage POST', async () => {
+  it('Command: пустой batch → batch не в теле Voyage POST', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'db-1.example.com', covens: ['prod'] }],
     });
@@ -610,11 +623,12 @@ describe('RunWizard', () => {
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // batch_size не заполняем.
+    // batch не заполняем.
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
+    expect('batch' in body).toBe(false);
     expect('batch_size' in body).toBe(false);
   });
 
@@ -874,7 +888,7 @@ describe('RunWizard', () => {
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
   });
 
-  it('Scenario: batch_size заполнен → уходит в Voyage POST', async () => {
+  it('Scenario: batch (строка) заполнен → уходит в Voyage POST как сырая строка', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -893,9 +907,9 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Поле Batch size присутствует, вводим значение.
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Batch size'), '5');
+    // Поле Batch присутствует, вводим значение.
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Batch'), '5');
 
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
@@ -904,20 +918,22 @@ describe('RunWizard', () => {
     const body = stub.posted?.body as {
       kind: string;
       scenario_name: string;
-      batch_size?: number;
+      batch?: string;
       on_failure?: string;
       concurrency?: number;
       target: { incarnations: string[] };
     };
     expect(body.kind).toBe('scenario');
     expect(body.scenario_name).toBe('restart');
-    expect(body.batch_size).toBe(5);
+    // batch — строка, НЕ число.
+    expect(body.batch).toBe('5');
+    expect('batch_size' in body).toBe(false);
     expect(body.on_failure).toBe('abort');
     expect(body.concurrency).toBe(50);
     expect(body.target.incarnations).toContain('redis-prod');
   });
 
-  it('Scenario: пустой batch_size → batch_size не в теле Voyage POST', async () => {
+  it('Scenario: пустой batch → batch не в теле Voyage POST', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -935,14 +951,15 @@ describe('RunWizard', () => {
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    // Batch size пуст по умолчанию — не заполняем.
+    // Batch пуст по умолчанию — не заполняем.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    // Пустой batch_size → не шлём поле.
+    // Пустой batch → не шлём поле.
+    expect('batch' in body).toBe(false);
     expect('batch_size' in body).toBe(false);
     expect((body.target as { incarnations: string[] }).incarnations).toContain('redis-prod');
   });
@@ -1170,12 +1187,12 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (v=8, incarnationRegex) → state восстанавливается', async () => {
+  it('Валидный свежий черновик (v=9, incarnationRegex) → state восстанавливается', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 8,
+        v: 9,
         step: 3,
         workload: 'scenario',
         runMode: 'voyage',
@@ -1201,16 +1218,14 @@ describe('RunWizard', () => {
         },
         hostCriteria: { incarnations: [], covens: [], sidRegex: '', soulprint: '' },
         options: {
-          batchSize: '',
+          batch: '',
+          maxFailures: '',
           concurrency: '50',
           onFailure: 'abort',
           dryRun: false,
           wait: false,
           scheduleAt: '',
           batchMode: 'barrier',
-          batchSizeMode: 'abs',
-          batchPercent: '',
-          failThreshold: '',
           interBatchIntervalMs: '',
           interUnitIntervalMs: '',
           requireAlive: false,
@@ -1247,21 +1262,21 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
-    // Невалидное значение (не целое).
-    await user.type(screen.getByLabelText('Batch size'), '0');
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    // Невалидный формат (буквы — не N|N%).
+    await user.type(screen.getByLabelText('Batch'), 'abc');
 
     // Inline-ошибка появилась.
     await waitFor(() =>
       expect(
-        screen.getByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+        screen.getByText(/Формат: целое число|Format: integer/),
       ).toBeInTheDocument(),
     );
     // Submit заблокирован.
     expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
   });
 
-  it('Batch size: валидное значение → ошибки нет, submit не заблокирован', async () => {
+  it('Batch: валидное значение N → ошибки нет, submit не заблокирован', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1280,16 +1295,16 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Batch size'), '5');
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Batch'), '5');
 
     expect(
-      screen.queryByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+      screen.queryByText(/Формат: целое число|Format: integer/),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
   });
 
-  it('Batch size: пустое поле → ошибки нет (поле опциональное)', async () => {
+  it('Batch: валидное значение N% → ошибки нет, submit не заблокирован', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1308,44 +1323,41 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Batch'), '20%');
+
+    expect(
+      screen.queryByText(/Формат: целое число|Format: integer/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
+  });
+
+  it('Batch: пустое поле → ошибки нет (поле опциональное)', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     // Не вводим ничего — поле пустое.
 
     expect(
-      screen.queryByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
+      screen.queryByText(/Формат: целое число|Format: integer/),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
-  });
-
-  it('Batch size: выше верхней границы (10001) → inline-ошибка видна, submit заблокирован', async () => {
-    setupFetchStub({ incarnationNames: ['redis-prod'] });
-    renderWizardWithRoutes();
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
-    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
-
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
-    await user.type(screen.getByLabelText('Incarnation regex'), '*');
-    await waitFor(() =>
-      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
-    );
-
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByLabelText('Batch size')).toBeInTheDocument());
-    // Выше верхней границы (10000 = max_scope-дефолт backend).
-    await user.type(screen.getByLabelText('Batch size'), '10001');
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Размер батча — целое число от 1 до 10000|Batch size must be an integer between 1 and 10000/),
-      ).toBeInTheDocument(),
-    );
-    expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
   });
 
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
@@ -1360,7 +1372,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
   });
 
-  // --- Новые тесты S-W5: batch_mode / batch_percent / fail_threshold / require_alive ---
+  // --- Тесты S-W5 (обновлены под S6): batch_mode / max_failures / require_alive ---
 
   async function reachStep4Command() {
     const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
@@ -1379,15 +1391,15 @@ describe('RunWizard', () => {
     return { stub, user };
   }
 
-  it('batch_mode=window → batch_size поле скрыто, concurrency-hint изменён', async () => {
+  it('batch_mode=window → поле Batch скрыто, concurrency-hint изменён', async () => {
     await reachStep4Command();
-    // Дефолт barrier — batch_size виден.
-    expect(screen.getByLabelText('Batch size')).toBeInTheDocument();
+    // Дефолт barrier — Batch виден.
+    expect(screen.getByLabelText('Batch')).toBeInTheDocument();
 
     // Переключаем на window.
     await userEvent.setup().click(screen.getByLabelText('batch_mode_window'));
-    // batch_size поле скрыто.
-    expect(screen.queryByLabelText('Batch size')).not.toBeInTheDocument();
+    // Batch поле скрыто.
+    expect(screen.queryByLabelText('Batch')).not.toBeInTheDocument();
     // concurrency hint содержит описание sliding window.
     await waitFor(() => {
       const hint = document.querySelector('[aria-label="Concurrency"]')?.closest('label')?.textContent ?? '';
@@ -1395,7 +1407,7 @@ describe('RunWizard', () => {
     });
   });
 
-  it('batch_mode=window → batch_size не уходит в POST', async () => {
+  it('batch_mode=window → batch/batch_size не уходят в POST', async () => {
     const { stub, user } = await reachStep4Command();
     await user.click(screen.getByLabelText('batch_mode_window'));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
@@ -1403,6 +1415,7 @@ describe('RunWizard', () => {
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.batch_mode).toBe('window');
+    expect('batch' in body).toBe(false);
     expect('batch_size' in body).toBe(false);
   });
 
@@ -1418,49 +1431,36 @@ describe('RunWizard', () => {
     expect('inter_unit_interval_ms' in body).toBe(false);
   });
 
-  it('batch_percent radio → batch_size скрыт, batch_percent уходит в POST', async () => {
+  it('batch строка «20%» уходит в POST как сырая строка, не число', async () => {
     const { stub, user } = await reachStep4Command();
-    // Переключаем на % режим.
-    await user.click(screen.getByLabelText('batch_size_mode_pct'));
-    // batch_size поле скрыто, batch_percent поле видно.
-    expect(screen.queryByLabelText('Batch size')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Batch percent')).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText('Batch percent'), '25');
+    await user.type(screen.getByLabelText('Batch'), '20%');
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    expect(body.batch_percent).toBe(25);
+    // Строка «20%» — не конвертируется в число 20; batch_percent отсутствует.
+    expect(body.batch).toBe('20%');
     expect('batch_size' in body).toBe(false);
-  });
-
-  it('batch_size radio → batch_percent не уходит в POST', async () => {
-    const { stub, user } = await reachStep4Command();
-    // Дефолт abs — batch_size видно.
-    await user.type(screen.getByLabelText('Batch size'), '5');
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
-    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
-
-    const body = stub.posted?.body as Record<string, unknown>;
-    expect(body.batch_size).toBe(5);
     expect('batch_percent' in body).toBe(false);
   });
 
-  it('fail_threshold заполнен → уходит в POST', async () => {
+  it('max_failures строка заполнена → уходит в POST как max_failures (строка)', async () => {
     const { stub, user } = await reachStep4Command();
-    await user.type(screen.getByLabelText('Fail threshold'), '3');
+    await user.type(screen.getByLabelText('Max failures'), '3');
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    expect((stub.posted?.body as Record<string, unknown>).fail_threshold).toBe(3);
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.max_failures).toBe('3');
+    expect('fail_threshold' in body).toBe(false);
   });
 
-  it('fail_threshold пустой → не уходит в POST', async () => {
+  it('max_failures пустой → не уходит в POST', async () => {
     const { stub, user } = await reachStep4Command();
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
+    expect('max_failures' in (stub.posted?.body as Record<string, unknown>)).toBe(false);
     expect('fail_threshold' in (stub.posted?.body as Record<string, unknown>)).toBe(false);
   });
 
@@ -1574,5 +1574,189 @@ describe('RunWizard', () => {
 
     // Submit должен быть разблокирован (точно на floor).
     expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).not.toBeDisabled();
+  });
+
+  // --- Guard-тесты S6: batch / max_failures / preview ---
+
+  it('S6: max_failures tooltip присутствует (aria-label)', async () => {
+    await reachStep4Command();
+    // Тултип должен быть в разметке.
+    await waitFor(() => expect(screen.getByLabelText(/Threshold is counted|Порог считается/)).toBeInTheDocument());
+  });
+
+  it('S6: max_failures строка «25%» уходит как max_failures в POST (не fail_threshold)', async () => {
+    const { stub, user } = await reachStep4Command();
+    await user.type(screen.getByLabelText('Max failures'), '25%');
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as Record<string, unknown>;
+    expect(body.max_failures).toBe('25%');
+    expect('fail_threshold' in body).toBe(false);
+  });
+
+  it('S6: snapshot target (regex/sids) → batch-preview клиентский, preview-endpoint НЕ вызывается', async () => {
+    // Command с sidRegex — snapshot-target. Preview-эндпоинт не должен дёргаться.
+    const previewCalls: string[] = [];
+    const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: [] }] });
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) previewCalls.push(url);
+      return origFetch(input, init);
+    }) as typeof fetch;
+
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.type(screen.getByLabelText('SID regex'), 'db-.*');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+
+    // Вводим batch — preview не должен дёргаться (snapshot-target).
+    await user.type(screen.getByLabelText('Batch'), '1');
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toHaveValue('1'));
+
+    // preview не вызывался.
+    expect(previewCalls).toHaveLength(0);
+
+    void stub; // Suppress unused var warning.
+  });
+
+  it('S6: late-binding coven target → preview-endpoint вызывается (debounced)', async () => {
+    // Command с coven-only → late-binding → preview вызывается.
+    const previewReplies: unknown[] = [];
+    setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) {
+        previewReplies.push('called');
+        return new Response(JSON.stringify({
+          kind: 'command',
+          scope_size: 1,
+          total_batches: 1,
+          batch_mode: 'barrier',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return origFetch(input, init);
+    }) as typeof fetch;
+
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    const covenChip = await screen.findByLabelText('Coven labels');
+    await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+
+    // Preview должен вызваться (после debounce).
+    await waitFor(() => expect(previewReplies.length).toBeGreaterThan(0), { timeout: 2000 });
+    expect(previewReplies.length).toBeGreaterThan(0);
+  });
+
+  it('S6: window batch_mode → batch-preview показывает window-сообщение (не null)', async () => {
+    // Для snapshot-target с 1 инкарнацией, window режим.
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    // Переключаем на window — поле batch скрыто, batch-preview не показывается.
+    await waitFor(() => expect(screen.getByLabelText('batch_mode_window')).toBeInTheDocument());
+    await user.click(screen.getByLabelText('batch_mode_window'));
+    // Поле batch скрыто.
+    expect(screen.queryByLabelText('Batch')).not.toBeInTheDocument();
+    // batch-preview под batch-полем не показывается (isWindow=true скрывает блок).
+    expect(screen.queryByTestId('batch-preview')).not.toBeInTheDocument();
+  });
+
+  it('S6: snapshot scenario-target + batch «2» → local batch-preview показан (≈1 батч для 1 инкарнации)', async () => {
+    setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Batch'), '2');
+
+    // Scope=1 инкарнация, batch=2 → ceil(1/2)=1 батч. batch-preview появился.
+    await waitFor(() => expect(screen.getByTestId('batch-preview')).toBeInTheDocument());
+    expect(screen.getByTestId('batch-preview').textContent).toMatch(/1/);
+  });
+
+  it('S6: 422 от preview/create → показан detail из keeper в submitError', async () => {
+    const origFetch = globalThis.fetch;
+    setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
+    const captureFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method === 'POST' && (url.endsWith('/v1/voyages') || url.includes('/v1/voyages?'))) {
+        return new Response(JSON.stringify({ code: 'voyage_batch_spec_conflict', message: 'batch spec conflict' }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return captureFetch(input, init);
+    }) as typeof fetch;
+
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    const covenChip = await screen.findByLabelText('Coven labels');
+    await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+
+    // Ошибка 422 от keeper показана в submitError.
+    await waitFor(() =>
+      expect(screen.getByText(/422|batch spec conflict/)).toBeInTheDocument(),
+    );
+
+    void origFetch;
   });
 });

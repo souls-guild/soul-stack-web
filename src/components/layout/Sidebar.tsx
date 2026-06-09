@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Boxes,
   Users,
+  Users2,
   FileText,
   Package,
   Puzzle,
@@ -50,6 +51,7 @@ const REGISTRY: NavItem[] = [
   { to: '/souls', label: 'Souls', icon: Users },
   { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
   { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
+  { to: '/synods', label: 'Synods', icon: Users2, matchPrefix: '/synods' },
 ];
 
 const ORACLE: NavItem[] = [

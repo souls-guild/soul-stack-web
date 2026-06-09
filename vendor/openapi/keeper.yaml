@@ -43,6 +43,8 @@ tags:
     description: Управление Архонтами (ADR-013, ADR-014).
   - name: Role
     description: RBAC — роли, permissions и состав операторов (ADR-022).
+  - name: Synod
+    description: RBAC — группы архонов (Архон → Synod → Роли, ADR-049).
   - name: Incarnation
     description: Жизненный цикл runtime-инстансов сервисов (ADR-009).
   - name: Soul
@@ -481,6 +483,171 @@ paths:
         '404': { $ref: '#/components/responses/Problem404' }
         '409': { $ref: '#/components/responses/Problem409' }
         '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/synods:
+    post:
+      tags: [Synod]
+      operationId: CreateSynod
+      summary: Создать Synod-группу.
+      description: |
+        Permission: synod.create. MCP-tool: keeper.synod.create.
+        Создаёт пустую группу архонов (ADR-049), бандлящую роли. Роли и
+        члены добавляются отдельными эндпоинтами. 409 synod-already-exists —
+        name уже занят.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SynodCreateRequest'
+      responses:
+        '201':
+          description: Группа создана.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Synod]
+      operationId: ListSynods
+      summary: Список Synod-групп.
+      description: |
+        Permission: synod.list. MCP-tool: keeper.synod.list.
+        Каталог групп с развёрнутым bundle ролей и составом членов (AID).
+      responses:
+        '200':
+          description: Каталог групп.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SynodListReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/synods/{name}:
+    delete:
+      tags: [Synod]
+      operationId: DeleteSynod
+      summary: Удалить Synod-группу.
+      description: |
+        Permission: synod.delete. MCP-tool: keeper.synod.delete.
+        Каскадом сносятся membership и bundle группы. 409 synod-builtin —
+        builtin-группу удалять нельзя; 409 would-lock-out-cluster —
+        исчезновение группы оставит кластер без `*`-админа (ADR-049(f)).
+      parameters:
+        - $ref: '#/components/parameters/SynodNamePath'
+      responses:
+        '204':
+          description: Группа удалена.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/synods/{name}/operators:
+    post:
+      tags: [Synod]
+      operationId: AddSynodOperator
+      summary: Добавить архона в группу.
+      description: |
+        Permission: synod.add-operator. MCP-tool: keeper.synod.add-operator.
+        Член группы получает весь её bundle ролей. Идемпотентно. Под
+        least-privilege subset (ADR-049(f)): 403 forbidden — инициатор не
+        держит права bundle группы. 404 not-found — группа/AID не существуют.
+      parameters:
+        - $ref: '#/components/parameters/SynodNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantOperatorRequest'
+      responses:
+        '204':
+          description: Архон добавлен в группу.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/synods/{name}/operators/{aid}:
+    delete:
+      tags: [Synod]
+      operationId: RemoveSynodOperator
+      summary: Убрать архона из группы.
+      description: |
+        Permission: synod.remove-operator. MCP-tool:
+        keeper.synod.remove-operator. 404 not-found — пары (synod, aid) нет;
+        409 would-lock-out-cluster — снятие осиротит последнего `*`-админа
+        (ADR-049(f)).
+      parameters:
+        - $ref: '#/components/parameters/SynodNamePath'
+        - $ref: '#/components/parameters/AidPath'
+      responses:
+        '204':
+          description: Архон убран из группы.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/synods/{name}/roles:
+    post:
+      tags: [Synod]
+      operationId: GrantSynodRole
+      summary: Добавить роль в bundle группы.
+      description: |
+        Permission: synod.grant-role. MCP-tool: keeper.synod.grant-role.
+        Роль выдаётся всем членам группы. Идемпотентно. Под least-privilege
+        subset (ADR-049(f)): 403 forbidden — инициатор не держит права роли.
+        404 not-found — группа/роль не существуют.
+      parameters:
+        - $ref: '#/components/parameters/SynodNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SynodGrantRoleRequest'
+      responses:
+        '204':
+          description: Роль добавлена в bundle.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/synods/{name}/roles/{role_name}:
+    delete:
+      tags: [Synod]
+      operationId: RevokeSynodRole
+      summary: Снять роль из bundle группы.
+      description: |
+        Permission: synod.revoke-role. MCP-tool: keeper.synod.revoke-role.
+        Права роли снимаются у всех членов. 404 not-found — пары
+        (synod, role) нет; 409 would-lock-out-cluster — снятие осиротит
+        последнего `*`-админа (ADR-049(f)).
+      parameters:
+        - $ref: '#/components/parameters/SynodNamePath'
+        - $ref: '#/components/parameters/SynodRoleNamePath'
+      responses:
+        '204':
+          description: Роль снята из bundle.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
         '500': { $ref: '#/components/responses/Problem500' }
 
   /v1/incarnations:
@@ -1597,6 +1764,11 @@ paths:
         batch_size (barrier) или concurrency (window) выше voyage.max_batch_size →
         422 voyage_batch_size_too_large. `input` НЕ логируется (audit
         scenario_run.started/command_run.invoked, инвариант A ADR-027).
+
+        Rate-limit (Tempo, ADR-050): resolver-тяжёлый create ограничен per-AID
+        (bucket voyage_create, default 10 rps / burst 20). Превышение → 429
+        tempo-exceeded + Retry-After. Будущий POST /v1/voyages/preview реюзит тот
+        же лимит. При недоступном Redis лимит fail-OPEN (passthrough).
       requestBody:
         required: true
         content:
@@ -1615,6 +1787,7 @@ paths:
         '403': { $ref: '#/components/responses/Problem403' }
         '404': { $ref: '#/components/responses/Problem404' }
         '422': { $ref: '#/components/responses/Problem422' }
+        '429': { $ref: '#/components/responses/Problem429' }
         '500': { $ref: '#/components/responses/Problem500' }
     get:
       tags: [Voyage]
@@ -1665,6 +1838,57 @@ paths:
         '401': { $ref: '#/components/responses/Problem401' }
         '403': { $ref: '#/components/responses/Problem403' }
         '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/voyages/preview:
+    post:
+      tags: [Voyage]
+      operationId: PreviewVoyage
+      summary: Dry-resolve scope Voyage без создания прогона (ADR-043 amendment §4).
+      description: |
+        Предпоказ резолвнутого scope БЕЗ создания Voyage: принимает тот же body,
+        что POST /v1/voyages, прогоняет ту же валидацию / резолв target-а / гейты
+        (RBAC-by-kind, target ∩ Purview для command, потолок voyage.max_scope),
+        но НЕ пишет в voyages/voyage_targets и НЕ раскрывает SID-список — отдаёт
+        только числа {kind, scope_size, total_batches, batch_mode,
+        effective_batch_size?}.
+
+        Консистентность: preview возвращает 403/422 РОВНО там же, где Create
+        отказал бы (тот же общий путь). scenario — per-incarnation scope-check
+        (403 на чужой инкарнации); command — гибрид-семантика (явный чужой SID →
+        403, широкий target урезается до Purview, пустое пересечение → 422
+        voyage_empty_target); scope > voyage.max_scope → 422.
+
+        Учитываются (влияют на резолв/арифметику): target, kind, batch/batch_size/
+        batch_percent/batch_mode, concurrency, max_failures, require_alive.
+        Игнорируются: dry_run, schedule_at, inter_batch_interval_ms,
+        inter_unit_interval_ms, on_failure, input.
+
+        Назначение — late-binding target (coven/require_alive, где число хостов
+        резолвит Keeper); для snapshot-таргета (явный incarnations[]/sids[]) число
+        батчей клиент считает сам, эндпоинт не обязателен.
+
+        Rate-limit (Tempo, ADR-050(c)): тот же per-AID bucket voyage_create, что у
+        create (единый лимит create+preview). Превышение → 429 + Retry-After.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoyageCreateRequest'
+      responses:
+        '200':
+          description: Резолвнутый scope (числа, без SID-списка).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoyagePreviewReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '429': { $ref: '#/components/responses/Problem429' }
         '500': { $ref: '#/components/responses/Problem500' }
 
   /v1/voyages/{id}:
@@ -3397,6 +3621,22 @@ components:
       schema:
         type: string
       description: Имя роли (kebab-case).
+    SynodNamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
+      description: Имя Synod-группы (kebab-case).
+    SynodRoleNamePath:
+      name: role_name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
+      description: Имя роли в bundle Synod-группы (kebab-case).
     ServiceNamePath:
       name: name
       in: path
@@ -3576,6 +3816,21 @@ components:
       description: |
         Bad gateway — upstream-ресурс (внешний git, …) недоступен или вернул
         ошибку. Keeper исправен, проблема за его пределами.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Problem429:
+      description: |
+        Too many requests — per-AID rate-limit Tempo превышен (tempo-exceeded,
+        ADR-050): оператор слишком часто дёргает resolver-тяжёлый write-эндпоинт.
+        Заголовок Retry-After — секунды до пополнения хотя бы одного токена.
+      headers:
+        Retry-After:
+          description: Секунды до пополнения хотя бы одного токена бакета.
+          schema:
+            type: integer
+            minimum: 1
       content:
         application/problem+json:
           schema:
@@ -3995,8 +4250,70 @@ components:
         aid:
           type: string
           pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
-          description: AID оператора, назначаемого в роль (naming-rules.md).
+          description: AID оператора, назначаемого в роль/группу (naming-rules.md).
       required: [aid]
+
+    SynodCreateRequest:
+      type: object
+      description: |
+        Создание Synod-группы (ADR-049): набор ролей для группы архонов.
+        name уникален в кластере. Роли/члены добавляются отдельными
+        эндпоинтами.
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z][a-z0-9-]*$'
+          description: Имя группы (kebab-case), уникальное в кластере.
+        description:
+          type: string
+          description: Человекочитаемое описание группы для UI/аудита.
+      required: [name]
+
+    SynodGrantRoleRequest:
+      type: object
+      description: Добавление роли в bundle Synod-группы (ADR-049).
+      properties:
+        role:
+          type: string
+          pattern: '^[a-z][a-z0-9-]*$'
+          description: Имя роли, добавляемой в bundle группы.
+      required: [role]
+
+    SynodView:
+      type: object
+      description: |
+        Проекция Synod-группы (ADR-049): метаданные, набор ролей (bundle) и
+        состав членов (AID). Возвращается в SynodListReply.items[].
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        builtin:
+          type: boolean
+          description: |
+            true — builtin-группа: не удаляется (409 synod-builtin).
+        roles:
+          type: array
+          items:
+            type: string
+          description: Имена ролей в bundle группы (пустой массив, если их нет).
+        operators:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
+          description: AID архонов — членов группы (пустой массив, если их нет).
+      required: [name, builtin, roles, operators]
+
+    SynodListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SynodView'
+      required: [items]
 
     ServiceRegisterRequest:
       type: object
@@ -6384,23 +6701,46 @@ components:
           description: Параметры прогона (НЕ логируются в audit, инвариант A ADR-027).
         target:
           $ref: '#/components/schemas/VoyageTarget'
+        batch:
+          type: string
+          example: "20%"
+          description: >-
+            Размер батча: `N` = число единиц | `N%` = процент (1-100) от
+            резолвнутого scope. Взаимоисключающе с batch_size/batch_percent —
+            смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar
+            `^(\d+)%?$`. Пустая строка трактуется как «не задано» (весь прогон один
+            Leg). Осмыслен только для batch_mode=barrier: непустой `batch` с
+            batch_mode=window → 422 (ширина окна = concurrency; поле не игнорируется
+            молча).
+        max_failures:
+          type: string
+          example: "25%"
+          description: >-
+            Порог провалов: `N` абсолют | `N%` процент от единиц прогона
+            (инкарнации для scenario / хосты для command). Взаимоисключающе с
+            fail_threshold — смешение → 422 voyage_batch_spec_conflict. keeper-parse,
+            grammar `^(\d+)%?$` (процент 1-100). Пустая строка трактуется как «не
+            задано». Работает в обоих batch_mode.
         batch_size:
           type: integer
           minimum: 1
+          deprecated: true
           description: >-
-            Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg.
-            Взаимоисключающий с batch_percent (оба заданы → 422). Не используется
-            при batch_mode=window (ширина окна = concurrency); явно заданный с
-            batch_mode=window → 422.
+            DEPRECATED — используйте `batch`. Размер Leg (число единиц в батче).
+            null/опущен — весь прогон один Leg. Взаимоисключающий с batch_percent
+            (оба заданы → 422). Не используется при batch_mode=window (ширина окна =
+            concurrency); явно заданный с batch_mode=window → 422.
         batch_percent:
           type: integer
           minimum: 1
           maximum: 100
+          deprecated: true
           description: >-
-            Размер Leg как % от резолвнутого scope (ADR-043 amendment, parity Salt
-            `-b 25%`). Эффективный batch_size = ceil(scope * pct/100).
-            Взаимоисключающий с batch_size (оба заданы → 422). Осмыслен только для
-            batch_mode=barrier; с batch_mode=window → 422.
+            DEPRECATED — используйте `batch` (формат `N%`). Размер Leg как % от
+            резолвнутого scope (ADR-043 amendment, parity Salt `-b 25%`).
+            Эффективный batch_size = ceil(scope * pct/100). Взаимоисключающий с
+            batch_size (оба заданы → 422). Осмыслен только для batch_mode=barrier;
+            с batch_mode=window → 422.
         concurrency:
           type: integer
           minimum: 1
@@ -6440,11 +6780,13 @@ components:
         fail_threshold:
           type: integer
           minimum: 1
+          deprecated: true
           description: >-
-            Порог абсолютного числа провалов: накоплено N провалов → прогон
-            останавливается (новые Leg-и / единицы окна не стартуют). ADR-043
-            amendment. on_failure=abort ≡ fail_threshold=1; on_failure=continue ≡
-            отсутствие порога. Работает в обоих batch_mode.
+            DEPRECATED — используйте `max_failures`. Порог абсолютного числа
+            провалов: накоплено N провалов → прогон останавливается (новые Leg-и /
+            единицы окна не стартуют). ADR-043 amendment. on_failure=abort ≡
+            fail_threshold=1; on_failure=continue ≡ отсутствие порога. Работает в
+            обоих batch_mode.
         require_alive:
           type: boolean
           default: false
@@ -6476,6 +6818,43 @@ components:
         location:
           type: string
       required: [voyage_id, kind, scope_size, status, location]
+
+    VoyagePreviewReply:
+      type: object
+      description: >-
+        Body 200 POST /v1/voyages/preview (ADR-043 amendment §4). Dry-resolve
+        scope БЕЗ создания Voyage и БЕЗ раскрытия SID-списка (только числа —
+        предпоказ числа батчей для late-binding target-а: coven/require_alive,
+        где число хостов резолвит Keeper). batch_mode присутствует всегда и
+        объясняет семантику остальных полей.
+      properties:
+        kind:
+          type: string
+          enum: [scenario, command]
+        scope_size:
+          type: integer
+          description: Число резолвнутых единиц (инкарнаций для scenario / хостов для command).
+        total_batches:
+          type: integer
+          minimum: 1
+          description: >-
+            barrier — число Leg-ов = ceil(scope_size / effective_batch_size);
+            window — 1 (плоский прогон одной волной-окном).
+        batch_mode:
+          type: string
+          enum: [barrier, window]
+          description: >-
+            Режим батчинга (нормализованный: отсутствие в запросе → barrier).
+            window → effective_batch_size опущен (ширина окна = concurrency).
+        effective_batch_size:
+          type: integer
+          minimum: 1
+          description: >-
+            Резолвнутый размер Leg (barrier): ceil(scope_size * batch_percent/100)
+            для процента, либо batch_size, либо весь scope одним Leg. Опущен, если
+            batch не задан (весь scope один Leg) ИЛИ batch_mode=window (поле
+            неприменимо — смотри concurrency).
+      required: [kind, scope_size, total_batches, batch_mode]
 
     VoyageSummary:
       type: object
@@ -6666,15 +7045,35 @@ components:
           description: Параметры прогона (НЕ логируются в audit, инвариант A ADR-027).
         target:
           $ref: '#/components/schemas/VoyageTarget'
+        batch:
+          type: string
+          example: "20%"
+          description: >-
+            Размер Leg: `N` = число единиц | `N%` = процент (1-100) от spawn-scope
+            (резолвится на спавне Voyage — у Cadence scope неизвестен на создании).
+            Взаимоисключающе с batch_size/batch_percent — смешение → 422
+            voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$`. Пустая
+            строка трактуется как «не задано».
+        max_failures:
+          type: string
+          example: "25%"
+          description: >-
+            Порог провалов: `N` абсолют | `N%` процент от единиц прогона spawn-scope
+            (инкарнации для scenario / хосты для command; резолвится на спавне).
+            Взаимоисключающе с fail_threshold — смешение → 422
+            voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$` (процент
+            1-100). Пустая строка трактуется как «не задано».
         batch_size:
           type: integer
           minimum: 1
-          description: Размер Leg (взаимоисключающий с batch_percent).
+          deprecated: true
+          description: DEPRECATED — используйте `batch`. Размер Leg (взаимоисключающий с batch_percent).
         batch_percent:
           type: integer
           minimum: 1
           maximum: 100
-          description: Размер Leg как % от scope (взаимоисключающий с batch_size).
+          deprecated: true
+          description: DEPRECATED — используйте `batch` (формат `N%`). Размер Leg как % от scope (взаимоисключающий с batch_size).
         concurrency:
           type: integer
           minimum: 1
@@ -6686,7 +7085,8 @@ components:
         fail_threshold:
           type: integer
           minimum: 1
-          description: Порог абсолютного числа провалов → стоп.
+          deprecated: true
+          description: DEPRECATED — используйте `max_failures`. Порог абсолютного числа провалов → стоп.
         inter_batch_interval_ms:
           type: integer
           minimum: 0
@@ -6737,13 +7137,34 @@ components:
           additionalProperties: true
         target:
           $ref: '#/components/schemas/VoyageTarget'
+        batch:
+          type: string
+          example: "20%"
+          description: >-
+            Размер Leg: `N` | `N%` (parity create). Взаимоисключающе с
+            batch_size/batch_percent в том же PATCH → 422 voyage_batch_spec_conflict.
+            Переключение формата поверх хранимого встречного значения обнуляет
+            встречное поле (batch `N` сбрасывает хранимый batch_percent и наоборот).
+        max_failures:
+          type: string
+          example: "25%"
+          description: >-
+            Порог провалов: `N` абсолют | `N%` процент spawn-scope (parity create).
+            Взаимоисключающе с fail_threshold в том же PATCH → 422
+            voyage_batch_spec_conflict. Переключение формата поверх хранимого
+            встречного обнуляет встречное поле (`N` сбрасывает fail_threshold_percent
+            и наоборот).
         batch_size:
           type: integer
           minimum: 1
+          deprecated: true
+          description: DEPRECATED — используйте `batch`.
         batch_percent:
           type: integer
           minimum: 1
           maximum: 100
+          deprecated: true
+          description: DEPRECATED — используйте `batch` (формат `N%`).
         concurrency:
           type: integer
           minimum: 1
@@ -6753,6 +7174,8 @@ components:
         fail_threshold:
           type: integer
           minimum: 1
+          deprecated: true
+          description: DEPRECATED — используйте `max_failures`.
         require_alive:
           type: boolean
         on_failure:
@@ -6827,6 +7250,13 @@ components:
           enum: [barrier, window]
         fail_threshold:
           type: integer
+        fail_threshold_percent:
+          type: integer
+          nullable: true
+          description: >-
+            Порог провалов в процентах spawn-scope (колонка 070, резолвится в
+            абсолют на спавне Voyage). Взаимоисключающ с fail_threshold. null — задан
+            fail_threshold или порога нет.
         require_alive:
           type: boolean
         on_failure:

@@ -36,6 +36,8 @@ import { RunsFeed } from './pages/runs/RunsFeed';
 import { VoyageDetail } from './pages/voyages/VoyageDetail';
 import { CadencesList } from './pages/cadences/CadencesList';
 import { CadenceDetail } from './pages/cadences/CadenceDetail';
+import { SynodsList } from './pages/synods/SynodsList';
+import { SynodDetail } from './pages/synods/SynodDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +114,8 @@ export function App() {
             <Route path="/voyages/:id" element={<Protected><VoyageDetail /></Protected>} />
             <Route path="/cadences" element={<Protected><CadencesList /></Protected>} />
             <Route path="/cadences/:id" element={<Protected><CadenceDetail /></Protected>} />
+            <Route path="/synods" element={<Protected><SynodsList /></Protected>} />
+            <Route path="/synods/:name" element={<Protected><SynodDetail /></Protected>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

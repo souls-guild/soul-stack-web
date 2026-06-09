@@ -291,7 +291,7 @@ export function VigilNewForm() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <section className={styles.section} aria-label={t('beacons:baseFieldsLegend')}>
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
-          <div className={styles.filters}>
+          <div className={styles.formFields}>
             <Input
               label="Name (kebab-case)"
               mono
@@ -344,7 +344,7 @@ export function VigilNewForm() {
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {t('beacons:subjectVigilHint', { sid: 'sid', coven: 'coven' })}
           </div>
-          <div className={styles.filters}>
+          <div className={styles.formFields}>
             <Input
               label="sid (FQDN)"
               mono
@@ -406,7 +406,7 @@ export function VigilNewForm() {
               ) : null}
             </label>
           ) : (
-            <div className={styles.filters}>
+            <div className={styles.formFields}>
               <ParamsTypedFields check={check} value={typedParams} onChange={setTypedParams} />
             </div>
           )}

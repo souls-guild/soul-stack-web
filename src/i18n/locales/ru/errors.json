@@ -24,6 +24,11 @@
   "svcInvalid": "Невалидные данные: {{detail}}.",
   "svcInvalidDefault": "проверьте имя и git-URL",
   "svcNotFound": "Service не найден.",
+  "synodAlreadyExists": "Synod с таким именем уже существует.",
+  "synodBuiltin": "Builtin-Synod нельзя удалить (сервер защищает).",
+  "synodNotFound": "Synod не найден.",
+  "synodLockout": "Удаление/изменение оставит кластер без `*`-администратора (self-lockout-защита).",
+  "synodSubsetDenied": "Нельзя выдать право, которого нет у вас самих (subset-check escalation, 403).",
   "unknown": "Неизвестная ошибка.",
   "validation": "Валидация: {{detail}}"
 }

@@ -43,6 +43,15 @@
   flex-wrap: wrap;
 }
 
+/* Для форм создания/редактирования: поля выровнены по верху,
+   чтобы разная высота ячеек (с hint / без) не давала лесенку. */
+.formFields {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
 .table {
   background: var(--surface);
   border: 1px solid var(--border);

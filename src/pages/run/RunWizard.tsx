@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
@@ -16,6 +16,8 @@ import type {
   SoulListEntry,
   VoyageOnFailure,
   VoyageTarget,
+  VoyageCreateRequest,
+  VoyagePreviewReply,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
@@ -116,9 +118,10 @@ interface CommandStateValues {
 type VoyageBatchMode = NonNullable<import('../../api/types.gen').components['schemas']['VoyageCreateRequest']['batch_mode']>;
 
 interface OptionsState {
-  // Опциональный размер батча (Leg): N инкарнаций/хостов за раз.
-  // Пусто/0 — весь scope одним прогоном. Доступно для обоих workload (window игнорирует его).
-  batchSize: string;
+  // Новое унифицированное строковое поле batch (N | N%). Keeper парсит, UI не парсит.
+  batch: string;
+  // Порог провалов: N | N%. Keeper парсит. Пусто = поведение по on_failure.
+  maxFailures: string;
   concurrency: string;
   // VoyageOnFailure = 'abort' | 'continue' (супerset ErrandRunOnFailure).
   onFailure: VoyageOnFailure;
@@ -128,12 +131,6 @@ interface OptionsState {
   scheduleAt: string;
   // Режим батчинга (ADR-043). barrier = последовательные Leg-и (дефолт); window = скользящее окно.
   batchMode: VoyageBatchMode;
-  // % от scope (1-100). Взаимоисключающий с batchSize.
-  // batchSizeMode = 'abs' | 'pct' — radio-выбор.
-  batchSizeMode: 'abs' | 'pct';
-  batchPercent: string;
-  // Порог провалов: остановить после N. Пусто = поведение по on_failure.
-  failThreshold: string;
   // Пауза между Leg-ами в ms (barrier). Пусто = без паузы.
   interBatchIntervalMs: string;
   // Пауза между единицами окна в ms (window). Пусто = без паузы.
@@ -143,6 +140,8 @@ interface OptionsState {
 }
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+// Лёгкая UX-валидация формата batch: N или N% (авторитет — backend 422).
+const BATCH_FORMAT_RE = /^\d+%?$/;
 
 // Cadence-специфичный state (используется только при runMode='cadence').
 interface CadenceState {
@@ -162,7 +161,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 8;
+const DRAFT_VERSION = 9;
 
 interface WizardDraft {
   v: number;
@@ -202,16 +201,14 @@ const DEFAULT_COMMAND_STATE: CommandStateValues = {
 };
 
 const DEFAULT_OPTIONS: OptionsState = {
-  batchSize: '',
+  batch: '',
+  maxFailures: '',
   concurrency: '50',
   onFailure: 'abort',
   dryRun: false,
   wait: false,
   scheduleAt: '',
   batchMode: 'barrier',
-  batchSizeMode: 'abs',
-  batchPercent: '',
-  failThreshold: '',
   interBatchIntervalMs: '',
   interUnitIntervalMs: '',
   requireAlive: false,
@@ -606,18 +603,11 @@ export function RunWizard() {
     const concurrency = c && c > 0 ? c : 50;
     const batchMode = options.batchMode;
 
-    // XOR batch_size / batch_percent: шлём только активный режим.
-    // window не использует batch_size (ширина окна = concurrency) — не шлём.
-    const batchSize =
-      batchMode !== 'window' && options.batchSizeMode === 'abs'
-        ? parseIntOrEmpty(options.batchSize)
-        : undefined;
-    const batchPercent =
-      batchMode !== 'window' && options.batchSizeMode === 'pct'
-        ? parseIntOrEmpty(options.batchPercent)
-        : undefined;
+    // Новые строковые поля batch / max_failures — шлём сырую строку, Keeper парсит.
+    // Пустая строка = не задано → не шлём поле (undefined → omit).
+    const batch = options.batch.trim() || undefined;
+    const maxFailures = options.maxFailures.trim() || undefined;
 
-    const failThreshold = parseIntOrEmpty(options.failThreshold);
     const interBatchMs =
       batchMode === 'barrier' ? parseIntOrEmpty(options.interBatchIntervalMs) : undefined;
     const interUnitMs =
@@ -626,9 +616,8 @@ export function RunWizard() {
     return {
       concurrency,
       batch_mode: batchMode,
-      batch_size: batchSize && batchSize > 0 ? batchSize : undefined,
-      batch_percent: batchPercent && batchPercent >= 1 && batchPercent <= 100 ? batchPercent : undefined,
-      fail_threshold: failThreshold && failThreshold > 0 ? failThreshold : undefined,
+      batch,
+      max_failures: maxFailures,
       inter_batch_interval_ms: interBatchMs && interBatchMs > 0 ? interBatchMs : undefined,
       inter_unit_interval_ms: interUnitMs && interUnitMs > 0 ? interUnitMs : undefined,
       on_failure: options.onFailure,
@@ -749,24 +738,14 @@ export function RunWizard() {
     return `/cadences/${encodeURIComponent(reply.cadence_id)}`;
   }
 
-  // batchSize — опциональное поле; если задано, должно быть целым 1..10000
-  // (верхняя граница = max_scope-дефолт backend). При window или batchSizeMode=pct — не валидируем.
-  const batchSizeValid = useMemo(() => {
-    if (options.batchMode === 'window' || options.batchSizeMode !== 'abs') return true;
-    const s = options.batchSize.trim();
-    if (!s) return true; // пусто — ok (весь scope одним прогоном)
-    const n = parseIntOrEmpty(s);
-    return Boolean(n && n >= 1 && n <= 10000);
-  }, [options.batchSize, options.batchMode, options.batchSizeMode]);
-
-  // batchPercent — опционально; если задан, 1..100.
-  const batchPercentValid = useMemo(() => {
-    if (options.batchSizeMode !== 'pct') return true;
-    const s = options.batchPercent.trim();
-    if (!s) return true;
-    const n = parseIntOrEmpty(s);
-    return Boolean(n && n >= 1 && n <= 100);
-  }, [options.batchPercent, options.batchSizeMode]);
+  // batch — лёгкая UX-валидация: пусто = ok; если заполнено — должно соответствовать
+  // грамматике keeper (^(\d+)%?$). Авторитетная проверка — на backend (422).
+  // window + непустой batch → backend вернёт 422 (молча блокируем только явно-мусорный формат).
+  const batchValid = useMemo(() => {
+    const s = options.batch.trim();
+    if (!s) return true; // пусто — ok
+    return BATCH_FORMAT_RE.test(s);
+  }, [options.batch]);
 
   // scheduleAt — опциональное поле; если задано, должно быть в будущем.
   const scheduleAtValid = useMemo(() => {
@@ -787,7 +766,83 @@ export function RunWizard() {
     return cadenceState.cronExpr.trim().length > 0;
   }, [runMode, cadenceState]);
 
-  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchSizeValid && batchPercentValid && (runMode === 'cadence' ? cadenceValid : scheduleAtValid) && !submitMu.isPending;
+  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchValid && (runMode === 'cadence' ? cadenceValid : scheduleAtValid) && !submitMu.isPending;
+
+  // --- Preview-логика батчей ---
+  // Snapshot-target: явные SID / regex / инкарнации — scope известен клиенту.
+  // Late-binding target: coven — scope резолвит Keeper; нужен /preview.
+  //
+  // Для Command: coven[] непустой → late-binding.
+  // Для Scenario: incarnations[] — snapshot (список известен после regex-резолва).
+  const isLateBinding = workload === 'command' && hostCriteria.covens.length > 0 && hostCriteria.sidRegex.trim().length === 0 && hostCriteria.soulprint.trim().length === 0;
+
+  // Scope для snapshot-count: для scenario = число инкарнаций; для command = число resolved SIDs.
+  const snapshotScope = workload === 'scenario' ? scenarioState.incarnations.length : resolvedSids.length;
+
+  // Локальный расчёт числа батчей для snapshot-target.
+  // batch = '' | 'N' | 'N%'. При window — всегда 1 (batch не используется в window-семантике).
+  const localBatchCount = useMemo(() => {
+    if (options.batchMode === 'window') return 1;
+    const s = options.batch.trim();
+    if (!s || snapshotScope === 0) return null;
+    if (s.endsWith('%')) {
+      const pct = parseInt(s, 10);
+      if (!pct || pct < 1 || pct > 100) return null;
+      const effective = Math.ceil(snapshotScope * pct / 100);
+      if (effective === 0) return null;
+      return Math.ceil(snapshotScope / effective);
+    }
+    const n = parseInt(s, 10);
+    if (!n || n < 1) return null;
+    return Math.ceil(snapshotScope / n);
+  }, [options.batch, options.batchMode, snapshotScope]);
+
+  // Preview-запрос для late-binding target (debounce на смену TARGET — не на ввод batch).
+  // Строим тело preview как buildRecipePayload() + buildOptionsPayload(), но без draft.
+  // Мы не можем вызывать build* внутри useMemo/useCallback (они читают state через closure),
+  // поэтому вычисляем primit-ключи прямо здесь для стабильного queryKey.
+  const previewTargetKey = isLateBinding
+    ? JSON.stringify({ covens: hostCriteria.covens.slice().sort() })
+    : null;
+
+  // Строим тело preview только при необходимости (lazy, только для late-binding).
+  const buildPreviewBody = useCallback((): VoyageCreateRequest | null => {
+    if (!isLateBinding) return null;
+    const moduleName = commandState.moduleState
+      ? `${commandState.moduleName}.${commandState.moduleState}`
+      : commandState.moduleName;
+    const c = parseIntOrEmpty(options.concurrency);
+    const concurrency = c && c > 0 ? c : 50;
+    const batch = options.batch.trim() || undefined;
+    const max_failures = options.maxFailures.trim() || undefined;
+    return {
+      kind: 'command',
+      module: moduleName,
+      target: { coven: hostCriteria.covens },
+      concurrency,
+      batch_mode: options.batchMode,
+      batch,
+      max_failures,
+      dry_run: false,
+      require_alive: options.requireAlive,
+      on_failure: options.onFailure,
+    };
+  }, [isLateBinding, commandState, hostCriteria.covens, options]);
+
+  // Debounce target-key для preview-запроса: меняем queryKey только после settle target.
+  const previewTargetKeyDebounced = useDebounce(previewTargetKey, 400);
+
+  const previewQ = useQuery({
+    queryKey: ['voyage.preview', previewTargetKeyDebounced, options.batchMode],
+    queryFn: async () => {
+      const body = buildPreviewBody();
+      if (!body) return null;
+      return keeperApi.voyages.preview(body);
+    },
+    enabled: isLateBinding && previewTargetKeyDebounced !== null && step === 4,
+    staleTime: 30_000,
+    retry: false,
+  });
 
   // Самый дальний достижимый шаг по валидации (gate каждого шага). Stepper красит
   // «done» только реально пройденные шаги и запрещает прыжок вперёд за невалидный
@@ -876,12 +931,16 @@ export function RunWizard() {
             onChange={setOptions}
             workload={workload}
             scheduleAtValid={scheduleAtValid}
-            batchSizeValid={batchSizeValid}
-            batchPercentValid={batchPercentValid}
+            batchValid={batchValid}
             runMode={runMode}
             cadenceState={cadenceState}
             onCadenceChange={setCadenceState}
             cadenceValid={cadenceValid}
+            isLateBinding={isLateBinding}
+            localBatchCount={localBatchCount}
+            previewData={previewQ.data ?? null}
+            previewLoading={previewQ.isLoading}
+            snapshotScope={snapshotScope}
           />
         ) : null}
 
@@ -1630,23 +1689,31 @@ function Step4Options({
   onChange,
   workload,
   scheduleAtValid,
-  batchSizeValid,
-  batchPercentValid,
+  batchValid,
   runMode,
   cadenceState,
   onCadenceChange,
   cadenceValid,
+  isLateBinding,
+  localBatchCount,
+  previewData,
+  previewLoading,
+  snapshotScope,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
   workload: Workload;
   scheduleAtValid: boolean;
-  batchSizeValid: boolean;
-  batchPercentValid: boolean;
+  batchValid: boolean;
   runMode: RunMode;
   cadenceState: CadenceState;
   onCadenceChange: (next: CadenceState) => void;
   cadenceValid: boolean;
+  isLateBinding: boolean;
+  localBatchCount: number | null;
+  previewData: VoyagePreviewReply | null;
+  previewLoading: boolean;
+  snapshotScope: number;
 }) {
   const { t } = useTranslation();
   const isWindow = value.batchMode === 'window';
@@ -1687,7 +1754,7 @@ function Step4Options({
               name="batch_mode"
               value="window"
               checked={value.batchMode === 'window'}
-              onChange={() => onChange({ ...value, batchMode: 'window', batchSizeMode: 'abs' })}
+              onChange={() => onChange({ ...value, batchMode: 'window', batch: '' })}
               aria-label="batch_mode_window"
             />
             window
@@ -1698,81 +1765,73 @@ function Step4Options({
         </div>
       </fieldset>
 
-      {/* Batch size / percent — скрыть при window (не используется) */}
+      {/* Единое текстовое поле batch (N | N%) — скрыть при window */}
       {!isWindow ? (
-        <>
-          {/* Radio: абсолютный / процент */}
-          <div className={styles.fieldRow}>
-            <span className={styles.fieldLabel}>{t('run:batchSizeModeLabel')}</span>
-            <div style={{ display: 'flex', gap: 14 }}>
-              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-                <input
-                  type="radio"
-                  name="batch_size_mode"
-                  value="abs"
-                  checked={value.batchSizeMode === 'abs'}
-                  onChange={() => onChange({ ...value, batchSizeMode: 'abs', batchPercent: '' })}
-                  aria-label="batch_size_mode_abs"
-                />
-                {t('run:batchSizeModeAbs')}
-              </label>
-              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-                <input
-                  type="radio"
-                  name="batch_size_mode"
-                  value="pct"
-                  checked={value.batchSizeMode === 'pct'}
-                  onChange={() => onChange({ ...value, batchSizeMode: 'pct', batchSize: '' })}
-                  aria-label="batch_size_mode_pct"
-                />
-                {t('run:batchSizeModePct')}
-              </label>
-            </div>
-          </div>
-
-          {value.batchSizeMode === 'abs' ? (
-            <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{t('run:batchSizeLabel')}</span>
-              <input
-                type="number"
-                className={styles.field}
-                min={1}
-                value={value.batchSize}
-                onChange={(e) => onChange({ ...value, batchSize: e.target.value })}
-                placeholder={t('run:batchSizePlaceholder')}
-                aria-label="Batch size"
-              />
-              <span className={styles.hint}>{t('run:batchSizeHint')}</span>
-              {!batchSizeValid && value.batchSize.trim() ? (
-                <span className={styles.warn}>{t('run:batchSizeError')}</span>
-              ) : null}
-            </label>
-          ) : (
-            <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{t('run:batchPercentLabel')}</span>
-              <input
-                type="number"
-                className={styles.field}
-                min={1}
-                max={100}
-                value={value.batchPercent}
-                onChange={(e) => onChange({ ...value, batchPercent: e.target.value })}
-                placeholder={t('run:batchPercentPlaceholder')}
-                aria-label="Batch percent"
-              />
-              <span className={styles.hint}>{t('run:batchPercentHint')}</span>
-              {!batchPercentValid && value.batchPercent.trim() ? (
-                <span className={styles.warn}>{t('run:batchPercentError')}</span>
-              ) : null}
-            </label>
-          )}
-        </>
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>{t('run:batchLabel')}</span>
+          <input
+            type="text"
+            className={styles.field}
+            value={value.batch}
+            onChange={(e) => onChange({ ...value, batch: e.target.value })}
+            placeholder={t('run:batchPlaceholder')}
+            aria-label="Batch"
+          />
+          <span className={styles.hint}>{t('run:batchHint')}</span>
+          {!batchValid && value.batch.trim() ? (
+            <span className={styles.warn}>{t('run:batchError')}</span>
+          ) : null}
+        </label>
       ) : (
-        // Window: batch_size не используется — пояснение
         <div className={styles.hint} style={{ marginTop: 4 }}>
           {t('run:batchSizeWindowHidden')}
         </div>
       )}
+
+      {/* max_failures — всегда видимо (работает в обоих batch_mode) */}
+      <label className={styles.fieldRow}>
+        <span className={styles.fieldLabel}>
+          {t('run:maxFailuresLabel')}
+          {' '}
+          <span
+            title={t('run:maxFailuresTooltip')}
+            style={{ cursor: 'help', color: 'var(--text-faint)', fontSize: 12 }}
+            aria-label={t('run:maxFailuresTooltip')}
+          >
+            (?)
+          </span>
+        </span>
+        <input
+          type="text"
+          className={styles.field}
+          value={value.maxFailures}
+          onChange={(e) => onChange({ ...value, maxFailures: e.target.value })}
+          placeholder={t('run:maxFailuresPlaceholder')}
+          aria-label="Max failures"
+        />
+        <span className={styles.hint}>{t('run:maxFailuresHint')}</span>
+      </label>
+
+      {/* Предпоказ числа батчей */}
+      {!isWindow && (isLateBinding ? (
+        previewLoading ? (
+          <div className={styles.hint} aria-label="batch preview">
+            {t('run:batchPreviewLoading')}
+          </div>
+        ) : previewData ? (
+          <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
+            {previewData.batch_mode === 'window'
+              ? t('run:batchPreviewWindow')
+              : t('run:batchPreviewBatches', { count: previewData.total_batches, scope: previewData.scope_size })}
+          </div>
+        ) : null
+      ) : (
+        localBatchCount !== null && snapshotScope > 0 ? (
+          <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
+            {t('run:batchPreviewBatches', { count: localBatchCount, scope: snapshotScope })}
+          </div>
+        ) : null
+      ))}
 
       <label className={styles.fieldRow}>
         <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
@@ -1817,21 +1876,6 @@ function Step4Options({
           </label>
         </div>
       </fieldset>
-
-      {/* fail_threshold */}
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>{t('run:failThresholdLabel')}</span>
-        <input
-          type="number"
-          className={styles.field}
-          min={1}
-          value={value.failThreshold}
-          onChange={(e) => onChange({ ...value, failThreshold: e.target.value })}
-          placeholder={t('run:failThresholdPlaceholder')}
-          aria-label="Fail threshold"
-        />
-        <span className={styles.hint}>{t('run:failThresholdHint')}</span>
-      </label>
 
       {/* inter_batch_interval_ms — только для barrier */}
       {!isWindow ? (
@@ -2063,4 +2107,18 @@ function parseIntOrEmpty(s: string): number | undefined {
   if (!t) return undefined;
   const n = parseInt(t, 10);
   return Number.isNaN(n) ? undefined : n;
+}
+
+// Простой debounce-хук: возвращает debounced-значение с задержкой ms.
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setDebounced(value), delay);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [value, delay]);
+  return debounced;
 }

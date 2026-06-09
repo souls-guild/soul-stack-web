@@ -190,6 +190,7 @@ export type VoyageCancelReply = components['schemas']['VoyageCancelReply'];
 export type VoyageTargetEntry = components['schemas']['VoyageTargetEntry'];
 export type VoyageTargetStatus = VoyageTargetEntry['status'];
 export type VoyageTargetsReply = components['schemas']['VoyageTargetsReply'];
+export type VoyagePreviewReply = components['schemas']['VoyagePreviewReply'];
 
 export interface ListVoyagesQuery {
   kind?: VoyageKind;
@@ -201,6 +202,16 @@ export interface ListVoyagesQuery {
 // Push-providers (ADR-032 amendment 2026-05-26, S7-2). Узкие алиасы.
 export type PushProvider = components['schemas']['PushProvider'];
 export type PushProviderListReply = components['schemas']['PushProviderListReply'];
+
+// Synod — группы архонов (ADR-049). Типы из gen.
+export type SynodView = components['schemas']['SynodView'];
+export type SynodListReply = components['schemas']['SynodListReply'];
+export type SynodCreateRequest = components['schemas']['SynodCreateRequest'];
+export type SynodGrantRoleRequest = components['schemas']['SynodGrantRoleRequest'];
+
+// GET /v1/me/permissions — эффективные права текущего Архонта (permission-aware UI).
+export type MyPermission = components['schemas']['MyPermission'];
+export type MyPermissionsReply = components['schemas']['MyPermissionsReply'];
 
 export type RoleView = components['schemas']['RoleView'];
 export type RoleListReply = components['schemas']['RoleListReply'];
@@ -695,6 +706,44 @@ export const keeperApi = {
 
   permissions: {
     list: () => apiGet<PermissionCatalogReply>('/v1/permissions'),
+    // GET /v1/me/permissions — эффективные права текущего Архонта (permission-aware UI, ADR-042).
+    listMy: () => apiGet<MyPermissionsReply>('/v1/me/permissions'),
+  },
+
+  // Synod — группы архонов, бандлирующие роли (ADR-049).
+  synods: {
+    // GET /v1/synods → SynodListReply (список с members + roles).
+    list: () => apiGet<SynodListReply>('/v1/synods'),
+    // POST /v1/synods → 201. 409 synod-already-exists.
+    create: (body: SynodCreateRequest) =>
+      apiSend<void>('/v1/synods', 'POST', { body }),
+    // DELETE /v1/synods/{name} → 204. 409 synod-builtin / would-lock-out-cluster.
+    delete: (name: string) =>
+      apiSend<void>(`/v1/synods/${encodeURIComponent(name)}`, 'DELETE'),
+    operators: {
+      // POST /v1/synods/{name}/operators → 201. body: {aid}.
+      add: (name: string, aid: string) =>
+        apiSend<void>(`/v1/synods/${encodeURIComponent(name)}/operators`, 'POST', { body: { aid } }),
+      // DELETE /v1/synods/{name}/operators/{aid} → 204.
+      remove: (name: string, aid: string) =>
+        apiSend<void>(
+          `/v1/synods/${encodeURIComponent(name)}/operators/${encodeURIComponent(aid)}`,
+          'DELETE',
+        ),
+    },
+    roles: {
+      // POST /v1/synods/{name}/roles → 201. body: {role}.
+      grant: (name: string, roleName: string) =>
+        apiSend<void>(`/v1/synods/${encodeURIComponent(name)}/roles`, 'POST', {
+          body: { role: roleName } satisfies SynodGrantRoleRequest,
+        }),
+      // DELETE /v1/synods/{name}/roles/{role_name} → 204.
+      revoke: (name: string, roleName: string) =>
+        apiSend<void>(
+          `/v1/synods/${encodeURIComponent(name)}/roles/${encodeURIComponent(roleName)}`,
+          'DELETE',
+        ),
+    },
   },
 
   services: {
@@ -812,6 +861,8 @@ export const keeperApi = {
   voyages: {
     create: (body: VoyageCreateRequest) =>
       apiSend<VoyageCreateReply>('/v1/voyages', 'POST', { body }),
+    preview: (body: VoyageCreateRequest) =>
+      apiSend<VoyagePreviewReply>('/v1/voyages/preview', 'POST', { body }),
     list: (q: ListVoyagesQuery = {}) =>
       apiGet<VoyageListReply>('/v1/voyages', {
         query: {

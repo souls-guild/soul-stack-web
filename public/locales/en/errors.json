@@ -24,6 +24,11 @@
   "svcInvalid": "Invalid data: {{detail}}.",
   "svcInvalidDefault": "check the name and git URL",
   "svcNotFound": "Service not found.",
+  "synodAlreadyExists": "A Synod with this name already exists.",
+  "synodBuiltin": "Builtin Synods cannot be deleted (server-protected).",
+  "synodNotFound": "Synod not found.",
+  "synodLockout": "Removing/modifying would leave the cluster without a `*`-admin (self-lockout protection).",
+  "synodSubsetDenied": "Cannot grant a permission you don't have yourself (subset-check escalation, 403).",
   "unknown": "Unknown error.",
   "validation": "Validation: {{detail}}"
 }

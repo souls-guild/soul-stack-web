@@ -300,6 +300,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/synods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Synod-групп.
+         * @description Permission: synod.list. MCP-tool: keeper.synod.list.
+         *     Каталог групп с развёрнутым bundle ролей и составом членов (AID).
+         */
+        get: operations["ListSynods"];
+        put?: never;
+        /**
+         * Создать Synod-группу.
+         * @description Permission: synod.create. MCP-tool: keeper.synod.create.
+         *     Создаёт пустую группу архонов (ADR-049), бандлящую роли. Роли и
+         *     члены добавляются отдельными эндпоинтами. 409 synod-already-exists —
+         *     name уже занят.
+         */
+        post: operations["CreateSynod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Удалить Synod-группу.
+         * @description Permission: synod.delete. MCP-tool: keeper.synod.delete.
+         *     Каскадом сносятся membership и bundle группы. 409 synod-builtin —
+         *     builtin-группу удалять нельзя; 409 would-lock-out-cluster —
+         *     исчезновение группы оставит кластер без `*`-админа (ADR-049(f)).
+         */
+        delete: operations["DeleteSynod"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Добавить архона в группу.
+         * @description Permission: synod.add-operator. MCP-tool: keeper.synod.add-operator.
+         *     Член группы получает весь её bundle ролей. Идемпотентно. Под
+         *     least-privilege subset (ADR-049(f)): 403 forbidden — инициатор не
+         *     держит права bundle группы. 404 not-found — группа/AID не существуют.
+         */
+        post: operations["AddSynodOperator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/operators/{aid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Убрать архона из группы.
+         * @description Permission: synod.remove-operator. MCP-tool:
+         *     keeper.synod.remove-operator. 404 not-found — пары (synod, aid) нет;
+         *     409 would-lock-out-cluster — снятие осиротит последнего `*`-админа
+         *     (ADR-049(f)).
+         */
+        delete: operations["RemoveSynodOperator"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Добавить роль в bundle группы.
+         * @description Permission: synod.grant-role. MCP-tool: keeper.synod.grant-role.
+         *     Роль выдаётся всем членам группы. Идемпотентно. Под least-privilege
+         *     subset (ADR-049(f)): 403 forbidden — инициатор не держит права роли.
+         *     404 not-found — группа/роль не существуют.
+         */
+        post: operations["GrantSynodRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/roles/{role_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Снять роль из bundle группы.
+         * @description Permission: synod.revoke-role. MCP-tool: keeper.synod.revoke-role.
+         *     Права роли снимаются у всех членов. 404 not-found — пары
+         *     (synod, role) нет; 409 would-lock-out-cluster — снятие осиротит
+         *     последнего `*`-админа (ADR-049(f)).
+         */
+        delete: operations["RevokeSynodRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations": {
         parameters: {
             query?: never;
@@ -975,8 +1118,56 @@ export interface paths {
          *     batch_size (barrier) или concurrency (window) выше voyage.max_batch_size →
          *     422 voyage_batch_size_too_large. `input` НЕ логируется (audit
          *     scenario_run.started/command_run.invoked, инвариант A ADR-027).
+         *
+         *     Rate-limit (Tempo, ADR-050): resolver-тяжёлый create ограничен per-AID
+         *     (bucket voyage_create, default 10 rps / burst 20). Превышение → 429
+         *     tempo-exceeded + Retry-After. Будущий POST /v1/voyages/preview реюзит тот
+         *     же лимит. При недоступном Redis лимит fail-OPEN (passthrough).
          */
         post: operations["CreateVoyage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/voyages/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry-resolve scope Voyage без создания прогона (ADR-043 amendment §4).
+         * @description Предпоказ резолвнутого scope БЕЗ создания Voyage: принимает тот же body,
+         *     что POST /v1/voyages, прогоняет ту же валидацию / резолв target-а / гейты
+         *     (RBAC-by-kind, target ∩ Purview для command, потолок voyage.max_scope),
+         *     но НЕ пишет в voyages/voyage_targets и НЕ раскрывает SID-список — отдаёт
+         *     только числа {kind, scope_size, total_batches, batch_mode,
+         *     effective_batch_size?}.
+         *
+         *     Консистентность: preview возвращает 403/422 РОВНО там же, где Create
+         *     отказал бы (тот же общий путь). scenario — per-incarnation scope-check
+         *     (403 на чужой инкарнации); command — гибрид-семантика (явный чужой SID →
+         *     403, широкий target урезается до Purview, пустое пересечение → 422
+         *     voyage_empty_target); scope > voyage.max_scope → 422.
+         *
+         *     Учитываются (влияют на резолв/арифметику): target, kind, batch/batch_size/
+         *     batch_percent/batch_mode, concurrency, max_failures, require_alive.
+         *     Игнорируются: dry_run, schedule_at, inter_batch_interval_ms,
+         *     inter_unit_interval_ms, on_failure, input.
+         *
+         *     Назначение — late-binding target (coven/require_alive, где число хостов
+         *     резолвит Keeper); для snapshot-таргета (явный incarnations[]/sids[]) число
+         *     батчей клиент считает сам, эндпоинт не обязателен.
+         *
+         *     Rate-limit (Tempo, ADR-050(c)): тот же per-AID bucket voyage_create, что у
+         *     create (единый лимит create+preview). Превышение → 429 + Retry-After.
+         */
+        post: operations["PreviewVoyage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2306,8 +2497,41 @@ export interface components {
             permissions: string[];
         };
         GrantOperatorRequest: {
-            /** @description AID оператора, назначаемого в роль (naming-rules.md). */
+            /** @description AID оператора, назначаемого в роль/группу (naming-rules.md). */
             aid: string;
+        };
+        /**
+         * @description Создание Synod-группы (ADR-049): набор ролей для группы архонов.
+         *     name уникален в кластере. Роли/члены добавляются отдельными
+         *     эндпоинтами.
+         */
+        SynodCreateRequest: {
+            /** @description Имя группы (kebab-case), уникальное в кластере. */
+            name: string;
+            /** @description Человекочитаемое описание группы для UI/аудита. */
+            description?: string;
+        };
+        /** @description Добавление роли в bundle Synod-группы (ADR-049). */
+        SynodGrantRoleRequest: {
+            /** @description Имя роли, добавляемой в bundle группы. */
+            role: string;
+        };
+        /**
+         * @description Проекция Synod-группы (ADR-049): метаданные, набор ролей (bundle) и
+         *     состав членов (AID). Возвращается в SynodListReply.items[].
+         */
+        SynodView: {
+            name: string;
+            description?: string;
+            /** @description true — builtin-группа: не удаляется (409 synod-builtin). */
+            builtin: boolean;
+            /** @description Имена ролей в bundle группы (пустой массив, если их нет). */
+            roles: string[];
+            /** @description AID архонов — членов группы (пустой массив, если их нет). */
+            operators: string[];
+        };
+        SynodListReply: {
+            items: components["schemas"]["SynodView"][];
         };
         /**
          * @description Регистрация Service-а в реестре service_registry. name+git+ref
@@ -3838,9 +4062,25 @@ export interface components {
                 [key: string]: unknown;
             };
             target: components["schemas"]["VoyageTarget"];
-            /** @description Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg. Взаимоисключающий с batch_percent (оба заданы → 422). Не используется при batch_mode=window (ширина окна = concurrency); явно заданный с batch_mode=window → 422. */
+            /**
+             * @description Размер батча: `N` = число единиц | `N%` = процент (1-100) от резолвнутого scope. Взаимоисключающе с batch_size/batch_percent — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$`. Пустая строка трактуется как «не задано» (весь прогон один Leg). Осмыслен только для batch_mode=barrier: непустой `batch` с batch_mode=window → 422 (ширина окна = concurrency; поле не игнорируется молча).
+             * @example 20%
+             */
+            batch?: string;
+            /**
+             * @description Порог провалов: `N` абсолют | `N%` процент от единиц прогона (инкарнации для scenario / хосты для command). Взаимоисключающе с fail_threshold — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$` (процент 1-100). Пустая строка трактуется как «не задано». Работает в обоих batch_mode.
+             * @example 25%
+             */
+            max_failures?: string;
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `batch`. Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg. Взаимоисключающий с batch_percent (оба заданы → 422). Не используется при batch_mode=window (ширина окна = concurrency); явно заданный с batch_mode=window → 422.
+             */
             batch_size?: number;
-            /** @description Размер Leg как % от резолвнутого scope (ADR-043 amendment, parity Salt `-b 25%`). Эффективный batch_size = ceil(scope * pct/100). Взаимоисключающий с batch_size (оба заданы → 422). Осмыслен только для batch_mode=barrier; с batch_mode=window → 422. */
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `batch` (формат `N%`). Размер Leg как % от резолвнутого scope (ADR-043 amendment, parity Salt `-b 25%`). Эффективный batch_size = ceil(scope * pct/100). Взаимоисключающий с batch_size (оба заданы → 422). Осмыслен только для batch_mode=barrier; с batch_mode=window → 422.
+             */
             batch_percent?: number;
             /**
              * @description batch_mode=barrier — параллелизм внутри Leg; batch_mode=window — ширина скользящего окна (держать N активных).
@@ -3864,7 +4104,10 @@ export interface components {
             inter_batch_interval_ms?: number;
             /** @description Per-unit пауза перед спавном следующей единицы окна, в миллисекундах (ADR-043 amendment, parity inter_batch_interval). Применима только к batch_mode=window; в barrier игнорируется. */
             inter_unit_interval_ms?: number;
-            /** @description Порог абсолютного числа провалов: накоплено N провалов → прогон останавливается (новые Leg-и / единицы окна не стартуют). ADR-043 amendment. on_failure=abort ≡ fail_threshold=1; on_failure=continue ≡ отсутствие порога. Работает в обоих batch_mode. */
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `max_failures`. Порог абсолютного числа провалов: накоплено N провалов → прогон останавливается (новые Leg-и / единицы окна не стартуют). ADR-043 amendment. on_failure=abort ≡ fail_threshold=1; on_failure=continue ≡ отсутствие порога. Работает в обоих batch_mode.
+             */
             fail_threshold?: number;
             /**
              * @description Presence-фильтр живых (ADR-043 amendment): при true scope-резолв отсекает Soul-ы без живого presence-lease. Снимок после фильтра фиксируется в target_resolved. Применяется только к kind=command.
@@ -3886,6 +4129,22 @@ export interface components {
             /** @enum {string} */
             status: "pending" | "scheduled";
             location: string;
+        };
+        /** @description Body 200 POST /v1/voyages/preview (ADR-043 amendment §4). Dry-resolve scope БЕЗ создания Voyage и БЕЗ раскрытия SID-списка (только числа — предпоказ числа батчей для late-binding target-а: coven/require_alive, где число хостов резолвит Keeper). batch_mode присутствует всегда и объясняет семантику остальных полей. */
+        VoyagePreviewReply: {
+            /** @enum {string} */
+            kind: "scenario" | "command";
+            /** @description Число резолвнутых единиц (инкарнаций для scenario / хостов для command). */
+            scope_size: number;
+            /** @description barrier — число Leg-ов = ceil(scope_size / effective_batch_size); window — 1 (плоский прогон одной волной-окном). */
+            total_batches: number;
+            /**
+             * @description Режим батчинга (нормализованный: отсутствие в запросе → barrier). window → effective_batch_size опущен (ширина окна = concurrency).
+             * @enum {string}
+             */
+            batch_mode: "barrier" | "window";
+            /** @description Резолвнутый размер Leg (barrier): ceil(scope_size * batch_percent/100) для процента, либо batch_size, либо весь scope одним Leg. Опущен, если batch не задан (весь scope один Leg) ИЛИ batch_mode=window (поле неприменимо — смотри concurrency). */
+            effective_batch_size?: number;
         };
         VoyageSummary: {
             total: number;
@@ -3996,9 +4255,25 @@ export interface components {
                 [key: string]: unknown;
             };
             target: components["schemas"]["VoyageTarget"];
-            /** @description Размер Leg (взаимоисключающий с batch_percent). */
+            /**
+             * @description Размер Leg: `N` = число единиц | `N%` = процент (1-100) от spawn-scope (резолвится на спавне Voyage — у Cadence scope неизвестен на создании). Взаимоисключающе с batch_size/batch_percent — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$`. Пустая строка трактуется как «не задано».
+             * @example 20%
+             */
+            batch?: string;
+            /**
+             * @description Порог провалов: `N` абсолют | `N%` процент от единиц прогона spawn-scope (инкарнации для scenario / хосты для command; резолвится на спавне). Взаимоисключающе с fail_threshold — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$` (процент 1-100). Пустая строка трактуется как «не задано».
+             * @example 25%
+             */
+            max_failures?: string;
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `batch`. Размер Leg (взаимоисключающий с batch_percent).
+             */
             batch_size?: number;
-            /** @description Размер Leg как % от scope (взаимоисключающий с batch_size). */
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `batch` (формат `N%`). Размер Leg как % от scope (взаимоисключающий с batch_size).
+             */
             batch_percent?: number;
             /** @description Параллелизм внутри Leg (barrier) / ширина окна (window). */
             concurrency?: number;
@@ -4007,7 +4282,10 @@ export interface components {
              * @enum {string}
              */
             batch_mode?: "barrier" | "window";
-            /** @description Порог абсолютного числа провалов → стоп. */
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `max_failures`. Порог абсолютного числа провалов → стоп.
+             */
             fail_threshold?: number;
             /** @description Пауза между Leg-ами, мс (batch_mode=barrier). */
             inter_batch_interval_ms?: number;
@@ -4041,11 +4319,33 @@ export interface components {
                 [key: string]: unknown;
             };
             target?: components["schemas"]["VoyageTarget"];
+            /**
+             * @description Размер Leg: `N` | `N%` (parity create). Взаимоисключающе с batch_size/batch_percent в том же PATCH → 422 voyage_batch_spec_conflict. Переключение формата поверх хранимого встречного значения обнуляет встречное поле (batch `N` сбрасывает хранимый batch_percent и наоборот).
+             * @example 20%
+             */
+            batch?: string;
+            /**
+             * @description Порог провалов: `N` абсолют | `N%` процент spawn-scope (parity create). Взаимоисключающе с fail_threshold в том же PATCH → 422 voyage_batch_spec_conflict. Переключение формата поверх хранимого встречного обнуляет встречное поле (`N` сбрасывает fail_threshold_percent и наоборот).
+             * @example 25%
+             */
+            max_failures?: string;
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `batch`.
+             */
             batch_size?: number;
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `batch` (формат `N%`).
+             */
             batch_percent?: number;
             concurrency?: number;
             /** @enum {string} */
             batch_mode?: "barrier" | "window";
+            /**
+             * @deprecated
+             * @description DEPRECATED — используйте `max_failures`.
+             */
             fail_threshold?: number;
             require_alive?: boolean;
             /** @enum {string} */
@@ -4085,6 +4385,8 @@ export interface components {
             /** @enum {string} */
             batch_mode?: "barrier" | "window";
             fail_threshold?: number;
+            /** @description Порог провалов в процентах spawn-scope (колонка 070, резолвится в абсолют на спавне Voyage). Взаимоисключающ с fail_threshold. null — задан fail_threshold или порога нет. */
+            fail_threshold_percent?: number | null;
             require_alive?: boolean;
             /** @enum {string} */
             on_failure?: "abort" | "continue";
@@ -4255,6 +4557,21 @@ export interface components {
                 "application/problem+json": components["schemas"]["ProblemDetails"];
             };
         };
+        /**
+         * @description Too many requests — per-AID rate-limit Tempo превышен (tempo-exceeded,
+         *     ADR-050): оператор слишком часто дёргает resolver-тяжёлый write-эндпоинт.
+         *     Заголовок Retry-After — секунды до пополнения хотя бы одного токена.
+         */
+        Problem429: {
+            headers: {
+                /** @description Секунды до пополнения хотя бы одного токена бакета. */
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ProblemDetails"];
+            };
+        };
     };
     parameters: {
         /** @description AID Архонта (naming-rules.md). */
@@ -4263,6 +4580,10 @@ export interface components {
         IncarnationNamePath: string;
         /** @description Имя роли (kebab-case). */
         RoleNamePath: string;
+        /** @description Имя Synod-группы (kebab-case). */
+        SynodNamePath: string;
+        /** @description Имя роли в bundle Synod-группы (kebab-case). */
+        SynodRoleNamePath: string;
         /** @description Имя Service-а (kebab-case). */
         ServiceNamePath: string;
         /** @description Имя Omen-а (kebab-case, 1..63). */
@@ -4738,6 +5059,202 @@ export interface operations {
             404: components["responses"]["Problem404"];
             409: components["responses"]["Problem409"];
             422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListSynods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Каталог групп. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynodListReply"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    CreateSynod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynodCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Группа создана. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            409: components["responses"]["Problem409"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    DeleteSynod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя Synod-группы (kebab-case). */
+                name: components["parameters"]["SynodNamePath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Группа удалена. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            409: components["responses"]["Problem409"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    AddSynodOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя Synod-группы (kebab-case). */
+                name: components["parameters"]["SynodNamePath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantOperatorRequest"];
+            };
+        };
+        responses: {
+            /** @description Архон добавлен в группу. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    RemoveSynodOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя Synod-группы (kebab-case). */
+                name: components["parameters"]["SynodNamePath"];
+                /** @description AID Архонта (naming-rules.md). */
+                aid: components["parameters"]["AidPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Архон убран из группы. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            409: components["responses"]["Problem409"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    GrantSynodRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя Synod-группы (kebab-case). */
+                name: components["parameters"]["SynodNamePath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynodGrantRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Роль добавлена в bundle. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    RevokeSynodRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя Synod-группы (kebab-case). */
+                name: components["parameters"]["SynodNamePath"];
+                /** @description Имя роли в bundle Synod-группы (kebab-case). */
+                role_name: components["parameters"]["SynodRoleNamePath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Роль снята из bundle. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            409: components["responses"]["Problem409"];
             500: components["responses"]["Problem500"];
         };
     };
@@ -5811,6 +6328,38 @@ export interface operations {
             403: components["responses"]["Problem403"];
             404: components["responses"]["Problem404"];
             422: components["responses"]["Problem422"];
+            429: components["responses"]["Problem429"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    PreviewVoyage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoyageCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Резолвнутый scope (числа, без SID-списка). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyagePreviewReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            429: components["responses"]["Problem429"];
             500: components["responses"]["Problem500"];
         };
     };
