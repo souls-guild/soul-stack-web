@@ -37,7 +37,13 @@ export type IncarnationCheckDriftRequest = components['schemas']['IncarnationChe
 
 export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
-export type SoulprintReadReply = components['schemas']['SoulprintReadReply'];
+// typed_facts в OpenAPI-схеме — opaque (json.RawMessage / x-go-type, ADR-051).
+// Генератор производит Record<string, never>. Переопределяем в правильный тип
+// через SoulprintFacts (схема сохранилась в components), чтобы UI мог работать
+// со структурированными полями. На wire данные приходят корректно.
+export type SoulprintReadReply = Omit<components['schemas']['SoulprintReadReply'], 'typed_facts'> & {
+  typed_facts: SoulprintFacts;
+};
 export type SoulIssueTokenReply = components['schemas']['SoulIssueTokenReply'];
 export type SoulCreateRequest = components['schemas']['SoulCreateRequest'];
 export type SoulCreateReply = components['schemas']['SoulCreateReply'];

@@ -26,7 +26,7 @@ const PAGE_LIMIT = 100;
 type SortKey = 'last_seen_at' | 'sid' | 'status';
 type SortDir = 'asc' | 'desc';
 
-function formatTimeAgo(iso: string | undefined): string {
+function formatTimeAgo(iso: string | null | undefined): string {
   if (!iso) return '—';
   const ts = new Date(iso).getTime();
   if (Number.isNaN(ts)) return iso;

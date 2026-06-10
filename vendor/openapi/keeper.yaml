@@ -6151,16 +6151,37 @@ components:
           items:
             type: string
           description: Coven-метки хоста (стабильные теги, ADR-008).
+          # Домен coalesce-ит nil-slice в `[]` (всегда массив) — required + present.
+          x-omitempty: false
         last_seen_at:
           type: string
           format: date-time
+          nullable: true
+          # Домен — *time.Time без omitempty: null отражает «никогда не подключался».
+          x-omitempty: false
         last_seen_by_kid:
           type: string
+          nullable: true
           description: KID Keeper-инстанса, видевшего последний контакт.
+          # Домен — *string без omitempty: null = «контакта не было».
+          x-omitempty: false
         registered_at:
           type: string
           format: date-time
-      required: [sid, transport, status, registered_at]
+        requested_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Момент CSR-запроса онбординга; null до запроса.
+          # Домен — *time.Time без omitempty: present-as-null.
+          x-omitempty: false
+        created_by_aid:
+          type: string
+          nullable: true
+          description: AID Архонта-создателя; null после ревокации FK / для self-онбординга.
+          # Домен — *string без omitempty: present-as-null.
+          x-omitempty: false
+      required: [sid, transport, status, covens, registered_at]
 
     SoulprintReadReply:
       type: object
@@ -6174,7 +6195,17 @@ components:
         sid:
           type: string
         typed_facts:
-          $ref: '#/components/schemas/SoulprintFacts'
+          type: object
+          description: |
+            Typed-факты Soulprint (ADR-018, форма по proto SoulprintFacts —
+            см. схему SoulprintFacts). byte-passthrough JSONB (категория D,
+            ADR-051): Keeper отдаёт сырые байты `souls.soulprint_facts` as-is,
+            без unmarshal→map→re-marshal. Это гарантирует forward-compat —
+            новые proto-поля Soul-агента доезжают на wire без рекомпиляции
+            Keeper-а. Порядок ключей — PG-jsonb-нормализованный.
+          # x-go-type → handler хранит сырой json.RawMessage напрямую (эталон
+          # augur/oracle Allow). Без x-go-type-import — oapi сам импортит json.
+          x-go-type: json.RawMessage
         collected_at:
           type: string
           format: date-time

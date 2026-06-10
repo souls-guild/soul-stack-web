@@ -3669,13 +3669,20 @@ export interface components {
             transport: components["schemas"]["SoulTransport"];
             status: components["schemas"]["SoulStatus"];
             /** @description Coven-метки хоста (стабильные теги, ADR-008). */
-            covens?: string[];
+            covens: string[];
             /** Format: date-time */
-            last_seen_at?: string;
+            last_seen_at?: string | null;
             /** @description KID Keeper-инстанса, видевшего последний контакт. */
-            last_seen_by_kid?: string;
+            last_seen_by_kid?: string | null;
             /** Format: date-time */
             registered_at: string;
+            /**
+             * Format: date-time
+             * @description Момент CSR-запроса онбординга; null до запроса.
+             */
+            requested_at?: string | null;
+            /** @description AID Архонта-создателя; null после ревокации FK / для self-онбординга. */
+            created_by_aid?: string | null;
         };
         /**
          * @description `GET /v1/souls/{sid}/soulprint`: проекция `souls.{soulprint_facts,
@@ -3686,7 +3693,15 @@ export interface components {
          */
         SoulprintReadReply: {
             sid: string;
-            typed_facts: components["schemas"]["SoulprintFacts"];
+            /**
+             * @description Typed-факты Soulprint (ADR-018, форма по proto SoulprintFacts —
+             *     см. схему SoulprintFacts). byte-passthrough JSONB (категория D,
+             *     ADR-051): Keeper отдаёт сырые байты `souls.soulprint_facts` as-is,
+             *     без unmarshal→map→re-marshal. Это гарантирует forward-compat —
+             *     новые proto-поля Soul-агента доезжают на wire без рекомпиляции
+             *     Keeper-а. Порядок ключей — PG-jsonb-нормализованный.
+             */
+            typed_facts: Record<string, never>;
             /**
              * Format: date-time
              * @description Soul-side timestamp момента сбора фактов.
