@@ -5456,10 +5456,12 @@ components:
         spec:
           type: object
           additionalProperties: true
+          nullable: true
           description: jsonb — то, что задекларировал оператор.
         state:
           type: object
           additionalProperties: true
+          nullable: true
           description: jsonb — текущая структурированная конфигурация.
         status:
           $ref: '#/components/schemas/IncarnationStatus'
@@ -5471,6 +5473,9 @@ components:
         created_by_aid:
           type: string
           pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
+          nullable: true
+          x-omitempty: false
+          description: AID Архонта-создателя (NULL после ревокации FK).
         created_at:
           type: string
           format: date-time
@@ -5487,37 +5492,24 @@ components:
             incarnation ни разу не сканировалась.
         last_drift_summary:
           type: object
+          additionalProperties: true
           nullable: true
           description: >-
-            ADR-031 Slice C. Counts-агрегат последнего DriftReport.
+            ADR-031 Slice C. Counts-агрегат последнего DriftReport (jsonb-
+            passthrough из колонки `incarnation.last_drift_summary`). Поля:
+            hosts_drifted / hosts_clean / hosts_unsupported / hosts_failed /
+            total_hosts (integer) + scanned_at (date-time, RFC3339Nano).
             Отсутствует, если incarnation ни разу не сканировалась.
-          properties:
-            hosts_drifted:
-              type: integer
-              format: int32
-            hosts_clean:
-              type: integer
-              format: int32
-            hosts_unsupported:
-              type: integer
-              format: int32
-            hosts_failed:
-              type: integer
-              format: int32
-            total_hosts:
-              type: integer
-              format: int32
-            scanned_at:
-              type: string
-              format: date-time
       required:
         - name
         - service
         - service_version
         - state_schema_version
         - covens
+        - spec
+        - state
         - status
-        - created_by_aid
+        - status_details
         - created_at
         - updated_at
 
@@ -5571,19 +5563,23 @@ components:
         state_before:
           type: object
           additionalProperties: true
+          nullable: true
         state_after:
           type: object
           additionalProperties: true
+          nullable: true
         changed_by_aid:
           type: string
           pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
+          nullable: true
+          description: AID Архонта, изменившего state (NULL после ревокации FK / для migration-шагов).
         apply_id:
           type: string
           pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
         created_at:
           type: string
           format: date-time
-      required: [history_id, scenario, changed_by_aid, apply_id, created_at]
+      required: [history_id, scenario, state_before, state_after, apply_id, created_at]
 
     IncarnationUnlockRequest:
       type: object

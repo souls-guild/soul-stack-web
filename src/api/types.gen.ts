@@ -3259,19 +3259,20 @@ export interface components {
             /** @description Declared environment-теги incarnation (ADR-008 amendment a). Источник RBAC coven-scope (covens ∪ {name}). Всегда массив (пустой, если тегов нет). */
             covens: string[];
             /** @description jsonb — то, что задекларировал оператор. */
-            spec?: {
-                [key: string]: unknown;
-            };
-            /** @description jsonb — текущая структурированная конфигурация. */
-            state?: {
-                [key: string]: unknown;
-            };
-            status: components["schemas"]["IncarnationStatus"];
-            /** @description Детали ошибки, если status локирующий. */
-            status_details?: {
+            spec: {
                 [key: string]: unknown;
             } | null;
-            created_by_aid: string;
+            /** @description jsonb — текущая структурированная конфигурация. */
+            state: {
+                [key: string]: unknown;
+            } | null;
+            status: components["schemas"]["IncarnationStatus"];
+            /** @description Детали ошибки, если status локирующий. */
+            status_details: {
+                [key: string]: unknown;
+            } | null;
+            /** @description AID Архонта-создателя (NULL после ревокации FK). */
+            created_by_aid?: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -3281,20 +3282,9 @@ export interface components {
              * @description ADR-031 Slice C. Время завершения последнего dry_run-прогона converge (фон или on-demand из Slice B). Отсутствует, если incarnation ни разу не сканировалась.
              */
             last_drift_check_at?: string | null;
-            /** @description ADR-031 Slice C. Counts-агрегат последнего DriftReport. Отсутствует, если incarnation ни разу не сканировалась. */
+            /** @description ADR-031 Slice C. Counts-агрегат последнего DriftReport (jsonb- passthrough из колонки `incarnation.last_drift_summary`). Поля: hosts_drifted / hosts_clean / hosts_unsupported / hosts_failed / total_hosts (integer) + scanned_at (date-time, RFC3339Nano). Отсутствует, если incarnation ни разу не сканировалась. */
             last_drift_summary?: {
-                /** Format: int32 */
-                hosts_drifted?: number;
-                /** Format: int32 */
-                hosts_clean?: number;
-                /** Format: int32 */
-                hosts_unsupported?: number;
-                /** Format: int32 */
-                hosts_failed?: number;
-                /** Format: int32 */
-                total_hosts?: number;
-                /** Format: date-time */
-                scanned_at?: string;
+                [key: string]: unknown;
             } | null;
         };
         IncarnationListReply: {
@@ -3321,13 +3311,14 @@ export interface components {
             history_id: string;
             /** @description Имя сценария, приведшего к изменению ("migration" для шагов миграции). */
             scenario: string;
-            state_before?: {
+            state_before: {
                 [key: string]: unknown;
-            };
-            state_after?: {
+            } | null;
+            state_after: {
                 [key: string]: unknown;
-            };
-            changed_by_aid: string;
+            } | null;
+            /** @description AID Архонта, изменившего state (NULL после ревокации FK / для migration-шагов). */
+            changed_by_aid?: string | null;
             apply_id: string;
             /** Format: date-time */
             created_at: string;

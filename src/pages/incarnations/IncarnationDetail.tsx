@@ -180,7 +180,10 @@ export function IncarnationDetail() {
         <span className={styles.metaVal}>{row.covens.length > 0 ? row.covens.join(', ') : '—'}</span>
         <span className={styles.metaKey}>Created by</span>
         <span className={styles.metaVal}>
-          <Link to={`/archons/${encodeURIComponent(row.created_by_aid)}`}>{row.created_by_aid}</Link>
+          {row.created_by_aid
+            ? <Link to={`/archons/${encodeURIComponent(row.created_by_aid)}`}>{row.created_by_aid}</Link>
+            : <span style={{ color: 'var(--text-muted)' }}>—</span>
+          }
         </span>
         <span className={styles.metaKey}>Created at</span>
         <span className={styles.metaVal}>{row.created_at}</span>
@@ -273,10 +276,10 @@ export function IncarnationDetail() {
             <>
               <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>Last drift summary</h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Badge tone="warn">drifted: {row.last_drift_summary.hosts_drifted ?? 0}</Badge>
-                <Badge tone="ok">clean: {row.last_drift_summary.hosts_clean ?? 0}</Badge>
-                <Badge tone="muted">unsupported: {row.last_drift_summary.hosts_unsupported ?? 0}</Badge>
-                <Badge tone="danger">failed: {row.last_drift_summary.hosts_failed ?? 0}</Badge>
+                <Badge tone="warn">drifted: {Number(row.last_drift_summary['hosts_drifted'] ?? 0)}</Badge>
+                <Badge tone="ok">clean: {Number(row.last_drift_summary['hosts_clean'] ?? 0)}</Badge>
+                <Badge tone="muted">unsupported: {Number(row.last_drift_summary['hosts_unsupported'] ?? 0)}</Badge>
+                <Badge tone="danger">failed: {Number(row.last_drift_summary['hosts_failed'] ?? 0)}</Badge>
               </div>
             </>
           ) : null}
@@ -341,7 +344,7 @@ export function IncarnationDetail() {
                   <tr key={entry.history_id}>
                     <td className="mono">{entry.scenario}</td>
                     <td className="mono">{entry.apply_id}</td>
-                    <td className="mono">{entry.changed_by_aid}</td>
+                    <td className="mono">{entry.changed_by_aid ?? '—'}</td>
                     <td className="mono">{entry.created_at}</td>
                   </tr>
                 ))}
