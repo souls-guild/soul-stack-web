@@ -391,7 +391,12 @@ export function IncarnationsList() {
                   <Link to={`/incarnations/${encodeURIComponent(row.name)}`}>{row.name}</Link>
                 </td>
                 <td className="mono">
-                  {row.service}
+                  <Link
+                    to={`/services/${encodeURIComponent(row.service)}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    {row.service}
+                  </Link>
                   <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>@{row.service_version}</span>
                 </td>
                 <td>

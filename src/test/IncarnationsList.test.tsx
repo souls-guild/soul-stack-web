@@ -116,4 +116,107 @@ describe('IncarnationsList', () => {
     // Перезапроса с невалидным значением не было.
     expect(called).toBe(initial);
   });
+
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] имя сервиса рендерится ссылкой на /services/:name', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations',
+        body: {
+          items: [
+            {
+              name: 'redis-prod',
+              service: 'redis',
+              service_version: 'v2.0.0',
+              state_schema_version: 3,
+              covens: ['prod'],
+              status: 'ready',
+              created_by_aid: 'archon-alice',
+              created_at: '2026-05-25T10:00:00Z',
+              updated_at: '2026-05-25T12:00:00Z',
+              last_drift_check_at: null,
+            },
+            {
+              name: 'postgres-stage',
+              service: 'postgres',
+              service_version: 'main',
+              state_schema_version: 1,
+              covens: ['stage'],
+              status: 'drift',
+              created_by_aid: 'archon-bob',
+              created_at: '2026-05-20T10:00:00Z',
+              updated_at: '2026-05-25T11:30:00Z',
+              last_drift_check_at: null,
+            },
+          ],
+          offset: 0,
+          limit: 100,
+          total: 2,
+        },
+      },
+    ]);
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
+
+    // Имена сервисов — ссылки на /services/:name.
+    const redisLink = screen.getByRole('link', { name: 'redis' });
+    expect(redisLink).toHaveAttribute('href', '/services/redis');
+
+    const postgresLink = screen.getByRole('link', { name: 'postgres' });
+    expect(postgresLink).toHaveAttribute('href', '/services/postgres');
+  });
+
+  it('[LINKS] version-суффикс (@v2.0.0) остаётся текстом, не ссылкой', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations',
+        body: {
+          items: [
+            {
+              name: 'redis-prod',
+              service: 'redis',
+              service_version: 'v2.0.0',
+              state_schema_version: 3,
+              covens: ['prod'],
+              status: 'ready',
+              created_by_aid: 'archon-alice',
+              created_at: '2026-05-25T10:00:00Z',
+              updated_at: '2026-05-25T12:00:00Z',
+              last_drift_check_at: null,
+            },
+          ],
+          offset: 0,
+          limit: 100,
+          total: 1,
+        },
+      },
+    ]);
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
+
+    // Версия — просто текст, не ссылка.
+    expect(screen.getByText('@v2.0.0')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /@v2\.0\.0/ })).not.toBeInTheDocument();
+  });
+
+  it('[LINKS] пустой список — нет ссылок на сервисы', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations',
+        body: { items: [], offset: 0, limit: 100, total: 0 },
+      },
+    ]);
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    await waitFor(() => expect(screen.getByText(/не найдено/i)).toBeInTheDocument());
+
+    // Нет ссылок на /services/*.
+    expect(screen.queryByRole('link', { name: /redis|postgres/i })).not.toBeInTheDocument();
+  });
 });

@@ -394,4 +394,42 @@ describe('SynodDetail', () => {
     expect(alert).toHaveTextContent(/description too long|валид/i);
     expect(screen.getByRole('dialog', { name: /Редактировать Synod/i })).toBeInTheDocument();
   });
+
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] участники-архоны рендерятся ссылками на /archons/:aid', async () => {
+    recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+
+    await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
+
+    const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
+    expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
+
+    const linkBob = screen.getByRole('link', { name: 'archon-bob' });
+    expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
+  });
+
+  it('[LINKS] роли группы рендерятся ссылками на /rbac', async () => {
+    recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+
+    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
+
+    const linkAdmin = screen.getByRole('link', { name: 'cluster-admin' });
+    expect(linkAdmin).toHaveAttribute('href', '/rbac');
+
+    const linkViewer = screen.getByRole('link', { name: 'viewer' });
+    expect(linkViewer).toHaveAttribute('href', '/rbac');
+  });
+
+  it('[LINKS] при пустых секциях ссылок нет (empty-group)', async () => {
+    recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/empty-group');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'empty-group' })).toBeInTheDocument());
+
+    // Нет ссылок на архонтов и роли в пустой группе.
+    expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
+  });
 });

@@ -184,7 +184,9 @@ export function ErrandsList() {
                       {e.errand_id.slice(0, 10)}…
                     </Link>
                   </td>
-                  <td className="mono">{e.sid}</td>
+                  <td className="mono">
+                    <Link to={`/souls/${encodeURIComponent(e.sid)}`} style={{ textDecoration: 'none', color: 'inherit' }}>{e.sid}</Link>
+                  </td>
                   <td className="mono">{e.module}</td>
                   <td>
                     <Badge tone={statusTone(e.status)}>{e.status}</Badge>

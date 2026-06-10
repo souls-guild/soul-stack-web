@@ -539,4 +539,67 @@ describe('RbacPage', () => {
     const soulList = await within(dialog).findByRole('checkbox', { name: /soul\.list/ });
     expect(soulList).toBeChecked();
   });
+
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] AID в Archon assignments рендерятся ссылками на /archons/:aid', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/roles', body: SAMPLE },
+      { method: 'GET', url: '/v1/operators', body: OPERATORS_SAMPLE },
+    ]);
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+
+    // Переходим на таб Archon assignments.
+    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /Archon assignments/i }));
+
+    // Ждём появления архонтов.
+    await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
+
+    // Каждый AID — ссылка с правильным href.
+    const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
+    expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
+
+    const linkBootstrap = screen.getByRole('link', { name: 'archon-bootstrap' });
+    expect(linkBootstrap).toHaveAttribute('href', '/archons/archon-bootstrap');
+
+    const linkBob = screen.getByRole('link', { name: 'archon-bob' });
+    expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
+  });
+
+  it('[LINKS] AID с спецсимволами корректно URL-кодируется', async () => {
+    // AID c «+» или пробелом — encodeURIComponent не даёт сломанный href.
+    const specialSample = {
+      items: [
+        {
+          name: 'cluster-admin',
+          description: '',
+          builtin: true,
+          permissions: ['*'],
+          operators: ['archon-special+one'],
+        },
+      ],
+    };
+    const specialOperators = {
+      items: [
+        { aid: 'archon-special+one', display_name: 'Special', auth_method: 'jwt', created_at: '2026-05-01', created_by_aid: null, revoked_at: null, bootstrap_initial: false },
+      ],
+      offset: 0, limit: 200, total: 1,
+    };
+    installFetchMock([
+      { method: 'GET', url: '/v1/roles', body: specialSample },
+      { method: 'GET', url: '/v1/operators', body: specialOperators },
+    ]);
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /Archon assignments/i }));
+
+    await waitFor(() => expect(screen.getByText('archon-special+one')).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'archon-special+one' });
+    expect(link).toHaveAttribute('href', `/archons/${encodeURIComponent('archon-special+one')}`);
+  });
 });

@@ -78,7 +78,7 @@ export function ServiceDetail() {
     <div className={styles.page}>
       <div>
         <div className={styles.crumbs}>
-          <Link to="/services">services</Link> / <span>{row.name}</span>
+          <Link to="/services">{t('admin:svcDetailCrumbParent')}</Link> / <span>{row.name}</span>
         </div>
         <div className={styles.header}>
           <div>
@@ -104,15 +104,15 @@ export function ServiceDetail() {
       </div>
 
       <div className={styles.meta}>
-        <span className={styles.metaKey}>Git</span>
+        <span className={styles.metaKey}>{t('admin:svcMetaGit')}</span>
         <span className={styles.metaVal}>
           <GitUrl git={row.git} />
         </span>
-        <span className={styles.metaKey}>Ref</span>
+        <span className={styles.metaKey}>{t('admin:svcMetaRef')}</span>
         <span className={styles.metaVal} data-testid="svc-ref">
           <span className="mono">{row.ref}</span>
         </span>
-        <span className={styles.metaKey}>Refresh</span>
+        <span className={styles.metaKey}>{t('admin:svcMetaRefresh')}</span>
         <span className={styles.metaVal}>
           {row.refresh ? (
             <Badge tone="info">{t('admin:svcRefreshOn', { interval: row.refresh })}</Badge>
@@ -120,18 +120,34 @@ export function ServiceDetail() {
             <Badge tone="muted">{t('admin:svcRefreshOff')}</Badge>
           )}
         </span>
-        <span className={styles.metaKey}>Created</span>
+        <span className={styles.metaKey}>{t('admin:svcMetaCreated')}</span>
         <span className={styles.metaVal} data-testid="svc-created">
           <span className="mono">{row.created_at}</span>
           {row.created_by_aid ? (
-            <span style={{ color: 'var(--text-muted)' }}> · {row.created_by_aid}</span>
+            <span style={{ color: 'var(--text-muted)' }}>
+              {' · '}
+              <Link
+                to={`/archons/${encodeURIComponent(row.created_by_aid)}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                {row.created_by_aid}
+              </Link>
+            </span>
           ) : null}
         </span>
-        <span className={styles.metaKey}>Updated</span>
+        <span className={styles.metaKey}>{t('admin:svcMetaUpdated')}</span>
         <span className={styles.metaVal} data-testid="svc-updated">
           <span className="mono">{row.updated_at}</span>
           {row.updated_by_aid ? (
-            <span style={{ color: 'var(--text-muted)' }}> · {row.updated_by_aid}</span>
+            <span style={{ color: 'var(--text-muted)' }}>
+              {' · '}
+              <Link
+                to={`/archons/${encodeURIComponent(row.updated_by_aid)}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                {row.updated_by_aid}
+              </Link>
+            </span>
           ) : null}
         </span>
       </div>
@@ -144,7 +160,7 @@ export function ServiceDetail() {
           className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`}
           onClick={() => setTab('overview')}
         >
-          Overview
+          {t('admin:svcTabOverview')}
         </button>
         <button
           type="button"
@@ -153,7 +169,7 @@ export function ServiceDetail() {
           className={`${styles.tab} ${tab === 'incarnations' ? styles.tabActive : ''}`}
           onClick={() => setTab('incarnations')}
         >
-          Incarnations
+          {t('admin:svcTabIncarnations')}
         </button>
         <button
           type="button"
@@ -162,7 +178,7 @@ export function ServiceDetail() {
           className={`${styles.tab} ${tab === 'scenarios' ? styles.tabActive : ''}`}
           onClick={() => setTab('scenarios')}
         >
-          Scenarios
+          {t('admin:svcTabScenarios')}
         </button>
         <button
           type="button"
@@ -171,7 +187,7 @@ export function ServiceDetail() {
           className={`${styles.tab} ${tab === 'refs' ? styles.tabActive : ''}`}
           onClick={() => setTab('refs')}
         >
-          Refs
+          {t('admin:svcTabRefs')}
         </button>
         <button
           type="button"
@@ -180,7 +196,7 @@ export function ServiceDetail() {
           className={`${styles.tab} ${tab === 'schema' ? styles.tabActive : ''}`}
           onClick={() => setTab('schema')}
         >
-          Schema
+          {t('admin:svcTabSchema')}
         </button>
         <button
           type="button"
@@ -238,10 +254,10 @@ export function ServiceDetail() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Description</th>
-                  <th>Input fields</th>
-                  <th>Actions</th>
+                  <th>{t('admin:svcScenColName')}</th>
+                  <th>{t('admin:svcScenColDescription')}</th>
+                  <th>{t('admin:svcScenColInputFields')}</th>
+                  <th>{t('admin:svcScenColActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -290,10 +306,10 @@ export function ServiceDetail() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Commit</th>
-                  <th>Default</th>
+                  <th>{t('admin:svcRefsColName')}</th>
+                  <th>{t('admin:svcRefsColType')}</th>
+                  <th>{t('admin:svcRefsColCommit')}</th>
+                  <th>{t('admin:svcRefsColDefault')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -465,17 +481,17 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
           <table className={styles.table} data-testid="svc-inc-table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>{t('admin:svcIncColName')}</th>
                 <th>{t('admin:svcIncColRef')}</th>
-                <th>Status</th>
-                <th>Covens</th>
+                <th>{t('admin:svcIncColStatus')}</th>
+                <th>{t('admin:svcIncColCovens')}</th>
                 {scalarFields.map((f) => (
                   <th key={f.name} className="mono">{f.name}</th>
                 ))}
                 {compositeFields.length > 0 ? (
                   <th>{t('admin:svcIncColState')}</th>
                 ) : null}
-                <th>Updated</th>
+                <th>{t('admin:svcIncColUpdated')}</th>
               </tr>
             </thead>
             <tbody>
@@ -538,7 +554,7 @@ function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: stri
     <section className={styles.section} data-testid="svc-schema-section">
       <h2 className={styles.sectionTitle}>
         <Layers size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
-        State Schema
+        {t('admin:svcSchemaTitle')}
       </h2>
 
       {q.isLoading ? <div className={styles.loading}>{t('admin:svcLoading')}</div> : null}
@@ -572,9 +588,9 @@ function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: stri
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Field</th>
-                <th>Type</th>
-                <th>Required</th>
+                <th>{t('admin:svcSchemaColField')}</th>
+                <th>{t('admin:svcSchemaColType')}</th>
+                <th>{t('admin:svcSchemaColRequired')}</th>
               </tr>
             </thead>
             <tbody>
@@ -605,9 +621,9 @@ function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: stri
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>From</th>
-                  <th>To</th>
-                  <th>File</th>
+                  <th>{t('admin:svcSchemaMigColFrom')}</th>
+                  <th>{t('admin:svcSchemaMigColTo')}</th>
+                  <th>{t('admin:svcSchemaMigColFile')}</th>
                 </tr>
               </thead>
               <tbody>

@@ -60,4 +60,32 @@ describe('PushRunDetail', () => {
     expect(screen.getByText('host02')).toBeInTheDocument();
     expect(screen.getByText('ssh_auth')).toBeInTheDocument();
   });
+
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] sid в per-host таблице — ссылка на /souls/:sid', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/push/${APPLY_ID}`, body: SAMPLE_VIEW },
+    ]);
+    renderAt(`/push-runs/${APPLY_ID}`);
+
+    await waitFor(() => expect(screen.getByText('host01')).toBeInTheDocument());
+
+    const linkHost01 = screen.getByRole('link', { name: 'host01' });
+    expect(linkHost01).toHaveAttribute('href', '/souls/host01');
+
+    const linkHost02 = screen.getByRole('link', { name: 'host02' });
+    expect(linkHost02).toHaveAttribute('href', '/souls/host02');
+  });
+
+  it('[LINKS] при отсутствии summary hosts ссылок на souls нет', async () => {
+    const viewNoHosts = { ...SAMPLE_VIEW, summary: null };
+    installFetchMock([
+      { method: 'GET', url: `/v1/push/${APPLY_ID}`, body: viewNoHosts },
+    ]);
+    renderAt(`/push-runs/${APPLY_ID}`);
+
+    await waitFor(() => expect(screen.getByText('partial_failed')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: /^host/ })).not.toBeInTheDocument();
+  });
 });

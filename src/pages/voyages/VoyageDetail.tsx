@@ -148,7 +148,19 @@ export function VoyageDetail() {
               {voyage.target?.sids && voyage.target.sids.length > 0 ? (
                 <>
                   <span className={styles.metaKey}>target.sids</span>
-                  <span className={styles.metaVal}>{voyage.target.sids.join(', ')}</span>
+                  <span className={styles.metaVal}>
+                    {voyage.target.sids.map((sid, i) => (
+                      <span key={sid}>
+                        {i > 0 ? ', ' : ''}
+                        <Link
+                          to={`/souls/${encodeURIComponent(sid)}`}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          {sid}
+                        </Link>
+                      </span>
+                    ))}
+                  </span>
                 </>
               ) : null}
             </>
@@ -182,7 +194,16 @@ export function VoyageDetail() {
           ) : null}
 
           <span className={styles.metaKey}>started_by</span>
-          <span className={styles.metaVal}>{voyage.started_by_aid}</span>
+          <span className={styles.metaVal}>
+            {voyage.started_by_aid ? (
+              <Link
+                to={`/archons/${encodeURIComponent(voyage.started_by_aid)}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                {voyage.started_by_aid}
+              </Link>
+            ) : '—'}
+          </span>
 
           <span className={styles.metaKey}>created_at</span>
           <span className={styles.metaVal}>{voyage.created_at}</span>

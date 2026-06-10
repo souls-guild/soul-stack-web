@@ -62,7 +62,13 @@ export function VigilDetail() {
                 {v.enabled ? <Badge tone="ok">enabled</Badge> : <Badge tone="muted">disabled</Badge>}
                 {v.created_by_aid ? (
                   <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    by {v.created_by_aid}
+                    by{' '}
+                    <Link
+                      to={`/archons/${encodeURIComponent(v.created_by_aid)}`}
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                    >
+                      {v.created_by_aid}
+                    </Link>
                   </span>
                 ) : null}
               </div>
@@ -98,7 +104,16 @@ export function VigilDetail() {
         <span className={styles.metaKey}>Enabled</span>
         <span className={styles.metaVal}>{String(v.enabled)}</span>
         <span className={styles.metaKey}>Created by</span>
-        <span className={styles.metaVal}>{v.created_by_aid ?? '—'}</span>
+        <span className={styles.metaVal}>
+          {v.created_by_aid ? (
+            <Link
+              to={`/archons/${encodeURIComponent(v.created_by_aid)}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              {v.created_by_aid}
+            </Link>
+          ) : '—'}
+        </span>
         <span className={styles.metaKey}>Created at</span>
         <span className={styles.metaVal}>{v.created_at}</span>
         <span className={styles.metaKey}>Updated at</span>

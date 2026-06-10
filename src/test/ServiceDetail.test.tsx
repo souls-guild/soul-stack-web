@@ -472,4 +472,60 @@ describe('ServiceDetail', () => {
     expect(screen.getByText(/Нет destiny-зависимостей|No destiny/i)).toBeInTheDocument();
     expect(screen.getByText(/Нет custom-модулей|No custom/i)).toBeInTheDocument();
   });
+
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+
+    // created_by_aid — ссылка с правильным href.
+    const createdLink = screen.getByRole('link', { name: 'archon-bootstrap' });
+    expect(createdLink).toHaveAttribute('href', '/archons/archon-bootstrap');
+  });
+
+  it('[LINKS] updated_by_aid рендерится ссылкой на /archons/:aid', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+
+    // updated_by_aid — ссылка с правильным href.
+    const updatedLink = screen.getByRole('link', { name: 'archon-alice' });
+    expect(updatedLink).toHaveAttribute('href', '/archons/archon-alice');
+  });
+
+  it('[LINKS] отсутствующий created_by_aid не рендерит ссылку', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/services/redis',
+        body: { ...SAMPLE, created_by_aid: null, updated_by_aid: null },
+      },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/services/:name" element={<ServiceDetail />} />
+      </Routes>,
+      '/services/redis',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
+
+    // Нет ссылок на архонтов.
+    expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
+  });
 });

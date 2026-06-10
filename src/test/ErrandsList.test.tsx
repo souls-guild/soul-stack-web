@@ -59,6 +59,55 @@ describe('ErrandsList', () => {
     expect(links[0].closest('a')?.getAttribute('href')).toMatch(/\/errands\/01HZAA/);
   });
 
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] sid в строке таблицы — ссылка на /souls/:sid', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/errands',
+        body: {
+          items: [
+            {
+              errand_id: '01HZAA0000000000000000000D',
+              sid: 'host01',
+              module: 'core.cmd.shell',
+              status: 'success',
+              exit_code: 0,
+              duration_ms: 5,
+              stdout: 'ok',
+              started_by_aid: 'archon-alice',
+              started_at: '2026-05-26T10:00:00Z',
+              finished_at: '2026-05-26T10:00:00Z',
+            },
+          ],
+          offset: 0,
+          limit: 50,
+          total: 1,
+        },
+      },
+    ]);
+
+    renderWithProviders(<ErrandsList />, '/errands');
+    await waitFor(() => expect(screen.getByText('host01')).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'host01' });
+    expect(link).toHaveAttribute('href', '/souls/host01');
+  });
+
+  it('[LINKS] при пустом списке errand-ов ссылок на souls нет', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/errands',
+        body: { items: [], offset: 0, limit: 50, total: 0 },
+      },
+    ]);
+
+    renderWithProviders(<ErrandsList />, '/errands');
+    await waitFor(() => expect(screen.queryByRole('link', { name: /^host/ })).not.toBeInTheDocument());
+  });
+
   it('module CSV-фильтр уходит в query как multi-value ?module=', async () => {
     let lastUrl = '';
     globalThis.fetch = (async (input: RequestInfo | URL) => {

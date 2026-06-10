@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, ShieldPlus, Trash2, UserPlus, X } from 'lucide-react';
@@ -199,7 +200,15 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
         <tbody>
           {byOperator.map(([aid, rs]) => (
             <tr key={aid}>
-              <td className="mono">{aid}</td>
+              <td className="mono">
+                {/* AID кликабелен — ведёт на карточку архонта */}
+                <Link
+                  to={`/archons/${encodeURIComponent(aid)}`}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  {aid}
+                </Link>
+              </td>
               <td>
                 {rs.length === 0 ? (
                   <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{t('admin:rbacNoRolesForOperator')}</span>

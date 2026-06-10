@@ -21,6 +21,11 @@ const SAMPLE = {
   updated_at: '2026-05-10T00:00:00Z',
 };
 
+const SAMPLE_NO_AID = {
+  ...SAMPLE,
+  created_by_aid: null,
+};
+
 describe('DecreeDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
@@ -46,5 +51,39 @@ describe('DecreeDetail', () => {
     expect(screen.getByText('redis-prod')).toBeInTheDocument();
     // Recent fires placeholder
     expect(screen.getByText(/Recent fires/i)).toBeInTheDocument();
+  });
+
+  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+
+  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/decrees/restart-on-config', body: SAMPLE },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/decrees/:name" element={<DecreeDetail />} />
+      </Routes>,
+      '/decrees/restart-on-config',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: /restart-on-config/ })).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'archon-alice' });
+    expect(link).toHaveAttribute('href', '/archons/archon-alice');
+  });
+
+  it('[LINKS] при отсутствии created_by_aid показывает «—», ссылок на архонтов нет', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/decrees/restart-on-config', body: SAMPLE_NO_AID },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/decrees/:name" element={<DecreeDetail />} />
+      </Routes>,
+      '/decrees/restart-on-config',
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: /restart-on-config/ })).toBeInTheDocument());
+
+    expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 });

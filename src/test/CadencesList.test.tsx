@@ -312,4 +312,48 @@ describe('CadenceDetail', () => {
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText(/Прогонов ещё нет/)).toBeInTheDocument());
   });
+
+  // ── Guard-тесты: кликабельные ссылки ─────────────────────────────────────
+
+  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+    setupMocks();
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences/:id" element={<CadenceDetail />} />
+        <Route path="/cadences" element={<div data-testid="cadences-list" />} />
+        <Route path="/archons/:aid" element={<div data-testid="archon-detail" />} />
+        <Route path="/voyages/:id" element={<div data-testid="voyage-detail" />} />
+      </Routes>,
+      '/cadences/cad-01',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'archon-alice' });
+    expect(link).toHaveAttribute('href', '/archons/archon-alice');
+  });
+
+  it('[LINKS] created_by_aid с спецсимволами корректно URL-кодируется', async () => {
+    const specialCadence = {
+      ...CADENCE_INTERVAL,
+      created_by_aid: 'archon-special+one',
+    };
+    installFetchMock([
+      { method: 'GET', url: '/v1/cadences/cad-01/runs', body: { items: [], offset: 0, limit: 50, total: 0 } },
+      { method: 'GET', url: '/v1/cadences/cad-01', body: specialCadence },
+    ]);
+    renderWithProviders(
+      <Routes>
+        <Route path="/cadences/:id" element={<CadenceDetail />} />
+        <Route path="/cadences" element={<div />} />
+        <Route path="/archons/:aid" element={<div data-testid="archon-detail" />} />
+      </Routes>,
+      '/cadences/cad-01',
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'archon-special+one' });
+    expect(link).toHaveAttribute('href', `/archons/${encodeURIComponent('archon-special+one')}`);
+  });
 });

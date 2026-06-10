@@ -197,7 +197,10 @@ export function ArchonDetail() {
                       fontSize: 12,
                     }}
                   >
-                    {r.name}
+                    {/* Имя роли — ссылка на /rbac (страницы отдельной роли нет) */}
+                    <Link to="/rbac" style={{ textDecoration: 'none', color: 'inherit' }}>
+                      {r.name}
+                    </Link>
                     {r.builtin ? <Badge tone="info">builtin</Badge> : null}
                     <button
                       type="button"

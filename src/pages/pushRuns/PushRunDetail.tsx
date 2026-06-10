@@ -124,7 +124,9 @@ export function PushRunDetail() {
             <tbody>
               {hosts.map((h) => (
                 <tr key={h.sid}>
-                  <td className="mono">{h.sid}</td>
+                  <td className="mono">
+                    <Link to={`/souls/${encodeURIComponent(h.sid)}`} style={{ textDecoration: 'none', color: 'inherit' }}>{h.sid}</Link>
+                  </td>
                   <td>
                     <Badge tone={pushStatusTone(h.status)}>{h.status}</Badge>
                   </td>

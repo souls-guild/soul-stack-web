@@ -431,4 +431,34 @@ describe('ArchonDetail', () => {
     // Никаких ссылок на синоды нет
     expect(screen.queryByRole('link', { name: /ops-team/i })).not.toBeInTheDocument();
   });
+
+  // ── Guard-тесты: ссылки на роли ─────────────────────────────────────────────
+
+  it('[LINKS] роли архонта рендерятся ссылками на /rbac', async () => {
+    roleRecordingFetch({ op: ALICE_OP, roles: ROLES_WITH_ALICE });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
+
+    // Ждём появления секции ролей — archon-alice состоит в cluster-admin
+    const link = await screen.findByRole('link', { name: 'cluster-admin' });
+    expect(link).toHaveAttribute('href', '/rbac');
+  });
+
+  it('[LINKS] при отсутствии ролей ссылок в секции ролей нет', async () => {
+    roleRecordingFetch({ op: ALICE_OP, roles: ROLES_NO_ALICE });
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
+
+    // Дожидаемся загрузки ролей (секция перестанет быть loading)
+    await waitFor(() => {
+      const section = screen.getByRole('region', { name: /^roles$/i });
+      expect(section).not.toHaveTextContent(/Загрузка/i);
+    });
+
+    // Ни одна из ролей не назначена alice — ссылок на /rbac нет
+    const rbacLinks = screen.queryAllByRole('link', { name: /cluster-admin|soul-operator/i });
+    expect(rbacLinks).toHaveLength(0);
+  });
 });

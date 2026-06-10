@@ -35,7 +35,7 @@ export function ServicesList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Services</h1>
+          <h1 className={styles.title}>{t('admin:svcListTitle')}</h1>
           <div className={styles.crumbs}>{t('admin:svcCrumbs')}</div>
         </div>
         <Button type="button" variant="primary" onClick={() => setRegisterOpen(true)}>
@@ -98,11 +98,11 @@ export function ServicesList() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Git</th>
-              <th>Ref</th>
-              <th>Refresh</th>
-              <th>Updated</th>
+              <th>{t('admin:svcColName')}</th>
+              <th>{t('admin:svcColGit')}</th>
+              <th>{t('admin:svcColRef')}</th>
+              <th>{t('admin:svcColRefresh')}</th>
+              <th>{t('admin:svcColUpdated')}</th>
             </tr>
           </thead>
           <tbody>

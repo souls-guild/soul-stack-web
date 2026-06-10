@@ -165,7 +165,12 @@ export function SynodDetail() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {synod.operators.map((aid) => (
               <span key={aid} style={chipStyle()}>
-                {aid}
+                <Link
+                  to={`/archons/${encodeURIComponent(aid)}`}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  {aid}
+                </Link>
                 {canRemoveOp
                   ? removeBtn(
                       () => { setMemberError(null); removeOpMut.mutate(aid); },
@@ -209,7 +214,12 @@ export function SynodDetail() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {synod.roles.map((r) => (
               <span key={r} style={chipStyle()}>
-                {r}
+                <Link
+                  to="/rbac"
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  {r}
+                </Link>
                 {canRevokeRole
                   ? removeBtn(
                       () => { setRoleError(null); revokeRoleMut.mutate(r); },

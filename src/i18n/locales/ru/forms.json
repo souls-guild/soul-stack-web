@@ -12,7 +12,7 @@
   "covenHint": "Стабильные логические метки хоста (кластер / проект / окружение)",
   "createRoleTitle": "Создать роль",
   "deleteRoleTitle": "Удалить роль: {{name}}",
-  "deregisterServiceTitle": "Deregister service: {{name}}",
+  "deregisterServiceTitle": "Снять с регистрации: {{name}}",
   "destroyTitle": "Destroy: {{name}}",
   "displayNameHint": "Человекочитаемое имя для отображения в UI",
   "removeHostTitle": "Remove host: {{sid}}",

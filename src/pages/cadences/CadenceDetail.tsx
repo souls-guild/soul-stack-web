@@ -94,7 +94,14 @@ export function CadenceDetail() {
           <dd className={styles.metaVal}>{c.last_run_at ? `${relative(c.last_run_at)} (${c.last_run_at})` : '—'}</dd>
 
           <dt className={styles.metaKey}>{t('cadences:createdBy')}</dt>
-          <dd className={styles.metaVal}>{c.created_by_aid}</dd>
+          <dd className={styles.metaVal}>
+            <Link
+              to={`/archons/${encodeURIComponent(c.created_by_aid)}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              {c.created_by_aid}
+            </Link>
+          </dd>
 
           <dt className={styles.metaKey}>{t('cadences:createdAt')}</dt>
           <dd className={styles.metaVal}>{relative(c.created_at)}</dd>

@@ -100,4 +100,53 @@ describe('PluginsList', () => {
     expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
     expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
   });
+
+  // ── Guard-тесты: кликабельные ссылки ─────────────────────────────────────
+
+  it('[LINKS] allowed_by_aid рендерится ссылкой на /archons/:aid', async () => {
+    installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
+    renderWithProviders(<PluginsList />, '/plugins');
+
+    await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
+
+    // archon-alice разрешила soul-mod-acme
+    const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
+    expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
+
+    // archon-bob разрешил soul-cloud-aws
+    const linkBob = screen.getByRole('link', { name: 'archon-bob' });
+    expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
+  });
+
+  it('[LINKS] allowed_by_aid с спецсимволами корректно URL-кодируется', async () => {
+    const specialSample = {
+      items: [
+        {
+          namespace: 'mod',
+          name: 'soul-mod-test',
+          ref: 'v1.0.0',
+          sha256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          allowed_by_aid: 'archon-special+one',
+          allowed_at: '2026-05-01T00:00:00Z',
+          revoked_at: null,
+        },
+      ],
+    };
+    installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: specialSample }]);
+    renderWithProviders(<PluginsList />, '/plugins');
+
+    await waitFor(() => expect(screen.getByText('soul-mod-test')).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'archon-special+one' });
+    expect(link).toHaveAttribute('href', `/archons/${encodeURIComponent('archon-special+one')}`);
+  });
+
+  it('[LINKS] при пустом списке ссылок на архонтов нет', async () => {
+    installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: { items: [] } }]);
+    renderWithProviders(<PluginsList />, '/plugins');
+
+    await waitFor(() => expect(screen.getByText(/keeper\.plugin\.allow/i)).toBeInTheDocument());
+
+    expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
+  });
 });

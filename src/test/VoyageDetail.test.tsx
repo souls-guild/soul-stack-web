@@ -310,4 +310,66 @@ describe('VoyageDetail', () => {
       expect(succeededBadge!.getAttribute('data-active')).toBe('true');
     });
   });
+
+  // ──────────────────────────────────────────────
+  // [LINKS] кликабельные ссылки
+  // ──────────────────────────────────────────────
+
+  it('[LINKS] started_by_aid рендерится ссылкой на /archons/:aid', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
+
+    const link = screen.getByRole('link', { name: 'archon-alice' });
+    expect(link).toHaveAttribute('href', '/archons/archon-alice');
+  });
+
+  it('[LINKS] target.sids в command-voyage рендерятся ссылками на /souls/:sid', async () => {
+    const cmdId = SAMPLE_VOYAGE_COMMAND.voyage_id;
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${cmdId}/targets`, body: { voyage_id: cmdId, targets: [] } },
+      { method: 'GET', url: `/v1/voyages/${cmdId}`, body: SAMPLE_VOYAGE_COMMAND },
+    ]);
+    renderVoyage(cmdId);
+    await waitFor(() => expect(screen.getByText('running')).toBeInTheDocument());
+
+    const linkA = screen.getByRole('link', { name: 'host-a.example.com' });
+    expect(linkA).toHaveAttribute('href', '/souls/host-a.example.com');
+
+    const linkB = screen.getByRole('link', { name: 'host-b.example.com' });
+    expect(linkB).toHaveAttribute('href', '/souls/host-b.example.com');
+  });
+
+  it('[LINKS] разделитель «, » между SID-ссылками сохранён визуально', async () => {
+    const cmdId = SAMPLE_VOYAGE_COMMAND.voyage_id;
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${cmdId}/targets`, body: { voyage_id: cmdId, targets: [] } },
+      { method: 'GET', url: `/v1/voyages/${cmdId}`, body: SAMPLE_VOYAGE_COMMAND },
+    ]);
+    renderVoyage(cmdId);
+    await waitFor(() => expect(screen.getByText('running')).toBeInTheDocument());
+
+    // Оба SID-элемента присутствуют как ссылки, значит визуальный разделитель отработал.
+    expect(screen.getAllByRole('link', { name: /host-[ab]\.example\.com/ })).toHaveLength(2);
+    // Текстовое содержимое ячейки содержит запятую-разделитель.
+    const sidCell = screen.getByRole('link', { name: 'host-a.example.com' }).closest('span')!.parentElement!;
+    expect(sidCell.textContent).toContain(',');
+  });
+
+  it('[LINKS] command-voyage без target.sids — секция target.sids не рендерится', async () => {
+    const voyage = { ...SAMPLE_VOYAGE_COMMAND, target: {} };
+    const cmdId = voyage.voyage_id;
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${cmdId}/targets`, body: { voyage_id: cmdId, targets: [] } },
+      { method: 'GET', url: `/v1/voyages/${cmdId}`, body: voyage },
+    ]);
+    renderVoyage(cmdId);
+    await waitFor(() => expect(screen.getByText('running')).toBeInTheDocument());
+
+    // Нет ссылок на /souls/... и нет текста target.sids.
+    expect(screen.queryByRole('link', { name: /host-/ })).not.toBeInTheDocument();
+  });
 });

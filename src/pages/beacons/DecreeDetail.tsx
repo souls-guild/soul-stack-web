@@ -106,7 +106,16 @@ export function DecreeDetail() {
         <span className={styles.metaKey}>Enabled</span>
         <span className={styles.metaVal}>{String(d.enabled)}</span>
         <span className={styles.metaKey}>Created by</span>
-        <span className={styles.metaVal}>{d.created_by_aid ?? '—'}</span>
+        <span className={styles.metaVal}>
+          {d.created_by_aid ? (
+            <Link
+              to={`/archons/${encodeURIComponent(d.created_by_aid)}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              {d.created_by_aid}
+            </Link>
+          ) : '—'}
+        </span>
         <span className={styles.metaKey}>Created at</span>
         <span className={styles.metaVal}>{d.created_at}</span>
         <span className={styles.metaKey}>Updated at</span>
