@@ -8,6 +8,8 @@
   "archonHideRevoked": "Hide revoked",
   "archonLimit": "Limit",
   "archonNoRoles": "The Archon has no roles. Assign them via RBAC → Archon assignments.",
+  "archonNoSynods": "The Archon is not a member of any group.",
+  "archonSynods": "Synods",
   "archonRevokeRoleAria": "unassign role {{role}}",
   "archonRevokeRoleConfirm": "Unassign {{role}} from {{aid}}?",
   "archonRolesOptional": "Roles (optional)",

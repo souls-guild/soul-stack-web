@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, UserPlus, ShieldPlus } from 'lucide-react';
+import { X, UserPlus, ShieldPlus, Pencil } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { EditSynodModal } from './EditSynodModal';
 import { AddOperatorModal } from './AddOperatorModal';
 import { GrantRoleModal } from './GrantRoleModal';
 import { prettySynodError } from './errors';
@@ -53,12 +54,14 @@ export function SynodDetail() {
   const { name = '' } = useParams<{ name: string }>();
   const qc = useQueryClient();
 
+  const [editOpen, setEditOpen] = useState(false);
   const [addOpOpen, setAddOpOpen] = useState(false);
   const [grantRoleOpen, setGrantRoleOpen] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
 
   const { hasPermission } = useMyPermissions();
+  const canEdit = hasPermission('synod.update');
   const canAddOp = hasPermission('synod.add-operator');
   const canRemoveOp = hasPermission('synod.remove-operator');
   const canGrantRole = hasPermission('synod.grant-role');
@@ -119,6 +122,17 @@ export function SynodDetail() {
             ) : null}
           </div>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={!canEdit}
+          title={!canEdit ? t('synods:noPermUpdate') : t('synods:editSynod')}
+          onClick={() => setEditOpen(true)}
+          data-testid="edit-synod-btn"
+        >
+          <Pencil size={14} style={{ marginRight: 6 }} />
+          {t('synods:editSynod')}
+        </Button>
       </div>
 
       {/* Members section */}
@@ -209,6 +223,13 @@ export function SynodDetail() {
         )}
       </section>
 
+      {editOpen ? (
+        <EditSynodModal
+          open={true}
+          synod={synod}
+          onClose={() => setEditOpen(false)}
+        />
+      ) : null}
       <AddOperatorModal
         open={addOpOpen}
         synodName={name}

@@ -55,6 +55,15 @@ export function ArchonDetail() {
   });
   const memberRoles = (rolesQ.data?.items ?? []).filter((r) => r.operators.includes(aid));
 
+  // Каталог Synod-групп — для секции «Синоды» в info-табе.
+  const synodsQ = useQuery({
+    queryKey: ['synods'],
+    queryFn: () => keeperApi.synods.list(),
+    enabled: Boolean(aid),
+    staleTime: 30_000,
+  });
+  const memberSynods = (synodsQ.data?.items ?? []).filter((s) => s.operators.includes(aid));
+
   const revokeRoleMut = useMutation({
     mutationFn: (roleName: string) => keeperApi.roles.revokeOperator(roleName, aid),
     onSuccess: () => {
@@ -213,6 +222,41 @@ export function ArchonDetail() {
                       <X size={12} />
                     </button>
                   </span>
+                ))}
+              </div>
+            )}
+          </section>
+          <section className={styles.section} aria-label="synods">
+            <h2 className={styles.sectionTitle}>{t('pages:archonSynods')}</h2>
+            {synodsQ.isLoading ? (
+              <div className={styles.loading}>{t('loading')}</div>
+            ) : memberSynods.length === 0 ? (
+              <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
+                {t('pages:archonNoSynods')}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {memberSynods.map((s) => (
+                  <Link
+                    key={s.name}
+                    to={`/synods/${encodeURIComponent(s.name)}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 8px',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-pill)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      textDecoration: 'none',
+                      color: 'inherit',
+                    }}
+                  >
+                    {s.name}
+                    {s.builtin ? <Badge tone="info">builtin</Badge> : null}
+                  </Link>
                 ))}
               </div>
             )}

@@ -30,5 +30,10 @@
   "noPermAddOp": "Missing synod.add-operator permission",
   "noPermRemoveOp": "Missing synod.remove-operator permission",
   "noPermGrantRole": "Missing synod.grant-role permission",
-  "noPermRevokeRole": "Missing synod.revoke-role permission"
+  "noPermRevokeRole": "Missing synod.revoke-role permission",
+  "noPermUpdate": "Missing synod.update permission",
+  "editSynod": "Edit",
+  "editSynodTitle": "Edit Synod: {{name}}",
+  "nameReadOnly": "name cannot be changed",
+  "nameLabel": "Group name (read-only)"
 }

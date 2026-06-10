@@ -55,6 +55,18 @@ const MY_PERMS_NO_CREATE = {
     { wildcard: false, resource: 'soul', action: 'list' },
   ],
 };
+// Права без synod.update.
+const MY_PERMS_NO_UPDATE = {
+  permissions: [
+    { wildcard: false, resource: 'soul', action: 'list' },
+    { wildcard: false, resource: 'synod', action: 'create' },
+    { wildcard: false, resource: 'synod', action: 'delete' },
+    { wildcard: false, resource: 'synod', action: 'add-operator' },
+    { wildcard: false, resource: 'synod', action: 'remove-operator' },
+    { wildcard: false, resource: 'synod', action: 'grant-role' },
+    { wildcard: false, resource: 'synod', action: 'revoke-role' },
+  ],
+};
 // Права без synod.add-operator.
 const MY_PERMS_NO_ADD_OP = {
   permissions: [
@@ -160,6 +172,9 @@ function recordingFetch(opts: {
     // Мутации Synod.
     if (/^\/v1\/synods$/.test(url) && method === 'POST') {
       return new Response('', { status: 201 });
+    }
+    if (/^\/v1\/synods\/[^/]+$/.test(url) && method === 'PATCH') {
+      return new Response(null, { status: 204 });
     }
     if (/^\/v1\/synods\/[^/]+$/.test(url) && method === 'DELETE') {
       return new Response('', { status: 204 });
@@ -627,6 +642,98 @@ describe('SynodsList', () => {
     expect(screen.getByText(/Загрузка/i)).toBeInTheDocument();
 
     resolve!(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  // --- Edit Synod guard-тесты ---
+
+  it('[EDIT] кнопка edit-synod-ops-team открывает модалку с именем и описанием', async () => {
+    recordingFetch({});
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    // name показан read-only
+    expect(within(dialog).getByTestId('edit-synod-name-readonly')).toHaveValue('ops-team');
+    // описание pre-filled
+    expect(within(dialog).getByTestId('edit-synod-description-input')).toHaveValue('Operations team');
+  });
+
+  it('[EDIT] PATCH /v1/synods/{name} шлёт { description }', async () => {
+    const calls = recordingFetch({});
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    const textarea = within(dialog).getByTestId('edit-synod-description-input');
+    await user.clear(textarea);
+    await user.type(textarea, 'Updated description');
+    await user.click(within(dialog).getByRole('button', { name: /^Сохранить$/ }));
+
+    await waitFor(() => {
+      const patch = calls.find((c) => c.url === '/v1/synods/ops-team' && c.method === 'PATCH');
+      expect(patch).toBeDefined();
+      const parsed = JSON.parse(patch!.body ?? '{}');
+      expect(parsed).toMatchObject({ description: 'Updated description' });
+    });
+    // Модалка закрылась после успеха.
+    await waitFor(
+      () => {
+        expect(screen.queryByRole('dialog', { name: /Редактировать Synod/i })).not.toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it('[EDIT][RBAC] без synod.update кнопка edit-synod disabled + title с noPermUpdate', async () => {
+    recordingFetch({ myPerms: MY_PERMS_NO_UPDATE });
+    renderWithProviders(<SynodsList />, '/synods');
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    const btn = screen.getByTestId('edit-synod-ops-team');
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('title', expect.stringMatching(/synod\.update/i));
+  });
+
+  it('[EDIT] 422 от PATCH показывается как ошибка в модалке', async () => {
+    recordingFetch({
+      conflict: {
+        path: /^\/v1\/synods\/ops-team$/,
+        method: 'PATCH',
+        status: 422,
+        detail: 'description is too long',
+      },
+    });
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Сохранить$/ }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent(/description is too long|валид/i);
+    // Модалка не закрылась.
+    expect(screen.getByRole('dialog', { name: /Редактировать Synod/i })).toBeInTheDocument();
+  });
+
+  it('[EDIT] name read-only — хинт "имя нельзя изменить" отображается', async () => {
+    recordingFetch({});
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod/i });
+    expect(within(dialog).getByTestId('edit-synod-name-hint')).toHaveTextContent(/имя нельзя изменить/i);
   });
 
   it('[STATE] synodsQ.error: показывает errorBox при 500 от GET /v1/synods', async () => {

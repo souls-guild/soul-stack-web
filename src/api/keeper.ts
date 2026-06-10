@@ -207,6 +207,7 @@ export type PushProviderListReply = components['schemas']['PushProviderListReply
 export type SynodView = components['schemas']['SynodView'];
 export type SynodListReply = components['schemas']['SynodListReply'];
 export type SynodCreateRequest = components['schemas']['SynodCreateRequest'];
+export type SynodUpdateRequest = components['schemas']['SynodUpdateRequest'];
 export type SynodGrantRoleRequest = components['schemas']['SynodGrantRoleRequest'];
 
 // GET /v1/me/permissions — эффективные права текущего Архонта (permission-aware UI).
@@ -717,6 +718,9 @@ export const keeperApi = {
     // POST /v1/synods → 201. 409 synod-already-exists.
     create: (body: SynodCreateRequest) =>
       apiSend<void>('/v1/synods', 'POST', { body }),
+    // PATCH /v1/synods/{name} → 204. Меняет только description (name immutable).
+    update: (name: string, body: SynodUpdateRequest) =>
+      apiSend<void>(`/v1/synods/${encodeURIComponent(name)}`, 'PATCH', { body }),
     // DELETE /v1/synods/{name} → 204. 409 synod-builtin / would-lock-out-cluster.
     delete: (name: string) =>
       apiSend<void>(`/v1/synods/${encodeURIComponent(name)}`, 'DELETE'),

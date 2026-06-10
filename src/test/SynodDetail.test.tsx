@@ -38,6 +38,15 @@ const MY_PERMS_WILDCARD = { permissions: [{ wildcard: true }] };
 const MY_PERMS_READONLY = {
   permissions: [{ wildcard: false, resource: 'soul', action: 'list' }],
 };
+const MY_PERMS_NO_UPDATE = {
+  permissions: [
+    { wildcard: false, resource: 'soul', action: 'list' },
+    { wildcard: false, resource: 'synod', action: 'add-operator' },
+    { wildcard: false, resource: 'synod', action: 'remove-operator' },
+    { wildcard: false, resource: 'synod', action: 'grant-role' },
+    { wildcard: false, resource: 'synod', action: 'revoke-role' },
+  ],
+};
 
 interface Call {
   url: string;
@@ -103,6 +112,9 @@ function recordingFetch(opts: {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+    if (/^\/v1\/synods\/[^/]+$/.test(url) && method === 'PATCH') {
+      return new Response(null, { status: 204 });
     }
     if (/^\/v1\/synods\/[^/]+\/operators$/.test(url) && method === 'POST') {
       return new Response('', { status: 201 });
@@ -308,5 +320,78 @@ describe('SynodDetail', () => {
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
     expect(screen.queryByTestId('grant-role-btn')).not.toBeInTheDocument();
+  });
+
+  // --- Edit guard-тесты ---
+
+  it('[EDIT] кнопка edit-synod-btn открывает EditSynodModal с именем и описанием', async () => {
+    const { within: w } = await import('@testing-library/react');
+    recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    expect(w(dialog).getByTestId('edit-synod-name-readonly')).toHaveValue('ops-team');
+    expect(w(dialog).getByTestId('edit-synod-description-input')).toHaveValue('Operations team');
+  });
+
+  it('[EDIT] PATCH /v1/synods/{name} шлёт { description }', async () => {
+    const { within: w } = await import('@testing-library/react');
+    const calls = recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    const textarea = w(dialog).getByTestId('edit-synod-description-input');
+    await user.clear(textarea);
+    await user.type(textarea, 'New description');
+    await user.click(w(dialog).getByRole('button', { name: /^Сохранить$/ }));
+
+    await waitFor(() => {
+      const patch = calls.find((c) => c.url === '/v1/synods/ops-team' && c.method === 'PATCH');
+      expect(patch).toBeDefined();
+      const parsed = JSON.parse(patch!.body ?? '{}');
+      expect(parsed).toMatchObject({ description: 'New description' });
+    });
+  });
+
+  it('[EDIT][RBAC] без synod.update кнопка edit-synod-btn disabled', async () => {
+    recordingFetch({ myPerms: MY_PERMS_NO_UPDATE });
+    renderWithProviders(withRoute(), '/synods/ops-team');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    const btn = screen.getByTestId('edit-synod-btn');
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('title', expect.stringMatching(/synod\.update/i));
+  });
+
+  it('[EDIT] 422 от PATCH показывается в модалке', async () => {
+    const { within: w } = await import('@testing-library/react');
+    recordingFetch({
+      conflict: {
+        path: /^\/v1\/synods\/ops-team$/,
+        method: 'PATCH',
+        status: 422,
+        detail: 'description too long',
+      },
+    });
+    renderWithProviders(withRoute(), '/synods/ops-team');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    await user.click(screen.getByTestId('edit-synod-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    await user.click(w(dialog).getByRole('button', { name: /^Сохранить$/ }));
+
+    const alert = await w(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent(/description too long|валид/i);
+    expect(screen.getByRole('dialog', { name: /Редактировать Synod/i })).toBeInTheDocument();
   });
 });

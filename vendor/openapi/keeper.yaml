@@ -529,6 +529,34 @@ paths:
         '500': { $ref: '#/components/responses/Problem500' }
 
   /v1/synods/{name}:
+    patch:
+      tags: [Synod]
+      operationId: UpdateSynod
+      summary: Изменить описание Synod-группы.
+      description: |
+        Permission: synod.update. MCP-tool: keeper.synod.update.
+        Меняет ТОЛЬКО description; name (PK) immutable — переименование
+        сознательно отвергнуто (ADR-049 amend). builtin-группа РАЗРЕШЕНА к
+        правке (description косметика, не поведение). Без subset-check и
+        self-lockout — description прав не выдаёт/не отнимает. 404
+        synod-not-found — группы нет.
+      parameters:
+        - $ref: '#/components/parameters/SynodNamePath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SynodUpdateRequest'
+      responses:
+        '204':
+          description: Описание группы изменено.
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
     delete:
       tags: [Synod]
       operationId: DeleteSynod
@@ -4260,6 +4288,20 @@ components:
           description: Человекочитаемое описание группы для UI/аудита.
       required: [name]
 
+    SynodUpdateRequest:
+      type: object
+      description: |
+        Правка Synod-группы (ADR-049 amend): меняется ТОЛЬКО description.
+        name (PK) immutable — берётся из path, в теле не принимается.
+        description обязателен (PATCH-семантика — присланное заменяет старое).
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1024
+          description: Новое человекочитаемое описание группы для UI/аудита.
+      required: [description]
+
     SynodGrantRoleRequest:
       type: object
       description: Добавление роли в bundle Synod-группы (ADR-049).
@@ -4686,6 +4728,10 @@ components:
         allow:
           type: object
           description: Allow-list; форма по source_type Omen-а.
+          # byte-passthrough JSONB (ADR-051 категория D): домен augur — json.RawMessage,
+          # сырые байты хранятся/отдаются as-is. map-re-marshal запрещён (переупорядочил
+          # бы ключи = wire-change). x-go-type → handler хранит RawMessage напрямую.
+          x-go-type: json.RawMessage
         delegate:
           type: boolean
           description: false — брокер (MVP-1); true — делегация (MVP-2).
@@ -4715,6 +4761,9 @@ components:
           type: string
         allow:
           type: object
+          # byte-passthrough JSONB (ADR-051 категория D): сырые байты augur.Rite.Allow
+          # отдаются as-is. map-re-marshal запрещён (переупорядочил бы ключи = wire-change).
+          x-go-type: json.RawMessage
         delegate:
           type: boolean
         token_ttl:
@@ -4766,6 +4815,8 @@ components:
         params:
           type: object
           description: Параметры проверки; форма зависит от check.
+          # byte-passthrough JSONB (ADR-051 категория D): домен oracle — json.RawMessage.
+          x-go-type: json.RawMessage
         enabled:
           type: boolean
           description: Активна ли проверка. По умолчанию true.
@@ -4792,6 +4843,8 @@ components:
           type: string
         params:
           type: object
+          # byte-passthrough JSONB (ADR-051 категория D): сырые байты oracle.Vigil.Params as-is.
+          x-go-type: json.RawMessage
         enabled:
           type: boolean
         created_by_aid:
@@ -4862,6 +4915,8 @@ components:
         action_input:
           type: object
           description: Вход сценария (vault-ref едет как есть).
+          # byte-passthrough JSONB (ADR-051 категория D): домен oracle — json.RawMessage.
+          x-go-type: json.RawMessage
         cooldown:
           type: string
           description: Минимальный интервал между срабатываниями per-(decree, subject).
@@ -4895,6 +4950,8 @@ components:
           type: string
         action_input:
           type: object
+          # byte-passthrough JSONB (ADR-051 категория D): сырые байты oracle.Decree.ActionInput as-is.
+          x-go-type: json.RawMessage
         cooldown:
           type: string
         enabled:

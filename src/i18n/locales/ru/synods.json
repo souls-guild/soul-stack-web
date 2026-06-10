@@ -30,5 +30,10 @@
   "noPermAddOp": "Нет права synod.add-operator",
   "noPermRemoveOp": "Нет права synod.remove-operator",
   "noPermGrantRole": "Нет права synod.grant-role",
-  "noPermRevokeRole": "Нет права synod.revoke-role"
+  "noPermRevokeRole": "Нет права synod.revoke-role",
+  "noPermUpdate": "Нет права synod.update",
+  "editSynod": "Редактировать",
+  "editSynodTitle": "Редактировать Synod: {{name}}",
+  "nameReadOnly": "имя нельзя изменить",
+  "nameLabel": "Имя группы (только чтение)"
 }

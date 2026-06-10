@@ -353,4 +353,82 @@ describe('ArchonDetail', () => {
     const link = screen.getByRole('link', { name: /Открыть Audit/i });
     expect(link).toHaveAttribute('href', '/audit?archon_aid=archon-alice');
   });
+
+  // ── Guard-тесты: секция Синодов ─────────────────────────────────────────────
+
+  const SYNODS_WITH_ALICE = {
+    items: [
+      { name: 'ops-team', description: 'Ops group', builtin: false, roles: ['soul-operator'], operators: ['archon-alice'] },
+      { name: 'admins', description: '', builtin: true, roles: ['cluster-admin'], operators: ['archon-alice', 'archon-bob'] },
+      { name: 'dev-team', description: '', builtin: false, roles: [], operators: ['archon-bob'] },
+    ],
+  };
+
+  const SYNODS_NO_ALICE = {
+    items: [
+      { name: 'ops-team', description: '', builtin: false, roles: [], operators: ['archon-bob'] },
+      { name: 'dev-team', description: '', builtin: false, roles: [], operators: [] },
+    ],
+  };
+
+  function synodFetch(op: typeof ALICE_OP, synods: typeof SYNODS_WITH_ALICE) {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (url.startsWith('/v1/operators/') && method === 'GET') {
+        return new Response(JSON.stringify(op), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.startsWith('/v1/roles') && method === 'GET') {
+        return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url === '/v1/synods' && method === 'GET') {
+        return new Response(JSON.stringify(synods), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch;
+  }
+
+  it('Guard: синоды-члены отображаются в секции, не-члены не показываются', async () => {
+    synodFetch(ALICE_OP, SYNODS_WITH_ALICE);
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument();
+    });
+
+    // Секция синодов видна
+    const section = await screen.findByRole('region', { name: /synods/i });
+    expect(section).toBeInTheDocument();
+
+    // archon-alice — член ops-team и admins
+    expect(await screen.findByRole('link', { name: /ops-team/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /admins/i })).toBeInTheDocument();
+
+    // dev-team — alice не член, не должен быть
+    expect(screen.queryByRole('link', { name: /dev-team/i })).not.toBeInTheDocument();
+  });
+
+  it('Guard: ссылки на синоды ведут на /synods/:name', async () => {
+    synodFetch(ALICE_OP, SYNODS_WITH_ALICE);
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    const link = await screen.findByRole('link', { name: /ops-team/i });
+    expect(link).toHaveAttribute('href', '/synods/ops-team');
+  });
+
+  it('Guard: empty-state если архонт не в ни одной группе', async () => {
+    synodFetch(ALICE_OP, SYNODS_NO_ALICE);
+    renderWithProviders(withParamRoute(), '/archons/archon-alice');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument();
+    });
+
+    // Ждём пока загрузка синодов завершится и появится empty-state
+    await waitFor(() => {
+      expect(screen.getByText(/не состоит ни в одной группе/i)).toBeInTheDocument();
+    });
+    // Никаких ссылок на синоды нет
+    expect(screen.queryByRole('link', { name: /ops-team/i })).not.toBeInTheDocument();
+  });
 });

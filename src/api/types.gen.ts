@@ -348,7 +348,16 @@ export interface paths {
         delete: operations["DeleteSynod"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Изменить описание Synod-группы.
+         * @description Permission: synod.update. MCP-tool: keeper.synod.update.
+         *     Меняет ТОЛЬКО description; name (PK) immutable — переименование
+         *     сознательно отвергнуто (ADR-049 amend). builtin-группа РАЗРЕШЕНА к
+         *     правке (description косметика, не поведение). Без subset-check и
+         *     self-lockout — description прав не выдаёт/не отнимает. 404
+         *     synod-not-found — группы нет.
+         */
+        patch: operations["UpdateSynod"];
         trace?: never;
     };
     "/v1/synods/{name}/operators": {
@@ -2532,6 +2541,15 @@ export interface components {
             name: string;
             /** @description Человекочитаемое описание группы для UI/аудита. */
             description?: string;
+        };
+        /**
+         * @description Правка Synod-группы (ADR-049 amend): меняется ТОЛЬКО description.
+         *     name (PK) immutable — берётся из path, в теле не принимается.
+         *     description обязателен (PATCH-семантика — присланное заменяет старое).
+         */
+        SynodUpdateRequest: {
+            /** @description Новое человекочитаемое описание группы для UI/аудита. */
+            description: string;
         };
         /** @description Добавление роли в bundle Synod-группы (ADR-049). */
         SynodGrantRoleRequest: {
@@ -5187,6 +5205,37 @@ export interface operations {
             403: components["responses"]["Problem403"];
             404: components["responses"]["Problem404"];
             409: components["responses"]["Problem409"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    UpdateSynod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя Synod-группы (kebab-case). */
+                name: components["parameters"]["SynodNamePath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynodUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Описание группы изменено. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
             500: components["responses"]["Problem500"];
         };
     };

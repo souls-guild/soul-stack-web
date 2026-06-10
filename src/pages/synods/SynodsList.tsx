@@ -2,13 +2,14 @@ import { type CSSProperties, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, UserPlus, ShieldPlus, Users2 } from 'lucide-react';
+import { X, UserPlus, ShieldPlus, Users2, Pencil } from 'lucide-react';
 import { keeperApi, type SynodView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { CreateSynodModal } from './CreateSynodModal';
 import { DeleteSynodModal } from './DeleteSynodModal';
+import { EditSynodModal } from './EditSynodModal';
 import { AddOperatorModal } from './AddOperatorModal';
 import { GrantRoleModal } from './GrantRoleModal';
 import { prettySynodError } from './errors';
@@ -78,9 +79,11 @@ function chip({ label, onRemove, ariaLabel, removeDisabled, removeTitle }: ChipP
 interface SynodRowProps {
   synod: SynodView;
   onDelete: (s: SynodView) => void;
+  onEdit: (s: SynodView) => void;
   onAddOperator: (s: SynodView) => void;
   onGrantRole: (s: SynodView) => void;
   canDelete: boolean;
+  canEdit: boolean;
   canAddOp: boolean;
   canRemoveOp: boolean;
   canGrantRole: boolean;
@@ -90,9 +93,11 @@ interface SynodRowProps {
 function SynodRow({
   synod,
   onDelete,
+  onEdit,
   onAddOperator,
   onGrantRole,
   canDelete,
+  canEdit,
   canAddOp,
   canRemoveOp,
   canGrantRole,
@@ -188,17 +193,30 @@ function SynodRow({
           </div>
         </td>
         <td>
-          <button
-            type="button"
-            aria-label={t('synods:deleteSynod')}
-            title={synod.builtin ? t('synods:builtinDeleteDenied') : t('synods:deleteSynod')}
-            disabled={synod.builtin || !canDelete}
-            onClick={() => onDelete(synod)}
-            style={iconBtn(true, synod.builtin || !canDelete)}
-            data-testid={`delete-synod-${synod.name}`}
-          >
-            <X size={14} />
-          </button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              type="button"
+              aria-label={t('synods:editSynod')}
+              title={!canEdit ? t('synods:noPermUpdate') : t('synods:editSynod')}
+              disabled={!canEdit}
+              onClick={canEdit ? () => { setRowError(null); onEdit(synod); } : undefined}
+              style={iconBtn(false, !canEdit)}
+              data-testid={`edit-synod-${synod.name}`}
+            >
+              <Pencil size={13} />
+            </button>
+            <button
+              type="button"
+              aria-label={t('synods:deleteSynod')}
+              title={synod.builtin ? t('synods:builtinDeleteDenied') : t('synods:deleteSynod')}
+              disabled={synod.builtin || !canDelete}
+              onClick={() => onDelete(synod)}
+              style={iconBtn(true, synod.builtin || !canDelete)}
+              data-testid={`delete-synod-${synod.name}`}
+            >
+              <X size={14} />
+            </button>
+          </div>
         </td>
       </tr>
     </>
@@ -209,6 +227,7 @@ export function SynodsList() {
   const { t } = useTranslation(['synods', 'common']);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<SynodView | null>(null);
+  const [editing, setEditing] = useState<SynodView | null>(null);
   const [addingOpTo, setAddingOpTo] = useState<SynodView | null>(null);
   const [grantingRoleTo, setGrantingRoleTo] = useState<SynodView | null>(null);
 
@@ -216,6 +235,7 @@ export function SynodsList() {
 
   const canCreate = hasPermission('synod.create');
   const canDelete = hasPermission('synod.delete');
+  const canEdit = hasPermission('synod.update');
   const canAddOp = hasPermission('synod.add-operator');
   const canRemoveOp = hasPermission('synod.remove-operator');
   const canGrantRole = hasPermission('synod.grant-role');
@@ -282,9 +302,11 @@ export function SynodsList() {
                 key={s.name}
                 synod={s}
                 onDelete={setDeleting}
+                onEdit={setEditing}
                 onAddOperator={setAddingOpTo}
                 onGrantRole={setGrantingRoleTo}
                 canDelete={canDelete}
+                canEdit={canEdit}
                 canAddOp={canAddOp}
                 canRemoveOp={canRemoveOp}
                 canGrantRole={canGrantRole}
@@ -296,6 +318,14 @@ export function SynodsList() {
       ) : null}
 
       <CreateSynodModal open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {editing ? (
+        <EditSynodModal
+          open={true}
+          synod={editing}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
 
       {deleting ? (
         <DeleteSynodModal
