@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -33,13 +33,16 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('[ИНВАРИАНТ] при 403 /v1/me/permissions hasPermission("synod.create") возвращает true', async () => {
-    globalThis.fetch = (async () =>
+    vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({ type: 'about:blank', title: 'Forbidden', status: 403, detail: 'forbidden' }),
         { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
-      )) as typeof fetch;
+      ));
 
     const qc = makeQC();
     const { result } = renderHook(() => useMyPermissions(), { wrapper: wrapper(qc) });
@@ -54,11 +57,11 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
   });
 
   it('[ИНВАРИАНТ] при 500 /v1/me/permissions hasPermission возвращает true', async () => {
-    globalThis.fetch = (async () =>
+    vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({ type: 'about:blank', title: 'Error', status: 500, detail: 'internal' }),
         { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
-      )) as typeof fetch;
+      ));
 
     const qc = makeQC();
     const { result } = renderHook(() => useMyPermissions(), { wrapper: wrapper(qc) });
@@ -68,13 +71,13 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
   });
 
   it('[БАЗОВАЯ] при успешном ответе без нужного права hasPermission возвращает false', async () => {
-    globalThis.fetch = (async () =>
+    vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({
           permissions: [{ wildcard: false, resource: 'soul', action: 'list' }],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )) as typeof fetch;
+      ));
 
     const qc = makeQC();
     const { result } = renderHook(() => useMyPermissions(), { wrapper: wrapper(qc) });
@@ -85,11 +88,11 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
   });
 
   it('[БАЗОВАЯ] wildcard=true → hasPermission всегда true', async () => {
-    globalThis.fetch = (async () =>
+    vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({ permissions: [{ wildcard: true }] }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )) as typeof fetch;
+      ));
 
     const qc = makeQC();
     const { result } = renderHook(() => useMyPermissions(), { wrapper: wrapper(qc) });

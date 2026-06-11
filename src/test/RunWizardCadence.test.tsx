@@ -2,7 +2,7 @@
  * RunWizard Cadence (recurrence) — тесты режима «Регулярно».
  * Тестирует переключение runMode, submit → POST /v1/cadences.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -44,7 +44,7 @@ interface PostCapture {
 function setupFetch(opts: { capturedPosts?: PostCapture[] } = {}) {
   const posts: PostCapture[] = opts.capturedPosts ?? [];
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = init?.body ? (JSON.parse(init.body as string) as unknown) : null;
@@ -83,7 +83,7 @@ function setupFetch(opts: { capturedPosts?: PostCapture[] } = {}) {
       });
     }
     return new Response('{}', { status: 404 });
-  }) as typeof fetch;
+  }) as typeof fetch);
 
   return posts;
 }
@@ -99,6 +99,9 @@ beforeEach(() => {
     static CONNECTING = 0;
     static CLOSED = 2;
   };
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('RunWizard — режим Cadence (recurrence)', () => {

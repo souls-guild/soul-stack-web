@@ -10,7 +10,7 @@
 // 7. Кнопка «Run по набору» → navigate с service + incarnation_regex (param НЕ incarnation).
 // 8. RunWizard с ?incarnation_regex=... реально резолвит список инкарнаций (не экранированный литерал).
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -93,6 +93,9 @@ describe('IncarnationsList — state filter', () => {
     tokenStore.clear();
     navigateSpy.mockReset();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('панель state-фильтра скрыта без выбора сервиса', async () => {
     installFetchMock([
@@ -139,7 +142,7 @@ describe('IncarnationsList — state filter', () => {
 
   it('отправляет state.<field>=<op>:<value> при заполненном предикате', async () => {
     let capturedUrl: string | null = null;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
@@ -160,7 +163,7 @@ describe('IncarnationsList — state filter', () => {
         });
       }
       return new Response(JSON.stringify({ title: 'not mocked', detail: urlStr }), { status: 599 });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
@@ -196,7 +199,7 @@ describe('IncarnationsList — state filter', () => {
     // Первый запрос к incarnations отдаём 422 сразу (без state-фильтров).
     // Чтобы 422 сработал при заполненном предикате — создаём мок,
     // который возвращает 422 всегда для /v1/incarnations.
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
@@ -223,7 +226,7 @@ describe('IncarnationsList — state filter', () => {
         });
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
@@ -265,7 +268,7 @@ describe('IncarnationsList — state filter', () => {
 
   it('sort передаётся как query-param (server-side)', async () => {
     let capturedUrl: string | null = null;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (urlStr.startsWith('/v1/services')) {
@@ -276,7 +279,7 @@ describe('IncarnationsList — state filter', () => {
         return new Response(JSON.stringify(INCARNATIONS_REPLY), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
@@ -371,7 +374,7 @@ describe('IncarnationsList — state filter', () => {
     const snapshotRegex = `^(${INCARNATION_NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`;
 
     // Общий fetch-stub для RunWizard.
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const json = (obj: unknown, status = 200) =>
         new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
@@ -399,7 +402,7 @@ describe('IncarnationsList — state filter', () => {
         return json({ items: [] });
       }
       return new Response('{}', { status: 404 });
-    }) as typeof fetch;
+    }));
 
     // URL как будто пришёл из IncarnationsList.handleRunSet.
     const initialPath = `/run?workload=scenario&service=redis&incarnation_regex=${encodeURIComponent(snapshotRegex)}`;

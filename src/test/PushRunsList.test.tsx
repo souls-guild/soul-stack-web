@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -41,6 +41,9 @@ describe('PushRunsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('рендерит список push-прогонов', async () => {
     installFetchMock([
@@ -61,13 +64,13 @@ describe('PushRunsList', () => {
 
   it('ssh_provider filter уходит в query как ?ssh_provider=', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
     renderWithProviders(<PushRunsList />, '/push-runs');
     const user = userEvent.setup();
     await user.type(screen.getByPlaceholderText('default'), 'aws-bastion');
@@ -78,13 +81,13 @@ describe('PushRunsList', () => {
 
   it('status chip multi-select добавляет ?status= повторно', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
     renderWithProviders(<PushRunsList />, '/push-runs');
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'success' }));

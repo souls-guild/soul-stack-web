@@ -204,7 +204,6 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
                 {/* AID кликабелен — ведёт на карточку архонта */}
                 <Link
                   to={`/archons/${encodeURIComponent(aid)}`}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
                 >
                   {aid}
                 </Link>

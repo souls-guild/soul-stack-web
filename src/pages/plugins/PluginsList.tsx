@@ -192,7 +192,6 @@ export function PluginsList() {
                   <td className="mono">
                     <Link
                       to={`/archons/${encodeURIComponent(row.allowed_by_aid)}`}
-                      style={{ textDecoration: 'none', color: 'inherit' }}
                     >
                       {row.allowed_by_aid}
                     </Link>

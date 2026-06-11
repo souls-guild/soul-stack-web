@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, MemoryRouter, useLocation } from 'react-router-dom';
@@ -51,6 +51,9 @@ function renderSoulsListWithRun() {
 describe('SoulsList', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит список Souls из /v1/souls', async () => {
@@ -257,7 +260,7 @@ describe('SoulsList — keyset pagination', () => {
         next_cursor: 'tok1',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
-    globalThis.fetch = fetchSpy as typeof fetch;
+    vi.stubGlobal('fetch', fetchSpy);
 
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
@@ -404,7 +407,7 @@ describe('SoulsList — keyset pagination', () => {
         status: 200, headers: { 'Content-Type': 'application/json' },
       });
     });
-    globalThis.fetch = fetchSpy as typeof fetch;
+    vi.stubGlobal('fetch', fetchSpy);
 
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
@@ -476,7 +479,7 @@ describe('SoulsList — keyset pagination', () => {
         next_cursor: 'tok',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
-    globalThis.fetch = fetchSpy as typeof fetch;
+    vi.stubGlobal('fetch', fetchSpy);
 
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
@@ -519,7 +522,7 @@ describe('SoulsList — keyset pagination', () => {
         // next_cursor отсутствует — scoped-ответ с нулевым покрытием
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
-    globalThis.fetch = fetchSpy as typeof fetch;
+    vi.stubGlobal('fetch', fetchSpy);
 
     renderWithProviders(<SoulsList />, '/souls');
 
@@ -549,7 +552,7 @@ describe('SoulsList — keyset pagination', () => {
         next_cursor: 'tok1',
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
-    globalThis.fetch = fetchSpy as typeof fetch;
+    vi.stubGlobal('fetch', fetchSpy);
 
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
@@ -627,7 +630,7 @@ describe('SoulsList — keyset pagination', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
-    globalThis.fetch = fetchSpy as typeof fetch;
+    vi.stubGlobal('fetch', fetchSpy);
 
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -14,7 +14,7 @@ interface Captured {
 // fetch-mock с захватом request body (стандартный installFetchMock тело не пишет).
 function installCapturingMock(status: number, responseBody: unknown): Captured[] {
   const calls: Captured[] = [];
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? 'GET').toUpperCase();
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     let body: unknown = undefined;
@@ -30,13 +30,16 @@ function installCapturingMock(status: number, responseBody: unknown): Captured[]
       status,
       headers: { 'Content-Type': 'application/json' },
     });
-  }) as typeof fetch;
+  }));
   return calls;
 }
 
 describe('RegisterServiceModal', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('валидная форма шлёт POST /v1/services с правильным body', async () => {

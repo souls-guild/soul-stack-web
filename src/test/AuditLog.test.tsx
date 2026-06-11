@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -9,6 +9,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('AuditLog', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит ленту audit-events с source-badge и expandable payload', async () => {
@@ -59,13 +62,13 @@ describe('AuditLog', () => {
 
   it('применяет type / source / archon_aid фильтры в query', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<AuditLog />, '/audit');
     const user = userEvent.setup();
@@ -128,13 +131,13 @@ describe('AuditLog', () => {
 
   it('подхватывает archon_aid из URL search params (deep-link из ArchonDetail)', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
     renderWithProviders(<AuditLog />, '/audit?archon_aid=archon-bootstrap');
     await waitFor(() => {
       expect(lastUrl).toMatch(/archon_aid=archon-bootstrap/);

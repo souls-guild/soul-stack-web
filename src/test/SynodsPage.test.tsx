@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -119,7 +119,7 @@ function recordingFetch(opts: {
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
   const calls: Call[] = [];
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === 'string'
         ? input
@@ -193,13 +193,16 @@ function recordingFetch(opts: {
     }
 
     return new Response('{}', { status: 599 });
-  }) as typeof fetch;
+  });
   return calls;
 }
 
 describe('SynodsList', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит список Synod-групп из GET /v1/synods', async () => {
@@ -633,10 +636,10 @@ describe('SynodsList', () => {
 
   it('[STATE] isLoading: показывает loading-индикатор пока данные грузятся', () => {
     let resolve: ((v: Response) => void) | undefined;
-    globalThis.fetch = (() =>
+    vi.stubGlobal('fetch', () =>
       new Promise<Response>((r) => {
         resolve = r;
-      })) as typeof fetch;
+      }));
 
     renderWithProviders(<SynodsList />, '/synods');
     expect(screen.getByText(/Загрузка/i)).toBeInTheDocument();
@@ -737,7 +740,7 @@ describe('SynodsList', () => {
   });
 
   it('[STATE] synodsQ.error: показывает errorBox при 500 от GET /v1/synods', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url =
         typeof input === 'string'
           ? input
@@ -755,7 +758,7 @@ describe('SynodsList', () => {
         JSON.stringify({ type: 'about:blank', title: 'Error', status: 500, detail: 'server error' }),
         { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
       );
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => {

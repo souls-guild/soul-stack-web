@@ -2131,69 +2131,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/push/cleanup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Чистка /var/lib/soul-stack/ на хосте.
-         * @description Permission: push.cleanup. MCP-tool: keeper.push.cleanup.
-         *     Async-операция. Полная семантика — docs/keeper/push.md → Cleanup.
-         */
-        post: operations["PushCleanup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Создать Provider.
-         * @description Permission: provider.create. MCP-tool: keeper.provider.create.
-         *     Семантика — docs/keeper/cloud.md → Provider и Profile.
-         */
-        post: operations["CreateProvider"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/profiles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Создать Profile.
-         * @description Permission: profile.create. MCP-tool: keeper.profile.create.
-         *     Семантика — docs/keeper/cloud.md.
-         */
-        post: operations["CreateProfile"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/push-providers": {
         parameters: {
             query?: never;
@@ -2699,10 +2636,11 @@ export interface components {
             path: string;
             /**
              * @description Дискриминатор сценария для UI (каталог, не хардкод имён):
-             *     `lifecycle` — keeper трактует его особо (create / destroy /
-             *     converge — bootstrap / teardown / drift-detect), `operational` —
-             *     обычная операция над state. Размечается keeper-ом по имени, фронт
-             *     читает поле, а не зашивает список lifecycle-имён.
+             *     `lifecycle` — keeper трактует его особо (create / destroy —
+             *     bootstrap / teardown), `operational` — обычная операция над state.
+             *     `converge` — operational с двойной ролью (operational-прогон +
+             *     dry-run target для check-drift). Размечается keeper-ом по имени,
+             *     фронт читает поле, а не зашивает список lifecycle-имён.
              * @enum {string}
              */
             kind: "lifecycle" | "operational";
@@ -3285,6 +3223,24 @@ export interface components {
             incarnation: string;
             scenario: string;
         };
+        /** @description ADR-031 Slice C. Counts-агрегат последнего drift-скана incarnation, хранимый в колонке `incarnation.last_drift_summary`. Симметричен scenario.DriftSummary плюс `total_hosts`/`scanned_at` для дискриминации устаревших скан-данных. Полный DriftReport в БД не хранится — только эти счётчики. */
+        DriftScanSummary: {
+            /** @description Число хостов с обнаруженным дрейфом конфигурации. */
+            hosts_drifted: number;
+            /** @description Число хостов без дрейфа (фактическое состояние совпало). */
+            hosts_clean: number;
+            /** @description Число хостов, не поддержавших dry_run-проверку дрейфа. */
+            hosts_unsupported: number;
+            /** @description Число хостов, на которых проверка дрейфа упала с ошибкой. */
+            hosts_failed: number;
+            /** @description Общее число хостов в скане (сумма перечисленных категорий). */
+            total_hosts: number;
+            /**
+             * Format: date-time
+             * @description Время завершения скана (RFC3339Nano, UTC). Совпадает с `last_drift_check_at` родительского объекта.
+             */
+            scanned_at: string;
+        };
         IncarnationGetReply: {
             name: string;
             service: string;
@@ -3321,10 +3277,8 @@ export interface components {
              * @description ADR-031 Slice C. Время завершения последнего dry_run-прогона converge (фон или on-demand из Slice B). Отсутствует, если incarnation ни разу не сканировалась.
              */
             last_drift_check_at?: string | null;
-            /** @description ADR-031 Slice C. Counts-агрегат последнего DriftReport (jsonb- passthrough из колонки `incarnation.last_drift_summary`). Поля: hosts_drifted / hosts_clean / hosts_unsupported / hosts_failed / total_hosts (integer) + scanned_at (date-time, RFC3339Nano). Отсутствует, если incarnation ни разу не сканировалась. */
-            last_drift_summary?: {
-                [key: string]: unknown;
-            } | null;
+            /** @description ADR-031 Slice C. Counts-агрегат последнего DriftReport-а из колонки `incarnation.last_drift_summary` (typed). Отсутствует, если incarnation ни разу не сканировалась. */
+            last_drift_summary?: components["schemas"]["DriftScanSummary"] | null;
         };
         IncarnationListReply: {
             items: components["schemas"]["IncarnationGetReply"][];
@@ -4532,69 +4486,6 @@ export interface components {
             offset: number;
             limit: number;
             total: number;
-        };
-        PushCleanupRequest: {
-            /** @description Список SID (FQDN) target-хостов. */
-            inventory: string[];
-            ssh_provider?: string;
-            /**
-             * @description true — стереть /var/lib/soul-stack/ целиком (для revoke);
-             *     false (default) — только устаревшие версии.
-             * @default false
-             */
-            full: boolean;
-        };
-        PushCleanupReply: {
-            apply_id: string;
-        };
-        ProviderCreateRequest: {
-            /** @description Имя Provider (kebab-case), уникальное в кластере. */
-            name: string;
-            /**
-             * @description Имя CloudDriver-плагина (aws/yc/…) из
-             *     keeper.yml plugins.cloud_drivers[].name.
-             */
-            type: string;
-            /** @description Регион/zone провайдера. */
-            region: string;
-            /**
-             * @description Vault-ref до credentials (формат "vault:<path>"). Сам secret
-             *     в БД не пишется. SENSITIVE: secret-masking middleware заменяет
-             *     значение на "vault:***" в логах.
-             */
-            credentials_ref: string;
-        };
-        ProviderCreateReply: {
-            name: string;
-            type: string;
-            region: string;
-            credentials_ref: string;
-            /** Format: date-time */
-            created_at: string;
-            created_by_aid: string;
-        };
-        ProfileCreateRequest: {
-            /** @description Имя Profile (kebab-case). */
-            name: string;
-            /** @description Имя зарегистрированного Provider. */
-            provider: string;
-            /** @description Параметры VM, валидируются против profile_schema CloudDriver-плагина. */
-            params: {
-                [key: string]: unknown;
-            };
-            /** @description Сырая cloud-init userdata (optional). */
-            cloud_init?: string;
-        };
-        ProfileCreateReply: {
-            name: string;
-            provider: string;
-            params: {
-                [key: string]: unknown;
-            };
-            cloud_init?: string;
-            /** Format: date-time */
-            created_at: string;
-            created_by_aid: string;
         };
     };
     responses: {
@@ -8018,96 +7909,6 @@ export interface operations {
             400: components["responses"]["Problem400"];
             401: components["responses"]["Problem401"];
             403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    PushCleanup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PushCleanupRequest"];
-            };
-        };
-        responses: {
-            /** @description Cleanup-прогон принят. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushCleanupReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateProvider: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProviderCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Provider создан. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateProfile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProfileCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Profile создан. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProfileCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
             422: components["responses"]["Problem422"];
             500: components["responses"]["Problem500"];
         };

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -12,6 +12,9 @@ const EMPTY_VIGILS = { items: [], offset: 0, limit: 200, total: 0 };
 const EMPTY_INCS = { items: [], offset: 0, limit: 200, total: 0 };
 
 describe('DecreeNewForm', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
   beforeEach(() => {
     tokenStore.clear();
   });
@@ -39,8 +42,7 @@ describe('DecreeNewForm', () => {
       updated_at: '2026-05-27T00:00:00Z',
     };
     const postSpy = vi.fn();
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const url = typeof input === 'string' ? input : input.toString();
       if (method === 'POST' && url.startsWith('/v1/decrees')) {
@@ -69,7 +71,7 @@ describe('DecreeNewForm', () => {
         });
       }
       return new Response('{}', { status: 599, headers: { 'Content-Type': 'application/json' } });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(
       <Routes>
@@ -96,7 +98,5 @@ describe('DecreeNewForm', () => {
     expect(payload.incarnation_name).toBe('redis-prod');
     expect(payload.action_scenario).toBe('restart');
     expect(payload.enabled).toBe(false);
-
-    globalThis.fetch = origFetch;
   });
 });

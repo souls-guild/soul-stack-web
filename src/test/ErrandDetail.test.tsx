@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -48,9 +48,12 @@ describe('ErrandDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('рендерит meta + stdout в табе Output', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/v1/errands/')) {
         return new Response(JSON.stringify(TERMINAL_RESULT), {
@@ -59,7 +62,7 @@ describe('ErrandDetail', () => {
         });
       }
       return new Response('{}', { status: 404 });
-    }) as typeof fetch;
+    });
 
     renderAt('/errands/01HZAA0000000000000000000B');
     await waitFor(() => {
@@ -71,8 +74,8 @@ describe('ErrandDetail', () => {
   });
 
   it('таб Events показывает started/finished', async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(TERMINAL_RESULT), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify(TERMINAL_RESULT), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     renderAt('/errands/01HZAA0000000000000000000B');
     await waitFor(() => {
       expect(screen.getByText(/hello/)).toBeInTheDocument();
@@ -87,11 +90,11 @@ describe('ErrandDetail', () => {
   });
 
   it('running → 202 polling, без stdout', async () => {
-    globalThis.fetch = (async () =>
+    vi.stubGlobal('fetch', async () =>
       new Response(JSON.stringify({ errand_id: 'x', status: 'running' }), {
         status: 202,
         headers: { 'Content-Type': 'application/json' },
-      })) as typeof fetch;
+      }));
     renderAt('/errands/01HZAA0000000000000000000C');
     await waitFor(() => {
       expect(screen.getByText(/polling/i)).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -10,6 +10,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('IncarnationNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('zod-валидация: пустое name блокирует submit', async () => {
@@ -133,7 +136,7 @@ describe('IncarnationNewForm', () => {
 
   it('POST /v1/incarnations отправляется с типизированным body', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : '';
@@ -153,7 +156,7 @@ describe('IncarnationNewForm', () => {
         );
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    }) as typeof fetch);
 
     renderWithProviders(
       <Routes>

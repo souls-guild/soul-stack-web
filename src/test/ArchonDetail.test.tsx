@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -18,6 +18,9 @@ function withParamRoute() {
 describe('ArchonDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит профиль активного Архонта', async () => {
@@ -111,7 +114,7 @@ describe('ArchonDetail', () => {
       bootstrap_initial: false,
       metadata: {},
     };
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       calls.push({ url, method });
@@ -125,7 +128,7 @@ describe('ArchonDetail', () => {
         return new Response('', { status: 204 });
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
     await waitFor(() => {
@@ -179,7 +182,7 @@ describe('ArchonDetail', () => {
     revokeDetail?: string;
   }): { calls: Array<{ url: string; method: string; body: string | null }> } {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : null;
@@ -207,7 +210,7 @@ describe('ArchonDetail', () => {
         return new Response(null, { status: 204 });
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
     return { calls };
   }
 
@@ -274,8 +277,6 @@ describe('ArchonDetail', () => {
     });
     // Ошибки нет — inline-error не показывается
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-
-    vi.unstubAllGlobals();
   });
 
   it('Guard: 409 lockout → inline-ошибка видна, роль НЕ исчезает из списка', async () => {
@@ -301,8 +302,6 @@ describe('ArchonDetail', () => {
 
     // Роль всё ещё в DOM (не пропала)
     expect(screen.getByRole('button', { name: /снять роль cluster-admin/i })).toBeInTheDocument();
-
-    vi.unstubAllGlobals();
   });
 
   it('Guard: 403 при снятии роли → понятное сообщение об ошибке', async () => {
@@ -323,8 +322,6 @@ describe('ArchonDetail', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/недостаточно прав|forbidden/i);
-
-    vi.unstubAllGlobals();
   });
 
   it('Activity-tab показывает link на /audit?archon_aid=<aid>', async () => {
@@ -372,7 +369,7 @@ describe('ArchonDetail', () => {
   };
 
   function synodFetch(op: typeof ALICE_OP, synods: typeof SYNODS_WITH_ALICE) {
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (url.startsWith('/v1/operators/') && method === 'GET') {
@@ -385,7 +382,7 @@ describe('ArchonDetail', () => {
         return new Response(JSON.stringify(synods), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
   }
 
   it('Guard: синоды-члены отображаются в секции, не-члены не показываются', async () => {

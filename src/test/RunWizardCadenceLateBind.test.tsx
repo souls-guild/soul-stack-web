@@ -8,7 +8,7 @@
  *   3. Cadence с regex/soulprint И coven → плашка cadence-early-binding-warn видна.
  *   4. Cadence с только regex (без coven) → плашка cadence-snapshot-only-warn видна.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -52,67 +52,70 @@ function setupFetch(
 ): { posts: PostCapture[] } {
   const posts: PostCapture[] = [];
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url =
-      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    const method = (init?.method ?? 'GET').toUpperCase();
-    const body = init?.body ? (JSON.parse(init.body as string) as unknown) : null;
-    const json = (obj: unknown, status = 200) =>
-      new Response(JSON.stringify(obj), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-      });
+  vi.stubGlobal(
+    'fetch',
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = init?.body ? (JSON.parse(init.body as string) as unknown) : null;
+      const json = (obj: unknown, status = 200) =>
+        new Response(JSON.stringify(obj), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
 
-    if (method === 'POST' && url.includes('/v1/cadences')) {
-      posts.push({ url, body });
-      return json(
-        { cadence_id: 'cad-lb-01', name: 'test', enabled: true, location: '/v1/cadences/cad-lb-01' },
-        201,
-      );
-    }
-    if (method === 'POST' && url.includes('/v1/voyages')) {
-      posts.push({ url, body });
-      return json(
-        { voyage_id: 'voy-lb-01', kind: 'command', scope_size: 1, status: 'pending', location: '' },
-        202,
-      );
-    }
+      if (method === 'POST' && url.includes('/v1/cadences')) {
+        posts.push({ url, body });
+        return json(
+          { cadence_id: 'cad-lb-01', name: 'test', enabled: true, location: '/v1/cadences/cad-lb-01' },
+          201,
+        );
+      }
+      if (method === 'POST' && url.includes('/v1/voyages')) {
+        posts.push({ url, body });
+        return json(
+          { voyage_id: 'voy-lb-01', kind: 'command', scope_size: 1, status: 'pending', location: '' },
+          202,
+        );
+      }
 
-    if (url.includes('/v1/souls')) {
-      return json({
-        items: souls.map((s) => ({
-          sid: s.sid,
-          transport: 'agent',
-          status: 'connected',
-          covens: s.covens ?? [],
-          registered_at: '',
-        })),
-        offset: 0,
-        limit: 1000,
-        total: souls.length,
-      });
-    }
-    if (url.includes('/v1/modules')) {
-      return json({
-        items: [
-          {
-            name: 'core.cmd',
-            kind: 'core',
-            states: ['shell'],
-            errand_safe: true,
-            params: [{ name: 'cmd', type: 'string', required: true, multiline: true }],
-          },
-        ],
-      });
-    }
-    if (url.includes('/v1/services')) {
-      return json({ items: [], offset: 0, limit: 50, total: 0 });
-    }
-    if (url.includes('/v1/incarnations')) {
-      return json({ items: [], offset: 0, limit: 500, total: 0 });
-    }
-    return new Response('{}', { status: 404 });
-  }) as typeof fetch;
+      if (url.includes('/v1/souls')) {
+        return json({
+          items: souls.map((s) => ({
+            sid: s.sid,
+            transport: 'agent',
+            status: 'connected',
+            covens: s.covens ?? [],
+            registered_at: '',
+          })),
+          offset: 0,
+          limit: 1000,
+          total: souls.length,
+        });
+      }
+      if (url.includes('/v1/modules')) {
+        return json({
+          items: [
+            {
+              name: 'core.cmd',
+              kind: 'core',
+              states: ['shell'],
+              errand_safe: true,
+              params: [{ name: 'cmd', type: 'string', required: true, multiline: true }],
+            },
+          ],
+        });
+      }
+      if (url.includes('/v1/services')) {
+        return json({ items: [], offset: 0, limit: 50, total: 0 });
+      }
+      if (url.includes('/v1/incarnations')) {
+        return json({ items: [], offset: 0, limit: 500, total: 0 });
+      }
+      return new Response('{}', { status: 404 });
+    },
+  );
 
   return { posts };
 }
@@ -163,6 +166,12 @@ beforeEach(() => {
     static CONNECTING = 0;
     static CLOSED = 2;
   };
+});
+
+afterEach(() => {
+  // Сброс vi.stubGlobal — гарантирует, что fetch-стаб текущего теста
+  // не "протекает" в следующий тест (незавершённые async-запросы React Query).
+  vi.unstubAllGlobals();
 });
 
 describe('Command+Cadence late-binding guard', () => {

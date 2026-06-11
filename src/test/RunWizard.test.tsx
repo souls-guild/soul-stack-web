@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -109,7 +109,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
   const modules = opts.modules ?? DEFAULT_MODULES;
   const ref: { posted: CapturedPost | null; posts: CapturedPost[] } = { posted: null, posts: [] };
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = init?.body ? JSON.parse(init.body as string) : null;
@@ -223,7 +223,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
       });
     }
     return new Response('{}', { status: 404 });
-  }) as typeof fetch;
+  }) as typeof fetch);
   return ref;
 }
 
@@ -241,6 +241,9 @@ describe('RunWizard', () => {
       static CONNECTING = 0;
       static CLOSED = 2;
     };
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('Step 1: ровно 2 workload-карточки (Scenario / Command), без Push', () => {
@@ -779,14 +782,14 @@ describe('RunWizard', () => {
       modules: [], // list вернёт {items:[]}; для 404 подменим ниже
     });
     // Переопределяем /v1/modules на 404 (graceful-fallback path).
-    const prevFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/v1/modules')) {
         return new Response('{}', { status: 404, headers: { 'Content-Type': 'application/json' } });
       }
-      return prevFetch(input, init);
-    }) as typeof fetch;
+      return baseFetch(input, init);
+    }) as typeof fetch);
 
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1599,12 +1602,12 @@ describe('RunWizard', () => {
     // Command с sidRegex — snapshot-target. Preview-эндпоинт не должен дёргаться.
     const previewCalls: string[] = [];
     const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: [] }] });
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/v1/voyages/preview')) previewCalls.push(url);
-      return origFetch(input, init);
-    }) as typeof fetch;
+      return baseFetch(input, init);
+    }) as typeof fetch);
 
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1633,8 +1636,8 @@ describe('RunWizard', () => {
     // Command с coven-only → late-binding → preview вызывается.
     const previewReplies: unknown[] = [];
     setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/v1/voyages/preview')) {
         previewReplies.push('called');
@@ -1645,8 +1648,8 @@ describe('RunWizard', () => {
           batch_mode: 'barrier',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-      return origFetch(input, init);
-    }) as typeof fetch;
+      return baseFetch(input, init);
+    }) as typeof fetch);
 
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1724,10 +1727,9 @@ describe('RunWizard', () => {
   });
 
   it('S6: 422 от preview/create → показан detail из keeper в submitError', async () => {
-    const origFetch = globalThis.fetch;
     setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
-    const captureFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'POST' && (url.endsWith('/v1/voyages') || url.includes('/v1/voyages?'))) {
@@ -1736,8 +1738,8 @@ describe('RunWizard', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
-      return captureFetch(input, init);
-    }) as typeof fetch;
+      return baseFetch(input, init);
+    }) as typeof fetch);
 
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1756,7 +1758,5 @@ describe('RunWizard', () => {
     await waitFor(() =>
       expect(screen.getByText(/422|batch spec conflict/)).toBeInTheDocument(),
     );
-
-    void origFetch;
   });
 });

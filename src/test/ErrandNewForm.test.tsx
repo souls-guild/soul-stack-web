@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -75,7 +75,7 @@ const SYNC_RESULT = {
 
 // Базовый fetch-мок: каталог модулей + список souls (пустой).
 function makeBaseFetch(overrides?: (url: string, method: string, init?: RequestInit) => Response | null) {
-  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+  return async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -95,16 +95,19 @@ function makeBaseFetch(overrides?: (url: string, method: string, init?: RequestI
       });
     }
     return new Response('{}', { status: 404 });
-  }) as typeof fetch;
+  };
 }
 
 describe('ErrandNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('shell: zod-валидация — пустой SID и команда блокируют submit', async () => {
-    globalThis.fetch = makeBaseFetch();
+    vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
 
@@ -122,7 +125,7 @@ describe('ErrandNewForm', () => {
 
   it('shell: 200 sync → редирект на /errands/:id', async () => {
     let postedBody: unknown = null;
-    globalThis.fetch = makeBaseFetch((url, method, init) => {
+    vi.stubGlobal('fetch', makeBaseFetch((url, method, init) => {
       if (method === 'POST' && url.includes('/v1/souls/') && url.includes('/exec')) {
         postedBody = init?.body ? JSON.parse(init.body as string) : null;
         return new Response(JSON.stringify(SYNC_RESULT), {
@@ -131,7 +134,7 @@ describe('ErrandNewForm', () => {
         });
       }
       return null;
-    });
+    }));
 
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
@@ -155,7 +158,7 @@ describe('ErrandNewForm', () => {
   });
 
   it('каталог содержит core.http.probe — видим в select, клик → CustomForm (JSON-textarea)', async () => {
-    globalThis.fetch = makeBaseFetch();
+    vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
 
@@ -176,7 +179,7 @@ describe('ErrandNewForm', () => {
   });
 
   it('переключение на custom-module: невалидный JSON ловится zod-ом', async () => {
-    globalThis.fetch = makeBaseFetch();
+    vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
 
@@ -197,7 +200,7 @@ describe('ErrandNewForm', () => {
   });
 
   it('?sid=… в query-параметре подставляет prefilled-SID', async () => {
-    globalThis.fetch = makeBaseFetch();
+    vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new?sid=fixed.example.com');
     await waitFor(() => {
       const input = screen.getByDisplayValue('fixed.example.com');

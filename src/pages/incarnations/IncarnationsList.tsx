@@ -393,7 +393,6 @@ export function IncarnationsList() {
                 <td className="mono">
                   <Link
                     to={`/services/${encodeURIComponent(row.service)}`}
-                    style={{ textDecoration: 'none', color: 'inherit' }}
                   >
                     {row.service}
                   </Link>

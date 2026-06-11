@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -11,6 +11,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('VigilNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('typed-форма для core.beacon.file_changed → POST /v1/vigils → redirect на detail', async () => {
@@ -44,14 +47,14 @@ describe('VigilNewForm', () => {
         },
       },
     ]);
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       if ((init?.method ?? 'GET') === 'POST' && url.startsWith('/v1/vigils')) {
         postSpy(JSON.parse(String(init?.body ?? '{}')));
       }
-      return origFetch(input, init);
-    }) as typeof fetch;
+      return baseFetch(input, init);
+    }));
 
     renderWithProviders(
       <Routes>
@@ -83,14 +86,13 @@ describe('VigilNewForm', () => {
 
   it('валидация: пустое имя блокирует submit (422 не отправляется)', async () => {
     const postSpy = vi.fn();
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       if ((init?.method ?? 'GET') === 'POST' && url.startsWith('/v1/vigils')) {
         postSpy();
       }
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(
       <Routes>
@@ -107,6 +109,5 @@ describe('VigilNewForm', () => {
       expect(screen.getByText(/имя обязательно/i)).toBeInTheDocument();
     });
     expect(postSpy).not.toHaveBeenCalled();
-    globalThis.fetch = origFetch;
   });
 });

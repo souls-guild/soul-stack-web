@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -20,6 +20,9 @@ describe('AddHostModal', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('select исключает уже-declared SID-ы', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/souls', body: SOULS }]);
@@ -35,7 +38,7 @@ describe('AddHostModal', () => {
   it('submit → PATCH .../hosts mode=append с выбранным SID + role', async () => {
     let lastUrl = '';
     let lastBody: unknown = null;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'PATCH') {
@@ -50,7 +53,7 @@ describe('AddHostModal', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <AddHostModal open incarnationName="redis-prod" existingSids={[]} onClose={() => {}} />,
@@ -70,7 +73,7 @@ describe('AddHostModal', () => {
   });
 
   it('422 unknown-SID → pretty-error', async () => {
-    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (_input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'PATCH') {
         return new Response(
@@ -82,7 +85,7 @@ describe('AddHostModal', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <AddHostModal open incarnationName="redis-prod" existingSids={[]} onClose={() => {}} />,

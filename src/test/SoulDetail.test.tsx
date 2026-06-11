@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -19,6 +19,9 @@ function renderAt(sid: string) {
 describe('SoulDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит overview-вкладку с данными Soul', async () => {
@@ -204,7 +207,7 @@ describe('SoulDetail', () => {
 
   it('History-вкладка: фильтр по type зовёт endpoint с ?type=errand', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('/history')) {
         lastUrl = url;
@@ -223,7 +226,7 @@ describe('SoulDetail', () => {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
-    }) as typeof fetch;
+    });
 
     renderAt('h.example.com');
     await waitFor(() => {

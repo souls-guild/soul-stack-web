@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -10,6 +10,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('IncarnationDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит detail incarnation-а и Overview summary с переходами на Spec/State/Schema/Hosts', async () => {
@@ -148,7 +151,7 @@ describe('IncarnationDetail', () => {
     let patchCount = 0;
     let lastUrl = '';
     let lastBody: unknown = null;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'PATCH') {
@@ -182,7 +185,7 @@ describe('IncarnationDetail', () => {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>

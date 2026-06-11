@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -78,7 +78,7 @@ function recordingFetch(opts: {
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
   const calls: Call[] = [];
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = typeof init?.body === 'string' ? init.body : null;
@@ -135,13 +135,16 @@ function recordingFetch(opts: {
     if (/^\/v1\/roles\/[^/]+\/operators\/[^/]+$/.test(url) && method === 'DELETE') return new Response('', { status: 204 });
 
     return new Response('{}', { status: 599 });
-  }) as typeof fetch;
+  });
   return calls;
 }
 
 describe('RbacPage', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит список ролей из /v1/roles', async () => {

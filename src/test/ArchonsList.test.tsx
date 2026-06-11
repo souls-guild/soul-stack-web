@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -45,6 +45,9 @@ describe('ArchonsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('рендерит таблицу Архонтов из GET /v1/operators', async () => {
     installFetchMock([
@@ -75,13 +78,13 @@ describe('ArchonsList', () => {
 
   it('фильтры auth_method + hide-revoked попадают в query', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       return new Response(JSON.stringify(SAMPLE_LIST), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText(/Метод аутентификации/i), 'jwt');
@@ -133,7 +136,7 @@ describe('ArchonsList', () => {
 
   it('per-row Revoke через Modal → POST /v1/operators/{aid}/revoke', async () => {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : null;
@@ -148,7 +151,7 @@ describe('ArchonsList', () => {
         return new Response('', { status: 204 });
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
@@ -174,7 +177,7 @@ describe('ArchonsList', () => {
   });
 
   it('Revoke 409 (last cluster-admin) — pretty-error в Modal, Modal не закрывается', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (url.startsWith('/v1/operators') && method === 'GET') {
@@ -198,7 +201,7 @@ describe('ArchonsList', () => {
         );
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
@@ -295,7 +298,7 @@ describe('ArchonsList', () => {
 
   it('TestCreateArchon_WithRoles_SendsRolesInPayload', async () => {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : null;
@@ -325,7 +328,7 @@ describe('ArchonsList', () => {
         );
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
@@ -357,7 +360,7 @@ describe('ArchonsList', () => {
 
   it('TestCreateArchon_NoRoles_OK', async () => {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : null;
@@ -387,7 +390,7 @@ describe('ArchonsList', () => {
         );
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
@@ -406,7 +409,7 @@ describe('ArchonsList', () => {
   });
 
   it('TestCreateArchon_UnknownRole_422', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (url.startsWith('/v1/operators') && method === 'GET') {
@@ -433,7 +436,7 @@ describe('ArchonsList', () => {
         );
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
@@ -454,7 +457,7 @@ describe('ArchonsList', () => {
   it('Backend без поддержки roles (404 на extended payload) — graceful degradation', async () => {
     let postCount = 0;
     const postBodies: string[] = [];
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : null;
@@ -498,7 +501,7 @@ describe('ArchonsList', () => {
         );
       }
       return new Response('{}', { status: 599 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();

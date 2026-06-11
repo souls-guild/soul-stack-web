@@ -185,7 +185,7 @@ export function ErrandsList() {
                     </Link>
                   </td>
                   <td className="mono">
-                    <Link to={`/souls/${encodeURIComponent(e.sid)}`} style={{ textDecoration: 'none', color: 'inherit' }}>{e.sid}</Link>
+                    <Link to={`/souls/${encodeURIComponent(e.sid)}`}>{e.sid}</Link>
                   </td>
                   <td className="mono">{e.module}</td>
                   <td>

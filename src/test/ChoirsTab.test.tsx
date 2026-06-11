@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -75,6 +75,9 @@ describe('ChoirsTab', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   // --- рендер вкладки через IncarnationDetail ---
 
@@ -111,7 +114,7 @@ describe('ChoirsTab', () => {
     let postCount = 0;
     let lastBody: unknown = null;
 
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -141,7 +144,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>
@@ -177,7 +180,7 @@ describe('ChoirsTab', () => {
 
   it('choir_name с невалидным паттерном → form-error, POST не уходит', async () => {
     let postCount = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       if (method === 'POST') postCount += 1;
@@ -191,7 +194,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>
@@ -223,7 +226,7 @@ describe('ChoirsTab', () => {
   it('Delete Choir — confirm-модалка, DELETE уходит только после подтверждения чекбоксом', async () => {
     let deleteCount = 0;
 
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -241,7 +244,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>
@@ -282,7 +285,7 @@ describe('ChoirsTab', () => {
     let voicePostCount = 0;
     let lastVoiceBody: unknown = null;
 
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -324,7 +327,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>
@@ -366,7 +369,7 @@ describe('ChoirsTab', () => {
   // --- 422 ErrNotMembers ---
 
   it('422 ErrNotMembers при add voice → человекочитаемое сообщение', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -398,7 +401,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>
@@ -433,7 +436,7 @@ describe('ChoirsTab', () => {
   it('Remove Voice — кнопка Trash2 отправляет DELETE', async () => {
     let deleteVoiceCount = 0;
 
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -457,7 +460,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(
       <Routes>
@@ -519,7 +522,7 @@ describe('ChoirsTab', () => {
   // --- graceful-404: choir-подсистема недоступна ---
 
   it('choirs.list 404 → graceful-плейсхолдер, не error-box', async () => {
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       if (url.includes('/choirs')) {
         return new Response(JSON.stringify({ title: 'Not Found' }), {
@@ -531,7 +534,7 @@ describe('ChoirsTab', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<ChoirsTab incarnationName="redis-prod" />);
 

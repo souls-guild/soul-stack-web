@@ -6,7 +6,7 @@
  * 4. Happy-path: вызов с правильным телом → 202 + apply_id → тост
  * 5. Обработка 409: показывает пояснительное сообщение
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -35,7 +35,7 @@ function makeIncarnation(status: string) {
 
 // Fetch-мок для incarnation-get.
 function mockFetch(incBody: unknown, overrides?: Record<string, { status: number; body: unknown }>) {
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
     const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -54,8 +54,12 @@ function mockFetch(incBody: unknown, overrides?: Record<string, { status: number
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
-  }) as typeof fetch;
+  }));
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // ────────────────────────────────────────────────────────────
 // 1. Фильтрация runnableScenarios по полю runnable
@@ -163,7 +167,7 @@ describe('RerunCreateModal — валидация reason', () => {
   it('не отправляет запрос при пустом reason', async () => {
     tokenStore.clear();
     let postCount = 0;
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       if (method === 'POST' && urlStr.includes('rerun-create')) {
@@ -173,7 +177,7 @@ describe('RerunCreateModal — валидация reason', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(
       <Routes>
@@ -217,7 +221,7 @@ describe('RerunCreateModal — happy-path', () => {
     let capturedBody: unknown = null;
     let postUrl = '';
 
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -233,7 +237,7 @@ describe('RerunCreateModal — happy-path', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(
       <Routes>
@@ -281,7 +285,7 @@ describe('RerunCreateModal — 409 conflict', () => {
   it('показывает сообщение о том, что последний прогон не create', async () => {
     tokenStore.clear();
 
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -295,7 +299,7 @@ describe('RerunCreateModal — 409 conflict', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    }));
 
     renderWithProviders(
       <Routes>

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -62,7 +62,7 @@ function recordingFetch(opts: {
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
   const calls: Call[] = [];
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === 'string'
         ? input
@@ -130,7 +130,7 @@ function recordingFetch(opts: {
     }
 
     return new Response('{}', { status: 599 });
-  }) as typeof fetch;
+  });
   return calls;
 }
 
@@ -145,6 +145,9 @@ function withRoute() {
 describe('SynodDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит секцию Members: список архонтов из ops-team', async () => {
@@ -197,10 +200,10 @@ describe('SynodDetail', () => {
   it('isLoading: показывает loading-индикатор пока данные грузятся', async () => {
     // Fetch никогда не резолвится — проверяем состояние loading.
     let resolve: ((v: Response) => void) | undefined;
-    globalThis.fetch = (() =>
+    vi.stubGlobal('fetch', () =>
       new Promise<Response>((r) => {
         resolve = r;
-      })) as typeof fetch;
+      }));
 
     renderWithProviders(withRoute(), '/synods/ops-team');
     expect(screen.getByText(/Загрузка/i)).toBeInTheDocument();

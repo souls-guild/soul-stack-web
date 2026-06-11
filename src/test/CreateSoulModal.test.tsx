@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -9,6 +9,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('CreateSoulModal', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит форму с полями SID / transport / covens', async () => {
@@ -68,15 +71,15 @@ describe('CreateSoulModal', () => {
     ]);
 
     // Перехватываем fetch для проверки body
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (init?.body) {
         try { calls.push({ method, url, body: JSON.parse(init.body as string) }); } catch { /* empty */ }
       }
-      return originalFetch(input, init);
-    };
+      return baseFetch(input, init);
+    });
 
     const user = userEvent.setup();
     renderWithProviders(<CreateSoulModal open onClose={() => {}} />);
@@ -93,8 +96,6 @@ describe('CreateSoulModal', () => {
       expect(screen.getByText('btoken-super-secret-abc123')).toBeInTheDocument();
     });
     expect(screen.getByText(/Токен отображается ОДИН РАЗ/i)).toBeInTheDocument();
-
-    globalThis.fetch = originalFetch;
   });
 
   it('transport=ssh — success без bootstrap_token, показывает SSH-сообщение', async () => {
@@ -153,15 +154,15 @@ describe('CreateSoulModal', () => {
       },
     ]);
 
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const baseFetch2 = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (init?.body) {
         try { calls.push({ method, url, body: JSON.parse(init.body as string) }); } catch { /* empty */ }
       }
-      return originalFetch(input, init);
-    };
+      return baseFetch2(input, init);
+    });
 
     const user = userEvent.setup();
     renderWithProviders(<CreateSoulModal open onClose={() => {}} />);
@@ -194,8 +195,6 @@ describe('CreateSoulModal', () => {
         return c.method === 'POST' && Array.isArray(b?.covens) && b.covens.includes('prod') && b.covens.includes('blue');
       })).toBe(true);
     });
-
-    globalThis.fetch = originalFetch;
   });
 
   it('409 conflict → human-readable ошибка', async () => {

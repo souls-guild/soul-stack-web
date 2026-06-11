@@ -291,10 +291,10 @@ export function IncarnationDetail() {
             <>
               <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>Last drift summary</h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Badge tone="warn">drifted: {Number(row.last_drift_summary['hosts_drifted'] ?? 0)}</Badge>
-                <Badge tone="ok">clean: {Number(row.last_drift_summary['hosts_clean'] ?? 0)}</Badge>
-                <Badge tone="muted">unsupported: {Number(row.last_drift_summary['hosts_unsupported'] ?? 0)}</Badge>
-                <Badge tone="danger">failed: {Number(row.last_drift_summary['hosts_failed'] ?? 0)}</Badge>
+                <Badge tone="warn">drifted: {row.last_drift_summary.hosts_drifted ?? 0}</Badge>
+                <Badge tone="ok">clean: {row.last_drift_summary.hosts_clean ?? 0}</Badge>
+                <Badge tone="muted">unsupported: {row.last_drift_summary.hosts_unsupported ?? 0}</Badge>
+                <Badge tone="danger">failed: {row.last_drift_summary.hosts_failed ?? 0}</Badge>
               </div>
             </>
           ) : null}

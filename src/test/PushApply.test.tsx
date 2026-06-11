@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -9,11 +9,14 @@ describe('PushApply', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
   it('submit → 202 → poll до success, рендерит per-host summary', async () => {
     const seen: string[] = [];
     let pollCount = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       seen.push(`${method} ${url}`);
@@ -58,7 +61,7 @@ describe('PushApply', () => {
         );
       }
       return new Response(JSON.stringify({}), { status: 404 });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<PushApply />, '/push');
     const user = userEvent.setup();

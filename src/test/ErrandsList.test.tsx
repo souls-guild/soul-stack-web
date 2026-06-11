@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -9,6 +9,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('ErrandsList', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит список errand-ов из GET /v1/errands', async () => {
@@ -110,13 +113,13 @@ describe('ErrandsList', () => {
 
   it('module CSV-фильтр уходит в query как multi-value ?module=', async () => {
     let lastUrl = '';
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
     renderWithProviders(<ErrandsList />, '/errands');
     const user = userEvent.setup();
     await user.type(

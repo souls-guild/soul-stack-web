@@ -3419,90 +3419,6 @@ paths:
         '422': { $ref: '#/components/responses/Problem422' }
         '500': { $ref: '#/components/responses/Problem500' }
 
-  /v1/push/cleanup:
-    post:
-      tags: [Push]
-      operationId: PushCleanup
-      summary: Чистка /var/lib/soul-stack/ на хосте.
-      description: |
-        Permission: push.cleanup. MCP-tool: keeper.push.cleanup.
-        Async-операция. Полная семантика — docs/keeper/push.md → Cleanup.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PushCleanupRequest'
-      responses:
-        '202':
-          description: Cleanup-прогон принят.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PushCleanupReply'
-        '400': { $ref: '#/components/responses/Problem400' }
-        '401': { $ref: '#/components/responses/Problem401' }
-        '403': { $ref: '#/components/responses/Problem403' }
-        '404': { $ref: '#/components/responses/Problem404' }
-        '422': { $ref: '#/components/responses/Problem422' }
-        '500': { $ref: '#/components/responses/Problem500' }
-
-  /v1/providers:
-    post:
-      tags: [Cloud]
-      operationId: CreateProvider
-      summary: Создать Provider.
-      description: |
-        Permission: provider.create. MCP-tool: keeper.provider.create.
-        Семантика — docs/keeper/cloud.md → Provider и Profile.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProviderCreateRequest'
-      responses:
-        '201':
-          description: Provider создан.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProviderCreateReply'
-        '400': { $ref: '#/components/responses/Problem400' }
-        '401': { $ref: '#/components/responses/Problem401' }
-        '403': { $ref: '#/components/responses/Problem403' }
-        '409': { $ref: '#/components/responses/Problem409' }
-        '422': { $ref: '#/components/responses/Problem422' }
-        '500': { $ref: '#/components/responses/Problem500' }
-
-  /v1/profiles:
-    post:
-      tags: [Cloud]
-      operationId: CreateProfile
-      summary: Создать Profile.
-      description: |
-        Permission: profile.create. MCP-tool: keeper.profile.create.
-        Семантика — docs/keeper/cloud.md.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProfileCreateRequest'
-      responses:
-        '201':
-          description: Profile создан.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProfileCreateReply'
-        '400': { $ref: '#/components/responses/Problem400' }
-        '401': { $ref: '#/components/responses/Problem401' }
-        '403': { $ref: '#/components/responses/Problem403' }
-        '409': { $ref: '#/components/responses/Problem409' }
-        '422': { $ref: '#/components/responses/Problem422' }
-        '500': { $ref: '#/components/responses/Problem500' }
-
   /v1/push-providers:
     post:
       tags: [PushProvider]
@@ -4532,10 +4448,11 @@ components:
           enum: [lifecycle, operational]
           description: |
             Дискриминатор сценария для UI (каталог, не хардкод имён):
-            `lifecycle` — keeper трактует его особо (create / destroy /
-            converge — bootstrap / teardown / drift-detect), `operational` —
-            обычная операция над state. Размечается keeper-ом по имени, фронт
-            читает поле, а не зашивает список lifecycle-имён.
+            `lifecycle` — keeper трактует его особо (create / destroy —
+            bootstrap / teardown), `operational` — обычная операция над state.
+            `converge` — operational с двойной ролью (operational-прогон +
+            dry-run target для check-drift). Размечается keeper-ом по имени,
+            фронт читает поле, а не зашивает список lifecycle-имён.
         runnable:
           type: boolean
           description: |
@@ -5483,6 +5400,44 @@ components:
           type: string
       required: [apply_id, incarnation, scenario]
 
+    DriftScanSummary:
+      type: object
+      description: >-
+        ADR-031 Slice C. Counts-агрегат последнего drift-скана incarnation,
+        хранимый в колонке `incarnation.last_drift_summary`. Симметричен
+        scenario.DriftSummary плюс `total_hosts`/`scanned_at` для дискриминации
+        устаревших скан-данных. Полный DriftReport в БД не хранится — только
+        эти счётчики.
+      properties:
+        hosts_drifted:
+          type: integer
+          description: Число хостов с обнаруженным дрейфом конфигурации.
+        hosts_clean:
+          type: integer
+          description: Число хостов без дрейфа (фактическое состояние совпало).
+        hosts_unsupported:
+          type: integer
+          description: Число хостов, не поддержавших dry_run-проверку дрейфа.
+        hosts_failed:
+          type: integer
+          description: Число хостов, на которых проверка дрейфа упала с ошибкой.
+        total_hosts:
+          type: integer
+          description: Общее число хостов в скане (сумма перечисленных категорий).
+        scanned_at:
+          type: string
+          format: date-time
+          description: >-
+            Время завершения скана (RFC3339Nano, UTC). Совпадает с
+            `last_drift_check_at` родительского объекта.
+      required:
+        - hosts_drifted
+        - hosts_clean
+        - hosts_unsupported
+        - hosts_failed
+        - total_hosts
+        - scanned_at
+
     IncarnationGetReply:
       type: object
       properties:
@@ -5544,15 +5499,13 @@ components:
             converge (фон или on-demand из Slice B). Отсутствует, если
             incarnation ни разу не сканировалась.
         last_drift_summary:
-          type: object
-          additionalProperties: true
+          allOf:
+            - $ref: '#/components/schemas/DriftScanSummary'
           nullable: true
           description: >-
-            ADR-031 Slice C. Counts-агрегат последнего DriftReport (jsonb-
-            passthrough из колонки `incarnation.last_drift_summary`). Поля:
-            hosts_drifted / hosts_clean / hosts_unsupported / hosts_failed /
-            total_hosts (integer) + scanned_at (date-time, RFC3339Nano).
-            Отсутствует, если incarnation ни разу не сканировалась.
+            ADR-031 Slice C. Counts-агрегат последнего DriftReport-а из колонки
+            `incarnation.last_drift_summary` (typed). Отсутствует, если
+            incarnation ни разу не сканировалась.
       required:
         - name
         - service
@@ -7495,110 +7448,3 @@ components:
         total:
           type: integer
       required: [items, offset, limit, total]
-
-    PushCleanupRequest:
-      type: object
-      properties:
-        inventory:
-          type: array
-          items:
-            type: string
-          description: Список SID (FQDN) target-хостов.
-        ssh_provider:
-          type: string
-        full:
-          type: boolean
-          default: false
-          description: |
-            true — стереть /var/lib/soul-stack/ целиком (для revoke);
-            false (default) — только устаревшие версии.
-      required: [inventory]
-
-    PushCleanupReply:
-      type: object
-      properties:
-        apply_id:
-          type: string
-          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
-      required: [apply_id]
-
-    ProviderCreateRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          description: Имя Provider (kebab-case), уникальное в кластере.
-        type:
-          type: string
-          description: |
-            Имя CloudDriver-плагина (aws/yc/…) из
-            keeper.yml plugins.cloud_drivers[].name.
-        region:
-          type: string
-          description: Регион/zone провайдера.
-        credentials_ref:
-          type: string
-          pattern: '^vault:.+$'
-          description: |
-            Vault-ref до credentials (формат "vault:<path>"). Сам secret
-            в БД не пишется. SENSITIVE: secret-masking middleware заменяет
-            значение на "vault:***" в логах.
-      required: [name, type, region, credentials_ref]
-
-    ProviderCreateReply:
-      type: object
-      properties:
-        name:
-          type: string
-        type:
-          type: string
-        region:
-          type: string
-        credentials_ref:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-        created_by_aid:
-          type: string
-          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
-      required: [name, type, region, credentials_ref, created_at, created_by_aid]
-
-    ProfileCreateRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          description: Имя Profile (kebab-case).
-        provider:
-          type: string
-          description: Имя зарегистрированного Provider.
-        params:
-          type: object
-          additionalProperties: true
-          description: |
-            Параметры VM, валидируются против profile_schema CloudDriver-плагина.
-        cloud_init:
-          type: string
-          description: Сырая cloud-init userdata (optional).
-      required: [name, provider, params]
-
-    ProfileCreateReply:
-      type: object
-      properties:
-        name:
-          type: string
-        provider:
-          type: string
-        params:
-          type: object
-          additionalProperties: true
-        cloud_init:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-        created_by_aid:
-          type: string
-          pattern: '^[a-z0-9][a-z0-9._@-]{1,127}$'
-      required: [name, provider, params, created_at, created_by_aid]

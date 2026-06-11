@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -9,6 +9,9 @@ import { tokenStore } from '../api/tokenStore';
 describe('IncarnationsList', () => {
   beforeEach(() => {
     tokenStore.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('рендерит заголовок и список из /v1/incarnations', async () => {
@@ -74,14 +77,14 @@ describe('IncarnationsList', () => {
 
   it('передаёт server-side coven=<x> в запрос /v1/incarnations', async () => {
     const calls: string[] = [];
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       calls.push(urlStr);
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 100, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
@@ -96,13 +99,13 @@ describe('IncarnationsList', () => {
 
   it('inline-error на невалидной coven-метке (не отправляет запрос)', async () => {
     let called = 0;
-    globalThis.fetch = (async () => {
+    vi.stubGlobal('fetch', async () => {
       called += 1;
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 100, total: 0 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as typeof fetch;
+    });
 
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
