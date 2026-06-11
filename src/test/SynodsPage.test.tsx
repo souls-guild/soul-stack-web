@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -201,10 +201,6 @@ describe('SynodsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('рендерит список Synod-групп из GET /v1/synods', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');

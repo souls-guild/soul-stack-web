@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -41,10 +41,6 @@ describe('PushRunsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('рендерит список push-прогонов', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/push-runs', body: SAMPLE_PAGE },

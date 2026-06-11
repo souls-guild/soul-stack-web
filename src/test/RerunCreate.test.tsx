@@ -6,7 +6,7 @@
  * 4. Happy-path: вызов с правильным телом → 202 + apply_id → тост
  * 5. Обработка 409: показывает пояснительное сообщение
  */
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -56,10 +56,6 @@ function mockFetch(incBody: unknown, overrides?: Record<string, { status: number
     });
   }));
 }
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 // ────────────────────────────────────────────────────────────
 // 1. Фильтрация runnableScenarios по полю runnable

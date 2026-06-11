@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,9 @@ function readNsKeys(dir: string, ns: string): string[] {
 // http-backend в jsdom фетчит /locales/<lng>/<ns>.json — реального сервера нет,
 // поэтому отдаём содержимое public/locales с диска, иначе changeLanguage('en')
 // никогда не резолвится.
-beforeAll(() => {
+// Стаб переустанавливается в beforeEach, т.к. глобальный afterEach из setup.ts
+// вызывает vi.unstubAllGlobals() после каждого теста.
+function installI18nFetch() {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
     const m = url.match(/\/locales\/([^/]+)\/([^/]+)\.json$/);
@@ -34,7 +36,10 @@ beforeAll(() => {
       return new Response('not found', { status: 404 });
     }
   }));
-});
+}
+
+beforeAll(() => { installI18nFetch(); });
+beforeEach(() => { installI18nFetch(); });
 
 afterAll(() => {
   vi.unstubAllGlobals();

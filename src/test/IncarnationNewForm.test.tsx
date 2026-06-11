@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -11,10 +11,6 @@ describe('IncarnationNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('zod-валидация: пустое name блокирует submit', async () => {
     installFetchMock([
       {

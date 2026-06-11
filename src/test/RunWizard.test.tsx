@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -242,10 +242,6 @@ describe('RunWizard', () => {
       static CLOSED = 2;
     };
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('Step 1: ровно 2 workload-карточки (Scenario / Command), без Push', () => {
     setupFetchStub();
     renderWizardWithRoutes();

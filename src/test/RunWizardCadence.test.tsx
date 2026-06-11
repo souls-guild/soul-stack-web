@@ -2,7 +2,7 @@
  * RunWizard Cadence (recurrence) — тесты режима «Регулярно».
  * Тестирует переключение runMode, submit → POST /v1/cadences.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -100,10 +100,6 @@ beforeEach(() => {
     static CLOSED = 2;
   };
 });
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 describe('RunWizard — режим Cadence (recurrence)', () => {
   it('Step 1 показывает кнопки выбора режима Разово/Регулярно', () => {
     setupFetch();

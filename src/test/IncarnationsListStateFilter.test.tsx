@@ -10,7 +10,7 @@
 // 7. Кнопка «Run по набору» → navigate с service + incarnation_regex (param НЕ incarnation).
 // 8. RunWizard с ?incarnation_regex=... реально резолвит список инкарнаций (не экранированный литерал).
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -93,10 +93,6 @@ describe('IncarnationsList — state filter', () => {
     tokenStore.clear();
     navigateSpy.mockReset();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('панель state-фильтра скрыта без выбора сервиса', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services', body: SERVICES_REPLY },

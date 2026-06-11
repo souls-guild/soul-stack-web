@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -10,10 +10,6 @@ describe('IncarnationsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('рендерит заголовок и список из /v1/incarnations', async () => {
     installFetchMock([
       {

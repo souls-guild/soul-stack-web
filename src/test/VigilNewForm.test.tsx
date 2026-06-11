@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -12,10 +12,6 @@ describe('VigilNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('typed-форма для core.beacon.file_changed → POST /v1/vigils → redirect на detail', async () => {
     const postSpy = vi.fn();
     installFetchMock([

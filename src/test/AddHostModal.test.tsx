@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -20,10 +20,6 @@ describe('AddHostModal', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('select исключает уже-declared SID-ы', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/souls', body: SOULS }]);
     renderWithProviders(

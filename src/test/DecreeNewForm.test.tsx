@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
@@ -12,9 +12,6 @@ const EMPTY_VIGILS = { items: [], offset: 0, limit: 200, total: 0 };
 const EMPTY_INCS = { items: [], offset: 0, limit: 200, total: 0 };
 
 describe('DecreeNewForm', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
   beforeEach(() => {
     tokenStore.clear();
   });

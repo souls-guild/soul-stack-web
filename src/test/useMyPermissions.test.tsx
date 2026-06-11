@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -33,10 +33,6 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('[ИНВАРИАНТ] при 403 /v1/me/permissions hasPermission("synod.create") возвращает true', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(

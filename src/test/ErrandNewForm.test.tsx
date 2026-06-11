@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -102,10 +102,6 @@ describe('ErrandNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('shell: zod-валидация — пустой SID и команда блокируют submit', async () => {
     vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
@@ -143,10 +143,6 @@ describe('RbacPage', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('рендерит список ролей из /v1/roles', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/roles', body: SAMPLE }]);
     renderWithProviders(<RbacPage />, '/rbac');

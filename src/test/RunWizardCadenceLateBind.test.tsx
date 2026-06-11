@@ -8,7 +8,7 @@
  *   3. Cadence с regex/soulprint И coven → плашка cadence-early-binding-warn видна.
  *   4. Cadence с только regex (без coven) → плашка cadence-snapshot-only-warn видна.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
@@ -72,12 +72,15 @@ function setupFetch(
           201,
         );
       }
-      if (method === 'POST' && url.includes('/v1/voyages')) {
+      if (method === 'POST' && (url.endsWith('/v1/voyages') || url.endsWith('/v1/voyages/'))) {
         posts.push({ url, body });
         return json(
           { voyage_id: 'voy-lb-01', kind: 'command', scope_size: 1, status: 'pending', location: '' },
           202,
         );
+      }
+      if (method === 'POST' && url.includes('/v1/voyages/preview')) {
+        return json({ kind: 'command', scope_size: 1, total_batches: 1, batch_mode: 'barrier' });
       }
 
       if (url.includes('/v1/souls')) {
@@ -166,12 +169,6 @@ beforeEach(() => {
     static CONNECTING = 0;
     static CLOSED = 2;
   };
-});
-
-afterEach(() => {
-  // Сброс vi.stubGlobal — гарантирует, что fetch-стаб текущего теста
-  // не "протекает" в следующий тест (незавершённые async-запросы React Query).
-  vi.unstubAllGlobals();
 });
 
 describe('Command+Cadence late-binding guard', () => {

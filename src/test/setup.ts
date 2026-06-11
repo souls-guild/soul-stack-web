@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 // Инициализация i18n для тестов (default-locale ru). Без этого t() возвращает
 // сырые ключи. Тесты матчат ru-строки как default-вывод.
@@ -11,4 +11,10 @@ afterEach(() => {
   if (i18n.language !== DEFAULT_LANG) {
     void i18n.changeLanguage(DEFAULT_LANG);
   }
+});
+
+// Сброс vi.stubGlobal-стабов: регистрируется последним → выполняется первым
+// (afterEach выполняются в LIFO-порядке), т.е. fetch-стабы гасятся ДО cleanup.
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
