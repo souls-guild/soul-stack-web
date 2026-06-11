@@ -98,7 +98,7 @@ export function IncarnationNewForm() {
     mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown> }) =>
       keeperApi.incarnations.create(body),
     onSuccess: (reply) => {
-      setCreatedApplyId(reply.apply_id);
+      setCreatedApplyId(reply.apply_id ?? null);
       setTimeout(() => navigate(`/incarnations/${encodeURIComponent(reply.incarnation)}`), 600);
     },
     onError: (err) => {

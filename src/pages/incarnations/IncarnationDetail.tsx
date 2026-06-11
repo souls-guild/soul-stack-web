@@ -10,6 +10,7 @@ import {
   Layers,
   Lock,
   Play,
+  RefreshCw,
   Search,
   Trash,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { keeperApi, type DriftReport } from '../../api/keeper';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { UnlockModal } from './UnlockModal';
+import { RerunCreateModal } from './RerunCreateModal';
 import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
 import { HostsTab } from './HostsTab';
@@ -40,6 +42,8 @@ export function IncarnationDetail() {
   const [driftError, setDriftError] = useState<string | null>(null);
 
   const [unlockOpen, setUnlockOpen] = useState(false);
+  const [rerunCreateOpen, setRerunCreateOpen] = useState(false);
+  const [rerunAcceptedId, setRerunAcceptedId] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [destroyOpen, setDestroyOpen] = useState(false);
 
@@ -158,9 +162,20 @@ export function IncarnationDetail() {
               </>
             ) : null}
             {isLocked ? (
-              <Button variant="primary" onClick={() => setUnlockOpen(true)} title={t('incarnations:unlockTitleShort')}>
-                <Lock size={14} /> Unlock
-              </Button>
+              <>
+                <Button variant="primary" onClick={() => setUnlockOpen(true)} title={t('incarnations:unlockTitleShort')}>
+                  <Lock size={14} /> Unlock
+                </Button>
+                {row.status === 'error_locked' ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setRerunAcceptedId(null); setRerunCreateOpen(true); }}
+                    title={t('incarnations:rerunCreateTooltip')}
+                  >
+                    <RefreshCw size={14} /> {t('incarnations:rerunCreateBtn')}
+                  </Button>
+                ) : null}
+              </>
             ) : null}
             {isDestroying ? (
               <Button variant="ghost" disabled title={t('incarnations:destroyInProgressTitle')}>
@@ -385,7 +400,35 @@ export function IncarnationDetail() {
         </section>
       ) : null}
 
+      {rerunAcceptedId ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
+            background: 'var(--success, #2d7a4f)', color: '#fff',
+            padding: '10px 18px', borderRadius: 'var(--radius)', fontSize: 13,
+            boxShadow: '0 2px 12px rgba(0,0,0,.25)',
+          }}
+        >
+          {t('incarnations:rerunCreateAccepted')} <span className="mono">{rerunAcceptedId}</span>
+          <button
+            type="button"
+            onClick={() => setRerunAcceptedId(null)}
+            aria-label={t('cancel')}
+            style={{ marginLeft: 12, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14 }}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
       <UnlockModal open={unlockOpen} incarnationName={row.name} onClose={() => setUnlockOpen(false)} />
+      <RerunCreateModal
+        open={rerunCreateOpen}
+        incarnationName={row.name}
+        onClose={() => setRerunCreateOpen(false)}
+        onAccepted={(id) => setRerunAcceptedId(id)}
+      />
       <UpgradeModal
         open={upgradeOpen}
         incarnationName={row.name}

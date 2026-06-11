@@ -636,6 +636,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{name}/rerun-create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Перезапустить scenario create из error_locked.
+         * @description Permission: incarnation.create-rerun. MCP-tool: keeper.incarnation.rerun-create.
+         *     Атомарно снимает error_locked (state НЕ трогается — last-known-good,
+         *     snapshot в state_history) и тем же действием перезапускает scenario
+         *     create (rerun bootstrap-а). Под одним FOR UPDATE: переход
+         *     error_locked → applying минуя ready — исключает окно, в котором
+         *     конкурентный прогон проскочил бы в освободившийся ready. reason
+         *     обязателен (явное подтверждение оператора). Scope ограничен
+         *     error_locked (для прочих случаев — обычный unlock + ручной run).
+         *     Async-операция, 202 + apply_id.
+         */
+        post: operations["RerunCreateIncarnation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations/{name}/hosts": {
         parameters: {
             query?: never;
@@ -2268,9 +2296,9 @@ export interface components {
         };
         /**
          * @description Query-params для list-эндпоинтов. В HTTP передаются как query (offset/limit),
-         *     в MCP-tool input — как top-level поля. Schema присутствует для 1:1
-         *     соответствия с proto/operator/v1/common.proto; ни одним $ref в этом
-         *     документе не используется (HTTP path-операции используют отдельные
+         *     в MCP-tool input — как top-level поля. Schema присутствует для симметрии
+         *     HTTP↔MCP (общая форма пагинации); ни одним $ref в этом документе
+         *     не используется (HTTP path-операции используют отдельные
          *     OffsetQuery/LimitQuery parameters).
          */
         PaginationRequest: {
@@ -2286,9 +2314,9 @@ export interface components {
             limit: number;
         };
         /**
-         * @description Поля ответа list-эндпоинтов (без items). Schema присутствует для 1:1
-         *     соответствия с proto/operator/v1/common.proto; *ListReply содержат
-         *     offset/limit/total inline (плоская форма по PM-decision из proto-task).
+         * @description Поля ответа list-эндпоинтов (без items). Schema присутствует для симметрии
+         *     HTTP↔MCP (общая форма пагинации); *ListReply содержат offset/limit/total
+         *     inline (плоская форма по PM-decision).
          */
         PaginationReply: {
             /** Format: int32 */
@@ -2432,8 +2460,8 @@ export interface components {
         };
         /**
          * @description Для HTTP 204 No Content тело не пишется; для MCP-tool отдаётся
-         *     structured-ответ с timestamp-ом. Schema присутствует для 1:1
-         *     соответствия с proto/operator/v1/operator.proto (симметрия HTTP↔MCP).
+         *     structured-ответ с timestamp-ом. Schema присутствует для симметрии
+         *     HTTP↔MCP (HTTP отдаёт пустое тело, MCP — structured-ответ).
          */
         OperatorRevokeReply: {
             /**
@@ -2444,8 +2472,8 @@ export interface components {
         };
         /**
          * @description Body запроса пустой; AID цели — в path-param URL. TTL берётся
-         *     из auth.jwt.ttl_default. Schema присутствует для 1:1 соответствия
-         *     с proto/operator/v1/operator.proto.
+         *     из auth.jwt.ttl_default. Schema присутствует для симметрии HTTP↔MCP
+         *     (AID echo из path-param в MCP-tool input).
          */
         IssueTokenRequest: {
             /** @description AID Архонта (echo из path-param для MCP). */
@@ -2678,6 +2706,12 @@ export interface components {
              * @enum {string}
              */
             kind: "lifecycle" | "operational";
+            /**
+             * @description Запускаем оператором из Run-формы: create=true, destroy=false
+             *     (удаление — спец-флоу DELETE), operational=true. UI фильтрует
+             *     Run-форму по этому признаку, а не по хардкоду имён (ADR-042).
+             */
+            runnable: boolean;
             /** @description top-level `description:` scenario (если задан). */
             description?: string;
             /**
@@ -3225,8 +3259,13 @@ export interface components {
             };
         };
         IncarnationCreateReply: {
-            /** @description ULID запуска. */
-            apply_id: string;
+            /**
+             * @description ULID запуска scenario `create`. null/отсутствует, если
+             *     манифест сервиса объявил `lifecycle.auto_create: false` —
+             *     инкарнация создана в `ready` без прогона, оператор запускает
+             *     `create` вручную.
+             */
+            apply_id?: string | null;
             /** @description Имя созданного instance (echo). */
             incarnation: string;
         };
@@ -3345,6 +3384,19 @@ export interface components {
         };
         IncarnationUpgradeReply: {
             apply_id: string;
+        };
+        IncarnationRerunCreateRequest: {
+            /**
+             * @description Свободный текст подтверждения оператора; пишется в
+             *     audit-payload incarnation.create_rerun.
+             */
+            reason: string;
+        };
+        IncarnationRerunCreateReply: {
+            /** @description ULID перезапущенного scenario create. */
+            apply_id: string;
+            /** @description Имя инкарнации (echo path-param). */
+            incarnation: string;
         };
         IncarnationDestroyReply: {
             apply_id: string;
@@ -5687,6 +5739,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IncarnationUpgradeReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            409: components["responses"]["Problem409"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    RerunCreateIncarnation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Имя incarnation (kebab-case). */
+                name: components["parameters"]["IncarnationNamePath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationRerunCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Rerun-create принят. apply_id для опроса статуса. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationRerunCreateReply"];
                 };
             };
             400: components["responses"]["Problem400"];

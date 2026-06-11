@@ -247,6 +247,10 @@ export type StateSchemaMigration = components['schemas']['StateSchemaMigration']
 export type ServiceDependency = components['schemas']['ServiceDependency'];
 export type ServiceDependenciesReply = components['schemas']['ServiceDependenciesReply'];
 
+// Rerun-create — перезапуск scenario create из error_locked (ADR lifecycle-rework S5).
+export type IncarnationRerunCreateRequest = components['schemas']['IncarnationRerunCreateRequest'];
+export type IncarnationRerunCreateReply = components['schemas']['IncarnationRerunCreateReply'];
+
 // Hosts-editing (PATCH /v1/incarnations/{name}/hosts).
 export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
 export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
@@ -313,6 +317,13 @@ export interface ServiceScenarioInfo {
   path?: string;
   /** Дискриминатор: lifecycle (create/destroy/converge) | operational. */
   kind: 'lifecycle' | 'operational';
+  /**
+   * Запускаем оператором из Run-формы (ADR-042, поле backend).
+   * create=true, destroy=false, operational=true.
+   * UI фильтрует по этому полю, а не по хардкоду имён.
+   * Опционально для обратной совместимости: старый backend без поля → fallback в runnableScenarios.
+   */
+  runnable?: boolean;
   description?: string;
   input_schema?: ScenarioInputSchema;
 }
@@ -479,6 +490,16 @@ export const keeperApi = {
         `/v1/incarnations/${encodeURIComponent(name)}`,
         'DELETE',
         { query: { allow_destroy: allowDestroy } },
+      ),
+    // POST /v1/incarnations/{name}/rerun-create — атомарный unlock + перезапуск
+    // scenario create из error_locked. 202 → IncarnationRerunCreateReply.
+    // 404 нет incarnation, 403 нет прав, 409 статус не error_locked или
+    // последний упавший прогон не create, 422 validation.
+    rerunCreate: (name: string, body: IncarnationRerunCreateRequest) =>
+      apiSend<IncarnationRerunCreateReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/rerun-create`,
+        'POST',
+        { body },
       ),
     // PATCH /v1/incarnations/{name}/hosts — правка declared spec.hosts[] (ADR-008).
     // mode=replace|append|remove. 200 → обновлённый incarnation. 422 unknown-SID,

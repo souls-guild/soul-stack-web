@@ -10,7 +10,7 @@ import { incarnationDot, incarnationTone } from '../../components/status';
 import { useServiceRefs } from './refs';
 import { EditServiceModal } from './EditServiceModal';
 import { DeregisterServiceModal } from './DeregisterServiceModal';
-import { isLifecycleScenario } from '../incarnations/reservedScenarios';
+import { runnableScenarios } from '../incarnations/reservedScenarios';
 import { extractFields, isSchemaDegraded, type SchemaField } from '../incarnations/stateSchema';
 import styles from '../common.module.css';
 
@@ -269,7 +269,7 @@ export function ServiceDetail() {
                       {scenarioInputSummary(s)}
                     </td>
                     <td style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      {isLifecycleScenario(s) ? (
+                      {!runnableScenarios([s]).length ? (
                         <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
                           {t('admin:svcReservedScenario')}
                         </span>
