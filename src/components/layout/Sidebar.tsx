@@ -15,6 +15,7 @@ import {
   Activity,
   HelpCircle,
   CalendarClock,
+  Bell,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
 import { HelpModal } from './HelpModal';
@@ -67,6 +68,7 @@ const HISTORY: NavItem[] = [
 
 const BOTTOM: NavItem[] = [
   { to: '/audit', label: 'Audit log', icon: FileText },
+  { to: '/notifications', label: 'Notifications', icon: Bell, matchPrefix: '/notifications' },
 ];
 
 interface ItemProps {

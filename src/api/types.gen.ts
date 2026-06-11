@@ -679,7 +679,7 @@ export interface paths {
         head?: never;
         /**
          * Править declared `spec.hosts[]` (UI Hosts editing, ADR-008).
-         * @description Permission: incarnation.update-hosts. MCP-tool: keeper.incarnation.hosts.update.
+         * @description Permission: incarnation.update-hosts. MCP-tool отсутствует — REST-only.
          *
          *     Три mode-семантики над declared `spec.hosts[]`:
          *       - `replace` — полная замена списка переданным набором (включая пустой).
@@ -699,7 +699,7 @@ export interface paths {
          *     при сносе); остальные статусы (включая `applying`) — допустимы (spec —
          *     declared-вход следующего прогона, не текущего).
          *
-         *     Audit `incarnation.hosts_updated` (`source: api`/`mcp`, archon = JWT.sub).
+         *     Audit `incarnation.hosts_updated` (`source: api`, archon = JWT.sub).
          */
         patch: operations["UpdateIncarnationHosts"];
         trace?: never;
@@ -721,7 +721,7 @@ export interface paths {
         /**
          * Создать Choir (партию хостов внутри инкарнации, ADR-044).
          * @description Permission: choir.create (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool: keeper.choir.create.
+         *     MCP-tool отсутствует — REST-only.
          *
          *     Choir — именованная топология хостов ВНУТРИ инкарнации (declared-«партия
          *     хора»). `created_by_aid` берётся из JWT-контекста, НЕ из тела. `choir_name`
@@ -748,7 +748,7 @@ export interface paths {
         /**
          * Удалить Choir (каскадом его Voice-ы, ADR-044).
          * @description Permission: choir.delete (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool: keeper.choir.delete. ON DELETE CASCADE сносит все Voice-ы Choir-а.
+         *     MCP-tool отсутствует — REST-only. ON DELETE CASCADE сносит все Voice-ы Choir-а.
          */
         delete: operations["DeleteChoir"];
         options?: never;
@@ -774,7 +774,7 @@ export interface paths {
         /**
          * Добавить Voice (членство SID в Choir-е, ADR-044).
          * @description Permission: choir.add-voice (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool: keeper.choir.add-voice.
+         *     MCP-tool отсутствует — REST-only.
          *
          *     Инвариант членства (ADR-044): Voice создаётся только для SID, который уже
          *     член инкарнации (его `souls.coven[]` содержит `incarnation.name`). SID вне
@@ -801,7 +801,7 @@ export interface paths {
         /**
          * Убрать Voice из Choir-а (ADR-044).
          * @description Permission: choir.remove-voice (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool: keeper.choir.remove-voice.
+         *     MCP-tool отсутствует — REST-only.
          */
         delete: operations["RemoveVoice"];
         options?: never;
@@ -2184,6 +2184,131 @@ export interface paths {
          * @description Permission push-provider.delete.
          */
         delete: operations["DeletePushProvider"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/heralds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Перечислить Herald-каналы.
+         * @description Permission herald.list. Сортировка updated_at DESC, name ASC.
+         */
+        get: operations["ListHeralds"];
+        put?: never;
+        /**
+         * Создать Herald (канал доставки уведомлений).
+         * @description ADR-052, S4. Herald — куда слать уведомления о событиях прогонов
+         *     (webhook-канал в MVP). config для webhook — { url, опц. headers };
+         *     SSRF-контур взведён по умолчанию (https-only + deny приватных IP),
+         *     снимается per-Herald opt-out-флагами config.http_allowed /
+         *     config.allow_private. secret_ref (опц.) — vault-ref на signing-token:
+         *     при заданном секрете webhook-доставка подписывает тело заголовком
+         *     X-SoulStack-Signature в форме `sha256=<hex>` (HMAC-SHA256). Permission:
+         *     herald.create.
+         */
+        post: operations["CreateHerald"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/heralds/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Прочитать один Herald-канал.
+         * @description Permission herald.read.
+         */
+        get: operations["GetHerald"];
+        /**
+         * Заменить Herald-канал (replace-семантика).
+         * @description Permission herald.update. Replace: тело полностью заменяет mutable-поля
+         *     (type/config/secret_ref/enabled); name (PK) immutable. SSRF-инвариант
+         *     тот же, что у create. Как у Push-Provider — PUT (полная замена), не PATCH.
+         */
+        put: operations["UpdateHerald"];
+        post?: never;
+        /**
+         * Удалить Herald-канал.
+         * @description Permission herald.delete. Каскадно сносит связанные Tiding-подписки
+         *     (tidings.herald ON DELETE CASCADE).
+         */
+        delete: operations["DeleteHerald"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tidings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Перечислить Tiding-правила.
+         * @description Permission tiding.list. Сортировка updated_at DESC, name ASC.
+         */
+        get: operations["ListTidings"];
+        put?: never;
+        /**
+         * Создать Tiding (правило подписки на уведомления).
+         * @description ADR-052, S4. Tiding — на что реагировать → каким Herald-ом. event_types —
+         *     непустой список audit-event-types с area-glob (scenario_run.*) в scope
+         *     прогонов (scenario_run / command_run / voyage / cadence + точечный
+         *     incarnation.drift_checked); произвольный wildcard запрещён. herald — FK
+         *     на существующий Herald: ссылка на отсутствующий канал → 404. Permission:
+         *     tiding.create.
+         */
+        post: operations["CreateTiding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tidings/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Прочитать одно Tiding-правило.
+         * @description Permission tiding.read.
+         */
+        get: operations["GetTiding"];
+        /**
+         * Заменить Tiding-правило (replace-семантика).
+         * @description Permission tiding.update. Replace: тело полностью заменяет mutable-поля;
+         *     name (PK) immutable. FK на отсутствующий herald → 404. Как у
+         *     Push-Provider — PUT (полная замена), не PATCH.
+         */
+        put: operations["UpdateTiding"];
+        post?: never;
+        /**
+         * Удалить Tiding-правило.
+         * @description Permission tiding.delete.
+         */
+        delete: operations["DeleteTiding"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3627,6 +3752,121 @@ export interface components {
         };
         PushProviderListReply: {
             items: components["schemas"]["PushProvider"][];
+            offset: number;
+            limit: number;
+            total: number;
+        };
+        /**
+         * @description Запись реестра heralds (ADR-052, S4) — канал доставки уведомлений о
+         *     событиях прогонов. type — closed-enum (webhook в MVP). config — per-type
+         *     конфигурация (для webhook: url + опц. headers + опц. SSRF-opt-out-флаги
+         *     http_allowed/allow_private). secret_ref (nullable) — vault-ref на
+         *     signing-token: при заданном секрете webhook-доставка подписывает тело
+         *     заголовком X-SoulStack-Signature (`sha256=<hex>`, HMAC-SHA256). Сам
+         *     секрет в записи НЕ хранится (vault-ref, не cleartext).
+         */
+        Herald: {
+            name: string;
+            /**
+             * @description Тип канала (closed-enum, webhook в MVP).
+             * @enum {string}
+             */
+            type: "webhook";
+            /**
+             * @description Per-type config. Для webhook: { url, опц. headers }. SSRF-контур
+             *     (https-only + deny приватных IP) взведён по умолчанию; снимается
+             *     флагами config.http_allowed=true / config.allow_private=true.
+             */
+            config: Record<string, never>;
+            /**
+             * @description vault-ref на signing-token (vault:<mount>/<path>); подпись webhook —
+             *     X-SoulStack-Signature: sha256=<hex>. null — без подписи.
+             */
+            secret_ref?: string | null;
+            enabled: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            created_by_aid?: string | null;
+        };
+        HeraldCreateRequest: {
+            name: string;
+            /** @enum {string} */
+            type: "webhook";
+            /** @description Per-type config (webhook — { url, опц. headers, опц. http_allowed/allow_private }). */
+            config: Record<string, never>;
+            /** @description Опц. vault-ref на signing-token (vault:<mount>/<path>). */
+            secret_ref?: string | null;
+            /** @description Канал включён (default — задаётся сервером, опц. в запросе). */
+            enabled?: boolean;
+        };
+        /** @description Replace-семантика — поля полностью заменяют существующие (name immutable). */
+        HeraldUpdateRequest: {
+            /** @enum {string} */
+            type: "webhook";
+            config: Record<string, never>;
+            secret_ref?: string | null;
+            enabled?: boolean;
+        };
+        HeraldListReply: {
+            items: components["schemas"]["Herald"][];
+            offset: number;
+            limit: number;
+            total: number;
+        };
+        /**
+         * @description Запись реестра tidings (ADR-052, S4) — правило подписки на уведомления.
+         *     event_types — непустой список audit-event-types с area-glob
+         *     (scenario_run.*) в scope прогонов. herald — FK на heralds(name).
+         *     only_failures/only_changes — фильтры. incarnation/cadence (nullable) —
+         *     опц. селекторы привязки к источнику прогона.
+         */
+        Tiding: {
+            name: string;
+            /** @description Имя Herald-канала доставки (FK на heralds.name). */
+            herald: string;
+            /**
+             * @description Список audit-event-types (area-glob `scenario_run.*` или точный
+             *     `incarnation.drift_checked`) в scope прогонов: scenario_run /
+             *     command_run / voyage / cadence + incarnation.drift_checked.
+             */
+            event_types: string[];
+            only_failures: boolean;
+            only_changes: boolean;
+            /** @description Опц. селектор привязки к инкарнации-источнику прогона. */
+            incarnation?: string | null;
+            /** @description Опц. селектор привязки к Cadence-расписанию-источнику. */
+            cadence?: string | null;
+            enabled: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            created_by_aid?: string | null;
+        };
+        TidingCreateRequest: {
+            name: string;
+            herald: string;
+            event_types: string[];
+            only_failures?: boolean;
+            only_changes?: boolean;
+            incarnation?: string | null;
+            cadence?: string | null;
+            enabled?: boolean;
+        };
+        /** @description Replace-семантика — поля полностью заменяют существующие (name immutable). */
+        TidingUpdateRequest: {
+            herald: string;
+            event_types: string[];
+            only_failures?: boolean;
+            only_changes?: boolean;
+            incarnation?: string | null;
+            cadence?: string | null;
+            enabled?: boolean;
+        };
+        TidingListReply: {
+            items: components["schemas"]["Tiding"][];
             offset: number;
             limit: number;
             total: number;
@@ -8034,6 +8274,293 @@ export interface operations {
         };
     };
     DeletePushProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Удалено. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListHeralds: {
+        parameters: {
+            query?: {
+                /** @description Сдвиг от начала набора (default 0). */
+                offset?: components["parameters"]["OffsetQuery"];
+                /** @description Размер страницы (1..1000, default 50). */
+                limit?: components["parameters"]["LimitQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница списка. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeraldListReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    CreateHerald: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeraldCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Канал создан. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Herald"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            409: components["responses"]["Problem409"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    GetHerald: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Канал. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Herald"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    UpdateHerald: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeraldUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Обновлённый канал. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Herald"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    DeleteHerald: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Удалено. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListTidings: {
+        parameters: {
+            query?: {
+                /** @description Сдвиг от начала набора (default 0). */
+                offset?: components["parameters"]["OffsetQuery"];
+                /** @description Размер страницы (1..1000, default 50). */
+                limit?: components["parameters"]["LimitQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Страница списка. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TidingListReply"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    CreateTiding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TidingCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Правило создано. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tiding"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            409: components["responses"]["Problem409"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    GetTiding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Правило. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tiding"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    UpdateTiding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TidingUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Обновлённое правило. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tiding"];
+                };
+            };
+            400: components["responses"]["Problem400"];
+            401: components["responses"]["Problem401"];
+            403: components["responses"]["Problem403"];
+            404: components["responses"]["Problem404"];
+            422: components["responses"]["Problem422"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    DeleteTiding: {
         parameters: {
             query?: never;
             header?: never;

@@ -1072,7 +1072,7 @@ paths:
       operationId: UpdateIncarnationHosts
       summary: Править declared `spec.hosts[]` (UI Hosts editing, ADR-008).
       description: |
-        Permission: incarnation.update-hosts. MCP-tool: keeper.incarnation.hosts.update.
+        Permission: incarnation.update-hosts. MCP-tool отсутствует — REST-only.
 
         Три mode-семантики над declared `spec.hosts[]`:
           - `replace` — полная замена списка переданным набором (включая пустой).
@@ -1092,7 +1092,7 @@ paths:
         при сносе); остальные статусы (включая `applying`) — допустимы (spec —
         declared-вход следующего прогона, не текущего).
 
-        Audit `incarnation.hosts_updated` (`source: api`/`mcp`, archon = JWT.sub).
+        Audit `incarnation.hosts_updated` (`source: api`, archon = JWT.sub).
       parameters:
         - $ref: '#/components/parameters/IncarnationNamePath'
       requestBody:
@@ -1123,7 +1123,7 @@ paths:
       summary: Создать Choir (партию хостов внутри инкарнации, ADR-044).
       description: |
         Permission: choir.create (scope incarnation/service/coven по path-{name}).
-        MCP-tool: keeper.choir.create.
+        MCP-tool отсутствует — REST-only.
 
         Choir — именованная топология хостов ВНУТРИ инкарнации (declared-«партия
         хора»). `created_by_aid` берётся из JWT-контекста, НЕ из тела. `choir_name`
@@ -1179,7 +1179,7 @@ paths:
       summary: Удалить Choir (каскадом его Voice-ы, ADR-044).
       description: |
         Permission: choir.delete (scope incarnation/service/coven по path-{name}).
-        MCP-tool: keeper.choir.delete. ON DELETE CASCADE сносит все Voice-ы Choir-а.
+        MCP-tool отсутствует — REST-only. ON DELETE CASCADE сносит все Voice-ы Choir-а.
       parameters:
         - $ref: '#/components/parameters/IncarnationNamePath'
         - $ref: '#/components/parameters/ChoirNamePath'
@@ -1199,7 +1199,7 @@ paths:
       summary: Добавить Voice (членство SID в Choir-е, ADR-044).
       description: |
         Permission: choir.add-voice (scope incarnation/service/coven по path-{name}).
-        MCP-tool: keeper.choir.add-voice.
+        MCP-tool отсутствует — REST-only.
 
         Инвариант членства (ADR-044): Voice создаётся только для SID, который уже
         член инкарнации (его `souls.coven[]` содержит `incarnation.name`). SID вне
@@ -1258,7 +1258,7 @@ paths:
       summary: Убрать Voice из Choir-а (ADR-044).
       description: |
         Permission: choir.remove-voice (scope incarnation/service/coven по path-{name}).
-        MCP-tool: keeper.choir.remove-voice.
+        MCP-tool отсутствует — REST-only.
       parameters:
         - $ref: '#/components/parameters/IncarnationNamePath'
         - $ref: '#/components/parameters/ChoirNamePath'
@@ -3529,6 +3529,245 @@ paths:
       operationId: DeletePushProvider
       summary: Удалить запись Push-Provider-а.
       description: Permission push-provider.delete.
+      responses:
+        '204':
+          description: Удалено.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/heralds:
+    post:
+      tags: [Herald]
+      operationId: CreateHerald
+      summary: Создать Herald (канал доставки уведомлений).
+      description: |
+        ADR-052, S4. Herald — куда слать уведомления о событиях прогонов
+        (webhook-канал в MVP). config для webhook — { url, опц. headers };
+        SSRF-контур взведён по умолчанию (https-only + deny приватных IP),
+        снимается per-Herald opt-out-флагами config.http_allowed /
+        config.allow_private. secret_ref (опц.) — vault-ref на signing-token:
+        при заданном секрете webhook-доставка подписывает тело заголовком
+        X-SoulStack-Signature в форме `sha256=<hex>` (HMAC-SHA256). Permission:
+        herald.create.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeraldCreateRequest'
+      responses:
+        '201':
+          description: Канал создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Herald'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Herald]
+      operationId: ListHeralds
+      summary: Перечислить Herald-каналы.
+      description: Permission herald.list. Сортировка updated_at DESC, name ASC.
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница списка.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeraldListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/heralds/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+    get:
+      tags: [Herald]
+      operationId: GetHerald
+      summary: Прочитать один Herald-канал.
+      description: Permission herald.read.
+      responses:
+        '200':
+          description: Канал.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Herald'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    put:
+      tags: [Herald]
+      operationId: UpdateHerald
+      summary: Заменить Herald-канал (replace-семантика).
+      description: |
+        Permission herald.update. Replace: тело полностью заменяет mutable-поля
+        (type/config/secret_ref/enabled); name (PK) immutable. SSRF-инвариант
+        тот же, что у create. Как у Push-Provider — PUT (полная замена), не PATCH.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeraldUpdateRequest'
+      responses:
+        '200':
+          description: Обновлённый канал.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Herald'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Herald]
+      operationId: DeleteHerald
+      summary: Удалить Herald-канал.
+      description: |
+        Permission herald.delete. Каскадно сносит связанные Tiding-подписки
+        (tidings.herald ON DELETE CASCADE).
+      responses:
+        '204':
+          description: Удалено.
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/tidings:
+    post:
+      tags: [Tiding]
+      operationId: CreateTiding
+      summary: Создать Tiding (правило подписки на уведомления).
+      description: |
+        ADR-052, S4. Tiding — на что реагировать → каким Herald-ом. event_types —
+        непустой список audit-event-types с area-glob (scenario_run.*) в scope
+        прогонов (scenario_run / command_run / voyage / cadence + точечный
+        incarnation.drift_checked); произвольный wildcard запрещён. herald — FK
+        на существующий Herald: ссылка на отсутствующий канал → 404. Permission:
+        tiding.create.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TidingCreateRequest'
+      responses:
+        '201':
+          description: Правило создано.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tiding'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '409': { $ref: '#/components/responses/Problem409' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    get:
+      tags: [Tiding]
+      operationId: ListTidings
+      summary: Перечислить Tiding-правила.
+      description: Permission tiding.list. Сортировка updated_at DESC, name ASC.
+      parameters:
+        - $ref: '#/components/parameters/OffsetQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Страница списка.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TidingListReply'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
+  /v1/tidings/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+    get:
+      tags: [Tiding]
+      operationId: GetTiding
+      summary: Прочитать одно Tiding-правило.
+      description: Permission tiding.read.
+      responses:
+        '200':
+          description: Правило.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tiding'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    put:
+      tags: [Tiding]
+      operationId: UpdateTiding
+      summary: Заменить Tiding-правило (replace-семантика).
+      description: |
+        Permission tiding.update. Replace: тело полностью заменяет mutable-поля;
+        name (PK) immutable. FK на отсутствующий herald → 404. Как у
+        Push-Provider — PUT (полная замена), не PATCH.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TidingUpdateRequest'
+      responses:
+        '200':
+          description: Обновлённое правило.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tiding'
+        '400': { $ref: '#/components/responses/Problem400' }
+        '401': { $ref: '#/components/responses/Problem401' }
+        '403': { $ref: '#/components/responses/Problem403' }
+        '404': { $ref: '#/components/responses/Problem404' }
+        '422': { $ref: '#/components/responses/Problem422' }
+        '500': { $ref: '#/components/responses/Problem500' }
+    delete:
+      tags: [Tiding]
+      operationId: DeleteTiding
+      summary: Удалить Tiding-правило.
+      description: Permission tiding.delete.
       responses:
         '204':
           description: Удалено.
@@ -6113,6 +6352,214 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PushProvider'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
+    Herald:
+      type: object
+      description: |
+        Запись реестра heralds (ADR-052, S4) — канал доставки уведомлений о
+        событиях прогонов. type — closed-enum (webhook в MVP). config — per-type
+        конфигурация (для webhook: url + опц. headers + опц. SSRF-opt-out-флаги
+        http_allowed/allow_private). secret_ref (nullable) — vault-ref на
+        signing-token: при заданном секрете webhook-доставка подписывает тело
+        заголовком X-SoulStack-Signature (`sha256=<hex>`, HMAC-SHA256). Сам
+        секрет в записи НЕ хранится (vault-ref, не cleartext).
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+        type:
+          type: string
+          enum: [webhook]
+          description: Тип канала (closed-enum, webhook в MVP).
+        config:
+          type: object
+          description: |
+            Per-type config. Для webhook: { url, опц. headers }. SSRF-контур
+            (https-only + deny приватных IP) взведён по умолчанию; снимается
+            флагами config.http_allowed=true / config.allow_private=true.
+        secret_ref:
+          type: string
+          nullable: true
+          description: |
+            vault-ref на signing-token (vault:<mount>/<path>); подпись webhook —
+            X-SoulStack-Signature: sha256=<hex>. null — без подписи.
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          nullable: true
+      required: [name, type, config, enabled, created_at, updated_at]
+
+    HeraldCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+        type:
+          type: string
+          enum: [webhook]
+        config:
+          type: object
+          description: Per-type config (webhook — { url, опц. headers, опц. http_allowed/allow_private }).
+        secret_ref:
+          type: string
+          nullable: true
+          description: Опц. vault-ref на signing-token (vault:<mount>/<path>).
+        enabled:
+          type: boolean
+          description: Канал включён (default — задаётся сервером, опц. в запросе).
+      required: [name, type, config]
+
+    HeraldUpdateRequest:
+      type: object
+      description: Replace-семантика — поля полностью заменяют существующие (name immutable).
+      properties:
+        type:
+          type: string
+          enum: [webhook]
+        config:
+          type: object
+        secret_ref:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+      required: [type, config]
+
+    HeraldListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Herald'
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+      required: [items, offset, limit, total]
+
+    Tiding:
+      type: object
+      description: |
+        Запись реестра tidings (ADR-052, S4) — правило подписки на уведомления.
+        event_types — непустой список audit-event-types с area-glob
+        (scenario_run.*) в scope прогонов. herald — FK на heralds(name).
+        only_failures/only_changes — фильтры. incarnation/cadence (nullable) —
+        опц. селекторы привязки к источнику прогона.
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+        herald:
+          type: string
+          description: Имя Herald-канала доставки (FK на heralds.name).
+        event_types:
+          type: array
+          items:
+            type: string
+          description: |
+            Список audit-event-types (area-glob `scenario_run.*` или точный
+            `incarnation.drift_checked`) в scope прогонов: scenario_run /
+            command_run / voyage / cadence + incarnation.drift_checked.
+        only_failures:
+          type: boolean
+        only_changes:
+          type: boolean
+        incarnation:
+          type: string
+          nullable: true
+          description: Опц. селектор привязки к инкарнации-источнику прогона.
+        cadence:
+          type: string
+          nullable: true
+          description: Опц. селектор привязки к Cadence-расписанию-источнику.
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by_aid:
+          type: string
+          nullable: true
+      required: [name, herald, event_types, only_failures, only_changes, enabled, created_at, updated_at]
+
+    TidingCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+        herald:
+          type: string
+        event_types:
+          type: array
+          items:
+            type: string
+        only_failures:
+          type: boolean
+        only_changes:
+          type: boolean
+        incarnation:
+          type: string
+          nullable: true
+        cadence:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+      required: [name, herald, event_types]
+
+    TidingUpdateRequest:
+      type: object
+      description: Replace-семантика — поля полностью заменяют существующие (name immutable).
+      properties:
+        herald:
+          type: string
+        event_types:
+          type: array
+          items:
+            type: string
+        only_failures:
+          type: boolean
+        only_changes:
+          type: boolean
+        incarnation:
+          type: string
+          nullable: true
+        cadence:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+      required: [herald, event_types]
+
+    TidingListReply:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tiding'
         offset:
           type: integer
         limit:

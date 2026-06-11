@@ -216,6 +216,18 @@ export type SynodCreateRequest = components['schemas']['SynodCreateRequest'];
 export type SynodUpdateRequest = components['schemas']['SynodUpdateRequest'];
 export type SynodGrantRoleRequest = components['schemas']['SynodGrantRoleRequest'];
 
+// Herald — канал доставки уведомлений (ADR-052, S5). Типы из gen.
+export type Herald = components['schemas']['Herald'];
+export type HeraldCreateRequest = components['schemas']['HeraldCreateRequest'];
+export type HeraldUpdateRequest = components['schemas']['HeraldUpdateRequest'];
+export type HeraldListReply = components['schemas']['HeraldListReply'];
+
+// Tiding — правило подписки на уведомления (ADR-052, S5). Типы из gen.
+export type Tiding = components['schemas']['Tiding'];
+export type TidingCreateRequest = components['schemas']['TidingCreateRequest'];
+export type TidingUpdateRequest = components['schemas']['TidingUpdateRequest'];
+export type TidingListReply = components['schemas']['TidingListReply'];
+
 // GET /v1/me/permissions — эффективные права текущего Архонта (permission-aware UI).
 export type MyPermission = components['schemas']['MyPermission'];
 export type MyPermissionsReply = components['schemas']['MyPermissionsReply'];
@@ -938,6 +950,48 @@ export const keeperApi = {
       apiGet<VoyageListReply>(`/v1/cadences/${encodeURIComponent(id)}/runs`, {
         query: { offset: q.offset, limit: q.limit },
       }),
+  },
+
+  // Heralds — каналы доставки уведомлений (ADR-052, S5).
+  heralds: {
+    // GET /v1/heralds → HeraldListReply (sorted updated_at DESC, name ASC).
+    list: (q: ListPagedQuery = {}) =>
+      apiGet<HeraldListReply>('/v1/heralds', {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+    // GET /v1/heralds/{name} → Herald.
+    get: (name: string) =>
+      apiGet<Herald>(`/v1/heralds/${encodeURIComponent(name)}`),
+    // POST /v1/heralds → 201 Herald.
+    create: (body: HeraldCreateRequest) =>
+      apiSend<Herald>('/v1/heralds', 'POST', { body }),
+    // PUT /v1/heralds/{name} → 200 Herald (replace-семантика).
+    update: (name: string, body: HeraldUpdateRequest) =>
+      apiSend<Herald>(`/v1/heralds/${encodeURIComponent(name)}`, 'PUT', { body }),
+    // DELETE /v1/heralds/{name} → 204. Каскадно удаляет Tiding-и.
+    delete: (name: string) =>
+      apiSend<void>(`/v1/heralds/${encodeURIComponent(name)}`, 'DELETE'),
+  },
+
+  // Tidings — правила подписки на уведомления (ADR-052, S5).
+  tidings: {
+    // GET /v1/tidings → TidingListReply (sorted updated_at DESC, name ASC).
+    list: (q: ListPagedQuery = {}) =>
+      apiGet<TidingListReply>('/v1/tidings', {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+    // GET /v1/tidings/{name} → Tiding.
+    get: (name: string) =>
+      apiGet<Tiding>(`/v1/tidings/${encodeURIComponent(name)}`),
+    // POST /v1/tidings → 201 Tiding.
+    create: (body: TidingCreateRequest) =>
+      apiSend<Tiding>('/v1/tidings', 'POST', { body }),
+    // PUT /v1/tidings/{name} → 200 Tiding (replace-семантика).
+    update: (name: string, body: TidingUpdateRequest) =>
+      apiSend<Tiding>(`/v1/tidings/${encodeURIComponent(name)}`, 'PUT', { body }),
+    // DELETE /v1/tidings/{name} → 204.
+    delete: (name: string) =>
+      apiSend<void>(`/v1/tidings/${encodeURIComponent(name)}`, 'DELETE'),
   },
 
   // Sigil-allow-list плагинов (ADR-026, вариант C). Полный путь записи — (namespace, name, ref).
