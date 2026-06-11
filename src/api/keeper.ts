@@ -189,6 +189,10 @@ export type VoyageOnFailure = NonNullable<components['schemas']['VoyageCreateReq
 export type VoyageTarget = components['schemas']['VoyageTarget'];
 export type VoyageCreateRequest = components['schemas']['VoyageCreateRequest'];
 export type VoyageCreateReply = components['schemas']['VoyageCreateReply'];
+// VoyageNotify — разовая подписка на уведомления о прогоне (ADR-052(g) amendment N2).
+export type VoyageNotify = components['schemas']['VoyageNotify'];
+// Допустимые терминальные события для поля `on` (completed/failed/partial).
+export type VoyageNotifyOn = NonNullable<VoyageNotify['on']>[number];
 export type VoyageSummary = components['schemas']['VoyageSummary'];
 export type Voyage = components['schemas']['Voyage'];
 export type VoyageListReply = components['schemas']['VoyageListReply'];

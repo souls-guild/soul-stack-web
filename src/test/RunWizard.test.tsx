@@ -1186,12 +1186,12 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (v=9, incarnationRegex) → state восстанавливается', async () => {
+  it('Валидный свежий черновик (v=10, incarnationRegex) → state восстанавливается', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 9,
+        v: 10,
         step: 3,
         workload: 'scenario',
         runMode: 'voyage',
@@ -1756,3 +1756,134 @@ describe('RunWizard', () => {
     );
   });
 });
+
+// --- Notify-блок RunWizard (ADR-052(g) amendment N2) ---
+
+describe('RunWizard — notify-блок Step 4', () => {
+  beforeEach(() => {
+    tokenStore.clear();
+    sessionStorage.clear();
+  });
+
+  /**
+   * Вспомогательная функция: проходит шаги wizard Scenario до Step 4 (Options).
+   * Возвращает stub для проверки posts.
+   */
+  async function reachStep4Scenario(user: ReturnType<typeof userEvent.setup>) {
+    const stub = setupFetchStubWithHeralds(['ops-webhook']);
+    renderWizardWithRoutes();
+
+    // Step 1 → 2
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    // Step 2 → 3
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    // Step 3 → 4
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByTestId('notify-block')).toBeInTheDocument());
+
+    return stub;
+  }
+
+  it('notify-блок виден на Step 4 (voyage-режим)', async () => {
+    const user = userEvent.setup();
+    await reachStep4Scenario(user);
+    expect(screen.getByTestId('notify-block')).toBeInTheDocument();
+  });
+
+  it('кнопка «Добавить уведомление» создаёт новый notify-элемент', async () => {
+    const user = userEvent.setup();
+    await reachStep4Scenario(user);
+
+    await user.click(screen.getByTestId('notify-add-btn'));
+    await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
+    expect(screen.getByTestId('notify-herald-select-0')).toBeInTheDocument();
+  });
+
+  it('выбор Herald и submit несут notify[] в POST /v1/voyages', async () => {
+    const user = userEvent.setup();
+    const stub = await reachStep4Scenario(user);
+
+    // Добавить notify-элемент.
+    await user.click(screen.getByTestId('notify-add-btn'));
+    await waitFor(() => expect(screen.getByTestId('notify-herald-select-0')).toBeInTheDocument());
+    await user.selectOptions(screen.getByTestId('notify-herald-select-0'), 'ops-webhook');
+
+    // Submit.
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
+    expect(voyagePost).toBeDefined();
+    const body = voyagePost!.body as { notify?: Array<{ herald: string }> };
+    expect(body.notify).toBeDefined();
+    expect(body.notify![0].herald).toBe('ops-webhook');
+  });
+
+  it('notify-элемент с пустым herald не попадает в POST', async () => {
+    const user = userEvent.setup();
+    const stub = await reachStep4Scenario(user);
+
+    // Добавить notify-элемент, но не выбрать Herald.
+    await user.click(screen.getByTestId('notify-add-btn'));
+    await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
+
+    // Submit без Herald.
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
+    expect(voyagePost).toBeDefined();
+    const body = voyagePost!.body as { notify?: unknown };
+    // Пустой herald → notify не шлём.
+    expect(body.notify).toBeUndefined();
+  });
+
+  it('кнопка «Удалить» удаляет notify-элемент', async () => {
+    const user = userEvent.setup();
+    await reachStep4Scenario(user);
+
+    await user.click(screen.getByTestId('notify-add-btn'));
+    await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
+
+    await user.click(screen.getByTestId('notify-remove-0'));
+    await waitFor(() => expect(screen.queryByTestId('notify-item-0')).not.toBeInTheDocument());
+  });
+});
+
+/**
+ * Вариант setupFetchStub с поддержкой heralds-запроса (для notify-блока).
+ */
+function setupFetchStubWithHeralds(heraldNames: string[]) {
+  const base = setupFetchStub({ incarnationNames: ['redis-prod'] });
+  const origFetch = globalThis.fetch;
+  vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+    if (url.startsWith('/v1/heralds')) {
+      const items = heraldNames.map((name) => ({
+        name,
+        type: 'webhook' as const,
+        config: { url: `https://example.com/${name}` },
+        enabled: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      return new Response(JSON.stringify({ items, offset: 0, limit: 200, total: items.length }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return origFetch(input, init);
+  }) as typeof fetch);
+  return base;
+}

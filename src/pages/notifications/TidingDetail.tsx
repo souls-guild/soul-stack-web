@@ -75,6 +75,12 @@ export function TidingDetail() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {/* Ephemeral-бейдж для разовых (voyage-bound) правил */}
+          {td.ephemeral ? (
+            <span data-testid="tiding-detail-ephemeral-badge" title={t('tidingEphemeralTooltip')}>
+              <Badge tone="muted">{t('tidingEphemeralBadge')}</Badge>
+            </span>
+          ) : null}
           {td.enabled ? (
             <Badge tone="ok">{t('tidingEnabled')}</Badge>
           ) : (
@@ -165,6 +171,40 @@ export function TidingDetail() {
                 <Link to={`/archons/${encodeURIComponent(td.created_by_aid)}`}>
                   {td.created_by_aid}
                 </Link>
+              </dd>
+            </>
+          ) : null}
+
+          {/* voyage_id — ссылка на Voyage для ephemeral-правил */}
+          {td.voyage_id ? (
+            <>
+              <dt className={styles.metaKey}>{t('tidingColVoyage')}</dt>
+              <dd className={styles.metaVal} data-testid="tiding-detail-voyage-link">
+                <Link to={`/voyages/${encodeURIComponent(td.voyage_id)}`}>
+                  {td.voyage_id}
+                </Link>
+              </dd>
+            </>
+          ) : null}
+
+          {/* annotations */}
+          {td.annotations && Object.keys(td.annotations).length > 0 ? (
+            <>
+              <dt className={styles.metaKey}>{t('tidingFieldAnnotations')}</dt>
+              <dd className={styles.metaVal} data-testid="tiding-detail-annotations">
+                <pre style={{ margin: 0, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
+                  {JSON.stringify(td.annotations, null, 2)}
+                </pre>
+              </dd>
+            </>
+          ) : null}
+
+          {/* projection */}
+          {td.projection && td.projection.length > 0 ? (
+            <>
+              <dt className={styles.metaKey}>{t('tidingFieldProjection')}</dt>
+              <dd className={styles.metaVal} data-testid="tiding-detail-projection">
+                {td.projection.join(', ')}
               </dd>
             </>
           ) : null}

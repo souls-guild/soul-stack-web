@@ -15,6 +15,7 @@ import type {
   ServiceScenarioInfo,
   SoulListEntry,
   VoyageOnFailure,
+  VoyageNotify,
   VoyageTarget,
   VoyageCreateRequest,
   VoyagePreviewReply,
@@ -46,6 +47,8 @@ import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder'
 import { ModulePicker } from './ModulePicker';
 import { hasParams, paramsToInputSchema } from './moduleParams.helpers';
 import { ChipsInput } from '../incarnations/ChipsInput';
+import { NotifyBlock } from './NotifyBlock';
+import { serializeNotify } from './notifyHelpers';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
 
@@ -161,7 +164,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
 // версией — старый persisted-state предыдущей формы визарда игнорируется, визард
 // стартует с дефолтов, а не падает на отсутствующем поле.
-const DRAFT_VERSION = 9;
+const DRAFT_VERSION = 10;
 
 interface WizardDraft {
   v: number;
@@ -173,6 +176,7 @@ interface WizardDraft {
   hostCriteria: HostCriteria;
   options: OptionsState;
   cadenceState: CadenceState;
+  notify: VoyageNotify[];
 }
 
 // Дефолты под-state-ов. Используются как база default-merge при восстановлении
@@ -380,6 +384,10 @@ export function RunWizard() {
     draft ? { ...DEFAULT_CADENCE_STATE, ...(draft.cadenceState ?? {}) } : DEFAULT_CADENCE_STATE,
   );
 
+  const [notify, setNotify] = useState<VoyageNotify[]>(() =>
+    draft ? asArray<VoyageNotify>(draft.notify, []) : [],
+  );
+
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Ошибки map-полей и pattern-полей (поднимаются из ScenarioInputFields).
@@ -392,13 +400,13 @@ export function RunWizard() {
   // Persist черновика на каждое изменение wizard-state. sessionStorage —
   // переживает навигацию внутри вкладки браузера, чистится при закрытии вкладки.
   useEffect(() => {
-    const payload: WizardDraft = { v: DRAFT_VERSION, step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState };
+    const payload: WizardDraft = { v: DRAFT_VERSION, step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState, notify };
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
     } catch {
       // sessionStorage недоступен (private-mode/quota) — persist опционален, не падаем.
     }
-  }, [step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState]);
+  }, [step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState, notify]);
 
   function goNext() {
     setStep((s) => (s < 4 ? ((s + 1) as 2 | 3 | 4) : s));
@@ -699,11 +707,13 @@ export function RunWizard() {
   async function submitScenario(): Promise<string> {
     const recipe = buildRecipePayload();
     const opts = buildOptionsPayload();
+    const notifyPayload = serializeNotify(notify);
     const reply = await keeperApi.voyages.create({
       ...recipe,
       dry_run: Boolean(options.dryRun),
       require_alive: options.requireAlive,
       ...opts,
+      ...(notifyPayload ? { notify: notifyPayload } : {}),
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
@@ -711,11 +721,13 @@ export function RunWizard() {
   async function submitCommand(): Promise<string> {
     const recipe = buildRecipePayload();
     const opts = buildOptionsPayload();
+    const notifyPayload = serializeNotify(notify);
     const reply = await keeperApi.voyages.create({
       ...recipe,
       dry_run: false,
       require_alive: options.requireAlive,
       ...opts,
+      ...(notifyPayload ? { notify: notifyPayload } : {}),
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
   }
@@ -941,6 +953,8 @@ export function RunWizard() {
             previewData={previewQ.data ?? null}
             previewLoading={previewQ.isLoading}
             snapshotScope={snapshotScope}
+            notify={notify}
+            onNotifyChange={setNotify}
           />
         ) : null}
 
@@ -1699,6 +1713,8 @@ function Step4Options({
   previewData,
   previewLoading,
   snapshotScope,
+  notify,
+  onNotifyChange,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
@@ -1714,6 +1730,8 @@ function Step4Options({
   previewData: VoyagePreviewReply | null;
   previewLoading: boolean;
   snapshotScope: number;
+  notify: VoyageNotify[];
+  onNotifyChange: (next: VoyageNotify[]) => void;
 }) {
   const { t } = useTranslation();
   const isWindow = value.batchMode === 'window';
@@ -2064,6 +2082,11 @@ function Step4Options({
         />
         {t('run:waitLabel')}
       </label>
+
+      {/* Блок уведомлений — только для разового Voyage (не Cadence: там уведомления через постоянный Tiding) */}
+      {runMode === 'voyage' ? (
+        <NotifyBlock value={notify} onChange={onNotifyChange} />
+      ) : null}
     </>
   );
 }

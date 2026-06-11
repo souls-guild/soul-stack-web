@@ -1,12 +1,114 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { keeperApi, type Tiding, type TidingCreateRequest, type TidingUpdateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Modal, Button, Input } from '../../components/primitives';
 import { KNOWN_EVENT_TYPE_AREAS } from './eventTypes';
 import styles from '../common.module.css';
+
+interface KVPair {
+  key: string;
+  value: string;
+}
+
+function kvFromRecord(r: Record<string, unknown> | null | undefined): KVPair[] {
+  if (!r) return [];
+  return Object.entries(r).map(([key, value]) => ({ key, value: String(value) }));
+}
+
+function kvToRecord(pairs: KVPair[]): Record<string, string> | null {
+  const valid = pairs.filter((p) => p.key.trim());
+  if (!valid.length) return null;
+  return Object.fromEntries(valid.map((p) => [p.key.trim(), p.value]));
+}
+
+function KVEditor({ pairs, onChange }: { pairs: KVPair[]; onChange: (next: KVPair[]) => void }) {
+  const { t } = useTranslation('notifications');
+  function updateKey(i: number, k: string) {
+    onChange(pairs.map((p, idx) => (idx === i ? { ...p, key: k } : p)));
+  }
+  function updateVal(i: number, v: string) {
+    onChange(pairs.map((p, idx) => (idx === i ? { ...p, value: v } : p)));
+  }
+  function remove(i: number) {
+    onChange(pairs.filter((_, idx) => idx !== i));
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {pairs.map((p, i) => (
+        <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <Input
+            value={p.key}
+            onChange={(e) => updateKey(i, e.target.value)}
+            placeholder="key"
+            aria-label={`annotation key ${i}`}
+            style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+          />
+          <span style={{ color: 'var(--text-muted)' }}>=</span>
+          <Input
+            value={p.value}
+            onChange={(e) => updateVal(i, e.target.value)}
+            placeholder="value"
+            aria-label={`annotation value ${i}`}
+            style={{ flex: 2, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+          />
+          <Button type="button" variant="ghost" onClick={() => remove(i)} aria-label={`remove annotation ${i}`} style={{ padding: '2px 6px' }}>
+            <Trash2 size={12} />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => onChange([...pairs, { key: '', value: '' }])}
+        data-testid="tiding-annotation-add"
+        style={{ alignSelf: 'flex-start', fontSize: 12, padding: '2px 8px' }}
+      >
+        <Plus size={12} /> {t('tidingAnnotationAddBtn')}
+      </Button>
+    </div>
+  );
+}
+
+function ProjectionEditor({ paths, onChange }: { paths: string[]; onChange: (next: string[]) => void }) {
+  const { t } = useTranslation('notifications');
+  function update(i: number, v: string) {
+    onChange(paths.map((p, idx) => (idx === i ? v : p)));
+  }
+  function remove(i: number) {
+    onChange(paths.filter((_, idx) => idx !== i));
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {paths.map((p, i) => (
+        <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <Input
+            value={p}
+            onChange={(e) => update(i, e.target.value)}
+            placeholder={t('tidingFieldProjectionPlaceholder')}
+            aria-label={`projection path ${i}`}
+            data-testid={`tiding-projection-path-${i}`}
+            style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: 12 }}
+          />
+          <Button type="button" variant="ghost" onClick={() => remove(i)} aria-label={`remove projection ${i}`} style={{ padding: '2px 6px' }}>
+            <Trash2 size={12} />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => onChange([...paths, ''])}
+        data-testid="tiding-projection-add"
+        style={{ alignSelf: 'flex-start', fontSize: 12, padding: '2px 8px' }}
+      >
+        <Plus size={12} /> {t('tidingProjectionAddBtn')}
+      </Button>
+    </div>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -29,6 +131,8 @@ export function TidingModal({ open, onClose, editing }: Props) {
   const [incarnation, setIncarnation] = useState('');
   const [cadence, setCadence] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [annotationPairs, setAnnotationPairs] = useState<KVPair[]>([]);
+  const [projectionPaths, setProjectionPaths] = useState<string[]>([]);
 
   const heraldsQ = useQuery({
     queryKey: ['heralds.list'],
@@ -47,6 +151,8 @@ export function TidingModal({ open, onClose, editing }: Props) {
       setIncarnation(editing.incarnation ?? '');
       setCadence(editing.cadence ?? '');
       setEnabled(editing.enabled);
+      setAnnotationPairs(kvFromRecord(editing.annotations as Record<string, unknown> | null | undefined));
+      setProjectionPaths(editing.projection ?? []);
     } else {
       setName('');
       setHerald('');
@@ -57,6 +163,8 @@ export function TidingModal({ open, onClose, editing }: Props) {
       setIncarnation('');
       setCadence('');
       setEnabled(true);
+      setAnnotationPairs([]);
+      setProjectionPaths([]);
     }
   }, [open, editing]);
 
@@ -103,6 +211,8 @@ export function TidingModal({ open, onClose, editing }: Props) {
     if (customType.trim()) {
       addCustomType();
     }
+    const annotations = kvToRecord(annotationPairs);
+    const projection = projectionPaths.filter((p) => p.trim());
     if (editing) {
       const body: TidingUpdateRequest = {
         herald,
@@ -112,6 +222,8 @@ export function TidingModal({ open, onClose, editing }: Props) {
         incarnation: incarnation || null,
         cadence: cadence || null,
         enabled,
+        ...(annotations ? { annotations } : {}),
+        ...(projection.length > 0 ? { projection } : {}),
       };
       updateMu.mutate(body);
     } else {
@@ -124,6 +236,8 @@ export function TidingModal({ open, onClose, editing }: Props) {
         incarnation: incarnation || null,
         cadence: cadence || null,
         enabled,
+        ...(annotations ? { annotations } : {}),
+        ...(projection.length > 0 ? { projection } : {}),
       };
       createMu.mutate(body);
     }
@@ -320,6 +434,24 @@ export function TidingModal({ open, onClose, editing }: Props) {
             {t('notifications:tidingFieldCadenceHint')}
           </span>
         </label>
+
+        {/* Annotations — статические поля в тело webhook */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className={styles.metaKey}>{t('notifications:tidingFieldAnnotations')}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {t('notifications:tidingFieldAnnotationsHint')}
+          </span>
+          <KVEditor pairs={annotationPairs} onChange={setAnnotationPairs} />
+        </div>
+
+        {/* Projection — allow-list путей payload */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className={styles.metaKey}>{t('notifications:tidingFieldProjection')}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {t('notifications:tidingFieldProjectionHint')}
+          </span>
+          <ProjectionEditor paths={projectionPaths} onChange={setProjectionPaths} />
+        </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
           <input

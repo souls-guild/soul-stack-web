@@ -7,6 +7,7 @@ import { NotificationsPage } from '../pages/notifications/NotificationsPage';
 import { HeraldDetail } from '../pages/notifications/HeraldDetail';
 import { TidingDetail } from '../pages/notifications/TidingDetail';
 import { tokenStore } from '../api/tokenStore';
+import type { Tiding } from '../api/keeper';
 
 // --- Sample data ---
 
@@ -32,38 +33,66 @@ const HERALD_DISABLED = {
   created_by_aid: null,
 };
 
-const TIDING_SCENARIOS = {
+const TIDING_SCENARIOS: Tiding = {
   name: 'run-failures',
   herald: 'ops-webhook',
   event_types: ['scenario_run.*', 'voyage.*'],
   only_failures: true,
   only_changes: false,
   incarnation: 'redis-prod',
-  cadence: null,
+  cadence: undefined,
   enabled: true,
+  ephemeral: false,
+  voyage_id: null,
+  annotations: undefined,
+  projection: [],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   created_by_aid: 'archon-alice',
 };
 
-const TIDING_CADENCE = {
+const TIDING_CADENCE: Tiding = {
   name: 'cadence-alerts',
   herald: 'ops-webhook',
   event_types: ['cadence.*'],
   only_failures: false,
   only_changes: true,
-  incarnation: null,
+  incarnation: undefined,
   cadence: 'redis-hourly',
   enabled: false,
+  ephemeral: false,
+  voyage_id: null,
+  annotations: undefined,
+  projection: [],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
-  created_by_aid: null,
+  created_by_aid: undefined,
+};
+
+// Ephemeral-правило (разовое, привязанное к Voyage).
+const TIDING_EPHEMERAL: Tiding = {
+  name: 'ephemeral-01hz',
+  herald: 'ops-webhook',
+  event_types: ['voyage.*'],
+  only_failures: false,
+  only_changes: false,
+  incarnation: undefined,
+  cadence: undefined,
+  enabled: true,
+  ephemeral: true,
+  voyage_id: '01HZ00000000EPHEMERAL',
+  annotations: { env: 'prod' },
+  projection: ['summary.succeeded', 'voyage_id'],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  created_by_aid: undefined,
 };
 
 const HERALDS_REPLY = { items: [HERALD_WEBHOOK, HERALD_DISABLED], offset: 0, limit: 200, total: 2 };
 const HERALDS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
-const TIDINGS_REPLY = { items: [TIDING_SCENARIOS, TIDING_CADENCE], offset: 0, limit: 200, total: 2 };
-const TIDINGS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
+const TIDINGS_REPLY: TidingsListReply = { items: [TIDING_SCENARIOS, TIDING_CADENCE], offset: 0, limit: 200, total: 2 };
+const TIDINGS_WITH_EPHEMERAL: TidingsListReply = { items: [TIDING_SCENARIOS, TIDING_CADENCE, TIDING_EPHEMERAL], offset: 0, limit: 200, total: 3 };
+const TIDINGS_EMPTY: TidingsListReply = { items: [], offset: 0, limit: 200, total: 0 };
 
 const MY_PERMS_WILDCARD = { permissions: [{ wildcard: true }] };
 const MY_PERMS_NO_CREATE = {
@@ -78,11 +107,18 @@ const MY_PERMS_NO_UPDATE = {
   ],
 };
 
+interface TidingsListReply {
+  items: Tiding[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
 interface MockOpts {
   heralds?: typeof HERALDS_REPLY | typeof HERALDS_EMPTY;
-  tidings?: typeof TIDINGS_REPLY | typeof TIDINGS_EMPTY;
+  tidings?: TidingsListReply;
   heraldDetail?: typeof HERALD_WEBHOOK;
-  tidingDetail?: typeof TIDING_SCENARIOS;
+  tidingDetail?: Tiding;
   myPerms?: typeof MY_PERMS_WILDCARD;
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }
@@ -121,7 +157,7 @@ function setupMock(opts: MockOpts = {}): Call[] {
     }
     if (/^\/v1\/tidings\/[^/]+$/.test(url) && method === 'GET') {
       const name = url.split('/').pop();
-      const td = [TIDING_SCENARIOS, TIDING_CADENCE].find((x) => x.name === name) ?? opts.tidingDetail ?? TIDING_SCENARIOS;
+      const td = [TIDING_SCENARIOS, TIDING_CADENCE, TIDING_EPHEMERAL].find((x) => x.name === name) ?? opts.tidingDetail ?? TIDING_SCENARIOS;
       return new Response(JSON.stringify(td), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.startsWith('/v1/tidings') && method === 'GET') {
@@ -621,5 +657,197 @@ describe('NotificationsPage — deep-link ?tab=tidings', () => {
     });
     // Таб Heralds не активен — содержимое HeraldsTab не отрисовано.
     expect(screen.queryByTestId('herald-create-btn')).not.toBeInTheDocument();
+  });
+});
+
+// --- Новые тесты: ephemeral-фильтр + annotations/projection ---
+
+describe('TidingsTab — ephemeral-фильтр', () => {
+  beforeEach(() => {
+    tokenStore.clear();
+  });
+
+  it('ephemeral-правило скрыто по умолчанию', async () => {
+    setupMock({ tidings: TIDINGS_WITH_EPHEMERAL });
+    renderNotificationsPage('/notifications?tab=tidings');
+    await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
+    // ephemeral-правило скрыто.
+    expect(screen.queryByText('ephemeral-01hz')).not.toBeInTheDocument();
+    // Кнопка показа видна (count > 0).
+    expect(screen.getByTestId('tiding-show-ephemeral-btn')).toBeInTheDocument();
+  });
+
+  it('кнопка «Показать разовые» раскрывает ephemeral-правила', async () => {
+    setupMock({ tidings: TIDINGS_WITH_EPHEMERAL });
+    renderNotificationsPage('/notifications?tab=tidings');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-show-ephemeral-btn'));
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    // Бейдж «разовое» присутствует.
+    expect(screen.getByTestId('tiding-ephemeral-badge-ephemeral-01hz')).toBeInTheDocument();
+  });
+
+  it('кнопка «Скрыть разовые» скрывает их снова', async () => {
+    setupMock({ tidings: TIDINGS_WITH_EPHEMERAL });
+    renderNotificationsPage('/notifications?tab=tidings');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-show-ephemeral-btn'));
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    // Снова скрываем.
+    await user.click(screen.getByTestId('tiding-show-ephemeral-btn'));
+    await waitFor(() => expect(screen.queryByText('ephemeral-01hz')).not.toBeInTheDocument());
+  });
+});
+
+describe('TidingDetail — ephemeral-бейдж', () => {
+  beforeEach(() => {
+    tokenStore.clear();
+  });
+
+  it('ephemeral-бейдж виден для разового правила', async () => {
+    setupMock({ tidingDetail: TIDING_EPHEMERAL });
+    renderNotificationsPage('/notifications/tidings/ephemeral-01hz');
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    expect(screen.getByTestId('tiding-detail-ephemeral-badge')).toBeInTheDocument();
+  });
+
+  it('voyage-ссылка присутствует для ephemeral-правила', async () => {
+    setupMock({ tidingDetail: TIDING_EPHEMERAL });
+    renderNotificationsPage('/notifications/tidings/ephemeral-01hz');
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    const link = screen.getByTestId('tiding-detail-voyage-link');
+    expect(link).toBeInTheDocument();
+    expect(link.querySelector('a')).toHaveAttribute(
+      'href',
+      `/voyages/${encodeURIComponent(TIDING_EPHEMERAL.voyage_id!)}`,
+    );
+  });
+
+  it('annotations и projection показаны в мета-блоке', async () => {
+    setupMock({ tidingDetail: TIDING_EPHEMERAL });
+    renderNotificationsPage('/notifications/tidings/ephemeral-01hz');
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    expect(screen.getByTestId('tiding-detail-annotations')).toBeInTheDocument();
+    expect(screen.getByTestId('tiding-detail-projection')).toHaveTextContent('summary.succeeded');
+  });
+});
+
+describe('TidingModal — annotations и projection', () => {
+  beforeEach(() => {
+    tokenStore.clear();
+  });
+
+  it('Create Tiding — POST несёт annotations+projection при заполнении', async () => {
+    const calls = setupMock();
+    renderNotificationsPage('/notifications?tab=tidings');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-create-btn'));
+    const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
+
+    await user.type(within(dialog).getByTestId('tiding-name-input'), 'annot-tiding');
+    await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
+    await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
+    await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));
+
+    // Добавить annotation.
+    await user.click(within(dialog).getByTestId('tiding-annotation-add'));
+    const keyInputs = within(dialog).getAllByLabelText(/^annotation key/);
+    const valInputs = within(dialog).getAllByLabelText(/^annotation value/);
+    await user.type(keyInputs[0], 'env');
+    await user.type(valInputs[0], 'prod');
+
+    // Добавить projection-путь.
+    await user.click(within(dialog).getByTestId('tiding-projection-add'));
+    const pathInputs = within(dialog).getAllByTestId(/^tiding-projection-path-/);
+    await user.type(pathInputs[0], 'voyage_id');
+
+    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url === '/v1/tidings' && c.method === 'POST');
+      expect(post).toBeDefined();
+      const parsed = JSON.parse(post!.body ?? '{}');
+      expect(parsed.annotations).toMatchObject({ env: 'prod' });
+      expect(parsed.projection).toContain('voyage_id');
+    });
+  });
+
+  it('Edit Tiding — PUT несёт annotations+projection', async () => {
+    // Используем TIDING_EPHEMERAL (у него уже есть annotations и projection в фикстуре).
+    const calls = setupMock({ tidings: TIDINGS_WITH_EPHEMERAL, tidingDetail: TIDING_EPHEMERAL });
+    renderNotificationsPage('/notifications?tab=tidings');
+    const user = userEvent.setup();
+
+    // Показываем ephemeral, чтобы его кнопка edit стала видна.
+    await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-show-ephemeral-btn'));
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-edit-btn-ephemeral-01hz'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Tiding/i });
+
+    // Форма должна загрузить существующие annotation/projection — добавляем ещё один annotation.
+    await user.click(within(dialog).getByTestId('tiding-annotation-add'));
+    const keyInputs = within(dialog).getAllByLabelText(/^annotation key/);
+    const valInputs = within(dialog).getAllByLabelText(/^annotation value/);
+    // Первая пара пришла из editing (env=prod), новая — последняя.
+    const lastIdx = keyInputs.length - 1;
+    await user.type(keyInputs[lastIdx], 'team');
+    await user.type(valInputs[lastIdx], 'ops');
+
+    // Добавляем ещё один projection-путь.
+    await user.click(within(dialog).getByTestId('tiding-projection-add'));
+    const pathInputs = within(dialog).getAllByTestId(/^tiding-projection-path-/);
+    await user.type(pathInputs[pathInputs.length - 1], 'summary.failed');
+
+    await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
+
+    await waitFor(() => {
+      const put = calls.find((c) => /^\/v1\/tidings\/ephemeral-01hz$/.test(c.url) && c.method === 'PUT');
+      expect(put).toBeDefined();
+      const parsed = JSON.parse(put!.body ?? '{}');
+      // Должны присутствовать annotations (включая новую пару) и projection.
+      expect(parsed).toHaveProperty('annotations');
+      expect(parsed.annotations).toMatchObject({ team: 'ops' });
+      expect(parsed).toHaveProperty('projection');
+      expect(parsed.projection).toContain('summary.failed');
+    });
+  });
+
+  it('Edit Tiding — стёр все пути → PUT без projection (omit == clear)', async () => {
+    // Открываем редактирование TIDING_EPHEMERAL у которого projection=['summary.succeeded','voyage_id'].
+    const calls = setupMock({ tidings: TIDINGS_WITH_EPHEMERAL, tidingDetail: TIDING_EPHEMERAL });
+    renderNotificationsPage('/notifications?tab=tidings');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-show-ephemeral-btn'));
+    await waitFor(() => expect(screen.getByText('ephemeral-01hz')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tiding-edit-btn-ephemeral-01hz'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Редактировать Tiding/i });
+
+    // Удаляем все projection-пути: кликаем первую кнопку remove пока они есть.
+    let removeBtns = within(dialog).queryAllByLabelText(/^remove projection/);
+    while (removeBtns.length > 0) {
+      await user.click(removeBtns[0]);
+      removeBtns = within(dialog).queryAllByLabelText(/^remove projection/);
+    }
+
+    await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
+
+    await waitFor(() => {
+      const put = calls.find((c) => /^\/v1\/tidings\/ephemeral-01hz$/.test(c.url) && c.method === 'PUT');
+      expect(put).toBeDefined();
+      const parsed = JSON.parse(put!.body ?? '{}');
+      // projection отсутствует в body (omit == clear: пустой массив не отправляется).
+      expect(Object.prototype.hasOwnProperty.call(parsed, 'projection')).toBe(false);
+    });
   });
 });

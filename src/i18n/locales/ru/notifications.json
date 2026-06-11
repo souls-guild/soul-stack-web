@@ -72,5 +72,23 @@
   "noFilters": "—",
 
   "heraldLinkLabel": "Herald",
-  "tidingsForHerald": "Tiding-правила этого канала"
+  "tidingsForHerald": "Tiding-правила этого канала",
+
+  "tidingFieldAnnotations": "Дополнительные поля (annotations)",
+  "tidingFieldAnnotationsHint": "Статические поля, добавляемые в тело webhook. Формат: ключ = значение.",
+  "tidingFieldProjection": "Фильтр полей (projection)",
+  "tidingFieldProjectionHint": "Список путей полей события, которые включить в тело (пусто = все). Пример: summary.succeeded, voyage_id",
+  "tidingFieldProjectionPlaceholder": "summary.succeeded",
+  "tidingAnnotationAddBtn": "Добавить",
+  "tidingProjectionAddBtn": "Добавить путь",
+  "tidingProjectionRemoveBtn": "Удалить",
+  "tidingEphemeralBadge": "разовое",
+  "tidingEphemeralVoyage": "voyage {{id}}",
+  "tidingEphemeralTooltip": "Разовое правило, привязанное к прогону",
+  "tidingShowEphemeral": "Показать разовые",
+  "tidingHideEphemeral": "Скрыть разовые",
+  "tidingColEphemeral": "Тип",
+  "tidingColVoyage": "Voyage",
+  "tidingPermanent": "постоянное",
+  "tidingEphemeral": "разовое"
 }

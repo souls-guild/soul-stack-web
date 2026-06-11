@@ -72,5 +72,23 @@
   "noFilters": "—",
 
   "heraldLinkLabel": "Herald",
-  "tidingsForHerald": "Tiding rules for this channel"
+  "tidingsForHerald": "Tiding rules for this channel",
+
+  "tidingFieldAnnotations": "Extra fields (annotations)",
+  "tidingFieldAnnotationsHint": "Static fields merged into the webhook body. Format: key = value.",
+  "tidingFieldProjection": "Field filter (projection)",
+  "tidingFieldProjectionHint": "List of event payload paths to include (empty = all). Example: summary.succeeded, voyage_id",
+  "tidingFieldProjectionPlaceholder": "summary.succeeded",
+  "tidingAnnotationAddBtn": "Add",
+  "tidingProjectionAddBtn": "Add path",
+  "tidingProjectionRemoveBtn": "Remove",
+  "tidingEphemeralBadge": "one-time",
+  "tidingEphemeralVoyage": "voyage {{id}}",
+  "tidingEphemeralTooltip": "One-time rule bound to a single run",
+  "tidingShowEphemeral": "Show one-time",
+  "tidingHideEphemeral": "Hide one-time",
+  "tidingColEphemeral": "Type",
+  "tidingColVoyage": "Voyage",
+  "tidingPermanent": "permanent",
+  "tidingEphemeral": "one-time"
 }

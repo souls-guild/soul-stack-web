@@ -3838,6 +3838,16 @@ export interface components {
             incarnation?: string | null;
             /** @description Опц. селектор привязки к Cadence-расписанию-источнику. */
             cadence?: string | null;
+            /** @description Статические поля оператора (JSON-объект верхнего уровня), мержатся в тело webhook-доставки ключом `annotations` (ADR-052(h)). Пусто/опущено — нет статических полей. Доступно и постоянному правилу: оператор управляет телом доставки одинаково для постоянных и разовых (ephemeral) подписок. */
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description Allow-list путей payload (ADR-052(h)), отбирающий, какие поля события попадут в тело доставки; пусто/опущено — полная форма. Каждый путь — сегменты `[a-z0-9_]`, разделённые `.` (`summary.succeeded`). */
+            projection?: string[];
+            /** @description Разовое правило, привязанное к одному прогону (ADR-052(g)). Серверное: оператор напрямую ephemeral-Tiding не создаёт — такие правила материализует keeper из notify-блока `POST /v1/voyages` (см. VoyageNotify). Инвариант `ephemeral=true ⟺ voyage_id != null`. Постоянное правило — `ephemeral=false`, `voyage_id=null`. */
+            readonly ephemeral: boolean;
+            /** @description ID Voyage, к которому привязано разовое (ephemeral) правило (ADR-052(g)). Серверное (см. ephemeral). У постоянного правила — `null`. */
+            readonly voyage_id?: string | null;
             enabled: boolean;
             /** Format: date-time */
             created_at: string;
@@ -3845,6 +3855,7 @@ export interface components {
             updated_at: string;
             created_by_aid?: string | null;
         };
+        /** @description Создание ПОСТОЯННОГО Tiding-правила. Поля ephemeral/voyage_id здесь отсутствуют — они серверные (ADR-052(g)): разовое правило оператор не создаёт напрямую, его материализует keeper из notify-блока Voyage. */
         TidingCreateRequest: {
             name: string;
             herald: string;
@@ -3853,9 +3864,15 @@ export interface components {
             only_changes?: boolean;
             incarnation?: string | null;
             cadence?: string | null;
+            /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h)). Опц. */
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description Allow-list путей payload (ADR-052(h)); пусто/опущено — полная форма. */
+            projection?: string[];
             enabled?: boolean;
         };
-        /** @description Replace-семантика — поля полностью заменяют существующие (name immutable). */
+        /** @description Replace-семантика — поля полностью заменяют существующие (name immutable). Поля ephemeral/voyage_id отсутствуют — серверные (см. TidingCreateRequest). */
         TidingUpdateRequest: {
             herald: string;
             event_types: string[];
@@ -3863,6 +3880,12 @@ export interface components {
             only_changes?: boolean;
             incarnation?: string | null;
             cadence?: string | null;
+            /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h)). Replace — отсутствие очищает. */
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description Allow-list путей payload (ADR-052(h)); пусто/опущено — полная форма. */
+            projection?: string[];
             enabled?: boolean;
         };
         TidingListReply: {
@@ -4440,6 +4463,25 @@ export interface components {
              * @enum {string}
              */
             on_failure: "abort" | "continue";
+            /** @description Разовые подписки на ЭТОТ прогон (ADR-052(g), amendment N2). Каждый элемент материализуется keeper-ом в ephemeral-Tiding (ephemeral=true, voyage_id=<новый voyage_id>) в той же транзакции, что создаёт Voyage. Инициатор обязан держать herald.read на каждый указанный канал (403 иначе); несуществующий канал → 422. Очистка ephemeral-правил — фоном Reaper-ом после терминала прогона. */
+            notify?: components["schemas"]["VoyageNotify"][];
+        };
+        /** @description Разовая подписка на уведомления о ЭТОМ прогоне (ADR-052(g)). Поля фильтров/тела совпадают с постоянным Tiding (only_failures/only_changes/ annotations/projection); event_types выводится keeper-ом из `on` по kind прогона. */
+        VoyageNotify: {
+            /** @description Имя Herald-канала доставки (FK на heralds.name). */
+            herald: string;
+            /** @description Какие терминалы прогона уведомлять. Маппится keeper-ом в event_types по kind прогона: scenario → scenario_run.{completed|failed| partial_failed}, command → command_run.{...}. Пусто/опущено — все три терминала. */
+            on?: ("completed" | "failed" | "partial")[];
+            /** @default false */
+            only_failures: boolean;
+            /** @default false */
+            only_changes: boolean;
+            /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h), применяет worker доставки). */
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description Allow-list путей payload (ADR-052(h)); пусто = полная форма. */
+            projection?: string[];
         };
         VoyageCreateReply: {
             voyage_id: string;

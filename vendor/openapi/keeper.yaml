@@ -6490,6 +6490,41 @@ components:
           type: string
           nullable: true
           description: Опц. селектор привязки к Cadence-расписанию-источнику.
+        annotations:
+          type: object
+          additionalProperties: true
+          description: >-
+            Статические поля оператора (JSON-объект верхнего уровня),
+            мержатся в тело webhook-доставки ключом `annotations` (ADR-052(h)).
+            Пусто/опущено — нет статических полей. Доступно и постоянному
+            правилу: оператор управляет телом доставки одинаково для постоянных
+            и разовых (ephemeral) подписок.
+        projection:
+          type: array
+          items:
+            type: string
+          description: >-
+            Allow-list путей payload (ADR-052(h)), отбирающий, какие поля
+            события попадут в тело доставки; пусто/опущено — полная форма.
+            Каждый путь — сегменты `[a-z0-9_]`, разделённые `.`
+            (`summary.succeeded`).
+        ephemeral:
+          type: boolean
+          readOnly: true
+          description: >-
+            Разовое правило, привязанное к одному прогону (ADR-052(g)).
+            Серверное: оператор напрямую ephemeral-Tiding не создаёт — такие
+            правила материализует keeper из notify-блока `POST /v1/voyages`
+            (см. VoyageNotify). Инвариант `ephemeral=true ⟺ voyage_id != null`.
+            Постоянное правило — `ephemeral=false`, `voyage_id=null`.
+        voyage_id:
+          type: string
+          nullable: true
+          readOnly: true
+          description: >-
+            ID Voyage, к которому привязано разовое (ephemeral) правило
+            (ADR-052(g)). Серверное (см. ephemeral). У постоянного правила —
+            `null`.
         enabled:
           type: boolean
         created_at:
@@ -6501,10 +6536,14 @@ components:
         created_by_aid:
           type: string
           nullable: true
-      required: [name, herald, event_types, only_failures, only_changes, enabled, created_at, updated_at]
+      required: [name, herald, event_types, only_failures, only_changes, ephemeral, enabled, created_at, updated_at]
 
     TidingCreateRequest:
       type: object
+      description: >-
+        Создание ПОСТОЯННОГО Tiding-правила. Поля ephemeral/voyage_id здесь
+        отсутствуют — они серверные (ADR-052(g)): разовое правило оператор не
+        создаёт напрямую, его материализует keeper из notify-блока Voyage.
       properties:
         name:
           type: string
@@ -6525,13 +6564,28 @@ components:
         cadence:
           type: string
           nullable: true
+        annotations:
+          type: object
+          additionalProperties: true
+          description: >-
+            Статические поля оператора, мержатся в тело webhook ключом
+            `annotations` (ADR-052(h)). Опц.
+        projection:
+          type: array
+          items:
+            type: string
+          description: >-
+            Allow-list путей payload (ADR-052(h)); пусто/опущено — полная форма.
         enabled:
           type: boolean
       required: [name, herald, event_types]
 
     TidingUpdateRequest:
       type: object
-      description: Replace-семантика — поля полностью заменяют существующие (name immutable).
+      description: >-
+        Replace-семантика — поля полностью заменяют существующие (name
+        immutable). Поля ephemeral/voyage_id отсутствуют — серверные (см.
+        TidingCreateRequest).
       properties:
         herald:
           type: string
@@ -6549,6 +6603,18 @@ components:
         cadence:
           type: string
           nullable: true
+        annotations:
+          type: object
+          additionalProperties: true
+          description: >-
+            Статические поля оператора, мержатся в тело webhook ключом
+            `annotations` (ADR-052(h)). Replace — отсутствие очищает.
+        projection:
+          type: array
+          items:
+            type: string
+          description: >-
+            Allow-list путей payload (ADR-052(h)); пусто/опущено — полная форма.
         enabled:
           type: boolean
       required: [herald, event_types]
@@ -7401,7 +7467,60 @@ components:
           type: string
           enum: [abort, continue]
           default: continue
+        notify:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoyageNotify'
+          description: >-
+            Разовые подписки на ЭТОТ прогон (ADR-052(g), amendment N2). Каждый
+            элемент материализуется keeper-ом в ephemeral-Tiding (ephemeral=true,
+            voyage_id=<новый voyage_id>) в той же транзакции, что создаёт Voyage.
+            Инициатор обязан держать herald.read на каждый указанный канал (403
+            иначе); несуществующий канал → 422. Очистка ephemeral-правил — фоном
+            Reaper-ом после терминала прогона.
       required: [kind, target]
+
+    VoyageNotify:
+      type: object
+      description: >-
+        Разовая подписка на уведомления о ЭТОМ прогоне (ADR-052(g)). Поля
+        фильтров/тела совпадают с постоянным Tiding (only_failures/only_changes/
+        annotations/projection); event_types выводится keeper-ом из `on` по kind
+        прогона.
+      properties:
+        herald:
+          type: string
+          pattern: '^[a-z0-9-]{1,63}$'
+          description: Имя Herald-канала доставки (FK на heralds.name).
+        on:
+          type: array
+          items:
+            type: string
+            enum: [completed, failed, partial]
+          description: >-
+            Какие терминалы прогона уведомлять. Маппится keeper-ом в event_types
+            по kind прогона: scenario → scenario_run.{completed|failed|
+            partial_failed}, command → command_run.{...}. Пусто/опущено — все
+            три терминала.
+        only_failures:
+          type: boolean
+          default: false
+        only_changes:
+          type: boolean
+          default: false
+        annotations:
+          type: object
+          additionalProperties: true
+          description: >-
+            Статические поля оператора, мержатся в тело webhook ключом
+            `annotations` (ADR-052(h), применяет worker доставки).
+        projection:
+          type: array
+          items:
+            type: string
+          description: >-
+            Allow-list путей payload (ADR-052(h)); пусто = полная форма.
+      required: [herald]
 
     VoyageCreateReply:
       type: object
