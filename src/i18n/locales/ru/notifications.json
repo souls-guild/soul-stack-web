@@ -64,6 +64,8 @@
   "tidingFieldIncarnationHint": "Фильтр по имени инкарнации-источника",
   "tidingFieldCadence": "Cadence (необязательно)",
   "tidingFieldCadenceHint": "Фильтр по имени Cadence-расписания",
+  "tidingFieldTask": "Задача (необязательно)",
+  "tidingFieldTaskHint": "Уведомлять, когда конкретная задача (по её id или register) что-то изменила в прогоне. Работает совместно с событием incarnation.run_completed.",
   "tidingFieldEnabled": "Правило активно",
   "tidingEventTypesAddBtn": "Добавить",
 

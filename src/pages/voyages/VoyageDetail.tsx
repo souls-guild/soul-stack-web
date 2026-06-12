@@ -15,6 +15,39 @@ import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 import { VoyageTargets } from './VoyageTargets';
 
+// --- Type-guard для changed_tasks в payload incarnation.run_completed ---
+
+interface ChangedTask {
+  name?: string;
+  register?: string;
+  id?: string;
+  module?: string;
+  changed_hosts: number;
+  total_hosts: number;
+}
+
+interface RunCompletedPayload {
+  incarnation?: string;
+  status?: string;
+  changed_tasks?: ChangedTask[];
+}
+
+function isChangedTask(v: unknown): v is ChangedTask {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.changed_hosts === 'number' && typeof o.total_hosts === 'number';
+}
+
+function parseRunCompletedPayload(payload: Record<string, unknown>): RunCompletedPayload {
+  const incarnation = typeof payload.incarnation === 'string' ? payload.incarnation : undefined;
+  const status = typeof payload.status === 'string' ? payload.status : undefined;
+  const rawTasks = payload.changed_tasks;
+  const changed_tasks = Array.isArray(rawTasks)
+    ? rawTasks.filter(isChangedTask)
+    : undefined;
+  return { incarnation, status, changed_tasks };
+}
+
 function relDate(iso?: string | null): string {
   if (!iso) return '—';
   try {
@@ -97,6 +130,103 @@ function VoyageNotifications({ events, isLoading, error }: VoyageNotificationsPr
   );
 }
 
+// --- Секция «Что изменилось» ---
+
+interface VoyageChangedTasksProps {
+  events: AuditEvent[];
+  isLoading: boolean;
+  error: Error | null;
+}
+
+function VoyageChangedTasks({ events, isLoading, error }: VoyageChangedTasksProps) {
+  const { t } = useTranslation('runhistory');
+
+  if (isLoading) return <div className={styles.loading}>{t('common:loading')}</div>;
+  if (error) return (
+    <div className={styles.errorBox}>
+      {error instanceof ApiError
+        ? t('errors:generic', { status: error.status, detail: error.message })
+        : String(error)}
+    </div>
+  );
+  if (events.length === 0) return <div className={styles.empty}>{t('voyageChangedEmpty')}</div>;
+
+  const runs = events.map((ev) => parseRunCompletedPayload(ev.payload));
+
+  return (
+    <div data-testid="voyage-changed-tasks">
+      {runs.map((run, idx) => {
+        const runStatusLabel = run.status === 'success'
+          ? t('voyageChangedRunStatusSuccess')
+          : run.status === 'failed'
+            ? t('voyageChangedRunStatusFailed')
+            : run.status
+              ? t('voyageChangedRunStatusUnknown', { status: run.status })
+              : '—';
+        const runStatusToneVal: 'ok' | 'danger' | 'muted' =
+          run.status === 'success' ? 'ok' : run.status === 'failed' ? 'danger' : 'muted';
+        const tasks = run.changed_tasks ?? [];
+
+        return (
+          <div
+            key={idx}
+            data-testid={`changed-run-${idx}`}
+            style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              background: 'var(--surface-2)',
+              borderBottom: tasks.length > 0 ? '1px solid var(--border)' : undefined,
+            }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                {run.incarnation ?? '—'}
+              </span>
+              <span data-testid={`run-status-badge-${idx}`}>
+                <Badge tone={runStatusToneVal}>{runStatusLabel}</Badge>
+              </span>
+            </div>
+            {tasks.length === 0 ? (
+              <div style={{ padding: '8px 12px', color: 'var(--text-muted)', fontSize: 13 }}>
+                {t('voyageChangedNoTasks')}
+              </div>
+            ) : (
+              <table className={styles.table} data-testid={`changed-tasks-table-${idx}`}>
+                <thead>
+                  <tr>
+                    <th>{t('voyageChangedColTask')}</th>
+                    <th>{t('voyageChangedColModule')}</th>
+                    <th>{t('voyageChangedColHosts')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map((task, ti) => {
+                    const taskAddr = task.register ?? task.id ?? task.name ?? '—';
+                    return (
+                      <tr key={ti} data-testid={`changed-task-row-${idx}-${ti}`}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{taskAddr}</td>
+                        <td style={{ fontSize: 12 }}>{task.module ?? '—'}</td>
+                        <td style={{ fontSize: 12 }}>
+                          {t('voyageChangedHostsRatio', {
+                            changed: task.changed_hosts,
+                            total: task.total_hosts,
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // satisfies: перечисление ⊆ VoyageStatus; при добавлении статуса в backend tsc потребует пересмотра.
 const NON_TERMINAL_STATUSES = ['pending', 'scheduled', 'running'] as const satisfies readonly VoyageStatus[];
 const NON_TERMINAL: ReadonlySet<string> = new Set(NON_TERMINAL_STATUSES);
@@ -157,6 +287,17 @@ export function VoyageDetail() {
       keeperApi.audit.list({
         type: ['herald.delivered', 'herald.failed'],
         correlation_id: id,
+        limit: 200,
+      }),
+    enabled: Boolean(id),
+  });
+
+  const changedQ = useQuery({
+    queryKey: ['voyage.changed', id],
+    queryFn: () =>
+      keeperApi.audit.list({
+        type: ['incarnation.run_completed'],
+        payload_voyage: id,
         limit: 200,
       }),
     enabled: Boolean(id),
@@ -393,6 +534,11 @@ export function VoyageDetail() {
       <section className={styles.section} aria-label="Voyage notifications" data-testid="voyage-notifications-section">
         <h2 className={styles.sectionTitle}>{t('notifications:voyageNotificationsTitle')}</h2>
         <VoyageNotifications events={notifQ.data?.items ?? []} isLoading={notifQ.isLoading} error={notifQ.error} />
+      </section>
+
+      <section className={styles.section} aria-label="Voyage changed tasks" data-testid="voyage-changed-section">
+        <h2 className={styles.sectionTitle}>{t('runhistory:voyageChangedTitle')}</h2>
+        <VoyageChangedTasks events={changedQ.data?.items ?? []} isLoading={changedQ.isLoading} error={changedQ.error} />
       </section>
 
       {cancelOpen ? (

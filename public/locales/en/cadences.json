@@ -31,5 +31,7 @@
   "runsColStatus": "Status",
   "runsColScope": "Scope",
   "runsColStarted": "Started",
-  "runsColFinished": "Finished"
+  "runsColFinished": "Finished",
+  "notificationsLinkLabel": "Set up run notifications",
+  "notificationsHint": "Notifications about run results for this schedule are configured in the Notifications tab (persistent rule for this schedule)."
 }

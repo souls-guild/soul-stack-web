@@ -64,6 +64,8 @@
   "tidingFieldIncarnationHint": "Filter by incarnation name",
   "tidingFieldCadence": "Cadence (optional)",
   "tidingFieldCadenceHint": "Filter by Cadence schedule name",
+  "tidingFieldTask": "Task (optional)",
+  "tidingFieldTaskHint": "Notify when a specific task (by its id or register name) produced changes in a run. Works together with the incarnation.run_completed event.",
   "tidingFieldEnabled": "Rule active",
   "tidingEventTypesAddBtn": "Add",
 

@@ -31,5 +31,7 @@
   "runsColStatus": "Статус",
   "runsColScope": "Scope",
   "runsColStarted": "Запущен",
-  "runsColFinished": "Завершён"
+  "runsColFinished": "Завершён",
+  "notificationsLinkLabel": "Настроить уведомления о прогонах",
+  "notificationsHint": "Уведомления о результатах прогонов этого расписания настраиваются во вкладке Notifications (постоянное правило с этим расписанием)."
 }

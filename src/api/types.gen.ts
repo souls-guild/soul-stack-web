@@ -52,7 +52,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Self-served OpenAPI 3.1 spec.
+         * Self-served OpenAPI 3.0.3 spec.
          * @description Hand-written спека этого API (RFC 9512 application/yaml).
          *     Embed-копия docs/keeper/openapi.yaml внутри keeper-бинаря.
          */
@@ -127,7 +127,8 @@ export interface paths {
          *     НЕ пишется в audit_log, чтобы не было рекурсии).
          *     Фильтры (все опциональны): type (multi-value OR), source (multi-value
          *     OR), archon_aid (exact), correlation_id (exact), payload_herald
-         *     (exact, по payload->>'herald'), started_after / started_before
+         *     (exact, по payload->>'herald'), payload_voyage (exact, по
+         *     payload->>'voyage_id'), started_after / started_before
          *     (RFC3339, обе границы включающие). Пагинация — стандартная
          *     (offset/limit).
          */
@@ -3843,6 +3844,8 @@ export interface components {
             incarnation?: string | null;
             /** @description Опц. селектор привязки к Cadence-расписанию-источнику. */
             cadence?: string | null;
+            /** @description Опц. селектор подписки на КОНКРЕТНУЮ задачу прогона по её адресу (register ∪ id из changed_tasks события incarnation.run_completed, ADR-052 §l/§j). null = без фильтра. Непустое значение → правило матчит incarnation.run_completed, только если в его changed_tasks есть задача с register или id, равным селектору (присутствие в changed_tasks = задача изменилась хотя бы на одном хосте). */
+            task?: string | null;
             /** @description Статические поля оператора (JSON-объект верхнего уровня), мержатся в тело webhook-доставки ключом `annotations` (ADR-052(h)). Пусто/опущено — нет статических полей. Доступно и постоянному правилу: оператор управляет телом доставки одинаково для постоянных и разовых (ephemeral) подписок. */
             annotations?: {
                 [key: string]: unknown;
@@ -3869,6 +3872,8 @@ export interface components {
             only_changes?: boolean;
             incarnation?: string | null;
             cadence?: string | null;
+            /** @description Опц. селектор подписки на конкретную задачу прогона по адресу register ∪ id из changed_tasks (ADR-052 §l). null = без фильтра. */
+            task?: string | null;
             /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h)). Опц. */
             annotations?: {
                 [key: string]: unknown;
@@ -3885,6 +3890,8 @@ export interface components {
             only_changes?: boolean;
             incarnation?: string | null;
             cadence?: string | null;
+            /** @description Опц. селектор подписки на конкретную задачу прогона по адресу register ∪ id из changed_tasks (ADR-052 §l). Replace — отсутствие очищает (null = без фильтра). */
+            task?: string | null;
             /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h)). Replace — отсутствие очищает. */
             annotations?: {
                 [key: string]: unknown;
@@ -4992,7 +4999,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OpenAPI 3.1 spec. */
+            /** @description OpenAPI 3.0.3 spec. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5115,6 +5122,13 @@ export interface operations {
                  *     herald.failed несут поле herald в payload).
                  */
                 payload_herald?: string;
+                /**
+                 * @description voyage_id из payload (`payload->>'voyage_id'`, exact match). Для
+                 *     Voyage detail: собирает per-incarnation run-события вояжа
+                 *     (incarnation.run_completed несёт correlation_id=apply_id, а не
+                 *     voyage_id, поэтому фильтр по correlation_id их не находит).
+                 */
+                payload_voyage?: string;
                 /** @description created_at >= started_after (RFC3339, включающая). */
                 started_after?: string;
                 /** @description created_at <= started_before (RFC3339, включающая). */

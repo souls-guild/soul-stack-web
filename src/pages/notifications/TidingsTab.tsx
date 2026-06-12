@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type Tiding } from '../../api/keeper';
@@ -32,10 +32,20 @@ export function TidingsTab() {
   const { t } = useTranslation('notifications');
   const qc = useQueryClient();
   const { hasPermission } = useMyPermissions();
+  const [searchParams] = useSearchParams();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Tiding | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Tiding | null>(null);
+
+  // Если URL содержит ?cadence=<name> — открываем форму создания с предзаполнением.
+  const prefillCadence = searchParams.get('cadence') ?? undefined;
+  useEffect(() => {
+    if (prefillCadence) {
+      setCreateOpen(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const q = useQuery({
     queryKey: ['tidings.list'],
@@ -170,7 +180,7 @@ export function TidingsTab() {
         </table>
       )}
 
-      <TidingModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <TidingModal open={createOpen} onClose={() => setCreateOpen(false)} initialCadence={prefillCadence} />
       <TidingModal open={editing !== null} onClose={() => setEditing(null)} editing={editing ?? undefined} />
 
       {/* Delete confirm */}

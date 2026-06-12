@@ -6,6 +6,9 @@
  * этот список заменяется фетчем, как требует ADR-042.]
  *
  * Список намеренно хранится в одном месте (этом файле) и не дублируется.
+ *
+ * TODO(ADR-042): заменить этот массив фетчем каталог-эндпоинта от backend-а,
+ * когда он будет реализован. Хардкод — известный долг.
  */
 
 export const KNOWN_EVENT_TYPE_AREAS = [
@@ -14,6 +17,9 @@ export const KNOWN_EVENT_TYPE_AREAS = [
   'voyage.*',
   'cadence.*',
   'incarnation.drift_checked',
+  // Итог прогона над инкарнацией (changed_tasks + cadence_id + status).
+  // Используется в связке с полем task Tiding-правила для алертов на конкретную задачу.
+  'incarnation.run_completed',
 ] as const;
 
 export type KnownEventTypeArea = (typeof KNOWN_EVENT_TYPE_AREAS)[number];

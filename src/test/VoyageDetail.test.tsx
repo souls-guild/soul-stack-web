@@ -459,4 +459,347 @@ describe('VoyageDetail', () => {
     expect(auditCall).toContain('type=herald.delivered');
     expect(auditCall).toContain('type=herald.failed');
   });
+
+  // ──────────────────────────────────────────────
+  // Секция «Что изменилось» (VoyageChangedTasks)
+  // ──────────────────────────────────────────────
+
+  const RUN_COMPLETED_EVENT = {
+    id: 'AUD01RUNCOMPLETED00000001',
+    type: 'incarnation.run_completed',
+    source: 'keeper_internal',
+    correlation_id: 'APPLY01',
+    created_at: new Date().toISOString(),
+    payload: {
+      incarnation: 'redis-prod',
+      status: 'success',
+      voyage_id: VOYAGE_ID,
+      changed_tasks: [
+        { id: 'task-restart', register: 'svc_restart', name: 'Restart redis', module: 'core.service', changed_hosts: 2, total_hosts: 3 },
+        { id: 'task-conf', register: null, name: 'Update config', module: 'core.file', changed_hosts: 1, total_hosts: 3 },
+      ],
+    },
+  };
+
+  const RUN_COMPLETED_NO_TASKS = {
+    id: 'AUD01RUNCOMPLETED00000002',
+    type: 'incarnation.run_completed',
+    source: 'keeper_internal',
+    correlation_id: 'APPLY02',
+    created_at: new Date().toISOString(),
+    payload: {
+      incarnation: 'redis-stage',
+      status: 'success',
+      voyage_id: VOYAGE_ID,
+      changed_tasks: [],
+    },
+  };
+
+  const RUN_COMPLETED_FAILED = {
+    id: 'AUD01RUNCOMPLETED00000003',
+    type: 'incarnation.run_completed',
+    source: 'keeper_internal',
+    correlation_id: 'APPLY03',
+    created_at: new Date().toISOString(),
+    payload: {
+      incarnation: 'redis-dr',
+      status: 'failed',
+      voyage_id: VOYAGE_ID,
+      changed_tasks: [
+        { id: 'task-fail', module: 'core.pkg', changed_hosts: 0, total_hosts: 2 },
+      ],
+    },
+  };
+
+  it('[changed] секция рендерится и фетч идёт с payload_voyage=voyage_id', async () => {
+    const calls: string[] = [];
+    const origFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      if (method === 'GET') calls.push(urlStr);
+      if (urlStr.includes('/targets')) return new Response(JSON.stringify(EMPTY_TARGETS), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (urlStr.includes(`/v1/voyages/${VOYAGE_ID}`) && !urlStr.includes('/targets')) return new Response(JSON.stringify(SAMPLE_VOYAGE_SCENARIO), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (urlStr.startsWith('/v1/audit') && urlStr.includes('payload_voyage')) {
+        return new Response(JSON.stringify({ items: [RUN_COMPLETED_EVENT], offset: 0, limit: 200, total: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (urlStr.startsWith('/v1/audit')) return new Response(JSON.stringify({ items: [], offset: 0, limit: 200, total: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response('{}', { status: 599 });
+    });
+    vi.stubGlobal('fetch', origFetch);
+
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-changed-section')).toBeInTheDocument());
+
+    // Фетч содержит payload_voyage
+    const changedCall = calls.find((u) => u.includes('payload_voyage'));
+    expect(changedCall).toBeDefined();
+    expect(changedCall).toContain(`payload_voyage=${VOYAGE_ID}`);
+    expect(changedCall).toContain('type=incarnation.run_completed');
+
+    // Секция отрендерилась с данными
+    expect(screen.getByTestId('voyage-changed-tasks')).toBeInTheDocument();
+  });
+
+  it('[changed] changed_tasks рендерятся: задача + N из M хостов', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [RUN_COMPLETED_EVENT], offset: 0, limit: 200, total: 1 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('changed-tasks-table-0')).toBeInTheDocument());
+
+    // Инкарнация
+    expect(screen.getByTestId('changed-run-0').textContent).toContain('redis-prod');
+
+    // Задача 1: register=svc_restart (register-first), module=core.service, 2 из 3
+    expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('svc_restart');
+    expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('core.service');
+    expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('2');
+    expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('3');
+
+    // Задача 2: id=task-conf (нет register), module=core.file, 1 из 3
+    expect(screen.getByTestId('changed-task-row-0-1').textContent).toContain('task-conf');
+    expect(screen.getByTestId('changed-task-row-0-1').textContent).toContain('core.file');
+  });
+
+  it('[changed] пустой changed_tasks → «без изменений»', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [RUN_COMPLETED_NO_TASKS], offset: 0, limit: 200, total: 1 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
+
+    // changed_tasks пустой → «без изменений»
+    expect(screen.getByText(/без изменений/)).toBeInTheDocument();
+    // Таблица задач не рендерится
+    expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
+  });
+
+  it('[changed] status=success → бейдж «успешно» (ok-тон)', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      // payload_voyage-запрос → событие с success
+      {
+        method: 'GET',
+        url: /\/v1\/audit.*payload_voyage/,
+        body: { items: [RUN_COMPLETED_EVENT], offset: 0, limit: 200, total: 1 },
+      },
+      // correlation_id-запрос (уведомления) → пустой
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [], offset: 0, limit: 200, total: 0 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('run-status-badge-0')).toBeInTheDocument());
+
+    expect(screen.getByTestId('run-status-badge-0').textContent).toContain('успешно');
+  });
+
+  it('[changed] status=failed → бейдж «ошибка» (danger-тон)', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      // payload_voyage-запрос → событие с failed
+      {
+        method: 'GET',
+        url: /\/v1\/audit.*payload_voyage/,
+        body: { items: [RUN_COMPLETED_FAILED], offset: 0, limit: 200, total: 1 },
+      },
+      // correlation_id-запрос (уведомления) → пустой
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [], offset: 0, limit: 200, total: 0 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('run-status-badge-0')).toBeInTheDocument());
+
+    expect(screen.getByTestId('run-status-badge-0').textContent).toContain('ошибка');
+  });
+
+  it('[changed] нет событий → пустой стейт «Нет событий прогона»', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [], offset: 0, limit: 200, total: 0 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-changed-section')).toBeInTheDocument());
+
+    expect(screen.getByText(/Нет событий прогона/)).toBeInTheDocument();
+    expect(screen.queryByTestId('voyage-changed-tasks')).not.toBeInTheDocument();
+  });
+
+  // ──────────────────────────────────────────────
+  // GUARD: type-safety инварианты parseRunCompletedPayload / isChangedTask
+  // ──────────────────────────────────────────────
+
+  it('[guard] грязный payload: changed_tasks не массив → секция не падает, «без изменений»', async () => {
+    const dirtyEvent = {
+      id: 'AUD01DIRTY00000000000001',
+      type: 'incarnation.run_completed',
+      source: 'keeper_internal',
+      correlation_id: 'APPLY_DIRTY',
+      created_at: new Date().toISOString(),
+      payload: {
+        incarnation: 'dirty-inc',
+        status: 'success',
+        // changed_tasks намеренно не массив — объект
+        changed_tasks: { corrupted: true },
+      },
+    };
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [dirtyEvent], offset: 0, limit: 200, total: 1 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
+
+    // Не упало, инкарнация видна
+    expect(screen.getByTestId('changed-run-0').textContent).toContain('dirty-inc');
+    // Нет таблицы задач — показывается «без изменений»
+    expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
+    expect(screen.getByText(/без изменений/)).toBeInTheDocument();
+  });
+
+  it('[guard] элемент changed_tasks без числовых changed_hosts/total_hosts → отсеивается isChangedTask, секция не падает', async () => {
+    const eventWithBadTasks = {
+      id: 'AUD01BADTASKS0000000001',
+      type: 'incarnation.run_completed',
+      source: 'keeper_internal',
+      correlation_id: 'APPLY_BAD',
+      created_at: new Date().toISOString(),
+      payload: {
+        incarnation: 'bad-tasks-inc',
+        status: 'success',
+        changed_tasks: [
+          // числа строкой — не проходят isChangedTask
+          { id: 'task-a', module: 'core.pkg', changed_hosts: '2', total_hosts: '3' },
+          // нет полей вообще
+          { id: 'task-b', module: 'core.file' },
+          // null-значения
+          { id: 'task-c', changed_hosts: null, total_hosts: null },
+        ],
+      },
+    };
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [eventWithBadTasks], offset: 0, limit: 200, total: 1 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
+
+    // Инкарнация видна, компонент жив
+    expect(screen.getByTestId('changed-run-0').textContent).toContain('bad-tasks-inc');
+    // Все элементы отфильтрованы — «без изменений»
+    expect(screen.getByText(/без изменений/)).toBeInTheDocument();
+    expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
+  });
+
+  it('[guard] multi-incarnation: несколько run_completed событий → несколько блоков', async () => {
+    const event1 = {
+      id: 'AUD01MULTI000000000001',
+      type: 'incarnation.run_completed',
+      source: 'keeper_internal',
+      correlation_id: 'APPLY_M1',
+      created_at: new Date().toISOString(),
+      payload: {
+        incarnation: 'inc-alpha',
+        status: 'success',
+        changed_tasks: [
+          { id: 'task-1', module: 'core.pkg', changed_hosts: 1, total_hosts: 2 },
+        ],
+      },
+    };
+    const event2 = {
+      id: 'AUD01MULTI000000000002',
+      type: 'incarnation.run_completed',
+      source: 'keeper_internal',
+      correlation_id: 'APPLY_M2',
+      created_at: new Date().toISOString(),
+      payload: {
+        incarnation: 'inc-beta',
+        status: 'failed',
+        changed_tasks: [],
+      },
+    };
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [event1, event2], offset: 0, limit: 200, total: 2 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
+
+    // Оба блока присутствуют
+    expect(screen.getByTestId('changed-run-0').textContent).toContain('inc-alpha');
+    expect(screen.getByTestId('changed-run-1').textContent).toContain('inc-beta');
+
+    // Первый блок: есть таблица задач
+    expect(screen.getByTestId('changed-tasks-table-0')).toBeInTheDocument();
+    // Второй блок: «без изменений»
+    expect(screen.getByTestId('changed-run-1').textContent).toContain('без изменений');
+  });
+
+  it('[guard] status=undefined → тон muted, лейбл «—»', async () => {
+    const eventNoStatus = {
+      id: 'AUD01NOSTATUS000000001',
+      type: 'incarnation.run_completed',
+      source: 'keeper_internal',
+      correlation_id: 'APPLY_NS',
+      created_at: new Date().toISOString(),
+      payload: {
+        incarnation: 'no-status-inc',
+        // status намеренно отсутствует
+        changed_tasks: [],
+      },
+    };
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [eventNoStatus], offset: 0, limit: 200, total: 1 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('run-status-badge-0')).toBeInTheDocument());
+
+    // Лейбл «—» — не упало
+    expect(screen.getByTestId('run-status-badge-0').textContent).toBe('—');
+  });
 });

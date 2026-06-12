@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarClock } from 'lucide-react';
+import { Bell, CalendarClock } from 'lucide-react';
 import { keeperApi, type Voyage, type VoyageStatus } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
@@ -106,6 +106,18 @@ export function CadenceDetail() {
           <dt className={styles.metaKey}>{t('cadences:createdAt')}</dt>
           <dd className={styles.metaVal}>{relative(c.created_at)}</dd>
         </dl>
+
+        <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface-raised, var(--surface))', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text-muted)' }}>
+          <Bell size={13} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+          {t('cadences:notificationsHint')}{' '}
+          <Link
+            to={`/notifications?tab=tidings&cadence=${encodeURIComponent(c.name)}`}
+            data-testid="cadence-notifications-link"
+            style={{ color: 'var(--accent)', textDecoration: 'none' }}
+          >
+            {t('cadences:notificationsLinkLabel')}
+          </Link>
+        </div>
       </div>
 
       <div className={styles.section}>

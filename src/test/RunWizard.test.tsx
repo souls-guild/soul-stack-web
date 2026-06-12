@@ -1859,6 +1859,60 @@ describe('RunWizard — notify-блок Step 4', () => {
     await user.click(screen.getByTestId('notify-remove-0'));
     await waitFor(() => expect(screen.queryByTestId('notify-item-0')).not.toBeInTheDocument());
   });
+
+  // Guard: регрессия — кнопка «добавить» annotation не добавляла строку
+  // (kvToAnnotations отбрасывала пустой ключ → annotations: undefined → строка исчезала).
+  it('GUARD: кнопка добавления annotations добавляет редактируемую строку (key+value)', async () => {
+    const user = userEvent.setup();
+    await reachStep4Scenario(user);
+
+    // Добавляем notify-элемент.
+    await user.click(screen.getByTestId('notify-add-btn'));
+    await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
+
+    // Открываем расширенные поля.
+    await user.click(screen.getByTestId('notify-advanced-toggle-0'));
+
+    // Нажимаем «добавить annotation».
+    await user.click(screen.getByTestId('notify-annotation-add'));
+
+    // Строка должна появиться (поле key и value).
+    await waitFor(() => {
+      expect(screen.getByLabelText('annotation key 0')).toBeInTheDocument();
+      expect(screen.getByLabelText('annotation value 0')).toBeInTheDocument();
+    });
+  });
+
+  // Guard: annotations заполненные попадают в POST /v1/voyages.
+  it('GUARD: заполненные annotations попадают в POST body', async () => {
+    const user = userEvent.setup();
+    const stub = await reachStep4Scenario(user);
+
+    // Добавить notify-элемент с Herald.
+    await user.click(screen.getByTestId('notify-add-btn'));
+    await waitFor(() => expect(screen.getByTestId('notify-herald-select-0')).toBeInTheDocument());
+    await user.selectOptions(screen.getByTestId('notify-herald-select-0'), 'ops-webhook');
+
+    // Открываем расширенные поля.
+    await user.click(screen.getByTestId('notify-advanced-toggle-0'));
+
+    // Добавляем annotation.
+    await user.click(screen.getByTestId('notify-annotation-add'));
+    await waitFor(() => expect(screen.getByLabelText('annotation key 0')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('annotation key 0'), 'env');
+    await user.type(screen.getByLabelText('annotation value 0'), 'prod');
+
+    // Submit.
+    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
+    expect(voyagePost).toBeDefined();
+    const body = voyagePost!.body as { notify?: Array<{ herald: string; annotations?: Record<string, string> }> };
+    expect(body.notify).toBeDefined();
+    expect(body.notify![0].herald).toBe('ops-webhook');
+    expect(body.notify![0].annotations).toMatchObject({ env: 'prod' });
+  });
 });
 
 /**

@@ -676,6 +676,7 @@ export const keeperApi = {
           archon_aid: q.archon_aid,
           correlation_id: q.correlation_id,
           payload_herald: q.payload_herald,
+          payload_voyage: q.payload_voyage,
           started_after: q.started_after,
           started_before: q.started_before,
           offset: q.offset,
@@ -1066,6 +1067,9 @@ export interface ListAuditQuery {
   correlation_id?: string;
   // Имя Herald-канала из payload (payload->>'herald', exact match).
   payload_herald?: string;
+  // voyage_id из payload (payload->>'voyage_id', exact match).
+  // Для Voyage detail: собирает per-incarnation run-события вояжа.
+  payload_voyage?: string;
   // RFC3339, обе границы включающие (см. openapi.yaml).
   started_after?: string;
   started_before?: string;

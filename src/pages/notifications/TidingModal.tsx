@@ -115,9 +115,11 @@ interface Props {
   onClose: () => void;
   /** Если передан — режим редактирования. */
   editing?: Tiding;
+  /** Предзаполнить cadence при создании (используется при переходе из CadenceDetail). */
+  initialCadence?: string;
 }
 
-export function TidingModal({ open, onClose, editing }: Props) {
+export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
   const { t } = useTranslation(['notifications', 'common']);
   const tc = (k: string) => t(`common:${k}`);
   const qc = useQueryClient();
@@ -130,6 +132,7 @@ export function TidingModal({ open, onClose, editing }: Props) {
   const [onlyChanges, setOnlyChanges] = useState(false);
   const [incarnation, setIncarnation] = useState('');
   const [cadence, setCadence] = useState('');
+  const [task, setTask] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [annotationPairs, setAnnotationPairs] = useState<KVPair[]>([]);
   const [projectionPaths, setProjectionPaths] = useState<string[]>([]);
@@ -150,6 +153,7 @@ export function TidingModal({ open, onClose, editing }: Props) {
       setOnlyChanges(editing.only_changes ?? false);
       setIncarnation(editing.incarnation ?? '');
       setCadence(editing.cadence ?? '');
+      setTask(editing.task ?? '');
       setEnabled(editing.enabled);
       setAnnotationPairs(kvFromRecord(editing.annotations as Record<string, unknown> | null | undefined));
       setProjectionPaths(editing.projection ?? []);
@@ -161,12 +165,13 @@ export function TidingModal({ open, onClose, editing }: Props) {
       setOnlyFailures(false);
       setOnlyChanges(false);
       setIncarnation('');
-      setCadence('');
+      setCadence(initialCadence ?? '');
+      setTask('');
       setEnabled(true);
       setAnnotationPairs([]);
       setProjectionPaths([]);
     }
-  }, [open, editing]);
+  }, [open, editing, initialCadence]);
 
   const createMu = useMutation({
     mutationFn: (body: TidingCreateRequest) => keeperApi.tidings.create(body),
@@ -221,6 +226,7 @@ export function TidingModal({ open, onClose, editing }: Props) {
         only_changes: onlyChanges,
         incarnation: incarnation || null,
         cadence: cadence || null,
+        task: task || null,
         enabled,
         ...(annotations ? { annotations } : {}),
         ...(projection.length > 0 ? { projection } : {}),
@@ -235,6 +241,7 @@ export function TidingModal({ open, onClose, editing }: Props) {
         only_changes: onlyChanges,
         incarnation: incarnation || null,
         cadence: cadence || null,
+        task: task || null,
         enabled,
         ...(annotations ? { annotations } : {}),
         ...(projection.length > 0 ? { projection } : {}),
@@ -432,6 +439,19 @@ export function TidingModal({ open, onClose, editing }: Props) {
           />
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             {t('notifications:tidingFieldCadenceHint')}
+          </span>
+        </label>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className={styles.metaKey}>{t('notifications:tidingFieldTask')}</span>
+          <Input
+            data-testid="tiding-task-input"
+            value={task}
+            onChange={(e) => setTask(e.target.value)}
+            placeholder="redis_conf"
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {t('notifications:tidingFieldTaskHint')}
           </span>
         </label>
 

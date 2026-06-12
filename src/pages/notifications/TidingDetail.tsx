@@ -152,6 +152,15 @@ export function TidingDetail() {
             </>
           ) : null}
 
+          {td.task ? (
+            <>
+              <dt className={styles.metaKey}>{t('tidingFieldTask')}</dt>
+              <dd className={styles.metaVal} style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }} data-testid="tiding-detail-task">
+                {td.task}
+              </dd>
+            </>
+          ) : null}
+
           <dt className={styles.metaKey}>{t('fieldCreatedAt')}</dt>
           <dd className={styles.metaVal}>{relDate(td.created_at)}</dd>
 

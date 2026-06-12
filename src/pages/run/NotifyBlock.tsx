@@ -3,7 +3,7 @@
  * Каждый элемент — VoyageNotify (herald + on + only_failures/only_changes + annotations + projection).
  * Разовые правила живут только для этого прогона; постоянные — Tidings (/notifications).
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
@@ -105,6 +105,7 @@ function KVEditor({
         type="button"
         variant="ghost"
         onClick={add}
+        data-testid="notify-annotation-add"
         style={{ alignSelf: 'flex-start', fontSize: 12, padding: '2px 8px' }}
       >
         <Plus size={12} /> {t('run:notifyAnnotationAddBtn')}
@@ -202,7 +203,21 @@ function NotifyItem({
   heraldItems: Array<{ name: string }>;
 }) {
   const { t } = useTranslation();
-  const kvPairs = annotationsToKV(value.annotations as Record<string, unknown> | undefined);
+
+  // Локальный state для пар ключ-значение аннотаций.
+  // Нельзя вычислять из value.annotations при каждом рендере:
+  // kvToAnnotations отбрасывает пустые ключи → новая строка исчезает сразу после добавления.
+  const [kvPairs, setKvPairs] = useState<KeyValue[]>(() =>
+    annotationsToKV(value.annotations as Record<string, unknown> | undefined),
+  );
+
+  // Синхронизируем локальный state при внешней смене value.annotations
+  // (например, при сбросе формы), но не при каждом onChange от самого редактора.
+  const annotationsKey = JSON.stringify(value.annotations);
+  useEffect(() => {
+    setKvPairs(annotationsToKV(value.annotations as Record<string, unknown> | undefined));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annotationsKey]);
 
   function toggleOn(opt: VoyageNotifyOn) {
     const cur = value.on ?? [];
@@ -211,6 +226,7 @@ function NotifyItem({
   }
 
   function onKVChange(pairs: KeyValue[]) {
+    setKvPairs(pairs);
     onChange({ ...value, annotations: kvToAnnotations(pairs) });
   }
 
