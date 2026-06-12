@@ -176,6 +176,7 @@
 
   "notifyTitle": "Run notifications",
   "notifySubtitle": "One-time rules — apply to this run only. For persistent subscriptions use Tidings.",
+  "notifySubtitlePermanent": "Permanent rule — lives as long as the schedule exists. Keeper creates the Tiding automatically and deletes it together with the schedule.",
   "notifyAddBtn": "Add notification",
   "notifyRemoveBtn": "Remove",
   "notifyHeraldLabel": "Channel (Herald)",

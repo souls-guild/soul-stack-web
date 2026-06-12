@@ -68,6 +68,7 @@
   "tidingFieldTaskHint": "Уведомлять, когда конкретная задача (по её id или register) что-то изменила в прогоне. Работает совместно с событием incarnation.run_completed.",
   "tidingFieldEnabled": "Правило активно",
   "tidingEventTypesAddBtn": "Добавить",
+  "tidingEventTypesLoading": "Загрузка типов событий…",
 
   "onlyFailures": "только неудачи",
   "onlyChanges": "только изменения",

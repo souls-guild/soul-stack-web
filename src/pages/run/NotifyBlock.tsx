@@ -399,13 +399,19 @@ export interface NotifyBlockProps {
   /** Текущий список notify-элементов. */
   value: VoyageNotify[];
   onChange: (next: VoyageNotify[]) => void;
+  /**
+   * ephemeral (default) — разовые правила, действуют только для этого прогона.
+   * permanent — постоянное правило, живёт пока живёт расписание (cadence).
+   * Меняет только подзаголовок/hint; поля идентичны.
+   */
+  mode?: 'ephemeral' | 'permanent';
 }
 
 /**
  * NotifyBlock — секция «Уведомления о прогоне» в Step 4.
  * Фетчит список Heralds (для select). При пустом списке — ссылка «создать канал».
  */
-export function NotifyBlock({ value, onChange }: NotifyBlockProps) {
+export function NotifyBlock({ value, onChange, mode = 'ephemeral' }: NotifyBlockProps) {
   const { t } = useTranslation();
 
   const heraldsQ = useQuery({
@@ -436,7 +442,9 @@ export function NotifyBlock({ value, onChange }: NotifyBlockProps) {
         {t('run:notifyTitle')}
       </legend>
       <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 8 }}>
-        {t('run:notifySubtitle')}
+        {mode === 'permanent'
+          ? t('run:notifySubtitlePermanent')
+          : t('run:notifySubtitle')}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

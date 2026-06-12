@@ -5,7 +5,7 @@ import { Plus, Trash2, X } from 'lucide-react';
 import { keeperApi, type Tiding, type TidingCreateRequest, type TidingUpdateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Modal, Button, Input } from '../../components/primitives';
-import { KNOWN_EVENT_TYPE_AREAS } from './eventTypes';
+import { useEventTypeCatalog } from './eventTypes';
 import styles from '../common.module.css';
 
 interface KVPair {
@@ -142,6 +142,8 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
     queryFn: () => keeperApi.heralds.list({ limit: 200 }),
     enabled: open,
   });
+
+  const eventTypeCatalog = useEventTypeCatalog();
 
   useEffect(() => {
     if (!open) return;
@@ -301,12 +303,17 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             {t('notifications:tidingFieldEventTypesHint')}
           </span>
-          {/* Известные области — чипы-переключатели */}
+          {/* Каталог event-types с backend — чипы-переключатели (ADR-042) */}
           <div
             data-testid="tiding-event-types-chips"
             style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
           >
-            {KNOWN_EVENT_TYPE_AREAS.map((et) => {
+            {eventTypeCatalog.isLoading && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {t('notifications:tidingEventTypesLoading')}
+              </span>
+            )}
+            {eventTypeCatalog.allTypes.map((et) => {
               const selected = selectedTypes.includes(et);
               return (
                 <button
@@ -330,9 +337,9 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
                 </button>
               );
             })}
-            {/* Пользовательские типы — чипы с кнопкой удалить */}
+            {/* Пользовательские типы (не из каталога) — чипы с кнопкой удалить */}
             {selectedTypes
-              .filter((et) => !(KNOWN_EVENT_TYPE_AREAS as readonly string[]).includes(et))
+              .filter((et) => !eventTypeCatalog.allTypes.includes(et))
               .map((et) => (
                 <span
                   key={et}

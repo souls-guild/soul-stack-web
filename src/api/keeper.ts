@@ -232,6 +232,12 @@ export type TidingCreateRequest = components['schemas']['TidingCreateRequest'];
 export type TidingUpdateRequest = components['schemas']['TidingUpdateRequest'];
 export type TidingListReply = components['schemas']['TidingListReply'];
 
+// EventTypeCatalog — каталог допустимых event-types для Tiding (ADR-042, ADR-052).
+// GET /v1/event-types → areas (glob-подписки) + point_events (точечные).
+export type EventTypeCatalogReply = components['schemas']['EventTypeCatalogReply'];
+export type EventTypeArea = components['schemas']['EventTypeArea'];
+export type EventTypePoint = components['schemas']['EventTypePoint'];
+
 // GET /v1/me/permissions — эффективные права текущего Архонта (permission-aware UI).
 export type MyPermission = components['schemas']['MyPermission'];
 export type MyPermissionsReply = components['schemas']['MyPermissionsReply'];
@@ -977,6 +983,12 @@ export const keeperApi = {
     // DELETE /v1/heralds/{name} → 204. Каскадно удаляет Tiding-и.
     delete: (name: string) =>
       apiSend<void>(`/v1/heralds/${encodeURIComponent(name)}`, 'DELETE'),
+  },
+
+  // EventTypeCatalog — каталог event-types для Tiding-формы (ADR-042, ADR-052).
+  // Список детерминирован и меняется только при обновлении Keeper-а → staleTime = Infinity.
+  eventTypes: {
+    list: () => apiGet<EventTypeCatalogReply>('/v1/event-types'),
   },
 
   // Tidings — правила подписки на уведомления (ADR-052, S5).

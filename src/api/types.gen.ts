@@ -1843,6 +1843,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/event-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Каталог event-types, допустимых для подписки Tiding (ADR-052(b)).
+         * @description RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
+         *     каталог самоописывающий (паттерн `GET /v1/permissions` / `GET /v1/modules`).
+         *     Назначение — UI Tiding-формы (`POST /v1/tidings`): UI фетчит допустимые
+         *     event-types из каталога вместо хардкода (ADR-042). Источник правды —
+         *     keeper/internal/herald/eventtypes.go (один и тот же scope валидирует CRUD
+         *     Tiding): расширение scope амендом ADR-052 автоматически отражается здесь.
+         *
+         *     Две группы: areas — области, на которые допустима area-glob-подписка
+         *     (`scenario_run.*`); point_events — точечные типы вне area-glob, допустимые
+         *     целиком (`incarnation.run_completed`). Read-only, без audit (паттерн
+         *     health/meta / permission-каталог).
+         */
+        get: operations["ListEventTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/augur/omens": {
         parameters: {
             query?: never;
@@ -3238,6 +3268,31 @@ export interface components {
         };
         PermissionCatalogReply: {
             items: components["schemas"]["PermissionCatalogItem"][];
+        };
+        /**
+         * @description Область событий прогонов, на которую допустима area-glob-подписка Tiding
+         *     (`<name>.*`) — а также точные типы внутри неё (`<name>.<action>`).
+         */
+        EventTypeArea: {
+            /** @description Имя области (`scenario_run` / `command_run` / `voyage` / `cadence`). */
+            name: string;
+        };
+        /**
+         * @description Точечный event-type вне area-glob-областей, допустимый для подписки
+         *     целиком (`incarnation.run_completed`). Область целиком в scope НЕ входит.
+         */
+        EventTypePoint: {
+            /** @description Полное имя точечного event-type (`<area>.<action>`). */
+            name: string;
+        };
+        /**
+         * @description Каталог event-types, допустимых для подписки Tiding (`GET /v1/event-types`,
+         *     ADR-052(b)). areas — области area-glob-подписки; point_events — точечные
+         *     типы вне area-glob. Оба списка детерминированно отсортированы по name.
+         */
+        EventTypeCatalogReply: {
+            areas: components["schemas"]["EventTypeArea"][];
+            point_events: components["schemas"]["EventTypePoint"][];
         };
         /**
          * @description Scope-сводка одного эффективного права, достаточная для UI: либо
@@ -4673,6 +4728,8 @@ export interface components {
             require_alive: boolean;
             /** @enum {string} */
             on_failure?: "abort" | "continue";
+            /** @description Подписки на уведомления о прогонах ЭТОГО расписания (ADR-052 §m). В отличие от voyage.notify (разовое правило на один прогон), каждый элемент материализуется keeper-ом в ПОСТОЯННЫЙ Tiding (ephemeral=false), привязанный по ULID расписания (cadences.id): селектором Cadence (слать только про прогоны этого расписания) + origin-маркером created_from_cadence_id. Insert правил — в той же транзакции, что создаёт Cadence (атомарно). DELETE cadence каскадно сносит эти правила (ADR-046 §9). Имя автоправила — <name>-notify[-N]. Инициатор обязан держать herald.read на каждый указанный канал (403 иначе); несуществующий канал → 422. */
+            notify?: components["schemas"]["VoyageNotify"][];
         };
         /**
          * @description Body PATCH /v1/cadences/{id} (ADR-046 S4). Все поля опциональны: заданное —
@@ -7696,6 +7753,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyPermissionsReply"];
+                };
+            };
+            401: components["responses"]["Problem401"];
+            500: components["responses"]["Problem500"];
+        };
+    };
+    ListEventTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Каталог event-types. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventTypeCatalogReply"];
                 };
             };
             401: components["responses"]["Problem401"];

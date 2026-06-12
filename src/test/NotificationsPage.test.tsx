@@ -151,6 +151,18 @@ function setupMock(opts: MockOpts = {}): Call[] {
       const h = [HERALD_WEBHOOK, HERALD_DISABLED].find((x) => x.name === name) ?? opts.heraldDetail ?? HERALD_WEBHOOK;
       return new Response(JSON.stringify(h), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
+    if (url.startsWith('/v1/event-types') && method === 'GET') {
+      return new Response(JSON.stringify({
+        areas: [
+          { name: 'scenario_run.*' },
+          { name: 'command_run.*' },
+          { name: 'voyage.*' },
+          { name: 'cadence.*' },
+          { name: 'incarnation.drift_checked' },
+        ],
+        point_events: [{ name: 'incarnation.run_completed' }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     if (url.startsWith('/v1/heralds') && method === 'GET') {
       return new Response(JSON.stringify(opts.heralds ?? HERALDS_REPLY), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }

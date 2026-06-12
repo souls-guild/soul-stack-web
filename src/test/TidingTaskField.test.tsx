@@ -92,6 +92,21 @@ function setupNotifMock(opts: { tidingDetail?: Tiding } = {}) {
     if (url.startsWith('/v1/heralds') && method === 'GET') {
       return new Response(JSON.stringify({ items: [HERALD], offset: 0, limit: 200, total: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
+    if (url.startsWith('/v1/event-types') && method === 'GET') {
+      // Возвращаем каталог с incarnation.run_completed в point_events.
+      return new Response(JSON.stringify({
+        areas: [
+          { name: 'scenario_run.*' },
+          { name: 'command_run.*' },
+          { name: 'voyage.*' },
+          { name: 'cadence.*' },
+        ],
+        point_events: [
+          { name: 'incarnation.drift_checked' },
+          { name: 'incarnation.run_completed' },
+        ],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     if (url.startsWith('/v1/audit') && method === 'GET') {
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }

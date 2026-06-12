@@ -62,6 +62,8 @@ tags:
     description: Каталог модулей (core registry + активные plugin) для UI Run→Command module-search.
   - name: Permission
     description: Машиночитаемый каталог RBAC-permissions (источник — rbac.catalog.go) для UI назначения прав роли.
+  - name: EventType
+    description: Каталог event-types, допустимых для подписки Tiding (источник — herald/eventtypes.go) для UI Tiding-формы (ADR-052(b)).
   - name: Augur
     description: Реестры Augur — Omen (внешняя система) и Rite (grant) (ADR-025, augur.md).
   - name: Oracle
@@ -2983,6 +2985,33 @@ paths:
         '401': { $ref: '#/components/responses/Problem401' }
         '500': { $ref: '#/components/responses/Problem500' }
 
+  /v1/event-types:
+    get:
+      tags: [EventType]
+      operationId: ListEventTypes
+      summary: Каталог event-types, допустимых для подписки Tiding (ADR-052(b)).
+      description: |
+        RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
+        каталог самоописывающий (паттерн `GET /v1/permissions` / `GET /v1/modules`).
+        Назначение — UI Tiding-формы (`POST /v1/tidings`): UI фетчит допустимые
+        event-types из каталога вместо хардкода (ADR-042). Источник правды —
+        keeper/internal/herald/eventtypes.go (один и тот же scope валидирует CRUD
+        Tiding): расширение scope амендом ADR-052 автоматически отражается здесь.
+
+        Две группы: areas — области, на которые допустима area-glob-подписка
+        (`scenario_run.*`); point_events — точечные типы вне area-glob, допустимые
+        целиком (`incarnation.run_completed`). Read-only, без audit (паттерн
+        health/meta / permission-каталог).
+      responses:
+        '200':
+          description: Каталог event-types.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventTypeCatalogReply'
+        '401': { $ref: '#/components/responses/Problem401' }
+        '500': { $ref: '#/components/responses/Problem500' }
+
   /v1/augur/omens:
     post:
       tags: [Augur]
@@ -5485,6 +5514,45 @@ components:
             $ref: '#/components/schemas/PermissionCatalogItem'
       required: [items]
 
+    EventTypeArea:
+      type: object
+      description: |
+        Область событий прогонов, на которую допустима area-glob-подписка Tiding
+        (`<name>.*`) — а также точные типы внутри неё (`<name>.<action>`).
+      properties:
+        name:
+          type: string
+          description: Имя области (`scenario_run` / `command_run` / `voyage` / `cadence`).
+      required: [name]
+
+    EventTypePoint:
+      type: object
+      description: |
+        Точечный event-type вне area-glob-областей, допустимый для подписки
+        целиком (`incarnation.run_completed`). Область целиком в scope НЕ входит.
+      properties:
+        name:
+          type: string
+          description: Полное имя точечного event-type (`<area>.<action>`).
+      required: [name]
+
+    EventTypeCatalogReply:
+      type: object
+      description: |
+        Каталог event-types, допустимых для подписки Tiding (`GET /v1/event-types`,
+        ADR-052(b)). areas — области area-glob-подписки; point_events — точечные
+        типы вне area-glob. Оба списка детерминированно отсортированы по name.
+      properties:
+        areas:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventTypeArea'
+        point_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventTypePoint'
+      required: [areas, point_events]
+
     MyPermissionScope:
       type: object
       description: |
@@ -7882,6 +7950,21 @@ components:
         on_failure:
           type: string
           enum: [abort, continue]
+        notify:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoyageNotify'
+          description: >-
+            Подписки на уведомления о прогонах ЭТОГО расписания (ADR-052 §m). В
+            отличие от voyage.notify (разовое правило на один прогон), каждый
+            элемент материализуется keeper-ом в ПОСТОЯННЫЙ Tiding (ephemeral=false),
+            привязанный по ULID расписания (cadences.id): селектором Cadence (слать
+            только про прогоны этого расписания) + origin-маркером
+            created_from_cadence_id. Insert правил — в той же транзакции, что
+            создаёт Cadence (атомарно). DELETE cadence каскадно сносит эти правила
+            (ADR-046 §9). Имя автоправила — <name>-notify[-N]. Инициатор обязан
+            держать herald.read на каждый указанный канал (403 иначе);
+            несуществующий канал → 422.
       required: [name, schedule_kind, overlap_policy, kind, target]
 
     CadencePatchRequest:

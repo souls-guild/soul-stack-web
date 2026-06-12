@@ -736,6 +736,7 @@ export function RunWizard() {
     const recipe = buildRecipePayload(/* forCadence */ true);
     const opts = buildOptionsPayload();
     const intervalSec = parseIntOrEmpty(cadenceState.intervalSeconds);
+    const notifyPayload = serializeNotify(notify);
     const reply = await keeperApi.cadences.create({
       name: cadenceState.cadenceName,
       enabled: true,
@@ -746,6 +747,7 @@ export function RunWizard() {
       ...recipe,
       ...opts,
       require_alive: options.requireAlive,
+      ...(notifyPayload ? { notify: notifyPayload } : {}),
     });
     return `/cadences/${encodeURIComponent(reply.cadence_id)}`;
   }
@@ -2083,10 +2085,12 @@ function Step4Options({
         {t('run:waitLabel')}
       </label>
 
-      {/* Блок уведомлений — только для разового Voyage (не Cadence: там уведомления через постоянный Tiding) */}
-      {runMode === 'voyage' ? (
-        <NotifyBlock value={notify} onChange={onNotifyChange} />
-      ) : null}
+      {/* Блок уведомлений — для Voyage (разовые) и Cadence (постоянные, mode=permanent) */}
+      <NotifyBlock
+        value={notify}
+        onChange={onNotifyChange}
+        mode={runMode === 'cadence' ? 'permanent' : 'ephemeral'}
+      />
     </>
   );
 }
