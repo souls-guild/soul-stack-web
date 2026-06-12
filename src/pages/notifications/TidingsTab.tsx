@@ -9,6 +9,9 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { TidingModal } from './TidingModal';
 import styles from '../common.module.css';
 
+// Tiding — постоянное правило подписки. Ephemeral-правила (voyage-bound)
+// не отображаются в этой вкладке: backend скрывает их по умолчанию.
+
 function relDate(iso?: string | null): string {
   if (!iso) return '—';
   try {
@@ -33,8 +36,6 @@ export function TidingsTab() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Tiding | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Tiding | null>(null);
-  // По умолчанию ephemeral-правила скрыты (N0 решение).
-  const [showEphemeral, setShowEphemeral] = useState(false);
 
   const q = useQuery({
     queryKey: ['tidings.list'],
@@ -53,10 +54,7 @@ export function TidingsTab() {
   const canUpdate = hasPermission('tiding.update');
   const canDelete = hasPermission('tiding.delete');
 
-  const allItems = q.data?.items ?? [];
-  // Фильтр: ephemeral скрыты по умолчанию.
-  const items = showEphemeral ? allItems : allItems.filter((it) => !it.ephemeral);
-  const ephemeralCount = allItems.filter((it) => it.ephemeral).length;
+  const items = q.data?.items ?? [];
 
   return (
     <div>
@@ -66,18 +64,6 @@ export function TidingsTab() {
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('tidingSubtitle')}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {ephemeralCount > 0 || showEphemeral ? (
-            <Button
-              variant="ghost"
-              type="button"
-              data-testid="tiding-show-ephemeral-btn"
-              onClick={() => setShowEphemeral((v) => !v)}
-              style={{ fontSize: 12 }}
-            >
-              {showEphemeral ? t('tidingHideEphemeral') : t('tidingShowEphemeral')}
-              {ephemeralCount > 0 && !showEphemeral ? ` (${ephemeralCount})` : ''}
-            </Button>
-          ) : null}
           <Button
             variant="primary"
             type="button"
@@ -124,14 +110,6 @@ export function TidingsTab() {
                   >
                     {item.name}
                   </Link>
-                  {item.ephemeral ? (
-                    <span
-                      data-testid={`tiding-ephemeral-badge-${item.name}`}
-                      style={{ marginLeft: 6 }}
-                    >
-                      <Badge tone="muted">{t('tidingEphemeralBadge')}</Badge>
-                    </span>
-                  ) : null}
                 </td>
                 <td>
                   <Link

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route } from 'react-router-dom';
@@ -365,11 +365,98 @@ describe('VoyageDetail', () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${cmdId}/targets`, body: { voyage_id: cmdId, targets: [] } },
       { method: 'GET', url: `/v1/voyages/${cmdId}`, body: voyage },
+      { method: 'GET', url: '/v1/audit', body: { items: [], offset: 0, limit: 200, total: 0 } },
     ]);
     renderVoyage(cmdId);
     await waitFor(() => expect(screen.getByText('running')).toBeInTheDocument());
 
     // Нет ссылок на /souls/... и нет текста target.sids.
     expect(screen.queryByRole('link', { name: /host-/ })).not.toBeInTheDocument();
+  });
+
+  // ──────────────────────────────────────────────
+  // Секция «Уведомления» прогона
+  // ──────────────────────────────────────────────
+
+  it('уведомления пусты → empty-state', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      { method: 'GET', url: '/v1/audit', body: { items: [], offset: 0, limit: 200, total: 0 } },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-notifications-section')).toBeInTheDocument());
+    expect(screen.getByText(/Уведомлений по этому прогону не было/)).toBeInTheDocument();
+    expect(screen.queryByTestId('voyage-notifications-table')).not.toBeInTheDocument();
+  });
+
+  it('уведомления: delivered показывается с бейджем ok, failed — danger', async () => {
+    const deliveredEv = {
+      id: 'AUD01DELIVERED00000000001',
+      type: 'herald.delivered',
+      source: 'keeper_internal',
+      correlation_id: VOYAGE_ID,
+      created_at: new Date().toISOString(),
+      payload: { herald: 'ops-webhook', tiding: 'run-failures', status_code: 200, attempt: 1 },
+    };
+    const failedEv = {
+      id: 'AUD01FAILED0000000000001',
+      type: 'herald.failed',
+      source: 'keeper_internal',
+      correlation_id: VOYAGE_ID,
+      created_at: new Date().toISOString(),
+      payload: { herald: 'ops-webhook', tiding: 'run-failures', status_code: 503, attempt: 2 },
+    };
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: { items: [deliveredEv, failedEv], offset: 0, limit: 200, total: 2 },
+      },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-notifications-table')).toBeInTheDocument());
+
+    // Обе строки присутствуют.
+    expect(screen.getByTestId(`notif-row-${deliveredEv.id}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`notif-row-${failedEv.id}`)).toBeInTheDocument();
+
+    // Herald-ссылка.
+    const heraldLinks = screen.getAllByRole('link', { name: 'ops-webhook' });
+    expect(heraldLinks.length).toBeGreaterThanOrEqual(1);
+    expect(heraldLinks[0]).toHaveAttribute('href', '/notifications/heralds/ops-webhook');
+
+    // Статусы: delivered → «доставлено», failed → «ошибка».
+    expect(screen.getByText('доставлено')).toBeInTheDocument();
+    expect(screen.getByText('ошибка')).toBeInTheDocument();
+
+    // Код ответа.
+    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getByText('503')).toBeInTheDocument();
+  });
+
+  it('audit-запрос уведомлений отправляет correlation_id=voyage_id', async () => {
+    const calls: string[] = [];
+    const origFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      if (method === 'GET') calls.push(urlStr);
+      if (urlStr.includes('/targets')) return new Response(JSON.stringify(EMPTY_TARGETS), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (urlStr.startsWith(`/v1/voyages/${VOYAGE_ID}`)) return new Response(JSON.stringify(SAMPLE_VOYAGE_SCENARIO), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (urlStr.startsWith('/v1/audit')) return new Response(JSON.stringify({ items: [], offset: 0, limit: 200, total: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response('{}', { status: 599 });
+    });
+    vi.stubGlobal('fetch', origFetch);
+
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-notifications-section')).toBeInTheDocument());
+
+    const auditCall = calls.find((u) => u.startsWith('/v1/audit'));
+    expect(auditCall).toBeDefined();
+    expect(auditCall).toContain(`correlation_id=${VOYAGE_ID}`);
+    expect(auditCall).toContain('type=herald.delivered');
+    expect(auditCall).toContain('type=herald.failed');
   });
 });

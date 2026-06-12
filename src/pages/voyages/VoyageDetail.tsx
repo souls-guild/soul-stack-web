@@ -7,12 +7,95 @@ import {
   keeperApi,
   type Voyage,
   type VoyageStatus,
+  type AuditEvent,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 import { VoyageTargets } from './VoyageTargets';
+
+function relDate(iso?: string | null): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+interface VoyageNotificationsProps {
+  events: AuditEvent[];
+  isLoading: boolean;
+  error: Error | null;
+}
+
+function VoyageNotifications({ events, isLoading, error }: VoyageNotificationsProps) {
+  const { t } = useTranslation('notifications');
+
+  if (isLoading) return <div className={styles.loading}>{t('common:loading')}</div>;
+  if (error) return (
+    <div className={styles.errorBox}>
+      {error instanceof ApiError
+        ? t('errors:generic', { status: error.status, detail: error.message })
+        : String(error)}
+    </div>
+  );
+  if (events.length === 0) return <div className={styles.empty}>{t('voyageNotificationsEmpty')}</div>;
+
+  return (
+    <table className={styles.table} data-testid="voyage-notifications-table">
+      <thead>
+        <tr>
+          <th>{t('voyageNotifColHerald')}</th>
+          <th>{t('voyageNotifColTiding')}</th>
+          <th>{t('voyageNotifColEvent')}</th>
+          <th>{t('voyageNotifColStatus')}</th>
+          <th>{t('voyageNotifColCode')}</th>
+          <th>{t('voyageNotifColAttempt')}</th>
+          <th>{t('voyageNotifColTime')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {events.map((ev) => {
+          const p = ev.payload as Record<string, unknown>;
+          const heraldName = typeof p.herald === 'string' ? p.herald : null;
+          const tidingName = typeof p.tiding === 'string' ? p.tiding : null;
+          const statusCode = typeof p.status_code === 'number' ? p.status_code : null;
+          const attempt = typeof p.attempt === 'number' ? p.attempt : null;
+          const isDelivered = ev.type === 'herald.delivered';
+          return (
+            <tr key={ev.id} data-testid={`notif-row-${ev.id}`}>
+              <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                {heraldName ? (
+                  <Link to={`/notifications/heralds/${encodeURIComponent(heraldName)}`}>
+                    {heraldName}
+                  </Link>
+                ) : '—'}
+              </td>
+              <td style={{ fontSize: 12 }}>
+                {tidingName ? (
+                  <Link to={`/notifications/tidings/${encodeURIComponent(tidingName)}`}>
+                    {tidingName}
+                  </Link>
+                ) : '—'}
+              </td>
+              <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{ev.type}</td>
+              <td>
+                <Badge tone={isDelivered ? 'ok' : 'danger'}>
+                  {isDelivered ? t('heraldDeliveryStatusDelivered') : t('heraldDeliveryStatusFailed')}
+                </Badge>
+              </td>
+              <td style={{ fontSize: 12 }}>{statusCode ?? '—'}</td>
+              <td style={{ fontSize: 12 }}>{attempt ?? '—'}</td>
+              <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{relDate(ev.created_at)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
 
 // satisfies: перечисление ⊆ VoyageStatus; при добавлении статуса в backend tsc потребует пересмотра.
 const NON_TERMINAL_STATUSES = ['pending', 'scheduled', 'running'] as const satisfies readonly VoyageStatus[];
@@ -66,6 +149,17 @@ export function VoyageDetail() {
       setCancelOpen(false);
       qc.invalidateQueries({ queryKey: ['voyage.get', id] });
     },
+  });
+
+  const notifQ = useQuery({
+    queryKey: ['voyage.notifications', id],
+    queryFn: () =>
+      keeperApi.audit.list({
+        type: ['herald.delivered', 'herald.failed'],
+        correlation_id: id,
+        limit: 200,
+      }),
+    enabled: Boolean(id),
   });
 
   if (q.isLoading && !q.data) return <div className={styles.loading}>{t('loading')}</div>;
@@ -294,6 +388,11 @@ export function VoyageDetail() {
       <section className={styles.section} aria-label="Voyage targets">
         <h2 className={styles.sectionTitle}>{t('runhistory:voyageTargetsTitle')}</h2>
         <VoyageTargets voyageId={id} refetchInterval={isRunning ? 3000 : false} statusFilter={statusFilter} />
+      </section>
+
+      <section className={styles.section} aria-label="Voyage notifications" data-testid="voyage-notifications-section">
+        <h2 className={styles.sectionTitle}>{t('notifications:voyageNotificationsTitle')}</h2>
+        <VoyageNotifications events={notifQ.data?.items ?? []} isLoading={notifQ.isLoading} error={notifQ.error} />
       </section>
 
       {cancelOpen ? (

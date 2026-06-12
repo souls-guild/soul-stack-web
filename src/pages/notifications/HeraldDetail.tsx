@@ -10,6 +10,8 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { HeraldModal } from './HeraldModal';
 import styles from '../common.module.css';
 
+const DELIVERIES_LIMIT = 50;
+
 function relDate(iso?: string | null): string {
   if (!iso) return '—';
   try {
@@ -26,6 +28,7 @@ export function HeraldDetail() {
   const qc = useQueryClient();
   const { hasPermission } = useMyPermissions();
   const [editOpen, setEditOpen] = useState(false);
+  const [deliveriesOffset, setDeliveriesOffset] = useState(0);
 
   const heraldQ = useQuery({
     queryKey: ['herald.get', name],
@@ -36,6 +39,18 @@ export function HeraldDetail() {
   const tidingsQ = useQuery({
     queryKey: ['tidings.list'],
     queryFn: () => keeperApi.tidings.list({ limit: 200 }),
+    enabled: Boolean(name),
+  });
+
+  const deliveriesQ = useQuery({
+    queryKey: ['herald.deliveries', name, deliveriesOffset],
+    queryFn: () =>
+      keeperApi.audit.list({
+        type: ['herald.delivered', 'herald.failed'],
+        payload_herald: name,
+        offset: deliveriesOffset,
+        limit: DELIVERIES_LIMIT,
+      }),
     enabled: Boolean(name),
   });
 
@@ -201,6 +216,99 @@ export function HeraldDetail() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>{t('heraldDeliveriesTitle')}</h2>
+        {deliveriesQ.isLoading ? (
+          <div className={styles.loading}>{t('common:loading')}</div>
+        ) : deliveriesQ.error ? (
+          <div className={styles.errorBox}>
+            {deliveriesQ.error instanceof ApiError
+              ? t('errors:generic', { status: deliveriesQ.error.status, detail: deliveriesQ.error.message })
+              : String(deliveriesQ.error)}
+          </div>
+        ) : (deliveriesQ.data?.items ?? []).length === 0 ? (
+          <div className={styles.empty} data-testid="herald-deliveries-empty">{t('heraldDeliveriesEmpty')}</div>
+        ) : (
+          <>
+            <table className={styles.table} data-testid="herald-deliveries-table">
+              <thead>
+                <tr>
+                  <th>{t('heraldDeliveryColEvent')}</th>
+                  <th>{t('heraldDeliveryColVoyage')}</th>
+                  <th>{t('heraldDeliveryColTiding')}</th>
+                  <th>{t('heraldDeliveryColStatus')}</th>
+                  <th>{t('heraldDeliveryColCode')}</th>
+                  <th>{t('heraldDeliveryColAttempt')}</th>
+                  <th>{t('heraldDeliveryColTime')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(deliveriesQ.data?.items ?? []).map((ev) => {
+                  const p = ev.payload as Record<string, unknown>;
+                  const tidingName = typeof p.tiding === 'string' ? p.tiding : null;
+                  const voyageId = ev.correlation_id ?? null;
+                  const statusCode = typeof p.status_code === 'number' ? p.status_code : null;
+                  const attempt = typeof p.attempt === 'number' ? p.attempt : null;
+                  const isDelivered = ev.type === 'herald.delivered';
+                  return (
+                    <tr key={ev.id} data-testid={`delivery-row-${ev.id}`}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{ev.type}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {voyageId ? (
+                          <Link to={`/voyages/${encodeURIComponent(voyageId)}`} data-testid={`delivery-voyage-link-${ev.id}`}>
+                            {voyageId}
+                          </Link>
+                        ) : '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {tidingName ? (
+                          <Link to={`/notifications/tidings/${encodeURIComponent(tidingName)}`}>
+                            {tidingName}
+                          </Link>
+                        ) : '—'}
+                      </td>
+                      <td>
+                        <Badge tone={isDelivered ? 'ok' : 'danger'}>
+                          {isDelivered ? t('heraldDeliveryStatusDelivered') : t('heraldDeliveryStatusFailed')}
+                        </Badge>
+                      </td>
+                      <td style={{ fontSize: 12 }}>{statusCode ?? '—'}</td>
+                      <td style={{ fontSize: 12 }}>{attempt ?? '—'}</td>
+                      <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{relDate(ev.created_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {/* Пагинация */}
+            {(deliveriesQ.data?.total ?? 0) > DELIVERIES_LIMIT ? (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  disabled={deliveriesOffset === 0}
+                  onClick={() => setDeliveriesOffset(Math.max(0, deliveriesOffset - DELIVERIES_LIMIT))}
+                >
+                  {t('common:prev')}
+                </Button>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {deliveriesOffset + 1}–{Math.min(deliveriesOffset + DELIVERIES_LIMIT, deliveriesQ.data?.total ?? 0)}
+                  {' / '}{deliveriesQ.data?.total}
+                </span>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  disabled={deliveriesOffset + DELIVERIES_LIMIT >= (deliveriesQ.data?.total ?? 0)}
+                  onClick={() => setDeliveriesOffset(deliveriesOffset + DELIVERIES_LIMIT)}
+                >
+                  {t('common:next')}
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 

@@ -675,6 +675,7 @@ export const keeperApi = {
           source: q.source,
           archon_aid: q.archon_aid,
           correlation_id: q.correlation_id,
+          payload_herald: q.payload_herald,
           started_after: q.started_after,
           started_before: q.started_before,
           offset: q.offset,
@@ -1063,6 +1064,8 @@ export interface ListAuditQuery {
   source?: AuditEventSource[];
   archon_aid?: string;
   correlation_id?: string;
+  // Имя Herald-канала из payload (payload->>'herald', exact match).
+  payload_herald?: string;
   // RFC3339, обе границы включающие (см. openapi.yaml).
   started_after?: string;
   started_before?: string;

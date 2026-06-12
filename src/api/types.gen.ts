@@ -126,9 +126,10 @@ export interface paths {
          * @description Permission: audit.read. Read-only — без audit-trail (чтение audit_log
          *     НЕ пишется в audit_log, чтобы не было рекурсии).
          *     Фильтры (все опциональны): type (multi-value OR), source (multi-value
-         *     OR), archon_aid (exact), correlation_id (exact), started_after /
-         *     started_before (RFC3339, обе границы включающие). Пагинация —
-         *     стандартная (offset/limit).
+         *     OR), archon_aid (exact), correlation_id (exact), payload_herald
+         *     (exact, по payload->>'herald'), started_after / started_before
+         *     (RFC3339, обе границы включающие). Пагинация — стандартная
+         *     (offset/limit).
          */
         get: operations["ListAuditEvents"];
         put?: never;
@@ -2263,6 +2264,10 @@ export interface paths {
         /**
          * Перечислить Tiding-правила.
          * @description Permission tiding.list. Сортировка updated_at DESC, name ASC.
+         *     По умолчанию отдаются ТОЛЬКО постоянные правила (ephemeral=false):
+         *     разовые правила (ADR-052(g), привязанные к одному прогону) — деталь
+         *     реализации, не предмет управления оператором. include_ephemeral=true
+         *     возвращает все правила (отладка).
          */
         get: operations["ListTidings"];
         put?: never;
@@ -5104,6 +5109,12 @@ export interface operations {
                 archon_aid?: string;
                 /** @description ULID цепочки связанных событий (exact match). */
                 correlation_id?: string;
+                /**
+                 * @description Имя Herald-канала из payload (`payload->>'herald'`, exact match).
+                 *     Для истории доставок одного канала (события herald.delivered /
+                 *     herald.failed несут поле herald в payload).
+                 */
+                payload_herald?: string;
                 /** @description created_at >= started_after (RFC3339, включающая). */
                 started_after?: string;
                 /** @description created_at <= started_before (RFC3339, включающая). */
@@ -8486,6 +8497,11 @@ export interface operations {
     ListTidings: {
         parameters: {
             query?: {
+                /**
+                 * @description true → включить и разовые (ephemeral) правила. По умолчанию
+                 *     (false) listing их скрывает.
+                 */
+                include_ephemeral?: boolean;
                 /** @description Сдвиг от начала набора (default 0). */
                 offset?: components["parameters"]["OffsetQuery"];
                 /** @description Размер страницы (1..1000, default 50). */

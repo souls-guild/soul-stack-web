@@ -22,6 +22,14 @@ export function installFetchMock(routes: FetchRoute[]): void {
         return urlStr.startsWith(r.url);
       });
       if (!route) {
+        // Graceful fallback для audit — не роняем тесты компонентов, которые
+        // добавили секцию уведомлений (VoyageDetail, HeraldDetail).
+        if (method === 'GET' && urlStr.startsWith('/v1/audit')) {
+          return new Response(
+            JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
         return new Response(JSON.stringify({ title: 'not mocked', detail: urlStr }), {
           status: 599,
           headers: { 'Content-Type': 'application/json' },

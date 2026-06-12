@@ -229,9 +229,10 @@ paths:
         Permission: audit.read. Read-only — без audit-trail (чтение audit_log
         НЕ пишется в audit_log, чтобы не было рекурсии).
         Фильтры (все опциональны): type (multi-value OR), source (multi-value
-        OR), archon_aid (exact), correlation_id (exact), started_after /
-        started_before (RFC3339, обе границы включающие). Пагинация —
-        стандартная (offset/limit).
+        OR), archon_aid (exact), correlation_id (exact), payload_herald
+        (exact, по payload->>'herald'), started_after / started_before
+        (RFC3339, обе границы включающие). Пагинация — стандартная
+        (offset/limit).
       parameters:
         - in: query
           name: type
@@ -268,6 +269,15 @@ paths:
           schema:
             type: string
           description: ULID цепочки связанных событий (exact match).
+        - in: query
+          name: payload_herald
+          required: false
+          schema:
+            type: string
+          description: |
+            Имя Herald-канала из payload (`payload->>'herald'`, exact match).
+            Для истории доставок одного канала (события herald.delivered /
+            herald.failed несут поле herald в payload).
         - in: query
           name: started_after
           required: false
@@ -3695,8 +3705,22 @@ paths:
       tags: [Tiding]
       operationId: ListTidings
       summary: Перечислить Tiding-правила.
-      description: Permission tiding.list. Сортировка updated_at DESC, name ASC.
+      description: |
+        Permission tiding.list. Сортировка updated_at DESC, name ASC.
+        По умолчанию отдаются ТОЛЬКО постоянные правила (ephemeral=false):
+        разовые правила (ADR-052(g), привязанные к одному прогону) — деталь
+        реализации, не предмет управления оператором. include_ephemeral=true
+        возвращает все правила (отладка).
       parameters:
+        - in: query
+          name: include_ephemeral
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            true → включить и разовые (ephemeral) правила. По умолчанию
+            (false) listing их скрывает.
         - $ref: '#/components/parameters/OffsetQuery'
         - $ref: '#/components/parameters/LimitQuery'
       responses:
