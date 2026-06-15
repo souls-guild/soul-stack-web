@@ -192,7 +192,7 @@ export function IncarnationDetail() {
           <Badge tone={incarnationTone(row.status)}>{row.status}</Badge>
         </span>
         <span className={styles.metaKey}>Covens</span>
-        <span className={styles.metaVal}>{row.covens.length > 0 ? row.covens.join(', ') : '—'}</span>
+        <span className={styles.metaVal}>{(row.covens ?? []).length > 0 ? (row.covens ?? []).join(', ') : '—'}</span>
         <span className={styles.metaKey}>Created by</span>
         <span className={styles.metaVal}>
           {row.created_by_aid
@@ -341,10 +341,10 @@ export function IncarnationDetail() {
               {history.error instanceof ApiError ? t('errors:generic', { status: history.error.status, detail: history.error.message }) : String(history.error)}
             </div>
           ) : null}
-          {history.data && history.data.items.length === 0 ? (
+          {history.data && (history.data.items ?? []).length === 0 ? (
             <div className={styles.empty}>{t('incarnations:historyEmpty')}</div>
           ) : null}
-          {history.data && history.data.items.length > 0 ? (
+          {history.data && (history.data.items ?? []).length > 0 ? (
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -355,7 +355,7 @@ export function IncarnationDetail() {
                 </tr>
               </thead>
               <tbody>
-                {history.data.items.map((entry) => (
+                {(history.data.items ?? []).map((entry) => (
                   <tr key={entry.history_id}>
                     <td className="mono">{entry.scenario}</td>
                     <td className="mono">{entry.apply_id}</td>

@@ -116,7 +116,7 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       const body: HeraldUpdateRequest = {
         type: 'webhook',
         config: cfg,
-        secret_ref: secretRef || null,
+        secret_ref: secretRef || undefined,
         enabled,
       };
       updateMu.mutate(body);
@@ -125,7 +125,7 @@ export function HeraldModal({ open, onClose, editing }: Props) {
         name,
         type: 'webhook',
         config: cfg,
-        secret_ref: secretRef || null,
+        secret_ref: secretRef || undefined,
         enabled,
       };
       createMu.mutate(body);

@@ -55,7 +55,7 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
         format: p.items.format,
         pattern: p.items.pattern,
         source: p.items.source,
-        enum: p.items.enum,
+        enum: p.items.enum ?? undefined,
         // isMap для вложенного items (если elements тоже map).
         ...(isMapRawType(p.items.type) ? { isMap: true } : {}),
       } } : {}),

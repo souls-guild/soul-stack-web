@@ -32,7 +32,7 @@ export function DeleteRoleModal({ open, role, onClose }: Props) {
     onClose();
   }
 
-  const operatorsCount = role.operators.length;
+  const operatorsCount = (role.operators ?? []).length;
 
   return (
     <Modal
@@ -79,7 +79,7 @@ export function DeleteRoleModal({ open, role, onClose }: Props) {
           {operatorsCount === 1 ? t('admin:rbacDeleteOperatorLoseOne') : t('admin:rbacDeleteOperatorLoseMany')}{' '}
           {t('admin:rbacDeleteOperatorSuffix')}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-            {role.operators.map((aid) => (
+            {(role.operators ?? []).map((aid) => (
               <code
                 key={aid}
                 style={{

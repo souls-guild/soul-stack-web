@@ -202,8 +202,8 @@ export function HeraldDetail() {
                     </Link>
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                    {td.event_types.slice(0, 2).join(', ')}
-                    {td.event_types.length > 2 ? ` +${td.event_types.length - 2}` : ''}
+                    {(td.event_types ?? []).slice(0, 2).join(', ')}
+                    {(td.event_types ?? []).length > 2 ? ` +${(td.event_types ?? []).length - 2}` : ''}
                   </td>
                   <td>
                     {td.enabled ? (

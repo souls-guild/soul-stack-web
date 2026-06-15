@@ -24,7 +24,7 @@ export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
   const [selected, setSelected] = useState<string>('');
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const candidates = roles.filter((r) => !r.operators.includes(aid));
+  const candidates = roles.filter((r) => !(r.operators ?? []).includes(aid));
 
   const mu = useMutation({
     mutationFn: (roleName: string) => keeperApi.roles.grantOperator(roleName, { aid }),

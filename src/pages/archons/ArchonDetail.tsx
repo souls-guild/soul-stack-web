@@ -53,7 +53,7 @@ export function ArchonDetail() {
     enabled: Boolean(aid),
     staleTime: 30_000,
   });
-  const memberRoles = (rolesQ.data?.items ?? []).filter((r) => r.operators.includes(aid));
+  const memberRoles = (rolesQ.data?.items ?? []).filter((r) => (r.operators ?? []).includes(aid));
 
   // Каталог Synod-групп — для секции «Синоды» в info-табе.
   const synodsQ = useQuery({
@@ -62,7 +62,7 @@ export function ArchonDetail() {
     enabled: Boolean(aid),
     staleTime: 30_000,
   });
-  const memberSynods = (synodsQ.data?.items ?? []).filter((s) => s.operators.includes(aid));
+  const memberSynods = (synodsQ.data?.items ?? []).filter((s) => (s.operators ?? []).includes(aid));
 
   const revokeRoleMut = useMutation({
     mutationFn: (roleName: string) => keeperApi.roles.revokeOperator(roleName, aid),

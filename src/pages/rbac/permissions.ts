@@ -13,7 +13,7 @@ export function normalizePermissionCatalog(
   return items
     .map((res) => ({
       resource: res.resource,
-      actions: [...res.actions].sort((a, b) => a.action.localeCompare(b.action)),
+      actions: [...(res.actions ?? [])].sort((a, b) => a.action.localeCompare(b.action)),
     }))
     .sort((a, b) => a.resource.localeCompare(b.resource));
 }
@@ -70,7 +70,7 @@ export function getSelectorKeys(
   const action = base.slice(dotIdx + 1);
   for (const res of catalog) {
     if (res.resource !== resource) continue;
-    for (const act of res.actions) {
+    for (const act of (res.actions ?? [])) {
       if (act.action === action) return act.selector_keys ?? [];
     }
   }

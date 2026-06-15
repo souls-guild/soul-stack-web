@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, ExternalLink, FileText } from 'lucide-react';
+import { Copy, ExternalLink, FileText, KeyRound } from 'lucide-react';
 import { Modal } from '../primitives';
 import styles from './HelpModal.module.css';
 
@@ -55,7 +55,7 @@ export function HelpModal({ open, onClose }: Props) {
   const { t } = useTranslation();
   const keeperBase = getKeeperBase();
   const mcpBase = getMcpBase();
-  const openapiUrl = `${keeperBase}/openapi.yaml`;
+  const docsUrl = `${keeperBase}/docs`;
   return (
     <Modal open={open} title={t('admin:helpTitle')} onClose={onClose}>
       <div className={styles.body}>
@@ -63,11 +63,11 @@ export function HelpModal({ open, onClose }: Props) {
           <h3 className={styles.h}>{t('admin:helpOpenapiTitle')}</h3>
           <p className={styles.lead}>{t('admin:helpOpenapiLead')}</p>
           <div className={styles.row}>
-            <code className={`mono ${styles.url}`}>{openapiUrl}</code>
+            <code className={`mono ${styles.url}`}>{docsUrl}</code>
             <div className={styles.actions}>
-              <CopyButton value={openapiUrl} label={t('admin:helpOpenapiCopyAria')} />
+              <CopyButton value={docsUrl} label={t('admin:helpOpenapiCopyAria')} />
               <a
-                href={openapiUrl}
+                href={docsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={styles.linkBtn}
@@ -76,6 +76,10 @@ export function HelpModal({ open, onClose }: Props) {
               </a>
             </div>
           </div>
+          <p className={`${styles.hint} ${styles.hintJwt}`}>
+            <KeyRound size={11} />
+            {t('admin:helpOpenapiJwtHint')}
+          </p>
         </section>
 
         <section className={styles.section}>

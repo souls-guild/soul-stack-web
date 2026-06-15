@@ -32,7 +32,7 @@ export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
     formState: { isSubmitting },
   } = useForm<EditPermissionsFormValues>({
     resolver: zodResolver(editPermissionsSchema),
-    defaultValues: { permissions: [...role.permissions] },
+    defaultValues: { permissions: [...(role.permissions ?? [])] },
   });
 
   const mu = useMutation({
@@ -49,7 +49,7 @@ export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
   function close() {
     if (mu.isPending) return;
     setServerError(null);
-    reset({ permissions: [...role.permissions] });
+    reset({ permissions: [...(role.permissions ?? [])] });
     onClose();
   }
 

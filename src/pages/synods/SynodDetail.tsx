@@ -75,7 +75,7 @@ export function SynodDetail() {
     enabled: Boolean(name),
   });
 
-  const synod = synodsQ.data?.items.find((s) => s.name === name);
+  const synod = (synodsQ.data?.items ?? []).find((s) => s.name === name);
 
   const removeOpMut = useMutation({
     mutationFn: (aid: string) => keeperApi.synods.operators.remove(name, aid),
@@ -157,13 +157,13 @@ export function SynodDetail() {
             {memberError}
           </div>
         ) : null}
-        {synod.operators.length === 0 ? (
+        {(synod.operators ?? []).length === 0 ? (
           <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
             {t('synods:noMembers')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {synod.operators.map((aid) => (
+            {(synod.operators ?? []).map((aid) => (
               <span key={aid} style={chipStyle()}>
                 <Link
                   to={`/archons/${encodeURIComponent(aid)}`}
@@ -206,13 +206,13 @@ export function SynodDetail() {
             {roleError}
           </div>
         ) : null}
-        {synod.roles.length === 0 ? (
+        {(synod.roles ?? []).length === 0 ? (
           <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
             {t('synods:noRoles')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {synod.roles.map((r) => (
+            {(synod.roles ?? []).map((r) => (
               <span key={r} style={chipStyle()}>
                 <Link
                   to="/rbac"
@@ -243,13 +243,13 @@ export function SynodDetail() {
       <AddOperatorModal
         open={addOpOpen}
         synodName={name}
-        currentMembers={synod.operators}
+        currentMembers={synod.operators ?? []}
         onClose={() => setAddOpOpen(false)}
       />
       <GrantRoleModal
         open={grantRoleOpen}
         synodName={name}
-        currentRoles={synod.roles}
+        currentRoles={synod.roles ?? []}
         onClose={() => setGrantRoleOpen(false)}
       />
     </div>

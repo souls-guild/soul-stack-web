@@ -37,12 +37,12 @@ const TIDING_BASE: Tiding = {
   event_types: ['incarnation.run_completed'],
   only_failures: false,
   only_changes: false,
-  incarnation: null,
+  incarnation: undefined,
   cadence: 'redis-hourly',
   task: 'redis_conf',
   enabled: true,
   ephemeral: false,
-  voyage_id: null,
+  voyage_id: undefined,
   annotations: undefined,
   projection: [],
   created_at: new Date().toISOString(),
@@ -193,7 +193,7 @@ describe('TidingModal — поле task', () => {
     });
   });
 
-  it('Create Tiding — пустое task → null в payload', async () => {
+  it('Create Tiding — пустое task → отсутствует в payload (undefined=omit)', async () => {
     const calls = setupNotifMock();
     renderNotif('/notifications?tab=tidings');
     const user = userEvent.setup();
@@ -214,7 +214,9 @@ describe('TidingModal — поле task', () => {
       const post = calls.find((c) => c.url === '/v1/tidings' && c.method === 'POST');
       expect(post).toBeDefined();
       const parsed = JSON.parse(post!.body ?? '{}');
-      expect(parsed.task).toBeNull();
+      // PUT/POST replace-семантика: пустое поле → отсутствует в JSON (undefined omit),
+      // backend трактует отсутствие как "очистить" (комментарий в спеке: "отсутствие очищает").
+      expect(Object.prototype.hasOwnProperty.call(parsed, 'task')).toBe(false);
     });
   });
 
@@ -253,7 +255,7 @@ describe('TidingModal — поле task', () => {
     });
   });
 
-  it('Edit Tiding — стёр task → PUT отправляет task: null (omit==clear)', async () => {
+  it('Edit Tiding — стёр task → PUT отправляет task: omit (undefined==clear)', async () => {
     const calls = setupNotifMock({ tidingDetail: TIDING_BASE });
     renderNotif('/notifications?tab=tidings');
     const user = userEvent.setup();
@@ -270,8 +272,8 @@ describe('TidingModal — поле task', () => {
       const put = calls.find((c) => /^\/v1\/tidings\/run-failures$/.test(c.url) && c.method === 'PUT');
       expect(put).toBeDefined();
       const parsed = JSON.parse(put!.body ?? '{}');
-      // PUT replace-семантика: пустое поле → null (очищает, как incarnation/cadence).
-      expect(parsed.task).toBeNull();
+      // PUT replace-семантика: пустое поле → отсутствует в JSON (backend: "отсутствие очищает").
+      expect(Object.prototype.hasOwnProperty.call(parsed, 'task')).toBe(false);
     });
   });
 });

@@ -4,116 +4,6 @@
  */
 
 export interface paths {
-    "/healthz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Liveness probe.
-         * @description Процесс жив. Не проверяет внешние зависимости.
-         */
-        get: operations["GetHealthz"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/readyz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Readiness probe.
-         * @description Postgres + Vault достижимы. Возвращает 503 при not-ready.
-         */
-        get: operations["GetReadyz"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/openapi.yaml": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Self-served OpenAPI 3.0.3 spec.
-         * @description Hand-written спека этого API (RFC 9512 application/yaml).
-         *     Embed-копия docs/keeper/openapi.yaml внутри keeper-бинаря.
-         */
-        get: operations["GetOpenapiSpec"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/operators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Архонтов (paged + фильтры).
-         * @description Permission: operator.list. Read-only, без audit.
-         *     Фильтры (опционально): auth_method (jwt/mtls/combined), revoked
-         *     (bool, default false — только активные). Пагинация — стандартная.
-         */
-        get: operations["ListOperators"];
-        put?: never;
-        /**
-         * Создать Архонта.
-         * @description Permission: operator.create. MCP-tool: keeper.operator.create.
-         *     Создаёт запись в реестре operators, выпускает первый JWT
-         *     (TTL = auth.jwt.ttl_default). JWT возвращается один раз.
-         */
-        post: operations["CreateOperator"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/operators/{aid}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Detail Архонта.
-         * @description Permission: operator.list (одна permission покрывает list+get в MVP,
-         *     паттерн service.list / soul.list). Read-only, без audit.
-         */
-        get: operations["GetOperator"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/audit": {
         parameters: {
             query?: never;
@@ -122,17 +12,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Лента audit-events (paged + фильтры).
-         * @description Permission: audit.read. Read-only — без audit-trail (чтение audit_log
-         *     НЕ пишется в audit_log, чтобы не было рекурсии).
-         *     Фильтры (все опциональны): type (multi-value OR), source (multi-value
-         *     OR), archon_aid (exact), correlation_id (exact), payload_herald
-         *     (exact, по payload->>'herald'), payload_voyage (exact, по
-         *     payload->>'voyage_id'), started_after / started_before
-         *     (RFC3339, обе границы включающие). Пагинация — стандартная
-         *     (offset/limit).
+         * Лента audit-events (paged + фильтры)
+         * @description Read-only-лента audit_log с фильтрами (type/source multi-OR, archon_aid/correlation_id/payload_herald/payload_voyage exact, started_after/before RFC3339) и пагинацией. Permission audit.read. Read-only, без audit (чтение не пишется — рекурсия).
          */
-        get: operations["ListAuditEvents"];
+        get: operations["listAuditEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -141,51 +24,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/operators/{aid}/revoke": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Отозвать Архонта.
-         * @description Permission: operator.revoke. MCP-tool: keeper.operator.revoke.
-         *     Ставит operators.revoked_at = now(). Активные JWT работают до exp.
-         *     409 would-lock-out-cluster — нельзя отозвать последнего Архонта
-         *     с *-permission.
-         */
-        post: operations["RevokeOperator"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/operators/{aid}/issue-token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Выпустить новый JWT для Архонта.
-         * @description Permission: operator.issue-token. MCP-tool: keeper.operator.issue-token.
-         *     Старые JWT остаются валидными до exp. Новый JWT возвращается один раз.
-         */
-        post: operations["IssueOperatorToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/roles": {
+    "/v1/augur/omens": {
         parameters: {
             query?: never;
             header?: never;
@@ -193,26 +32,71 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список ролей.
-         * @description Permission: role.list. MCP-tool: keeper.role.list.
-         *     Каталог ролей с их permissions и составом операторов (membership).
+         * Список Omen-ов (paged)
+         * @description Реестр Omen-ов с пагинацией (ADR-025). Permission omen.list. Read-only, без audit.
          */
-        get: operations["ListRoles"];
+        get: operations["listOmens"];
         put?: never;
         /**
-         * Создать роль.
-         * @description Permission: role.create. MCP-tool: keeper.role.create.
-         *     Создаёт роль с набором permissions (replace-семантики нет — это
-         *     создание). 409 role-already-exists — name уже занят.
+         * Создать Omen
+         * @description Заносит Omen (внешняя система) в реестр augur (ADR-025). Permission omen.create. 409 — name занят. master-credential не хранится (только auth_ref).
          */
-        post: operations["CreateRole"];
+        post: operations["createOmen"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/roles/{name}": {
+    "/v1/augur/omens/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Omen-а
+         * @description Метаданные одного Omen-а по имени (ADR-025). Permission omen.list (read покрыт list-правом). Read-only, без audit.
+         */
+        get: operations["getOmen"];
+        put?: never;
+        post?: never;
+        /**
+         * Удалить Omen
+         * @description Удаляет Omen каскадно (связанные Rite-ы, ADR-025). Permission omen.delete. 404 — записи нет.
+         */
+        delete: operations["deleteOmen"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/augur/rites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Rite-ов по Omen
+         * @description Rite-ы (grant-ы) одного Omen-а (ADR-025). Permission rite.list. Обязательный фильтр omen=<name>. Read-only, без audit.
+         */
+        get: operations["listRites"];
+        put?: never;
+        /**
+         * Создать Rite (grant)
+         * @description Заносит Rite (grant) в реестр augur (ADR-025). Permission rite.create. 404 — Omen не существует. 422 — XOR-нарушение субъекта/битый allow.
+         */
+        post: operations["createRite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/augur/rites/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -223,64 +107,68 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Удалить роль.
-         * @description Permission: role.delete. MCP-tool: keeper.role.delete.
-         *     Каскадом сносятся permissions роли и membership. 409 role-builtin —
-         *     builtin-роль удалять нельзя; 409 would-lock-out-cluster — удаление
-         *     снимет последнего `*`-админа.
+         * Удалить Rite
+         * @description Снимает grant-запись Rite по id (ADR-025). Permission rite.delete. 404 — записи нет. 422 — id не положительное число.
          */
-        delete: operations["DeleteRole"];
+        delete: operations["deleteRite"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/roles/{name}/permissions": {
+    "/v1/cadences": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
         /**
-         * Заменить набор permissions роли.
-         * @description Permission: role.update. MCP-tool: keeper.role.update.
-         *     Replace-семантика: переданный набор полностью заменяет существующий.
-         *     409 role-builtin — builtin-роль редактировать нельзя;
-         *     409 would-lock-out-cluster — снятие `*` оставит кластер без админа.
+         * Список расписаний (Cadence, paged)
+         * @description Read-only-список Cadence с фильтрами enabled/kind и пагinацией (sort created_at DESC). Permission cadence.list. Read-only, без audit.
          */
-        patch: operations["UpdateRolePermissions"];
-        trace?: never;
-    };
-    "/v1/roles/{name}/operators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
+        get: operations["listCadences"];
         put?: never;
         /**
-         * Назначить оператора в роль.
-         * @description Permission: role.grant-operator. MCP-tool: keeper.role.grant-operator.
-         *     Идемпотентно: повторный grant той же пары (role, aid) — no-op.
-         *     404 not-found — целевой AID не существует в реестре операторов.
+         * Создать расписание (Cadence)
+         * @description Регулярный/повторяющийся Voyage (ADR-046). Двухуровневый RBAC: cadence.create + Voyage-permission по kind рецепта.
          */
-        post: operations["GrantRoleOperator"];
+        post: operations["createCadence"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/roles/{name}/operators/{aid}": {
+    "/v1/cadences/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Получить расписание (Cadence)
+         * @description Деталь расписания по ULID. Permission cadence.list. Read-only, без audit.
+         */
+        get: operations["getCadence"];
+        put?: never;
+        post?: never;
+        /**
+         * Снять расписание (Cadence)
+         * @description Удаляет расписание; порождённые Voyage остаются (FK ON DELETE SET NULL). Permission cadence.delete.
+         */
+        delete: operations["deleteCadence"];
+        options?: never;
+        head?: never;
+        /**
+         * Обновить расписание (Cadence)
+         * @description Read-modify-write рецепта/расписания/enabled-toggle. Двухуровневый RBAC (cadence.update + Voyage-permission по kind). kind не меняется.
+         */
+        patch: operations["patchCadence"];
+        trace?: never;
+    };
+    "/v1/cadences/{id}/disable": {
         parameters: {
             query?: never;
             header?: never;
@@ -289,80 +177,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
         /**
-         * Снять оператора с роли.
-         * @description Permission: role.revoke-operator. MCP-tool: keeper.role.revoke-operator.
-         *     404 not-found — пары (role, aid) нет; 409 would-lock-out-cluster —
-         *     снятие оставит кластер без `*`-админа.
+         * Выключить расписание (Cadence)
+         * @description Пауза планировщика. Permission cadence.disable ИЛИ backcompat cadence.update.
          */
-        delete: operations["RevokeRoleOperator"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/synods": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Synod-групп.
-         * @description Permission: synod.list. MCP-tool: keeper.synod.list.
-         *     Каталог групп с развёрнутым bundle ролей и составом членов (AID).
-         */
-        get: operations["ListSynods"];
-        put?: never;
-        /**
-         * Создать Synod-группу.
-         * @description Permission: synod.create. MCP-tool: keeper.synod.create.
-         *     Создаёт пустую группу архонов (ADR-049), бандлящую роли. Роли и
-         *     члены добавляются отдельными эндпоинтами. 409 synod-already-exists —
-         *     name уже занят.
-         */
-        post: operations["CreateSynod"];
+        post: operations["disableCadence"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/synods/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Удалить Synod-группу.
-         * @description Permission: synod.delete. MCP-tool: keeper.synod.delete.
-         *     Каскадом сносятся membership и bundle группы. 409 synod-builtin —
-         *     builtin-группу удалять нельзя; 409 would-lock-out-cluster —
-         *     исчезновение группы оставит кластер без `*`-админа (ADR-049(f)).
-         */
-        delete: operations["DeleteSynod"];
-        options?: never;
-        head?: never;
-        /**
-         * Изменить описание Synod-группы.
-         * @description Permission: synod.update. MCP-tool: keeper.synod.update.
-         *     Меняет ТОЛЬКО description; name (PK) immutable — переименование
-         *     сознательно отвергнуто (ADR-049 amend). builtin-группа РАЗРЕШЕНА к
-         *     правке (description косметика, не поведение). Без subset-check и
-         *     self-lockout — description прав не выдаёт/не отнимает. 404
-         *     synod-not-found — группы нет.
-         */
-        patch: operations["UpdateSynod"];
-        trace?: never;
-    };
-    "/v1/synods/{name}/operators": {
+    "/v1/cadences/{id}/enable": {
         parameters: {
             query?: never;
             header?: never;
@@ -372,83 +198,195 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Добавить архона в группу.
-         * @description Permission: synod.add-operator. MCP-tool: keeper.synod.add-operator.
-         *     Член группы получает весь её bundle ролей. Идемпотентно. Под
-         *     least-privilege subset (ADR-049(f)): 403 forbidden — инициатор не
-         *     держит права bundle группы. 404 not-found — группа/AID не существуют.
+         * Включить расписание (Cadence)
+         * @description Возобновление планировщика. Permission cadence.enable ИЛИ backcompat cadence.update.
          */
-        post: operations["AddSynodOperator"];
+        post: operations["enableCadence"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/synods/{name}/operators/{aid}": {
+    "/v1/cadences/{id}/runs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Прогоны расписания (Cadence runs, paged)
+         * @description Список Voyage, порождённых расписанием, с фильтром status[] и пагинацией. Permission incarnation.history. Read-only, без audit.
+         */
+        get: operations["listCadenceRuns"];
         put?: never;
         post?: never;
-        /**
-         * Убрать архона из группы.
-         * @description Permission: synod.remove-operator. MCP-tool:
-         *     keeper.synod.remove-operator. 404 not-found — пары (synod, aid) нет;
-         *     409 would-lock-out-cluster — снятие осиротит последнего `*`-админа
-         *     (ADR-049(f)).
-         */
-        delete: operations["RemoveSynodOperator"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/synods/{name}/roles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Добавить роль в bundle группы.
-         * @description Permission: synod.grant-role. MCP-tool: keeper.synod.grant-role.
-         *     Роль выдаётся всем членам группы. Идемпотентно. Под least-privilege
-         *     subset (ADR-049(f)): 403 forbidden — инициатор не держит права роли.
-         *     404 not-found — группа/роль не существуют.
-         */
-        post: operations["GrantSynodRole"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/synods/{name}/roles/{role_name}": {
+    "/v1/decrees": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Список Decree-ов (paged)
+         * @description Реестр Decree-ов с пагинацией (ADR-030). Permission decree.list. Read-only, без audit.
+         */
+        get: operations["listDecrees"];
+        put?: never;
+        /**
+         * Создать Decree
+         * @description Заносит Decree (правило reactor) в реестр oracle (ADR-030). Permission decree.create. 409 — name занят.
+         */
+        post: operations["createDecree"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decrees/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Decree-а
+         * @description Метаданные одного Decree-а по имени (ADR-030). Permission decree.list (read покрыт list-правом). Read-only, без audit.
+         */
+        get: operations["getDecree"];
         put?: never;
         post?: never;
         /**
-         * Снять роль из bundle группы.
-         * @description Permission: synod.revoke-role. MCP-tool: keeper.synod.revoke-role.
-         *     Права роли снимаются у всех членов. 404 not-found — пары
-         *     (synod, role) нет; 409 would-lock-out-cluster — снятие осиротит
-         *     последнего `*`-админа (ADR-049(f)).
+         * Удалить Decree
+         * @description Удаляет Decree каскадно (cooldown-state, ADR-030). Permission decree.delete. 404 — записи нет.
          */
-        delete: operations["RevokeSynodRole"];
+        delete: operations["deleteDecree"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/errands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Errand-ов (paged)
+         * @description Реестр Errand-ов с фильтрами и пагинацией (ADR-033). Permission errand.list. Read-only, без audit.
+         */
+        get: operations["listErrands"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/errands/{errand_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Состояние Errand-а
+         * @description Терминал-строка (200) либо running-poll (202) по ULID (ADR-033). Permission errand.list. Read-only, без audit.
+         */
+        get: operations["getErrand"];
+        put?: never;
+        post?: never;
+        /**
+         * Отменить Errand
+         * @description Отправляет cancel-сигнал Soul-у (ADR-033, slice E5). Permission errand.cancel. 409 — уже терминал.
+         */
+        delete: operations["cancelErrand"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/event-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Каталог event-types для Tiding-подписки
+         * @description Допустимые для подписки Tiding типы: areas (area-glob `<name>.*`) + точечные point_events (источник herald/eventtypes.go). Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
+         */
+        get: operations["listEventTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/heralds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Herald-каналов (paged)
+         * @description Реестр Herald-каналов с пагинацией (ADR-052). Permission herald.list. Read-only, без audit.
+         */
+        get: operations["listHeralds"];
+        put?: never;
+        /**
+         * Создать Herald-канал
+         * @description Заносит Herald (канал доставки уведомлений) в реестр (ADR-052). Permission herald.create. 409 — name занят. Секрет не хранится (только secret_ref).
+         */
+        post: operations["createHerald"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/heralds/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Herald-канала
+         * @description Метаданные одного Herald-канала по имени (ADR-052). Permission herald.read. Read-only, без audit.
+         */
+        get: operations["getHerald"];
+        /**
+         * Обновить Herald-канал (replace)
+         * @description Replace-семантика: поля полностью заменяют существующие, name immutable (ADR-052). Permission herald.update. 404 — записи нет.
+         */
+        put: operations["updateHerald"];
+        post?: never;
+        /**
+         * Удалить Herald-канал
+         * @description Удаляет Herald каскадно (связанные Tiding-ы, ADR-052). Permission herald.delete. 404 — записи нет.
+         */
+        delete: operations["deleteHerald"];
         options?: never;
         head?: never;
         patch?: never;
@@ -462,28 +400,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список incarnation-ов.
-         * @description Permission: incarnation.list. MCP-tool: keeper.incarnation.list.
-         *
-         *     Видимость scoped по RBAC (ADR-047 S3b-3): оператор видит только
-         *     incarnation-ы в своей scope-границе (Purview для `incarnation.list`).
-         *     Измерения объединяются OR-ом («всё мне доступное»): coven∪{name}
-         *     (covens incarnation пересекаются со scope-ковенами ИЛИ имя incarnation =
-         *     scope-coven, ADR-008 корневая метка) ∪ state-CEL (incarnation.state
-         *     удовлетворяет state-предикату scope). scope ПРОЗРАЧЕН для клиента —
-         *     деривируется из JWT, НЕ query-параметр; пользовательские фильтры сужают
-         *     ВНУТРИ scope (AND). `total` считается с тем же scope-WHERE (когерентен
-         *     выдаче — не учитывает incarnation вне scope). cluster-admin (`*`) /
-         *     bare-permission → весь список.
+         * Список инкарнаций (paged)
+         * @description Фильтры service/status/coven/state.<field> + сортировка. Видимость scoped по RBAC (ADR-047). Permission incarnation.list. Read-only.
          */
-        get: operations["ListIncarnations"];
+        get: operations["listIncarnations"];
         put?: never;
         /**
-         * Создать incarnation.
-         * @description Permission: incarnation.create. MCP-tool: keeper.incarnation.create.
-         *     Запускает scenario create указанного сервиса (async).
+         * Создать инкарнацию
+         * @description Runtime-инстанс сервиса (ADR-029). Запускает scenario create (async, если lifecycle.auto_create). Permission incarnation.create.
          */
-        post: operations["CreateIncarnation"];
+        post: operations["createIncarnation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -498,92 +424,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Прочитать spec + state + status incarnation-а.
-         * @description Permission: incarnation.get. MCP-tool: keeper.incarnation.get.
-         *
-         *     Видимость scoped по RBAC (ADR-047 S3b-3): incarnation вне scope-границы
-         *     оператора (Purview для `incarnation.get`) отдаётся как 404, НЕ 403 — мы
-         *     не палим существование чужой incarnation. В scope, если: cluster-admin
-         *     (`*`) / bare-permission; ЛИБО coven∪{name} (covens пересекаются со
-         *     scope-ковенами / имя = scope-coven); ЛИБО state-CEL scope истинен на
-         *     её state. fail-closed: пустой Purview → 404.
+         * Получить инкарнацию
+         * @description Деталь runtime-инстанса. Вне RBAC-scope → 404 (не палим существование). Permission incarnation.get. Read-only.
          */
-        get: operations["GetIncarnation"];
+        get: operations["getIncarnation"];
         put?: never;
         post?: never;
         /**
-         * Удалить incarnation.
-         * @description Permission: incarnation.destroy. MCP-tool: keeper.incarnation.destroy.
-         *     Async-операция. Operator-facing allow_destroy маппится в internal
-         *     force (decisions.md → force↔allow_destroy). false — штатный destroy
-         *     через teardown-scenario `destroy`; true — снос без teardown (DELETE
-         *     строки напрямую, escape-hatch для incarnation без внешних ресурсов,
-         *     warning в audit).
+         * Снести инкарнацию
+         * @description allow_destroy=true → DELETE без teardown; false → scenario destroy (S-D4). Permission incarnation.destroy.
          */
-        delete: operations["DestroyIncarnation"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/scenarios/{scenario}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Запустить scenario против incarnation.
-         * @description Permission: incarnation.run. MCP-tool: keeper.incarnation.run.
-         *     Async-операция, 202 + `apply_id` (`IncarnationRunReply`).
-         */
-        post: operations["RunIncarnationScenario"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Журнал изменений state.
-         * @description Permission: incarnation.history. MCP-tool: keeper.incarnation.history.
-         */
-        get: operations["GetIncarnationHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/unlock": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Снять error_locked.
-         * @description Permission: incarnation.unlock. MCP-tool: keeper.incarnation.unlock.
-         *     Снимает статус error_locked после ручного разбора. Оператор берёт
-         *     на себя ответственность за консистентность хостов.
-         */
-        post: operations["UnlockIncarnation"];
-        delete?: never;
+        delete: operations["destroyIncarnation"];
         options?: never;
         head?: never;
         patch?: never;
@@ -599,24 +450,41 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Scry-проверка drift (ADR-031 Slice B).
-         * @description Permission: incarnation.check-drift. MCP-tool: keeper.incarnation.check-drift.
-         *     Sync-операция: Keeper рендерит scenario `converge` под текущим
-         *     service-snapshot-ом, шлёт всем хостам `ApplyRequest{dry_run:true}` через
-         *     work-queue (Acolyte). Soul зовёт `mod.Plan` вместо `mod.Apply` (pure-
-         *     read), собирает per-host per-task `changed` и возвращает `DriftReport`.
-         *     Информационный статус `drift` ставится post-check (НЕ блокирующий —
-         *     ADR-031(d)). converge-input резолвится auto-from-state по конвенции
-         *     имени (`incarnation.state.<param>`), `input` в body — operator-override.
+         * Проверить drift инкарнации (Scry)
+         * @description Sync dry_run converge → DriftReport (ADR-031 Slice B). Информационная маркировка status=drift. Permission incarnation.check-drift.
          */
-        post: operations["CheckIncarnationDrift"];
+        post: operations["checkIncarnationDrift"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/upgrade": {
+    "/v1/incarnations/{name}/choirs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Choir-ов инкарнации
+         * @description Топология Choir-ов инкарнации (ADR-044). Permission choir.list. Несуществующая incarnation → items=[]. Read-only, без audit.
+         */
+        get: operations["listChoirs"];
+        put?: never;
+        /**
+         * Создать Choir
+         * @description Declared-топология хостов внутри инкарнации (ADR-044). created_by_aid из JWT. Permission choir.create. 409 — имя занято.
+         */
+        post: operations["createChoir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/choirs/{choir}": {
         parameters: {
             query?: never;
             header?: never;
@@ -625,20 +493,42 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        post?: never;
         /**
-         * Перевод на новую state_schema_version.
-         * @description Permission: incarnation.upgrade. MCP-tool: keeper.incarnation.upgrade.
-         *     Запускает миграцию state (ADR-019) + переключает service_version
-         *     одной PG-транзакцией. Async-операция.
+         * Удалить Choir
+         * @description Удаляет Choir (каскадом его Voice-ы). Permission choir.delete.
          */
-        post: operations["UpgradeIncarnation"];
+        delete: operations["deleteChoir"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/choirs/{choir}/voices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Voice-ов Choir-а
+         * @description Члены Choir-а (ADR-044). Permission choir.list. Несуществующий Choir → items=[]. Read-only, без audit.
+         */
+        get: operations["listVoices"];
+        put?: never;
+        /**
+         * Добавить Voice в Choir
+         * @description Членство SID в Choir-е (ADR-044). added_by_aid из JWT. Permission choir.add-voice. 409 — Voice уже есть; 422 — SID не член инкарнации.
+         */
+        post: operations["addVoice"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/rerun-create": {
+    "/v1/incarnations/{name}/choirs/{choir}/voices/{sid}": {
         parameters: {
             query?: never;
             header?: never;
@@ -647,19 +537,31 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        post?: never;
         /**
-         * Перезапустить scenario create из error_locked.
-         * @description Permission: incarnation.create-rerun. MCP-tool: keeper.incarnation.rerun-create.
-         *     Атомарно снимает error_locked (state НЕ трогается — last-known-good,
-         *     snapshot в state_history) и тем же действием перезапускает scenario
-         *     create (rerun bootstrap-а). Под одним FOR UPDATE: переход
-         *     error_locked → applying минуя ready — исключает окно, в котором
-         *     конкурентный прогон проскочил бы в освободившийся ready. reason
-         *     обязателен (явное подтверждение оператора). Scope ограничен
-         *     error_locked (для прочих случаев — обычный unlock + ручной run).
-         *     Async-операция, 202 + apply_id.
+         * Убрать Voice из Choir-а
+         * @description Снимает членство SID в Choir-е (ADR-044). Permission choir.remove-voice.
          */
-        post: operations["RerunCreateIncarnation"];
+        delete: operations["removeVoice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * История state-переходов инкарнации (paged)
+         * @description state_history с фильтром apply_id и пагинацией. Вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         */
+        get: operations["getIncarnationHistory"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -680,178 +582,13 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Править declared `spec.hosts[]` (UI Hosts editing, ADR-008).
-         * @description Permission: incarnation.update-hosts. MCP-tool отсутствует — REST-only.
-         *
-         *     Три mode-семантики над declared `spec.hosts[]`:
-         *       - `replace` — полная замена списка переданным набором (включая пустой).
-         *       - `append`  — добавить переданные hosts; при совпадении SID role
-         *                     существующей записи обновляется (insert-or-update).
-         *       - `remove`  — удалить записи с указанными SID-ами (`role` в payload
-         *                     игнорируется).
-         *
-         *     SID-ы валидируются на существование в реестре `souls` (single batch-
-         *     SELECT, не per-host); неизвестные SID → 422. `role` — опциональна,
-         *     формат `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` (kebab-case, 1..63 символа) или
-         *     пустая (ADR-008 допускает null для хостов вне declared-spec).
-         *     Атомарность — одна PG-транзакция SELECT FOR UPDATE → guard статуса →
-         *     souls-validate → UPDATE spec.
-         *
-         *     Статус `destroying` / `destroy_failed` → 409 (правка spec бессмысленна
-         *     при сносе); остальные статусы (включая `applying`) — допустимы (spec —
-         *     declared-вход следующего прогона, не текущего).
-         *
-         *     Audit `incarnation.hosts_updated` (`source: api`, archon = JWT.sub).
+         * Править declared spec.hosts[] инкарнации
+         * @description Три mode (replace/append/remove) над declared hosts (ADR-008). Permission incarnation.update-hosts.
          */
-        patch: operations["UpdateIncarnationHosts"];
+        patch: operations["updateIncarnationHosts"];
         trace?: never;
     };
-    "/v1/incarnations/{name}/choirs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Choir-ов инкарнации (ADR-044).
-         * @description Permission: choir.list (scope incarnation/service/coven по path-{name}).
-         *     Сортировка по choir_name. Несуществующая incarnation → 200 + items=[].
-         */
-        get: operations["ListChoirs"];
-        put?: never;
-        /**
-         * Создать Choir (партию хостов внутри инкарнации, ADR-044).
-         * @description Permission: choir.create (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool отсутствует — REST-only.
-         *
-         *     Choir — именованная топология хостов ВНУТРИ инкарнации (declared-«партия
-         *     хора»). `created_by_aid` берётся из JWT-контекста, НЕ из тела. `choir_name`
-         *     валидируется на формат `^[a-z][a-z0-9_-]*$`. `min_size`/`max_size` —
-         *     опциональные sane-bounds (> 0, min ≤ max).
-         */
-        post: operations["CreateChoir"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/choirs/{choir}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Удалить Choir (каскадом его Voice-ы, ADR-044).
-         * @description Permission: choir.delete (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool отсутствует — REST-only. ON DELETE CASCADE сносит все Voice-ы Choir-а.
-         */
-        delete: operations["DeleteChoir"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/choirs/{choir}/voices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Voice-ов Choir-а (ADR-044).
-         * @description Permission: choir.list (scope incarnation/service/coven по path-{name}).
-         *     Сортировка по position (NULL — в конец), затем по sid. Несуществующий
-         *     Choir → 200 + items=[].
-         */
-        get: operations["ListVoices"];
-        put?: never;
-        /**
-         * Добавить Voice (членство SID в Choir-е, ADR-044).
-         * @description Permission: choir.add-voice (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool отсутствует — REST-only.
-         *
-         *     Инвариант членства (ADR-044): Voice создаётся только для SID, который уже
-         *     член инкарнации (его `souls.coven[]` содержит `incarnation.name`). SID вне
-         *     членства → 422 (нарушившие SID-ы в detail). `added_by_aid` берётся из
-         *     JWT-контекста, НЕ из тела. `role`/`position` — опциональные declared-атрибуты.
-         */
-        post: operations["AddVoice"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/choirs/{choir}/voices/{sid}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Убрать Voice из Choir-а (ADR-044).
-         * @description Permission: choir.remove-voice (scope incarnation/service/coven по path-{name}).
-         *     MCP-tool отсутствует — REST-only.
-         */
-        delete: operations["RemoveVoice"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/souls": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Souls.
-         * @description Permission: soul.list. MCP-tool: keeper.soul.list.
-         *     Single-Soul read (GET /v1/souls/{sid}) и soulprint-read
-         *     (GET /v1/souls/{sid}/soulprint) покрываются тем же permission
-         *     `soul.list` (паттерн service.list / omen.list / vigil.list /
-         *     decree.list — одно permission на чтение реестра; `soul.get`
-         *     сознательно отложен, rbac.md §Souls).
-         *
-         *     Видимость scoped по RBAC (ADR-047 S3b): оператор видит только хосты
-         *     в своей scope-границе (Purview для `soul.list`; в пилоте — coven-
-         *     измерение). scope ПРОЗРАЧЕН для клиента — деривируется из JWT, НЕ
-         *     query-параметр; coven-фильтр сужает ВНУТРИ scope (AND), не расширяет.
-         *     `total` считается с тем же scope-WHERE (когерентен выдаче — не учитывает
-         *     хосты вне scope). cluster-admin (`*`) / bare-permission → весь флот.
-         */
-        get: operations["ListSouls"];
-        put?: never;
-        /**
-         * Зарегистрировать Soul.
-         * @description Permission: soul.create. MCP-tool: keeper.soul.create.
-         *     Создаёт запись в реестре souls (status: pending). Для transport: agent
-         *     выпускает первый bootstrap-токен (одноразовый, plain-токен один раз);
-         *     для transport: ssh токен не выпускается. Полная семантика —
-         *     docs/soul/onboarding.md.
-         */
-        post: operations["CreateSoul"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/souls/coven": {
+    "/v1/incarnations/{name}/rerun-create": {
         parameters: {
             query?: never;
             header?: never;
@@ -861,130 +598,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Массовое назначение/снятие/замена Coven-меток по селектору.
-         * @description Permission: soul.coven-assign. Селектор coven=/host= (домен soul.*).
-         *     Массово добавляет (mode: append) / снимает (mode: remove) ОДНУ
-         *     Coven-метку либо ЗАМЕНЯЕТ (mode: replace) набор Coven-меток целиком
-         *     на хостах под selector ∩ coven-scope оператора. Coven — холодная
-         *     PG-метка: чистый UPDATE souls, без Redis.
-         *
-         *     Форма тела:
-         *       - mode=append/remove → обязателен `label` (одна метка);
-         *       - mode=replace → обязателен `labels` (массив, может быть пустым =
-         *         «снять все»); поле `label` запрещено.
-         *
-         *     Двухслойная авторизация:
-         *       - middleware (право вообще + назначаемая метка ∈ scope оператора:
-         *         coven-scoped оператор проходит только для метки в своём scope;
-         *         для replace middleware проверяет первую метку набора, остальные
-         *         проверяет handler ДО БД);
-         *       - service: целевые хосты ⊆ coven-scope оператора (scope-intersection);
-         *         для replace КАЖДАЯ метка набора ∈ scope (иначе validation-failed).
-         *
-         *     Селектор включает incarnation= (имя incarnation как корневая
-         *     Coven-метка по ADR-008); комбинации критериев соединяются AND.
-         *
-         *     dry_run (тело или ?dry_run=true) — вернуть matched без UPDATE.
-         *     Идемпотентность: append не трогает хост, где метка уже есть; remove —
-         *     где метки нет; replace — где набор уже совпадает (coven IS DISTINCT
-         *     FROM $labels). Чанкинг с коммитом на чанк: при фейле середины часть
-         *     изменений зафиксирована (status: partial, безопасно до-повторяется).
-         *     CEL-предикат — будущий слайс.
+         * Перезапустить create из error_locked
+         * @description Снимает error_locked и тем же действием перезапускает scenario create (одна tx FOR UPDATE). Permission incarnation.create-rerun.
          */
-        post: operations["AssignSoulCoven"];
+        post: operations["rerunCreateIncarnation"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/souls/{sid}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Получить одну Soul.
-         * @description Permission: soul.list. MCP-tool: keeper.soul.list (одно permission
-         *     покрывает list и get — паттерн service.list / omen.list / vigil.list /
-         *     decree.list; `soul.get` сознательно отложен, rbac.md §Souls). Селектор
-         *     `host=<sid>` для будущих per-host scope-ролей.
-         *     Видимость scoped по RBAC (ADR-047 S3b, coven-измерение в пилоте): хост вне
-         *     scope-границы оператора отдаёт 404 (не 403) — существование чужого хоста
-         *     не раскрывается. fail-closed: нет прав / пустой Purview → 404.
-         *     404 not-found — записи нет ЛИБО хост вне scope оператора.
-         */
-        get: operations["GetSoul"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/souls/{sid}/soulprint": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Последний полученный typed-SoulprintReport.
-         * @description Permission: soul.list (тот же, что для GET /v1/souls/{sid};
-         *     отдельная `soul.soulprint.read` не вводится — паттерн one-permission-
-         *     per-read, rbac.md §Souls).
-         *     Возвращает `typed_facts` (proto SoulprintFacts, ADR-018) +
-         *     collected_at (Soul-side) + received_at (Keeper-side).
-         *     Видимость scoped по RBAC (ADR-047 S3b, тот же coven-гейт, что GET
-         *     /v1/souls/{sid}): хост вне scope-границы оператора отдаёт 404 (не 403)
-         *     ДО раскрытия фактов — существование чужого хоста не раскрывается.
-         *     404 not-found — Soul-а нет в реестре ЛИБО хост вне scope оператора;
-         *     410 soulprint-not-received — Soul есть, но SoulprintReport ни разу не
-         *     приходил (`transport: ssh` без агента, либо только что онбординг).
-         */
-        get: operations["GetSoulprint"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/souls/{sid}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Per-host operation timeline (scenario + errand).
-         * @description Permission: soul.list (тот же read-permission, что GET /v1/souls/{sid}
-         *     и /soulprint; отдельная `soul.history` не вводится — паттерн
-         *     one-permission-per-read, rbac.md §Souls). Селектор `host=<sid>`.
-         *     Агрегирует per-host строки двух источников в единый timeline,
-         *     отсортированный started_at DESC:
-         *       - scenario — `apply_runs` (scenario-задача, доехавшая до хоста в
-         *         рамках scenario-прогона инкарнации);
-         *       - errand — `errands` (ad-hoc pull-exec одиночного модуля, ADR-033).
-         *     push_runs пока НЕ включён (per-host данные там в jsonb summary —
-         *     follow-up).
-         */
-        get: operations["GetSoulHistory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/souls/{sid}/issue-token": {
+    "/v1/incarnations/{name}/scenarios/{scenario}": {
         parameters: {
             query?: never;
             header?: never;
@@ -994,51 +618,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Перевыпустить bootstrap-токен Soul.
-         * @description Permission: soul.issue-token. MCP-tool: keeper.soul.issue-token.
-         *     Перевыпуск bootstrap-токена для существующей Soul (transport: agent).
-         *     Инвариант UNIQUE (sid) WHERE used_at IS NULL — максимум один активный
-         *     токен. Без force при активном токене → 409 bootstrap-token-active;
-         *     force=true истекает старый и выпускает новый. Для transport: ssh →
-         *     422 validation-failed. Plain-токен один раз.
+         * Запустить сценарий инкарнации
+         * @description Async-прогон именованного scenario (ADR-009). Блокируется при cluster:degraded (503). Permission incarnation.run.
          */
-        post: operations["IssueSoulToken"];
+        post: operations["runIncarnationScenario"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/souls/{sid}/ssh-target": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Обновить per-host SSH-реквизиты push-flow.
-         * @description ADR-032 amendment 2026-05-26 (S7-1): souls.ssh_target jsonb — canonical
-         *     источник per-host SSH-реквизитов push-flow. keeper.yml::push.targets[]
-         *     — legacy fallback под флагом push.allow_legacy_push_targets (1-release
-         *     WARN deprecation window).
-         *
-         *     Permission: soul.ssh-target-update; selector host=<sid>. MCP-tool:
-         *     keeper.soul.ssh-target.update (3-сегментное имя, паттерн
-         *     keeper.sigil.key.<verb> ↔ permission sigil.key-<verb>). Body несёт
-         *     полный набор полей; partial-update не поддерживается (write-NULL для
-         *     снятия target-а — отдельный DELETE-роут, не S7-1).
-         */
-        put: operations["UpdateSoulSshTarget"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/souls/{sid}/exec": {
+    "/v1/incarnations/{name}/unlock": {
         parameters: {
             query?: never;
             header?: never;
@@ -1048,129 +638,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Запустить Errand на Soul (pull-ad-hoc exec одиночного модуля).
-         * @description Permission: errand.run; selector host=<sid>. ADR-033.
-         *     Sync-первичный flow с server-cap 30s: 200 + ErrandResult если терминал
-         *     получен до cap; иначе 202 + {errand_id} + Location: /v1/errands/{errand_id},
-         *     продолжение в background-горутине до полного timeout_seconds (max 300s).
-         *     Errand НЕ мутирует incarnation.state. Whitelist модулей: жёсткий список
-         *     core.cmd.shell / core.exec.run, либо marker-интерфейс ErrandReadSafe в
-         *     sdk/module/. Проверка на Soul-side (defense-in-depth) → MODULE_NOT_ALLOWED.
+         * Снять блокирующий статус инкарнации
+         * @description error_locked / migration_failed → ready под FOR UPDATE; state не меняется (ADR-009/019). Permission incarnation.unlock.
          */
-        post: operations["ErrandExec"];
+        post: operations["unlockIncarnation"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/errands": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Errand-ов (фильтр + пагинация).
-         * @description Permission: errand.list. Read-only, без audit.
-         *     Фильтры (опционально): sid (FQDN), status, started_after (RFC3339).
-         *     Пагинация — стандартная (offset/limit). Per-row RBAC-фильтрация по
-         *     host=/coven= — slice E5 (сейчас bare-permission).
-         */
-        get: operations["ListErrands"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/errands/{errand_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Состояние одного Errand-а.
-         * @description Permission: errand.list. Read-only. 200 + ErrandResult — терминал;
-         *     202 + {status:"running"} — Errand ещё выполняется (async-poll).
-         */
-        get: operations["GetErrand"];
-        put?: never;
-        post?: never;
-        /**
-         * Отменить in-flight Errand (slice E5, ADR-033).
-         * @description Permission: errand.cancel. Best-effort: Keeper отправляет CancelErrand
-         *     Soul-у через EventStream-канал, Soul-side errandrunner отменяет ctx
-         *     активной Run-горутины → возвращает ErrandResult{CANCELLED} тем же
-         *     каналом, Keeper переводит строку errands в status=cancelled через
-         *     applybus-receiver. 204 — сигнал отправлен (финальный статус видно
-         *     через GET /v1/errands/{errand_id}). 409 — Errand уже в терминальном
-         *     статусе (нечего отменять). 404 — errand_id не найден ИЛИ целевой
-         *     Soul не подключён к кластеру (cancel-сигнал не доставлен; строка
-         *     останется running до Reaper timed_out).
-         */
-        delete: operations["CancelErrand"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/voyages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Voyage-прогонов (фильтр kind/status + пагинация).
-         * @description Permission: incarnation.history. Sort created_at DESC.
-         */
-        get: operations["ListVoyages"];
-        put?: never;
-        /**
-         * Создать Voyage — унифицированный батчевый прогон (ADR-043).
-         * @description Унифицированный батчевый прогон (kind=scenario / kind=command).
-         *     Дискриминатор `kind`:
-         *     - `scenario` — применить named scenario к набору ИНКАРНАЦИЙ (батч = N
-         *       инкарнаций, per-incarnation state-commit, B1). Target резолвится в
-         *       имена инкарнаций (incarnations[] ∪ фильтр service/coven).
-         *     - `command` — выполнить whitelisted-модуль на наборе ХОСТОВ (батч = N
-         *       хостов, state не трогается). Target резолвится в SID-snapshot (AND-merge
-         *       sids/coven/where, security invariant ADR-040 → ADR-043 §5).
-         *
-         *     RBAC-by-kind (ADR-043 §6, security-критичный fail-closed guard):
-         *     scenario→permission `incarnation.run`, command→`errand.run`. Permission
-         *     выбирается ПО kind из тела + per-incarnation scope-check (scenario);
-         *     старт на цели вне permission-скоупа = privilege escalation → 403.
-         *
-         *     Batch (Leg) = N единиц (batch_size или batch_percent — взаимоисключающие,
-         *     оба → 422); между Leg-ами — inter_batch_interval; on_failure ∈ {abort,
-         *     continue} либо fail_threshold (порог числа провалов). schedule_at →
-         *     отложенный старт (status scheduled). Async-by-default: 202 + voyage_id +
-         *     Location. Пустой резолв-target → 422 voyage_empty_target. Эффективный
-         *     batch_size (barrier) или concurrency (window) выше voyage.max_batch_size →
-         *     422 voyage_batch_size_too_large. `input` НЕ логируется (audit
-         *     scenario_run.started/command_run.invoked, инвариант A ADR-027).
-         *
-         *     Rate-limit (Tempo, ADR-050): resolver-тяжёлый create ограничен per-AID
-         *     (bucket voyage_create, default 10 rps / burst 20). Превышение → 429
-         *     tempo-exceeded + Retry-After. Будущий POST /v1/voyages/preview реюзит тот
-         *     же лимит. При недоступном Redis лимит fail-OPEN (passthrough).
-         */
-        post: operations["CreateVoyage"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/voyages/preview": {
+    "/v1/incarnations/{name}/upgrade": {
         parameters: {
             query?: never;
             header?: never;
@@ -1180,40 +658,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Dry-resolve scope Voyage без создания прогона (ADR-043 amendment §4).
-         * @description Предпоказ резолвнутого scope БЕЗ создания Voyage: принимает тот же body,
-         *     что POST /v1/voyages, прогоняет ту же валидацию / резолв target-а / гейты
-         *     (RBAC-by-kind, target ∩ Purview для command, потолок voyage.max_scope),
-         *     но НЕ пишет в voyages/voyage_targets и НЕ раскрывает SID-список — отдаёт
-         *     только числа {kind, scope_size, total_batches, batch_mode,
-         *     effective_batch_size?}.
-         *
-         *     Консистентность: preview возвращает 403/422 РОВНО там же, где Create
-         *     отказал бы (тот же общий путь). scenario — per-incarnation scope-check
-         *     (403 на чужой инкарнации); command — гибрид-семантика (явный чужой SID →
-         *     403, широкий target урезается до Purview, пустое пересечение → 422
-         *     voyage_empty_target); scope > voyage.max_scope → 422.
-         *
-         *     Учитываются (влияют на резолв/арифметику): target, kind, batch/batch_size/
-         *     batch_percent/batch_mode, concurrency, max_failures, require_alive.
-         *     Игнорируются: dry_run, schedule_at, inter_batch_interval_ms,
-         *     inter_unit_interval_ms, on_failure, input.
-         *
-         *     Назначение — late-binding target (coven/require_alive, где число хостов
-         *     резолвит Keeper); для snapshot-таргета (явный incarnations[]/sids[]) число
-         *     батчей клиент считает сам, эндпоинт не обязателен.
-         *
-         *     Rate-limit (Tempo, ADR-050(c)): тот же per-AID bucket voyage_create, что у
-         *     create (единый лимит create+preview). Превышение → 429 + Retry-After.
+         * Перевести инкарнацию на новую версию
+         * @description Sync-под-202 миграция state_schema (ADR-019) + смена service_version одной tx. Permission incarnation.upgrade.
          */
-        post: operations["PreviewVoyage"];
+        post: operations["upgradeIncarnation"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/voyages/{id}": {
+    "/v1/me/permissions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1221,492 +676,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Snapshot одного Voyage (detail + summary).
-         * @description Permission: incarnation.history. Для running-row — current_batch_index
-         *     без summary; для терминала — Summary с агрегатами.
+         * Эффективные права текущего Архонта
+         * @description Подмножество каталога, реально выданное текущему оператору (AID из JWT-claims). Auth-only (свои права видит любой аутентифицированный; чужие не отдаёт). Read-only, без audit.
          */
-        get: operations["GetVoyage"];
-        put?: never;
-        post?: never;
-        /**
-         * Отменить Voyage (pending/scheduled → cancelled, ADR-043 S5).
-         * @description RBAC-by-kind (как у create): scenario→incarnation.run, command→errand.run.
-         *     Cancel pending/scheduled — простой перевод в cancelled. Running-abort —
-         *     post-MVP (409 voyage_running_cancel_unsupported). Уже terminal — 409
-         *     voyage_already_terminal. Audit: scenario_run.cancelled/command_run.cancelled.
-         */
-        delete: operations["CancelVoyage"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/voyages/{id}/targets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * All-runs drill — единицы Voyage-прогона (ADR-043 S5).
-         * @description Permission: incarnation.history. Per-target (batch_index, status,
-         *     back-link apply_id|errand_id) для two-level drill: scenario — инкарнации
-         *     → их хосты (через apply_id); command — сразу хосты (через errand_id).
-         */
-        get: operations["ListVoyageTargets"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/cadences": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Cadence-расписаний (фильтр enabled/kind + пагинация).
-         * @description Permission: cadence.list. Sort created_at DESC.
-         */
-        get: operations["ListCadences"];
-        put?: never;
-        /**
-         * Создать Cadence — регулярный запуск Voyage по расписанию (ADR-046).
-         * @description Cadence — расписание, по времени спавнящее обычный Voyage-прогон. Тело —
-         *     рецепт прогона (kind/scenario_name|module/target/input/batch-настройки, то
-         *     же множество, что VoyageCreateRequest) + правило повторения (schedule_kind
-         *     interval|cron; interval_seconds XOR cron_expr) + overlap_policy.
-         *
-         *     Двухуровневый RBAC (ADR-046 §7, security-критичный fail-closed):
-         *     - первый уровень — cadence.create (управляет самим расписанием);
-         *     - второй уровень — Voyage-permission по kind рецепта (scenario→
-         *       incarnation.run, command→errand.run, ADR-043 §6), иначе Cadence стала бы
-         *       privilege-escalation-обходом RBAC → 403.
-         *
-         *     next_run_at вычисляется при создании. created_by_aid = JWT.sub. enabled по
-         *     умолчанию true. `input` НЕ логируется (audit cadence.created, инвариант A
-         *     ADR-027).
-         */
-        post: operations["CreateCadence"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/cadences/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Деталь одного Cadence-расписания.
-         * @description Permission: cadence.list. `input` рецепта НЕ отдаётся (инвариант A ADR-027).
-         */
-        get: operations["GetCadence"];
-        put?: never;
-        post?: never;
-        /**
-         * Снять Cadence-расписание (ADR-046 §9).
-         * @description Permission: cadence.delete. Порождённые Voyage остаются (FK
-         *     voyages.cadence_id ON DELETE SET NULL — история детей и ручные прогоны
-         *     сохраняются). Audit: cadence.deleted.
-         */
-        delete: operations["DeleteCadence"];
-        options?: never;
-        head?: never;
-        /**
-         * Обновить Cadence (рецепт / расписание / enabled-toggle, ADR-046 S4).
-         * @description Permission: cadence.update. Read-modify-write: заданные поля перезаписывают,
-         *     опущенные сохраняются. Пересчёт next_run_at при смене расписания. kind НЕ
-         *     меняется (смена kind = delete + create). Audit: cadence.updated.
-         */
-        patch: operations["PatchCadence"];
-        trace?: never;
-    };
-    "/v1/cadences/{id}/enable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Включить Cadence (возобновление расписания, ADR-046 S4).
-         * @description Permission: cadence.enable ИЛИ cadence.update (backcompat — роли со
-         *     старым cadence.update сохраняют toggle, амендмент 2026-06-02).
-         *     Lightweight toggle без перезаписи рецепта. Audit: cadence.updated.
-         */
-        post: operations["EnableCadence"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/cadences/{id}/disable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Выключить Cadence (пауза расписания, ADR-046 S4).
-         * @description Permission: cadence.disable ИЛИ cadence.update (backcompat — роли со
-         *     старым cadence.update сохраняют toggle, амендмент 2026-06-02).
-         *     Lightweight toggle без перезаписи рецепта. Audit: cadence.updated.
-         */
-        post: operations["DisableCadence"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/cadences/{id}/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Дочерние Voyage Cadence-расписания (ADR-046 §6).
-         * @description Permission: incarnation.history (read runtime-состояния прогонов, parity
-         *     Voyage-list). Voyage WHERE cadence_id=$1; reuse Voyage-DTO. Drill
-         *     «расписание → его прогоны». 404 если Cadence не существует.
-         */
-        get: operations["ListCadenceRuns"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/plugins/sigils": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список активных Sigil-допусков.
-         * @description Permission: plugin.list. MCP-tool: keeper.plugin.list (S4b).
-         *     Лента активных (не отозванных) записей allow-list-а plugin_sigils, новые
-         *     первыми. БЕЗ signature и manifest (крипто-материал / крупный JSONB).
-         */
-        get: operations["ListPluginSigils"];
-        put?: never;
-        /**
-         * Допустить плагин в allow-list Sigil.
-         * @description Permission: plugin.allow. MCP-tool: keeper.plugin.allow (S4b).
-         *     Допуск целостности плагина (ADR-026). Keeper читает ТЕКУЩИЙ бинарь +
-         *     manifest из единственного слота кеша host-а по (namespace, name) —
-         *     single-slot, ref в чтении НЕ участвует (вариант C), — подписывает блок
-         *     Sigil-а и вставляет запись в реестр plugin_sigils. `ref` —
-         *     operator-asserted метка версии (НЕ git-verified); authority целостности
-         *     — sha256 + подпись Keeper-а. 404 plugin-not-in-cache — плагина нет в
-         *     кеше; 409 sigil-already-active — активный допуск на (ns, name, ref) уже
-         *     есть (сперва revoke).
-         */
-        post: operations["AllowPluginSigil"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/plugins/sigils/{namespace}/{name}/{ref}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Отозвать Sigil-допуск.
-         * @description Permission: plugin.revoke. MCP-tool: keeper.plugin.revoke (S4b).
-         *     Мягкая ревокация активного допуска (ns, name, ref): запись остаётся в
-         *     реестре для аудита, бинарь перестаёт проходить Sigil-верификацию. 404
-         *     sigil-not-found — активной записи нет. `ref` — одиночный path-сегмент
-         *     (tag-ref вида v1.2.3); branch-ref со слешем через path в MVP не
-         *     поддерживается → 422.
-         */
-        delete: operations["RevokePluginSigil"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sigil/keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список active ключей подписи Sigil.
-         * @description Permission: sigil.key-list. MCP-tool: keeper.sigil.key.list (R3). Active
-         *     trust-anchor-ключи подписи (primary первым). БЕЗ vault_ref (внутренняя
-         *     ссылка на приватник).
-         */
-        get: operations["ListSigilKeys"];
-        put?: never;
-        /**
-         * Ввести новый ключ подписи Sigil.
-         * @description Permission: sigil.key-introduce. MCP-tool: keeper.sigil.key.introduce
-         *     (ADR-026(h), R3). Keeper генерирует ed25519-пару, пишет приватник в Vault
-         *     KV и вставляет публичную часть (SPKI) в реестр sigil_signing_keys как
-         *     active trust-anchor. Ответ несёт key_id + pubkey_pem — приватник НИКОГДА
-         *     не возвращается (security-инвариант ADR-026(d)). make_primary=true делает
-         *     ключ primary (новые Sigil-ы подписываются им). После ввода кластер
-         *     re-load-ит набор якорей (`sigil:anchors-changed`). 409
-         *     sigil-key-concurrent-change — гонка установки primary (retry).
-         */
-        post: operations["IntroduceSigilKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sigil/keys/{key_id}/primary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Сделать ключ подписи primary.
-         * @description Permission: sigil.key-set-primary. MCP-tool: keeper.sigil.key.set-primary
-         *     (R3). Делает active-ключ primary — новые Sigil-ы подписываются им после
-         *     cluster reload. 404 sigil-key-not-found — ключа нет; 409
-         *     sigil-key-concurrent-change — гонка primary либо ключ retired.
-         */
-        post: operations["SetPrimarySigilKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/sigil/keys/{key_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Вывести ключ подписи из набора.
-         * @description Permission: sigil.key-retire. MCP-tool: keeper.sigil.key.retire (R3).
-         *     Выводит trust-anchor-ключ (Soul забывает его при следующем
-         *     SigilTrustAnchors). 404 sigil-key-not-found — active-записи нет; 409
-         *     sigil-key-last-active — последний active-ключ (набор не должен опустеть);
-         *     409 sigil-key-primary — primary напрямую (сперва set-primary другому).
-         */
-        delete: operations["RetireSigilKey"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/services": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Service-ов.
-         * @description Permission: service.list. MCP-tool: keeper.service.list.
-         *     Реестр зарегистрированных Service-ов (sort name ASC).
-         */
-        get: operations["ListServices"];
-        put?: never;
-        /**
-         * Зарегистрировать Service.
-         * @description Permission: service.register. MCP-tool: keeper.service.register
-         *     (ADR-028-паттерн RBAC-storage). Создаёт запись в реестре
-         *     service_registry (git-источник + ref + опц. авто-refresh). 409
-         *     service-already-exists — name занят; 404 not-found — AID создателя
-         *     отсутствует в реестре operators (FK).
-         */
-        post: operations["RegisterService"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/services/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Получить Service.
-         * @description Permission: service.list. MCP-tool: keeper.service.list (одно
-         *     permission покрывает list и get). Читает одну запись реестра по имени.
-         *     404 not-found — записи нет.
-         */
-        get: operations["GetService"];
-        put?: never;
-        post?: never;
-        /**
-         * Удалить Service из реестра.
-         * @description Permission: service.deregister. MCP-tool: keeper.service.deregister.
-         *     Удаляет запись реестра по имени. 404 not-found — записи нет.
-         */
-        delete: operations["DeregisterService"];
-        options?: never;
-        head?: never;
-        /**
-         * Обновить Service.
-         * @description Permission: service.update. MCP-tool: keeper.service.update.
-         *     Replace-семантика mutable-полей (git/ref/refresh); name — ключ, не
-         *     меняется. 404 not-found — записи нет либо AID правщика отсутствует в
-         *     operators (FK).
-         */
-        patch: operations["UpdateService"];
-        trace?: never;
-    };
-    "/v1/services/{name}/refs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список git-tag-ов и branch-ей Service-а.
-         * @description Permission: service.list. Возвращает доступные git-ref-ы remote-
-         *     репозитория Service-а (tags + branches с commit-hash-ом и пометкой
-         *     дефолтной ветки) для UI Upgrade-modal dropdown. Кеш на стороне Keeper-а
-         *     — TTL 60s (per-Keeper, не cluster-wide). Tags сортируются semver desc
-         *     (валидный semver выше lex; pre-release ниже release); branches —
-         *     default first, остальные lex asc. Read-only, без audit. 502 bad-gateway
-         *     — внешний git-источник не ответил (DNS / auth / неподдерживаемая схема).
-         */
-        get: operations["ListServiceRefs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/services/{name}/scenarios": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список scenario из git-репо Service-а.
-         * @description Permission: service.list. Возвращает список scenario-метаданных из
-         *     материализованного снапшота git-репо Service-а (`scenario/<name>/main.yml`)
-         *     для UI Run-modal dropdown «Choose scenario». Параметр `?ref=<git-ref>`
-         *     опционален: по умолчанию используется ref из реестра Service-а; UI может
-         *     переопределить, чтобы посмотреть scenario конкретной версии до Upgrade.
-         *     Сортировка alphabetical asc. Невалидный YAML / отсутствующий `main.yml`
-         *     в одной из scenario-папок не ломает listing остальных (partial-success).
-         *     Кеш на стороне Keeper-а — TTL 60s, ключ (name, ref). Read-only, без
-         *     audit. 502 bad-gateway — loader упал (git-clone / парсинг манифеста).
-         */
-        get: operations["ListServiceScenarios"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/services/{name}/state-schema": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * state_schema-метаданные сервиса (для UI Schema explorer-а).
-         * @description Permission: service.list. Возвращает state_schema-метаданные сервиса
-         *     из материализованного снапшота git-репо Service-а:
-         *     `state_schema_version` (текущая версия структуры `incarnation.state`),
-         *     опциональная декларация структуры (`service.yml::state_schema:`, MVP
-         *     подмножество JSON Schema — type/required/properties/items/
-         *     additionalProperties), и плоский список миграций
-         *     `migrations/<NNN>_to_<MMM>.yml` (metadata-only: from/to/path; content
-         *     DSL не парсится). Параметр `?ref=<git-ref>` опционален: по умолчанию
-         *     используется ref из реестра Service-а. Сортировка миграций — by `to`
-         *     ASC. Кеш на стороне Keeper-а — TTL 60s, ключ (name, ref). Read-only,
-         *     без audit. 502 bad-gateway — loader упал (git-clone / парсинг
-         *     манифеста / scan migrations).
-         */
-        get: operations["ListServiceStateSchema"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/services/{name}/dependencies": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * git-зависимости сервиса (destiny + modules, для UI Service Detail).
-         * @description Permission: service.list. Возвращает git-зависимости сервиса из
-         *     материализованного снапшота git-репо Service-а: задекларированные в
-         *     `service.yml` destiny-кирпичики (`destiny:`) и custom-модули
-         *     (`modules:`), каждый со своим git-ref-ом (ADR-007: версия = git
-         *     tag/branch). Поле `git` присутствует только при per-entry override
-         *     полного URL (поддержан лишь для destiny[]). Content самих
-         *     destiny/модулей НЕ грузится — только `{name, ref}`. Параметр
-         *     `?ref=<git-ref>` опционален: по умолчанию используется ref из реестра
-         *     Service-а. Кеш на стороне Keeper-а — TTL 60s, ключ (name, ref).
-         *     Read-only, без audit. 502 bad-gateway — loader упал (git-clone /
-         *     парсинг манифеста).
-         */
-        get: operations["ListServiceDependencies"];
+        get: operations["listMyPermissions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,17 +696,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Каталог доступных модулей (core + активные plugin).
-         * @description Permission: service.list. Каталог модулей для UI Run→Command module-
-         *     search (замена free-text «custom module»). Два источника:
-         *     core — статическая doc-таблица (имя/описание/state-ы/errand-safe; params
-         *     пусты — input-схема core не формализована), plugin — активные (не
-         *     отозванные) записи plugin_sigils с params из manifest `spec.states[*].
-         *     input`. Выдача отсортирована по name. Read-only, без audit (паттерн
-         *     service.list / plugin.list). Опц. фильтр `?errand_safe=true` — только
-         *     модули с хотя бы одним errand-safe state (для Run→Command whitelist).
+         * Каталог модулей
+         * @description Доступные для прогона модули (core + активные plugin) + input-метаданные (ADR-045). Опц. фильтр errand_safe. Permission service.list. Read-only, без audit.
          */
-        get: operations["ListModules"];
+        get: operations["listModules"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1750,13 +716,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Деталь одного модуля по полному имени.
-         * @description Permission: service.list. Возвращает запись каталога по полному имени
-         *     без state-суффикса (`core.cmd` / `official.postgres-user`). 404 — модуля
-         *     нет в каталоге (core-таблица или активные plugin-допуски). Read-only,
-         *     без audit.
+         * Карточка модуля
+         * @description Деталь одного модуля по полному имени (ADR-045). Permission service.list. Read-only, без audit.
          */
-        get: operations["GetModule"];
+        get: operations["getModule"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1775,10 +738,94 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Resolve UI-form source catalog to live SIDs (ADR-045 S3)
-         * @description Резолвер source-каталогов UI-формы модуля. По source (incarnation_hosts / choir) возвращает живые SID-ы для автокомплита поля формы. Cluster-wide (по реестру souls), prefix-фильтр + жёсткий cap (truncated=true при упоре в cap). Permission incarnation.run (подготовка прогона Run→Command).
+         * Резолв source-каталога формы модуля
+         * @description Живые SID-ы под source-поля UI-формы Run→Command (ADR-045 S3). Permission incarnation.run. Read-only-резолв, без audit.
          */
         post: operations["moduleFormPrep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Архонтов (paged + фильтры)
+         * @description Реестр операторов с фильтрами (auth_method enum, revoked) и пагинацией. Permission operator.list. Read-only, без audit.
+         */
+        get: operations["listOperators"];
+        put?: never;
+        /**
+         * Создать Архонта
+         * @description Создаёт оператора (Archon) + опц. atomic-grant ролей (ADR-013/014). Permission operator.create. 409 — AID занят. Возвращает JWT один раз.
+         */
+        post: operations["createOperator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Архонта
+         * @description Метаданные одного оператора по AID. Permission operator.list (read покрыт list-правом). Read-only, без audit.
+         */
+        get: operations["getOperator"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}/issue-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Выпустить новый JWT Архонту
+         * @description Выпускает свежий JWT существующему оператору (ADR-014). Permission operator.issue-token. 409 — оператор revoked. Возвращает JWT один раз.
+         */
+        post: operations["issueOperatorToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Отозвать Архонта
+         * @description Ставит operators.revoked_at (ADR-014). Permission operator.revoke. 409 — последний cluster-admin (self-lockout-защита) либо уже revoked.
+         */
+        post: operations["revokeOperator"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1793,18 +840,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Каталог RBAC-permissions (источник правды — rbac.catalog.go).
-         * @description RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
-         *     каталог самоописывающий (требование права на чтение списка прав даёт
-         *     курицу-яйцо). Назначение — UI назначения прав роли (`PATCH /v1/roles/
-         *     {name}/permissions`): UI фетчит реальные имена из каталога вместо
-         *     хардкода. Сгруппировано по resource (сортировка по resource, внутри —
-         *     по action). Read-only, без audit (паттерн health/meta).
-         *
-         *     selector_keys — ОБЩИЙ список допустимых ключей скоупа (service / coven /
-         *     incarnation / host): per-permission-метаданных скоупа в каталоге MVP нет.
+         * Каталог RBAC-permissions
+         * @description Машиночитаемый каталог `<resource>.<action>` (источник rbac.catalog.go), сгруппированный по resource. Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
          */
-        get: operations["ListPermissions"];
+        get: operations["listPermissions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1813,7 +852,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/permissions": {
+    "/v1/plugins/sigils": {
         parameters: {
             query?: never;
             header?: never;
@@ -1821,146 +860,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Эффективные права текущего Архонта (permission-aware UI).
-         * @description RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
-         *     эндпоинт само-описывающий «свои права» (любой аутентифицированный видит
-         *     ИМЕННО СВОИ права; чужие не отдаёт — AID берётся из JWT-claims, не из
-         *     query). Отличие от `GET /v1/permissions`: тот отдаёт ВЕСЬ каталог
-         *     возможных прав, этот — ПОДМНОЖЕСТВО, реально выданное оператору
-         *     (распаковка его ролей).
-         *
-         *     Назначение — permission-aware UI (показывать/прятать кнопки по «можно ли
-         *     resource.action [в каком scope]»). wildcard=true → cluster-admin (можно
-         *     всё, resource/action/scope не несутся). Иначе resource.action + scope-
-         *     сводка (unrestricted / covens / regex / soulprint). Read-only, без audit.
+         * Список активных Sigil-ов
+         * @description Лента активных допусков плагинов (без signature/manifest, ADR-026 S4a). Permission plugin.list. Read-only, без audit.
          */
-        get: operations["ListMyPermissions"];
+        get: operations["listPluginSigils"];
         put?: never;
-        post?: never;
+        /**
+         * Допустить плагин (Sigil)
+         * @description Заносит (namespace,name,ref) в allow-list целостности плагинов с подписью SHA-256 (ADR-026 S4a). Permission plugin.allow. 404 — плагина нет в кеше host-а. 409 — допуск уже активен.
+         */
+        post: operations["allowPluginSigil"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/event-types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Каталог event-types, допустимых для подписки Tiding (ADR-052(b)).
-         * @description RBAC: только аутентификация (валидный JWT), БЕЗ отдельной permission —
-         *     каталог самоописывающий (паттерн `GET /v1/permissions` / `GET /v1/modules`).
-         *     Назначение — UI Tiding-формы (`POST /v1/tidings`): UI фетчит допустимые
-         *     event-types из каталога вместо хардкода (ADR-042). Источник правды —
-         *     keeper/internal/herald/eventtypes.go (один и тот же scope валидирует CRUD
-         *     Tiding): расширение scope амендом ADR-052 автоматически отражается здесь.
-         *
-         *     Две группы: areas — области, на которые допустима area-glob-подписка
-         *     (`scenario_run.*`); point_events — точечные типы вне area-glob, допустимые
-         *     целиком (`incarnation.run_completed`). Read-only, без audit (паттерн
-         *     health/meta / permission-каталог).
-         */
-        get: operations["ListEventTypes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/augur/omens": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Omen-ов.
-         * @description Permission: omen.list. MCP-tool: keeper.augur.omen.list.
-         *     Реестр Omen-ов (sort created_at DESC, name ASC; offset/limit).
-         */
-        get: operations["ListOmens"];
-        put?: never;
-        /**
-         * Создать Omen.
-         * @description Permission: omen.create. MCP-tool: keeper.augur.omen.create (ADR-025).
-         *     Создаёт запись в реестре omens (внешняя система vault/prometheus/elk +
-         *     endpoint + auth_ref — vault-ref на master-cred, не сам секрет). 409
-         *     omen-already-exists — name занят; 422 validation-failed — битый
-         *     name/source_type/endpoint/auth_ref.
-         */
-        post: operations["CreateOmen"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/augur/omens/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Получить Omen.
-         * @description Permission: omen.list. MCP-tool: keeper.augur.omen.list (одно permission
-         *     покрывает list и get). Читает одну запись по имени. 404 not-found —
-         *     записи нет.
-         */
-        get: operations["GetOmen"];
-        put?: never;
-        post?: never;
-        /**
-         * Удалить Omen.
-         * @description Permission: omen.delete. MCP-tool: keeper.augur.omen.delete.
-         *     Удаляет Omen по имени; каскадно убирает связанные Rite-ы (ON DELETE
-         *     CASCADE). 404 not-found — записи нет.
-         */
-        delete: operations["DeleteOmen"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/augur/rites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список Rite-ов Omen-а.
-         * @description Permission: rite.list. MCP-tool: keeper.augur.rite.list.
-         *     Rite-ы одного Omen-а (фильтр omen ОБЯЗАТЕЛЕН; sort created_at DESC,
-         *     id ASC). 422 validation-failed — omen не передан / битый.
-         */
-        get: operations["ListRites"];
-        put?: never;
-        /**
-         * Создать Rite.
-         * @description Permission: rite.create. MCP-tool: keeper.augur.rite.create (ADR-025).
-         *     Создаёт grant: субъект (coven XOR sid) × omen → allow-list + delegate +
-         *     опц. token_ttl/token_num_uses (только vault-delegate). 404 not-found —
-         *     Omen не существует; 422 validation-failed — нарушение XOR / битый allow /
-         *     token-поля.
-         */
-        post: operations["CreateRite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/augur/rites/{id}": {
+    "/v1/plugins/sigils/{namespace}/{name}/{ref}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1971,17 +887,16 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Удалить Rite.
-         * @description Permission: rite.delete. MCP-tool: keeper.augur.rite.delete.
-         *     Удаляет Rite по суррогатному id. 404 not-found — записи нет.
+         * Отозвать Sigil
+         * @description Снимает активный допуск (namespace,name,ref) из allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — активной записи нет.
          */
-        delete: operations["DeleteRite"];
+        delete: operations["revokePluginSigil"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/vigils": {
+    "/v1/push-providers": {
         parameters: {
             query?: never;
             header?: never;
@@ -1989,28 +904,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Vigil-ов.
-         * @description Permission: vigil.list. MCP-tool: keeper.oracle.vigil.list.
-         *     Реестр Vigil-ов (sort created_at DESC, name ASC; offset/limit).
+         * Список Push-Provider-ов (paged)
+         * @description Реестр Push-Provider-ов с пагинацией и фильтром name_pattern (ADR-032 S7-2). Permission push-provider.list. Read-only, без audit.
          */
-        get: operations["ListVigils"];
+        get: operations["listPushProviders"];
         put?: never;
         /**
-         * Создать Vigil.
-         * @description Permission: vigil.create. MCP-tool: keeper.oracle.vigil.create (ADR-030).
-         *     Создаёт запись в реестре vigils (Soul-side проверка: check — адрес
-         *     core-beacon + interval + субъект coven XOR sid). Read-only по конструкции
-         *     (наблюдает, не мутирует хост). 409 vigil-already-exists — name занят;
-         *     422 validation-failed — битый name/interval/check/субъект.
+         * Создать Push-Provider
+         * @description Заносит Push-Provider (per-provider env-payload, ADR-032 S7-2). Permission push-provider.create. 409 — name занят. sensitive-ключи обязаны быть vault-refs.
          */
-        post: operations["CreateVigil"];
+        post: operations["createPushProvider"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/vigils/{name}": {
+    "/v1/push-providers/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2018,27 +928,27 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Получить Vigil.
-         * @description Permission: vigil.list. MCP-tool: keeper.oracle.vigil.list (одно
-         *     permission покрывает list и get). Читает одну запись по имени. 404
-         *     not-found — записи нет.
+         * Карточка Push-Provider-а
+         * @description Метаданные одного Push-Provider-а по имени (ADR-032 S7-2). Permission push-provider.read. Read-only, без audit.
          */
-        get: operations["GetVigil"];
-        put?: never;
+        get: operations["getPushProvider"];
+        /**
+         * Заменить params Push-Provider-а
+         * @description Replace-семантика: params полностью заменяет существующий набор (ADR-032 S7-2). Permission push-provider.update. 404 — записи нет.
+         */
+        put: operations["updatePushProvider"];
         post?: never;
         /**
-         * Удалить Vigil.
-         * @description Permission: vigil.delete. MCP-tool: keeper.oracle.vigil.delete.
-         *     Удаляет Vigil по имени (перестаёт раздаваться хостам в VigilSnapshot;
-         *     Decree-ы НЕ каскадятся). 404 not-found — записи нет.
+         * Удалить Push-Provider
+         * @description Удаляет запись Push-Provider-а (ADR-032 S7-2). Permission push-provider.delete. 404 — записи нет.
          */
-        delete: operations["DeleteVigil"];
+        delete: operations["deletePushProvider"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/decrees": {
+    "/v1/push-runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -2046,51 +956,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Decree-ов.
-         * @description Permission: decree.list. MCP-tool: keeper.oracle.decree.list.
-         *     Реестр Decree-ов (sort created_at DESC, name ASC; offset/limit).
+         * Список push-прогонов (paged)
+         * @description Глобальный реестр push-прогонов с фильтрами status/ssh_provider и пагинацией (UI-4). Permission incarnation.history. Read-only, без audit.
          */
-        get: operations["ListDecrees"];
+        get: operations["listPushRuns"];
         put?: never;
-        /**
-         * Создать Decree.
-         * @description Permission: decree.create. MCP-tool: keeper.oracle.decree.create (ADR-030).
-         *     Создаёт правило reactor: on_beacon (Vigil) × субъект (coven XOR sid) ×
-         *     incarnation_name → action_scenario (named, whitelist) + опц. where-CEL
-         *     предикат над event.data + cooldown. Default-deny. 409 decree-already-exists
-         *     — name занят; 422 validation-failed — битый name/on_beacon/incarnation_name/
-         *     action_scenario/субъект/where-CEL/cooldown.
-         */
-        post: operations["CreateDecree"];
+        post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/decrees/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Получить Decree.
-         * @description Permission: decree.list. MCP-tool: keeper.oracle.decree.list (одно
-         *     permission покрывает list и get). Читает одну запись по имени. 404
-         *     not-found — записи нет.
-         */
-        get: operations["GetDecree"];
-        put?: never;
-        post?: never;
-        /**
-         * Удалить Decree.
-         * @description Permission: decree.delete. MCP-tool: keeper.oracle.decree.delete.
-         *     Удаляет Decree по имени; каскадно чистит cooldown-state (oracle_fires,
-         *     ON DELETE CASCADE). 404 not-found — записи нет.
-         */
-        delete: operations["DeleteDecree"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2106,11 +978,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Push-прогон Destiny по SSH.
-         * @description Permission: push.apply. MCP-tool: keeper.push.apply.
-         *     Async-операция. Полная модель — docs/keeper/push.md.
+         * Запустить push-прогон Destiny по SSH
+         * @description Async push-orchestrator (Variant C, ADR-004 push-flow). 202 + apply_id, далее опрос GET /v1/push/{apply_id}. Permission push.apply. Блокируется Toll при cluster:degraded (503).
          */
-        post: operations["PushApply"];
+        post: operations["pushApply"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2125,12 +996,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Состояние push-прогона.
-         * @description Permission: push.read. Variant C orchestrator (docs/keeper/push.md): read-endpoint
-         *     push_runs-записи. Возвращает status + summary (per-host исходы для терминальных
-         *     статусов). MCP-tool отсутствует (опрос через REST).
+         * Состояние push-прогона
+         * @description Текущее состояние push-прогона по apply_id (ADR-004 push-flow). Permission push.read. Read-only, без audit (recovery-friendly при degraded).
          */
-        get: operations["PushGet"];
+        get: operations["pushGet"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2139,7 +1008,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/push-runs": {
+    "/v1/roles": {
         parameters: {
             query?: never;
             header?: never;
@@ -2147,23 +1016,103 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Глобальный список push-прогонов (UI-4 Push-runs page).
-         * @description Permission: incarnation.history (push — это history-info; permission
-         *     переиспользуется; отдельная permission `push.list` не вводится до
-         *     запроса оператора). Сортировка `started_at DESC` (свежие первыми).
-         *
-         *     Per-id detail (с полным `summary.hosts[]`) — `GET /v1/push/{apply_id}`.
+         * Список ролей
+         * @description Каталог RBAC-ролей с развёрнутыми permissions и составом операторов (ADR-022). Permission role.list. Read-only, без audit.
          */
-        get: operations["ListPushRuns"];
+        get: operations["listRoles"];
         put?: never;
-        post?: never;
+        /**
+         * Создать роль
+         * @description Создаёт RBAC-роль с набором permissions (ADR-022). Permission role.create. 409 — name уже занят.
+         */
+        post: operations["createRole"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/push-providers": {
+    "/v1/roles/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Удалить роль
+         * @description Удаляет RBAC-роль каскадом (permissions + membership). Permission role.delete. 409 — builtin/last-admin.
+         */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roles/{name}/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Привязать оператора к роли
+         * @description Идемпотентно (повтор — no-op). Permission role.grant-operator. 404 — роль/оператор не найдены.
+         */
+        post: operations["grantRoleOperator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roles/{name}/operators/{aid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Отвязать оператора от роли
+         * @description Снимает membership-строку (name, aid). Permission role.revoke-operator. 409 — last-admin lock-out.
+         */
+        delete: operations["revokeRoleOperator"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roles/{name}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Заменить permissions роли
+         * @description Replace-семантика: набор полностью заменяет существующий (ADR-022). Permission role.update. 409 — builtin/last-admin.
+         */
+        patch: operations["updateRolePermissions"];
+        trace?: never;
+    };
+    "/v1/services": {
         parameters: {
             query?: never;
             header?: never;
@@ -2171,57 +1120,23 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Перечислить Push-Provider-ов.
-         * @description Permission push-provider.list. Сортировка updated_at DESC.
+         * Список Service-ов
+         * @description Реестр Service-ов (sort name ASC, ADR-028). Permission service.list. Read-only, без audit.
          */
-        get: operations["ListPushProviders"];
+        get: operations["listServices"];
         put?: never;
         /**
-         * Создать запись Push-Provider-а (env-payload params SSH-плагина).
-         * @description ADR-032 amendment 2026-05-26, S7-2. Long-term canon вместо
-         *     keeper.yml::push.providers[] (pilot S6 / S7-1). Sensitive params
-         *     (secret_id/token/password/private_key) ОБЯЗАНЫ быть vault-refs
-         *     (vault:<path>). После commit-а — cluster-wide invalidate через Redis
-         *     pub/sub `push-providers:changed`. Permission: push-provider.create.
+         * Зарегистрировать Service
+         * @description Заносит Service в реестр service_registry (ADR-028). Permission service.register. 409 — name занят. 404 — caller AID отсутствует в реестре операторов.
          */
-        post: operations["CreatePushProvider"];
+        post: operations["registerService"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/push-providers/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        /**
-         * Прочитать одну запись Push-Provider-а.
-         * @description Permission push-provider.read.
-         */
-        get: operations["GetPushProvider"];
-        /**
-         * Заменить params Push-Provider-а (replace-семантика).
-         * @description Permission push-provider.update. Sensitive-инвариант тот же, что у create.
-         */
-        put: operations["UpdatePushProvider"];
-        post?: never;
-        /**
-         * Удалить запись Push-Provider-а.
-         * @description Permission push-provider.delete.
-         */
-        delete: operations["DeletePushProvider"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/heralds": {
+    "/v1/services/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2229,57 +1144,457 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Перечислить Herald-каналы.
-         * @description Permission herald.list. Сортировка updated_at DESC, name ASC.
+         * Карточка Service-а
+         * @description Метаданные одной записи реестра по имени (ADR-028). Permission service.list. Read-only, без audit.
          */
-        get: operations["ListHeralds"];
+        get: operations["getService"];
         put?: never;
+        post?: never;
         /**
-         * Создать Herald (канал доставки уведомлений).
-         * @description ADR-052, S4. Herald — куда слать уведомления о событиях прогонов
-         *     (webhook-канал в MVP). config для webhook — { url, опц. headers };
-         *     SSRF-контур взведён по умолчанию (https-only + deny приватных IP),
-         *     снимается per-Herald opt-out-флагами config.http_allowed /
-         *     config.allow_private. secret_ref (опц.) — vault-ref на signing-token:
-         *     при заданном секрете webhook-доставка подписывает тело заголовком
-         *     X-SoulStack-Signature в форме `sha256=<hex>` (HMAC-SHA256). Permission:
-         *     herald.create.
+         * Удалить Service из реестра
+         * @description Удаляет запись реестра по имени + инвалидирует кеши (ADR-028). Permission service.deregister. 404 — записи нет.
          */
-        post: operations["CreateHerald"];
+        delete: operations["deregisterService"];
+        options?: never;
+        head?: never;
+        /**
+         * Обновить Service (replace mutable-полей)
+         * @description Replace-семантика git/ref/refresh, name immutable (ADR-028). Permission service.update. 404 — записи нет.
+         */
+        patch: operations["updateService"];
+        trace?: never;
+    };
+    "/v1/services/{name}/dependencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * git-зависимости Service-а
+         * @description Задекларированные в service.yml destiny-кирпичики + custom-модули со своими git-ref-ами для UI Service Detail (ADR-007/028). Permission service.list. Read-only, без audit. 502 — loader упал.
+         */
+        get: operations["listServiceDependencies"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/heralds/{name}": {
+    "/v1/services/{name}/refs": {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                name: string;
-            };
+            path?: never;
             cookie?: never;
         };
         /**
-         * Прочитать один Herald-канал.
-         * @description Permission herald.read.
+         * git-tag-и + branch-и Service-а
+         * @description Список git-ref-ов remote-репозитория Service-а для UI Upgrade-modal (ADR-028). Permission service.list. Read-only, без audit. 502 — git-источник unreachable.
          */
-        get: operations["GetHerald"];
+        get: operations["listServiceRefs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/services/{name}/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         /**
-         * Заменить Herald-канал (replace-семантика).
-         * @description Permission herald.update. Replace: тело полностью заменяет mutable-поля
-         *     (type/config/secret_ref/enabled); name (PK) immutable. SSRF-инвариант
-         *     тот же, что у create. Как у Push-Provider — PUT (полная замена), не PATCH.
+         * scenario из снапшота Service-репо
+         * @description Список scenario из материализованного снапшота git-репо Service-а для UI Run-modal (ADR-028). Permission service.list. Read-only, без audit. 502 — loader упал.
          */
-        put: operations["UpdateHerald"];
+        get: operations["listServiceScenarios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/services/{name}/state-schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * state_schema-метаданные Service-а
+         * @description state_schema-версия + декларация структуры + цепочка миграций (metadata-only) для UI Schema explorer (ADR-019/028). Permission service.list. Read-only, без audit. 502 — loader упал.
+         */
+        get: operations["listServiceStateSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sigil/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список active-ключей подписи Sigil
+         * @description Active trust-anchor-ключи подписи (primary первым, без vault_ref, ADR-026(h)). Permission sigil.key-list. Read-only, без audit.
+         */
+        get: operations["listSigilKeys"];
+        put?: never;
+        /**
+         * Ввести ключ подписи Sigil
+         * @description Генерирует ed25519-пару, пишет приватник в Vault, вводит публичную часть в реестр trust-anchor-ов (ADR-026(h)). Permission sigil.key-introduce. Возвращает pubkey, НЕ приватник.
+         */
+        post: operations["introduceSigilKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sigil/keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post?: never;
         /**
-         * Удалить Herald-канал.
-         * @description Permission herald.delete. Каскадно сносит связанные Tiding-подписки
-         *     (tidings.herald ON DELETE CASCADE).
+         * Вывести ключ подписи из active
+         * @description Помечает ключ retired (ADR-026(h)). Permission sigil.key-retire. 404 — active-записи нет; 409 — последний active либо primary (сперва SetPrimary другому).
          */
-        delete: operations["DeleteHerald"];
+        delete: operations["retireSigilKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sigil/keys/{key_id}/primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Сделать ключ подписи primary
+         * @description Назначает active-ключ primary (новые Sigil-ы подписываются им, ADR-026(h)). Permission sigil.key-set-primary. 404 — ключа нет; 409 — retired/гонка.
+         */
+        post: operations["setPrimarySigilKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Soul-ов (paged, scoped)
+         * @description Реестр souls со scoped-видимостью (ADR-047) и фильтрами coven/status/transport. offset-fast-path либо keyset (режим выбирает сервер из Purview). Permission soul.list. Read-only, без audit.
+         */
+        get: operations["listSouls"];
+        put?: never;
+        /**
+         * Зарегистрировать Soul
+         * @description Онбординг хоста в реестр souls (status: pending). Для transport=agent выпускается bootstrap-токен. Permission soul.create. 409 — SID занят.
+         */
+        post: operations["createSoul"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/coven": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Массовое назначение Coven-меток
+         * @description Bulk append/remove одной метки либо replace набора на хостах под selector ∩ scope (ADR-008). Permission soul.coven-assign. partial → 200 status:partial.
+         */
+        post: operations["assignSoulCoven"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Soul-а
+         * @description Одна строка реестра souls для detail-page (ADR-047 scoped). Permission soul.list. Вне scope → 404. Read-only, без audit.
+         */
+        get: operations["getSoul"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/{sid}/exec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Запустить Errand на Soul-е
+         * @description Pull-ad-hoc exec модуля на одном хосте (ADR-033). 200 sync (терминал до server-cap 30s) либо 202 + Location async-escalation. Permission errand.run. 404 — Soul не подключён.
+         */
+        post: operations["ErrandExec"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/{sid}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * История прогонов Soul-а (paged)
+         * @description Per-host timeline (scenario apply_runs + ad-hoc errands) со scope-гейтом. Permission soul.list. Read-only, без audit.
+         */
+        get: operations["getSoulHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/{sid}/issue-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Перевыпустить bootstrap-токен
+         * @description Повторная выписка bootstrap-токена для transport=agent (?force=true истекает активный). Permission soul.issue-token. 409 — активный токен без force.
+         */
+        post: operations["issueSoulToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/{sid}/soulprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Soulprint Soul-а
+         * @description Последний typed-SoulprintReport (ADR-018) со scope-гейтом. Permission soul.list. 410 — soulprint ни разу не приходил. Read-only, без audit.
+         */
+        get: operations["getSoulprint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/{sid}/ssh-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Обновить SSH-реквизиты Soul-а
+         * @description Per-host SSH-реквизиты push-flow (ADR-032 S7-1). Replace-семантика (полный набор). Permission soul.ssh-target-update. 404 — нет soul.
+         */
+        put: operations["updateSoulSSHTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Synod-групп
+         * @description Каталог Synod-групп с bundle ролей и составом членов (ADR-049). Permission synod.list. Read-only, без audit.
+         */
+        get: operations["listSynods"];
+        put?: never;
+        /**
+         * Создать Synod-группу
+         * @description Заносит Synod-группу (группа архонов, bundle ролей) в реестр (ADR-049). Permission synod.create. 409 — name занят.
+         */
+        post: operations["createSynod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Удалить Synod-группу
+         * @description Удаляет Synod каскадно (membership + bundle, ADR-049). Permission synod.delete. 409 — builtin/last-admin lock-out.
+         */
+        delete: operations["deleteSynod"];
+        options?: never;
+        head?: never;
+        /**
+         * Обновить описание Synod-группы
+         * @description Меняет ТОЛЬКО description (name immutable, ADR-049 amend). Permission synod.update. 404 — записи нет.
+         */
+        patch: operations["updateSynod"];
+        trace?: never;
+    };
+    "/v1/synods/{name}/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Добавить архонта в Synod-группу
+         * @description Член получает весь bundle ролей группы (ADR-049). Идемпотентно. Permission synod.add-operator. 403 — least-privilege.
+         */
+        post: operations["addSynodOperator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/operators/{aid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Убрать архонта из Synod-группы
+         * @description Снимает membership-строку (name, aid). Permission synod.remove-operator. 409 — last-admin lock-out.
+         */
+        delete: operations["removeSynodOperator"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Добавить роль в bundle Synod-группы
+         * @description Все члены группы получают эффективные права роли (ADR-049). Идемпотентно. Permission synod.grant-role. 403 — least-privilege.
+         */
+        post: operations["grantSynodRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/synods/{name}/roles/{role_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Снять роль из bundle Synod-группы
+         * @description Права роли снимаются у всех членов группы (ADR-049). Permission synod.revoke-role. 409 — last-admin lock-out.
+         */
+        delete: operations["revokeSynodRole"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2293,25 +1608,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Перечислить Tiding-правила.
-         * @description Permission tiding.list. Сортировка updated_at DESC, name ASC.
-         *     По умолчанию отдаются ТОЛЬКО постоянные правила (ephemeral=false):
-         *     разовые правила (ADR-052(g), привязанные к одному прогону) — деталь
-         *     реализации, не предмет управления оператором. include_ephemeral=true
-         *     возвращает все правила (отладка).
+         * Список Tiding-правил (paged)
+         * @description Реестр Tiding-правил с пагинацией (ADR-052). Permission tiding.list. По умолчанию скрывает разовые (include_ephemeral=true отдаёт все). Read-only, без audit.
          */
-        get: operations["ListTidings"];
+        get: operations["listTidings"];
         put?: never;
         /**
-         * Создать Tiding (правило подписки на уведомления).
-         * @description ADR-052, S4. Tiding — на что реагировать → каким Herald-ом. event_types —
-         *     непустой список audit-event-types с area-glob (scenario_run.*) в scope
-         *     прогонов (scenario_run / command_run / voyage / cadence + точечный
-         *     incarnation.drift_checked); произвольный wildcard запрещён. herald — FK
-         *     на существующий Herald: ссылка на отсутствующий канал → 404. Permission:
-         *     tiding.create.
+         * Создать Tiding-правило
+         * @description Заносит постоянное Tiding-правило подписки (ADR-052). Permission tiding.create. 404 — Herald-канал не существует. 409 — name занят.
          */
-        post: operations["CreateTiding"];
+        post: operations["createTiding"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2322,29 +1628,161 @@ export interface paths {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                name: string;
-            };
+            path?: never;
             cookie?: never;
         };
         /**
-         * Прочитать одно Tiding-правило.
-         * @description Permission tiding.read.
+         * Карточка Tiding-правила
+         * @description Метаданные одного Tiding-правила по имени (ADR-052). Permission tiding.read. Read-only, без audit.
          */
-        get: operations["GetTiding"];
+        get: operations["getTiding"];
         /**
-         * Заменить Tiding-правило (replace-семантика).
-         * @description Permission tiding.update. Replace: тело полностью заменяет mutable-поля;
-         *     name (PK) immutable. FK на отсутствующий herald → 404. Как у
-         *     Push-Provider — PUT (полная замена), не PATCH.
+         * Обновить Tiding-правило (replace)
+         * @description Replace-семантика: поля полностью заменяют существующие, name immutable (ADR-052). Permission tiding.update. 404 — записи/Herald нет.
          */
-        put: operations["UpdateTiding"];
+        put: operations["updateTiding"];
         post?: never;
         /**
-         * Удалить Tiding-правило.
-         * @description Permission tiding.delete.
+         * Удалить Tiding-правило
+         * @description Снимает Tiding-правило подписки по имени (ADR-052). Permission tiding.delete. 404 — записи нет.
          */
-        delete: operations["DeleteTiding"];
+        delete: operations["deleteTiding"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/vigils": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Vigil-ов (paged)
+         * @description Реестр Vigil-ов с пагинацией (ADR-030). Permission vigil.list. Read-only, без audit.
+         */
+        get: operations["listVigils"];
+        put?: never;
+        /**
+         * Создать Vigil
+         * @description Заносит Vigil (Soul-side проверку) в реестр oracle (ADR-030). Permission vigil.create. 409 — name занят.
+         */
+        post: operations["createVigil"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/vigils/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Vigil-а
+         * @description Метаданные одного Vigil-а по имени (ADR-030). Permission vigil.list (read покрыт list-правом). Read-only, без audit.
+         */
+        get: operations["getVigil"];
+        put?: never;
+        post?: never;
+        /**
+         * Удалить Vigil
+         * @description Удаляет Vigil из реестра oracle (ADR-030). Permission vigil.delete. 404 — записи нет.
+         */
+        delete: operations["deleteVigil"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/voyages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Voyage-прогонов (paged)
+         * @description Список прогонов с фильтрами kind/status и пагинацией (ADR-043). target_resolved НЕ раскрывается (UI читает scope_size). Permission incarnation.history. Read-only, без audit.
+         */
+        get: operations["listVoyages"];
+        put?: never;
+        /**
+         * Создать Voyage
+         * @description Унифицированный батчевый прогон (ADR-043). RBAC-by-kind: scenario→incarnation.run, command→errand.run (fail-closed, в handler-е). Tempo per-AID rate-limit.
+         */
+        post: operations["createVoyage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/voyages/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry-resolve scope Voyage
+         * @description Предпоказ числа единиц/батчей БЕЗ создания Voyage (ADR-043 amendment §4). Та же валидация/резолв/RBAC, что Create. Без раскрытия SID-списка. Read-like — без audit.
+         */
+        post: operations["previewVoyage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/voyages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Snapshot Voyage-прогона
+         * @description Detail + summary одного прогона (ADR-043). Permission incarnation.history. Read-only, без audit.
+         */
+        get: operations["getVoyage"];
+        put?: never;
+        post?: never;
+        /**
+         * Отменить Voyage-прогон
+         * @description Cancel pending/scheduled (running-abort — post-MVP). RBAC-by-kind в handler-е. 409 — running/terminal. Permission по kind.
+         */
+        delete: operations["cancelVoyage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/voyages/{id}/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All-runs drill Voyage-прогона
+         * @description Per-target batch/status/back-link одного прогона (ADR-043). Permission incarnation.history. Read-only, без audit.
+         */
+        get: operations["listVoyageTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2354,2846 +1792,1749 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        HealthStatus: {
-            /** @enum {string} */
-            status: "ok";
-        };
-        ReadinessStatus: {
-            /** @enum {string} */
-            status: "not_ready";
-            /** @description Карта зависимость → статус (postgres/vault/...). */
-            checks?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * @description RFC 7807 Problem Details. Каталог стабильных URN-ов в поле type —
-         *     docs/keeper/operator-api.md → Типы ошибок.
-         */
-        ProblemDetails: {
-            /**
-             * Format: uri
-             * @description Стабильный URN ошибки для machine-parsing.
-             *     Пример "https://soul-stack.io/errors/incarnation-locked".
-             */
-            type: string;
-            /** @description Краткий заголовок (английский, фиксированный для каждого type). */
-            title: string;
-            /**
-             * Format: int32
-             * @description HTTP status code (дублируется для удобства клиента).
-             */
-            status: number;
-            /** @description Человекочитаемое сообщение со значениями. */
-            detail?: string;
-            /**
-             * Format: uri
-             * @description URI запроса, который привёл к ошибке.
-             */
-            instance?: string;
-        };
-        /**
-         * @description Query-params для list-эндпоинтов. В HTTP передаются как query (offset/limit),
-         *     в MCP-tool input — как top-level поля. Schema присутствует для симметрии
-         *     HTTP↔MCP (общая форма пагинации); ни одним $ref в этом документе
-         *     не используется (HTTP path-операции используют отдельные
-         *     OffsetQuery/LimitQuery parameters).
-         */
-        PaginationRequest: {
-            /**
-             * Format: int32
-             * @default 0
-             */
-            offset: number;
-            /**
-             * Format: int32
-             * @default 50
-             */
-            limit: number;
-        };
-        /**
-         * @description Поля ответа list-эндпоинтов (без items). Schema присутствует для симметрии
-         *     HTTP↔MCP (общая форма пагинации); *ListReply содержат offset/limit/total
-         *     inline (плоская форма по PM-decision).
-         */
-        PaginationReply: {
-            /** Format: int32 */
-            offset?: number;
-            /** Format: int32 */
-            limit?: number;
-            /**
-             * Format: int32
-             * @description Общее количество элементов с учётом фильтров.
-             */
-            total?: number;
-        };
-        /**
-         * @description Статус runtime-инстанса. В proto константы имеют family-prefix
-         *     (INCARNATION_STATUS_READY), в JSON API — короткие формы. `drift` —
-         *     информационный статус Scry (ADR-031), НЕ блокирующий: remediation =
-         *     обычный apply, который при успехе вернёт incarnation в `ready`.
-         * @enum {string}
-         */
-        IncarnationStatus: "provisioning" | "ready" | "applying" | "error_locked" | "migration_failed" | "drift" | "destroying" | "destroy_failed";
-        /**
-         * @description Способ доставки конфигурации. agent — демон soul поверх mTLS gRPC stream;
-         *     ssh — push без агента.
-         * @enum {string}
-         */
-        SoulTransport: "agent" | "ssh";
-        /**
-         * @description Статус Soul в реестре.
-         * @enum {string}
-         */
-        SoulStatus: "pending" | "connected" | "disconnected" | "expired";
-        OperatorCreateRequest: {
-            /** @description AID нового Архонта (naming-rules.md). */
-            aid: string;
-            /** @description Человекочитаемое имя для UI/аудита. */
-            display_name: string;
-            /**
-             * @description Опциональный список ролей, которые надо приатачить новому Архонту
-             *     в той же транзакции с INSERT operator-а (UX-fix: онбординг одним
-             *     API-вызовом вместо двух — create + grant). Любая ошибка
-             *     (несуществующая роль, FK-violation) → rollback, оператор НЕ
-             *     создаётся. Пустой/опущенный — старое поведение без grant-ов.
-             *     Идемпотентно: дубль в массиве — no-op (ON CONFLICT DO NOTHING).
-             */
-            roles?: string[];
-        };
-        /**
-         * @description SENSITIVE: поле jwt отдаётся один раз; secret-masking middleware
-         *     вырезает его из логов/OTel-spans/audit-trail.
-         */
-        OperatorCreateReply: {
-            aid: string;
-            display_name: string;
-            /** Format: date-time */
-            created_at: string;
-            /** @description AID Архонта, выполнившего запрос (из JWT.sub). */
-            created_by_aid: string;
-            /**
-             * @description Actually-granted-роли (порядок входа). Пусто/опущено, если caller
-             *     не передавал roles в запросе.
-             */
-            roles?: string[];
-            /**
-             * @description SENSITIVE: never log. Выпущенный JWT, TTL = auth.jwt.ttl_default.
-             *     Возвращается один раз — повторный выпуск только через issue-token.
-             */
-            jwt: string;
-        };
-        /**
-         * @description Запись реестра operators (ADR-014). Возвращается /v1/operators (list) и
-         *     /v1/operators/{aid} (detail). `bootstrap_initial` — derived-флаг
-         *     (created_by_aid == null у первого Архонта через `keeper init`).
-         */
-        Operator: {
-            aid: string;
-            display_name: string;
-            /** @enum {string} */
-            auth_method: "jwt" | "mtls" | "combined";
-            /** Format: date-time */
-            created_at: string;
-            /** @description null для первого bootstrap-Архонта (ADR-013). */
-            created_by_aid?: string | null;
-            /**
-             * Format: date-time
-             * @description null для активного Архонта.
-             */
-            revoked_at?: string | null;
-            /** @description true — первый Архонт через `keeper init` (created_by_aid==null). */
-            bootstrap_initial: boolean;
-            metadata?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * @description GET /v1/operators paged-list. items — Operator[]; offset/limit/total —
-         *     стандартная сквозная пагинация (shared/api).
-         */
-        OperatorListReply: {
-            items: components["schemas"]["Operator"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Одна запись audit_log (ADR-022). Возвращается GET /v1/audit. payload —
-         *     свободный jsonb, форма зависит от event_type; секреты маскируются на
-         *     write-path (audit.MaskSecrets), read-path их НЕ декодирует обратно.
-         */
         AuditEvent: {
-            /** @description ULID-26 (audit_log.audit_id). */
-            id: string;
-            /** @description `<area>.<action>` (см. docs/naming-rules.md → Audit-events). */
-            type: string;
-            /** @enum {string} */
-            source: "signal" | "api" | "mcp" | "keeper_internal" | "soul_grpc" | "background";
-            /** @description AID инициатора (null для signal/keeper_internal/soul_grpc/background). */
-            archon_aid?: string | null;
-            /** @description ULID цепочки связанных событий (reuse apply_id для soul_grpc). */
-            correlation_id?: string | null;
+            archon_aid?: string;
+            correlation_id?: string;
             /** Format: date-time */
             created_at: string;
+            id: string;
             payload: {
                 [key: string]: unknown;
             };
+            source: string;
+            type: string;
         };
-        /**
-         * @description GET /v1/audit paged-list. items — AuditEvent[]; offset/limit/total —
-         *     стандартная сквозная пагинация.
-         */
         AuditEventListReply: {
-            items: components["schemas"]["AuditEvent"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        OperatorRevokeRequest: {
-            /** @description AID Архонта для отзыва (echo из path-param для MCP). */
-            aid?: string;
-            /** @description Свободный текст причины для audit-trail (optional). */
-            reason?: string;
-        };
-        /**
-         * @description Для HTTP 204 No Content тело не пишется; для MCP-tool отдаётся
-         *     structured-ответ с timestamp-ом. Schema присутствует для симметрии
-         *     HTTP↔MCP (HTTP отдаёт пустое тело, MCP — structured-ответ).
-         */
-        OperatorRevokeReply: {
-            /**
-             * Format: date-time
-             * @description Время установки operators.revoked_at.
-             */
-            revoked_at?: string;
-        };
-        /**
-         * @description Body запроса пустой; AID цели — в path-param URL. TTL берётся
-         *     из auth.jwt.ttl_default. Schema присутствует для симметрии HTTP↔MCP
-         *     (AID echo из path-param в MCP-tool input).
-         */
-        IssueTokenRequest: {
-            /** @description AID Архонта (echo из path-param для MCP). */
-            aid?: string;
-        };
-        /**
-         * @description SENSITIVE: поле jwt отдаётся один раз, masking-правила те же,
-         *     что для OperatorCreateReply.jwt.
-         */
-        IssueTokenReply: {
-            aid: string;
-            /** @description SENSITIVE: never log. Новый JWT, TTL = auth.jwt.ttl_default. */
-            jwt: string;
-            /** Format: date-time */
-            expires_at: string;
-        };
-        RoleCreateRequest: {
-            /** @description Имя роли (kebab-case), уникальное в кластере. */
-            name: string;
-            /** @description Человекочитаемое описание роли для UI/аудита. */
-            description?: string;
-            /**
-             * @description Набор permission-строк роли (например "incarnation.run",
-             *     "soul.*", "*"). Валидируются rbac.ParsePermission; битый
-             *     permission → 422 validation-failed.
-             */
-            permissions?: string[];
-            /**
-             * @description Селектор scope роли (ADR-047 S1) формы `key=v1,v2,…`, где key ∈
-             *     service/coven/incarnation/host; наследуется bare-permission-ами
-             *     роли без своего `on <selector>`. omitted/null → роль без
-             *     scope-ограничения. Валидируется rbac.ParseDefaultScope; битая
-             *     форма → 422 validation-failed.
-             */
-            default_scope?: string | null;
-        };
-        /**
-         * @description Проекция роли: метаданные, набор permissions и состав операторов
-         *     (membership). Возвращается в RoleListReply.items[].
-         */
-        RoleView: {
-            name: string;
-            description?: string;
-            /**
-             * @description true — builtin-роль (cluster-admin и т.п.): не удаляется и не
-             *     редактируется (409 role-builtin).
-             */
-            builtin: boolean;
-            /** @description Permission-строки роли (пустой массив, если их нет). */
-            permissions: string[];
-            /** @description AID операторов — членов роли (пустой массив, если их нет). */
-            operators: string[];
-            /**
-             * @description Селектор scope роли (ADR-047 S1) формы `key=v1,v2,…`. Опускается
-             *     в JSON, если NULL (роль без scope-ограничения).
-             */
-            default_scope?: string | null;
-        };
-        RoleListReply: {
-            items: components["schemas"]["RoleView"][];
-        };
-        /**
-         * @description Replace-семантика: переданный набор полностью заменяет существующий
-         *     набор permissions роли.
-         */
-        RolePermissionsUpdateRequest: {
-            /**
-             * @description Новый полный набор permission-строк. Битый permission →
-             *     422 validation-failed.
-             */
-            permissions: string[];
-            /**
-             * @description Селектор scope роли (ADR-047 S1) формы `key=v1,v2,…`. PATCH-
-             *     семантика по presence ключа: поле ОТСУТСТВУЕТ → scope роли не
-             *     трогается; присутствует (включая null) → заменяет (null снимает
-             *     scope). Различение omitted/null требует чтения сырого JSON и в
-             *     сгенерированном *string-поле не выражается. Валидируется
-             *     rbac.ParseDefaultScope; битая форма → 422 validation-failed.
-             */
-            default_scope?: string | null;
-        };
-        GrantOperatorRequest: {
-            /** @description AID оператора, назначаемого в роль/группу (naming-rules.md). */
-            aid: string;
-        };
-        /**
-         * @description Создание Synod-группы (ADR-049): набор ролей для группы архонов.
-         *     name уникален в кластере. Роли/члены добавляются отдельными
-         *     эндпоинтами.
-         */
-        SynodCreateRequest: {
-            /** @description Имя группы (kebab-case), уникальное в кластере. */
-            name: string;
-            /** @description Человекочитаемое описание группы для UI/аудита. */
-            description?: string;
-        };
-        /**
-         * @description Правка Synod-группы (ADR-049 amend): меняется ТОЛЬКО description.
-         *     name (PK) immutable — берётся из path, в теле не принимается.
-         *     description обязателен (PATCH-семантика — присланное заменяет старое).
-         */
-        SynodUpdateRequest: {
-            /** @description Новое человекочитаемое описание группы для UI/аудита. */
-            description: string;
-        };
-        /** @description Добавление роли в bundle Synod-группы (ADR-049). */
-        SynodGrantRoleRequest: {
-            /** @description Имя роли, добавляемой в bundle группы. */
-            role: string;
-        };
-        /**
-         * @description Проекция Synod-группы (ADR-049): метаданные, набор ролей (bundle) и
-         *     состав членов (AID). Возвращается в SynodListReply.items[].
-         */
-        SynodView: {
-            name: string;
-            description?: string;
-            /** @description true — builtin-группа: не удаляется (409 synod-builtin). */
-            builtin: boolean;
-            /** @description Имена ролей в bundle группы (пустой массив, если их нет). */
-            roles: string[];
-            /** @description AID архонов — членов группы (пустой массив, если их нет). */
-            operators: string[];
-        };
-        SynodListReply: {
-            items: components["schemas"]["SynodView"][];
-        };
-        /**
-         * @description Регистрация Service-а в реестре service_registry. name+git+ref
-         *     обязательны; refresh опционален (duration авто-refresh, '5m').
-         */
-        ServiceRegisterRequest: {
-            /** @description Имя Service-а (kebab-case). */
-            name: string;
-            /** @description git-источник service-репо (URL; не секрет). */
-            git: string;
-            /** @description git ref (tag/branch) — версия Service-а (ADR-007). */
-            ref: string;
-            /** @description Опц. duration авто-refresh ('5m'); опущено — без авто-refresh. */
-            refresh?: string;
-        };
-        /**
-         * @description Replace-семантика mutable-полей записи Service-а (git/ref/refresh).
-         *     name — path-параметр (ключ записи), здесь не передаётся.
-         */
-        ServiceUpdateRequest: {
-            /** @description Новый git-источник. */
-            git: string;
-            /** @description Новый git ref. */
-            ref: string;
-            /** @description Опц. duration авто-refresh ('5m'). */
-            refresh?: string;
-        };
-        /**
-         * @description Проекция записи реестра service_registry: имя + git/ref/refresh +
-         *     audit-метаданные. Возвращается в ServiceListReply.items[] и из
-         *     register/get/update.
-         */
-        ServiceView: {
-            name: string;
-            git: string;
-            ref: string;
-            /** @description duration авто-refresh; отсутствует, если не задан. */
-            refresh?: string;
-            /** @description AID создателя; отсутствует у seed/системных записей. */
-            created_by_aid?: string;
-            /** @description AID последнего правщика; отсутствует, если не задан. */
-            updated_by_aid?: string;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        ServiceListReply: {
-            items: components["schemas"]["ServiceView"][];
-        };
-        /**
-         * @description Одна запись git-ref-листинга remote-репозитория Service-а (tag либо
-         *     branch). Используется в UI Upgrade-modal dropdown.
-         */
-        GitRef: {
-            /** @description Голое имя ref-а ('v2.0.0' / 'main'), без 'refs/'-префикса. */
-            name: string;
-            /**
-             * @description Тип ref-а.
-             * @enum {string}
-             */
-            type: "tag" | "branch";
-            /** @description Полный sha1 commit-а, на который указывает ref. */
-            commit: string;
-            /**
-             * @description true только для дефолтной ветки remote-а (HEAD-symref) или для
-             *     main/master при fallback-е, если HEAD-symref не получен. У tag-ов
-             *     всегда отсутствует/false.
-             */
-            is_default?: boolean;
-        };
-        /**
-         * @description Ответ `GET /v1/services/{name}/refs`: список git-tag-ов + branch-ей
-         *     remote-репозитория Service-а. Сортировка: tags — semver desc (валидный
-         *     semver выше lex; pre-release ниже release), затем branches — default
-         *     first, остальные lex asc.
-         */
-        ServiceRefsListReply: {
-            /** @description Имя Service-а (дубль path-параметра для удобства клиента). */
-            service: string;
-            refs: components["schemas"]["GitRef"][];
-        };
-        /**
-         * @description Метаданные одного scenario из материализованного снапшота git-репо
-         *     Service-а (`scenario/<name>/main.yml`). Лёгкая проекция top-level полей
-         *     scenario.yml для UI dropdown «Choose scenario» — handler-у не нужны ни
-         *     tasks, ни state_changes, ни orchestration-дельта. Имя берётся из имени
-         *     директории, не из top-level `name:` (директория — надёжный источник).
-         */
-        Scenario: {
-            /** @description Имя scenario (имя поддиректории `scenario/<name>/`). */
-            name: string;
-            /**
-             * @description Относительный путь к main.yml внутри снапшота
-             *     (`scenario/<name>/main.yml`).
-             */
-            path: string;
-            /**
-             * @description Дискриминатор сценария для UI (каталог, не хардкод имён):
-             *     `lifecycle` — keeper трактует его особо (create / destroy —
-             *     bootstrap / teardown), `operational` — обычная операция над state.
-             *     `converge` — operational с двойной ролью (operational-прогон +
-             *     dry-run target для check-drift). Размечается keeper-ом по имени,
-             *     фронт читает поле, а не зашивает список lifecycle-имён.
-             * @enum {string}
-             */
-            kind: "lifecycle" | "operational";
-            /**
-             * @description Запускаем оператором из Run-формы: create=true, destroy=false
-             *     (удаление — спец-флоу DELETE), operational=true. UI фильтрует
-             *     Run-форму по этому признаку, а не по хардкоду имён (ADR-042).
-             */
-            runnable: boolean;
-            /** @description top-level `description:` scenario (если задан). */
-            description?: string;
-            /**
-             * @description top-level `input_schema:` (нормативное имя) или `input:` (fallback)
-             *     scenario, в исходной YAML-форме. UI рендерит из этого форму ввода.
-             */
-            input_schema?: {
-                [key: string]: unknown;
-            };
-            /** @description top-level `tags:` scenario (если заданы). */
-            tags?: string[];
-        };
-        /**
-         * @description Ответ `GET /v1/services/{name}/scenarios`: список scenario из git-репо
-         *     Service-а на конкретном ref-е. Сортировка scenarios — alphabetical asc.
-         *     Невалидный YAML / отсутствующий main.yml в одной из scenario-папок не
-         *     ломает listing остальных (partial-success).
-         */
-        ServiceScenariosListReply: {
-            /** @description Имя Service-а (дубль path-параметра). */
-            service: string;
-            /**
-             * @description git-ref, на котором составлен listing (значение query-параметра
-             *     либо ref из реестра Service-а, если query не задан).
-             */
-            ref: string;
-            scenarios: components["schemas"]["Scenario"][];
-        };
-        /**
-         * @description Одна запись цепочки state_schema-миграций (metadata-only): номера
-         *     версий-источника и -приёмника + относительный путь файла в снапшоте.
-         *     Content (DSL-операции) НЕ парсится — UI Schema explorer-у нужен только
-         *     граф `from → to` (грамматику миграции пользователь смотрит в git-репо).
-         */
-        StateSchemaMigration: {
-            /** @description Версия-источник миграции (`<NNN>` в имени файла). */
-            from: number;
-            /** @description Версия-приёмник миграции (`<MMM>` в имени файла). */
-            to: number;
-            /**
-             * @description Относительный путь файла миграции внутри снапшота
-             *     (`migrations/<NNN>_to_<MMM>.yml`).
-             */
-            path: string;
-        };
-        /**
-         * @description Ответ `GET /v1/services/{name}/state-schema`: state_schema-метаданные
-         *     сервиса на конкретном ref-е. `state_schema_version` — текущая версия
-         *     структуры `incarnation.state` (monotonic int, ADR-019); `schema` —
-         *     опциональная декларация структуры из `service.yml::state_schema:`
-         *     (MVP подмножество JSON Schema; отсутствует — UI трактует как
-         *     «структура не задекларирована»); `migrations` — плоский список
-         *     миграций в `migrations/<NNN>_to_<MMM>.yml`, отсортированный по `to`
-         *     ASC. Content миграций не парсится — только metadata.
-         */
-        ServiceStateSchemaReply: {
-            /** @description Имя Service-а (дубль path-параметра). */
-            service: string;
-            /**
-             * @description git-ref, на котором составлен listing (значение query-параметра
-             *     либо ref из реестра Service-а, если query не задан).
-             */
-            ref: string;
-            /** @description Текущая версия структуры `incarnation.state` (≥1). */
-            state_schema_version: number;
-            /**
-             * @description Декларация структуры state из `service.yml::state_schema:`
-             *     (MVP подмножество JSON Schema draft-07: type / required /
-             *     properties / items / additionalProperties). Может отсутствовать.
-             */
-            schema?: {
-                [key: string]: unknown;
-            };
-            /** @description Найденные шаги цепочки миграций (metadata-only), sorted by `to` ASC. */
-            migrations: components["schemas"]["StateSchemaMigration"][];
-        };
-        /**
-         * @description Одна запись `destiny[]` / `modules[]` манифеста `service.yml`
-         *     (metadata-only): имя зависимости и её git-ref (ADR-007: версия = git
-         *     tag/branch). Content самой destiny/модуля не парсится.
-         */
-        ServiceDependency: {
-            /**
-             * @description Имя зависимости: kebab-case destiny (`redis`) или двухуровневый
-             *     `<namespace>.<module>` для custom-модуля (`wb.redis-failover`).
-             */
-            name: string;
-            /** @description git-ref зависимости (tag или branch, ADR-007). */
-            ref: string;
-            /**
-             * @description Опц. per-entry override полного git-URL зависимости. Присутствует
-             *     только если задан в манифесте (поддержан лишь для destiny[]).
-             */
-            git?: string;
-        };
-        /**
-         * @description Ответ `GET /v1/services/{name}/dependencies`: git-зависимости сервиса
-         *     на конкретном ref-е. `destiny` / `modules` — задекларированные в
-         *     `service.yml` блоки `destiny:` / `modules:` (каждая запись со своим
-         *     git-ref-ом). Оба массива non-nil (сервис без зависимостей валиден →
-         *     `[]`, не null).
-         */
-        ServiceDependenciesReply: {
-            /** @description Имя Service-а (дубль path-параметра). */
-            service: string;
-            /**
-             * @description git-ref, на котором составлен listing (значение query-параметра
-             *     либо ref из реестра Service-а, если query не задан).
-             */
-            ref: string;
-            /** @description destiny-кирпичики из `service.yml::destiny:`. */
-            destiny: components["schemas"]["ServiceDependency"][];
-            /** @description custom-модули из `service.yml::modules:`. */
-            modules: components["schemas"]["ServiceDependency"][];
-        };
-        /**
-         * @description Создание Omen-а (внешняя система Augur). Master-credential НЕ передаётся —
-         *     только auth_ref (vault-ref на него, augur.md §4.1).
-         */
-        OmenCreateRequest: {
-            /** @description Имя Omen-а (kebab-case, 1..63). */
-            name: string;
-            /**
-             * @description Тип внешней системы.
-             * @enum {string}
-             */
-            source_type: "vault" | "prometheus" | "elk";
-            /** @description URL внешней системы (не секрет). */
-            endpoint: string;
-            /** @description vault-ref на master-credential (vault:<mount>/<path>). */
-            auth_ref: string;
-        };
-        /**
-         * @description Проекция записи реестра omens: имя + source_type/endpoint/auth_ref +
-         *     audit-метаданные. Возвращается из create/get и в OmenListReply.items[].
-         */
-        OmenView: {
-            name: string;
-            /** @enum {string} */
-            source_type: "vault" | "prometheus" | "elk";
-            endpoint: string;
-            /** @description vault-ref на master-cred; сам секрет не возвращается. */
-            auth_ref: string;
-            /** @description AID создателя; отсутствует у системных записей. */
-            created_by_aid?: string;
-            /** Format: date-time */
-            created_at: string;
-        };
-        OmenListReply: {
-            items: components["schemas"]["OmenView"][];
-            /** Format: int32 */
-            offset: number;
-            /** Format: int32 */
-            limit: number;
-            /** Format: int32 */
-            total: number;
-        };
-        /**
-         * @description Создание Rite-а (grant). Субъект — XOR coven/sid. allow — объект, форма
-         *     зависит от source_type Omen-а (vault {paths?,policies?} / prometheus
-         *     {queries} / elk {indices}, augur.md §4.2). token_ttl/token_num_uses —
-         *     только vault-delegate.
-         */
-        RiteCreateRequest: {
-            /** @description Omen, к которому относится grant. */
-            omen: string;
-            /** @description Субъект-grant по Coven-метке (XOR с sid). */
-            coven?: string;
-            /** @description Субъект-grant по конкретному SID (XOR с coven). */
-            sid?: string;
-            /** @description Allow-list; форма по source_type Omen-а. */
-            allow: Record<string, never>;
-            /** @description false — брокер (MVP-1); true — делегация (MVP-2). */
-            delegate?: boolean;
-            /** @description TTL минтуемого scoped-токена; только vault-delegate. */
-            token_ttl?: string;
-            /** @description Лимит использований токена; только vault-delegate. */
-            token_num_uses?: number;
-        };
-        /**
-         * @description Проекция записи реестра rites: id + omen + субъект + allow + delegate +
-         *     token-поля + audit-метаданные.
-         */
-        RiteView: {
+            items: components["schemas"]["AuditEvent"][] | null;
             /** Format: int64 */
-            id: number;
-            omen: string;
-            coven?: string;
-            sid?: string;
-            allow: Record<string, never>;
-            delegate: boolean;
-            token_ttl?: string;
-            token_num_uses?: number;
-            created_by_aid?: string;
-            /** Format: date-time */
-            created_at: string;
-        };
-        RiteListReply: {
-            items: components["schemas"]["RiteView"][];
-        };
-        /**
-         * @description Создание Vigil-а (Soul-side проверка beacons). Субъект — XOR coven/sid.
-         *     params — объект, форма зависит от check (path / service-name / порог);
-         *     typed-схема отложена (ADR-030). enabled опц. (опущено → true).
-         */
-        VigilCreateRequest: {
-            /** @description Имя Vigil-а (kebab-case, 1..63). */
-            name: string;
-            /** @description Субъект-метки coven (XOR с sid). */
-            coven?: string[];
-            /** @description Субъект — один конкретный SID (XOR с coven). */
-            sid?: string;
-            /** @description Частота проверки (duration-конвенция, напр. '30s'). */
-            interval: string;
-            /** @description Адрес core-beacon (напр. 'core.beacon.file_changed'). */
-            check: string;
-            /** @description Параметры проверки; форма зависит от check. */
-            params?: Record<string, never>;
-            /** @description Активна ли проверка. По умолчанию true. */
-            enabled?: boolean;
-        };
-        /**
-         * @description Проекция записи реестра vigils: имя + субъект + interval/check/params +
-         *     enabled + audit-метаданные. Возвращается из create/get и в
-         *     VigilListReply.items[].
-         */
-        VigilView: {
-            name: string;
-            coven?: string[];
-            sid?: string;
-            interval: string;
-            check: string;
-            params: Record<string, never>;
-            enabled: boolean;
-            /** @description AID создателя; отсутствует у системных записей. */
-            created_by_aid?: string;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        VigilListReply: {
-            items: components["schemas"]["VigilView"][];
-            /** Format: int32 */
-            offset: number;
-            /** Format: int32 */
             limit: number;
-            /** Format: int32 */
-            total: number;
-        };
-        /**
-         * @description Создание Decree-а (правило reactor). Субъект — XOR coven/sid.
-         *     incarnation_name обязательно (ServiceRef резолвится из неё; ADR-030).
-         *     where — опц. CEL-предикат над event.data (compile-проверяется на create).
-         *     action_scenario — named scenario (whitelist). enabled опц. (опущено → true).
-         */
-        DecreeCreateRequest: {
-            /** @description Имя Decree-а (kebab-case, 1..63). */
-            name: string;
-            /** @description Имя Vigil-а, на чей Portent правило реагирует. */
-            on_beacon: string;
-            /** @description Опц. CEL-предикат над event.data; compile-проверяется. */
-            where?: string;
-            /** @description Субъект-метки coven (XOR с sid). */
-            coven?: string[];
-            /** @description Субъект — один конкретный SID (XOR с coven). */
-            sid?: string;
-            /** @description Таргет-incarnation реакции (обязательно). */
-            incarnation_name: string;
-            /** @description Named scenario (whitelist; raw-команда отвергнута). */
-            action_scenario: string;
-            /** @description Вход сценария (vault-ref едет как есть). */
-            action_input?: Record<string, never>;
-            /** @description Минимальный интервал между срабатываниями per-(decree, subject). */
-            cooldown?: string;
-            /** @description Активно ли правило. По умолчанию true. */
-            enabled?: boolean;
-        };
-        /**
-         * @description Проекция записи реестра decrees: имя + on_beacon + субъект +
-         *     incarnation_name + action_scenario/action_input + where/cooldown +
-         *     enabled + audit-метаданные.
-         */
-        DecreeView: {
-            name: string;
-            on_beacon: string;
-            where?: string;
-            coven?: string[];
-            sid?: string;
-            incarnation_name: string;
-            action_scenario: string;
-            action_input: Record<string, never>;
-            cooldown: string;
-            enabled: boolean;
-            created_by_aid?: string;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        DecreeListReply: {
-            items: components["schemas"]["DecreeView"][];
-            /** Format: int32 */
-            offset: number;
-            /** Format: int32 */
-            limit: number;
-            /** Format: int32 */
-            total: number;
-        };
-        /**
-         * @description Допуск плагина в allow-list Sigil. Бинарь + manifest Keeper читает из
-         *     кеша host-а по (namespace, name); хеш бинаря НЕ передаётся клиентом —
-         *     Keeper считает его сам (вариант C). ref — operator-asserted метка.
-         */
-        PluginSigilAllowRequest: {
-            /** @description Namespace плагина (тип — cloud / ssh / mod). */
-            namespace: string;
-            /** @description Имя плагина (как в manifest.name). */
-            name: string;
-            /** @description Operator-asserted метка версии (НЕ git-verified, tag-ref). */
-            ref: string;
-        };
-        PluginSigilAllowReply: {
-            namespace: string;
-            name: string;
-            ref: string;
-            /** @description SHA-256 одобренного бинаря (hex lowercase), посчитанный Keeper-ом. */
-            sha256: string;
-        };
-        /**
-         * @description Проекция активного допуска. БЕЗ signature и manifest (крипто-материал /
-         *     крупный JSONB query/audit-слой).
-         */
-        PluginSigilView: {
-            namespace: string;
-            name: string;
-            ref: string;
-            sha256: string;
-            /** @description AID Архонта, допустившего плагин. */
-            allowed_by_aid: string;
-            /** Format: date-time */
-            allowed_at: string;
-            /**
-             * Format: date-time
-             * @description Время ревокации; null у активных записей.
-             */
-            revoked_at?: string | null;
-        };
-        PluginSigilListReply: {
-            items: components["schemas"]["PluginSigilView"][];
-        };
-        /**
-         * @description Один параметр модуля из manifest-схемы (`spec.states[*].input`): для
-         *     plugin — из manifest.yaml, для core — из coremanifest-реестра. Поля
-         *     enum/pattern/format/source/multiline/example описывают UI-форму модуля (ADR-045).
-         */
-        ModuleParam: {
-            name: string;
-            /** @description Тип значения (string/int/bool/list/map и синонимы input-DSL). */
-            type?: string;
-            required: boolean;
-            /** @description Значение приходит через vault-ref (manifest secret-флаг). */
-            secret?: boolean;
-            description?: string;
-            /** @description Допустимые значения поля (closed-set). */
-            enum?: unknown[];
-            /** @description Regex-ограничение значения. */
-            pattern?: string;
-            /** @description Семантический формат строки (hostname/fqdn/ipv4/.../sid). */
-            format?: string;
-            source?: components["schemas"]["ModuleInputSource"];
-            /** @description Поле = большое textarea (а не однострочный input). */
-            multiline?: boolean;
-            /** @description Пример значения для placeholder UI-формы. */
-            example?: string;
-            /** @description Описатель типа коллекции (ADR-045 S7 + amend). Для type=list/array — тип ЭЛЕМЕНТА (строит типизированный список, напр. list[int]). Для type=map/object — тип ЗНАЧЕНИЯ (map[string]<items>): при скалярном items.type UI рисует KEY→VALUE-редактор (виджет по items.type), без items / при items.type=map|object — JSON-редактор. Присутствует только если задан в манифесте. */
-            items?: components["schemas"]["ModuleParam"];
-        };
-        /**
-         * @description Дискриминатор каталога-источника значений поля формы (ADR-044/ADR-045):
-         *     ровно один активный под-ключ.
-         */
-        ModuleInputSource: {
-            /** @description Все SID текущей инкарнации. */
-            incarnation_hosts?: boolean;
-            /** @description SID-ы конкретной Choir-партии инкарнации. */
-            choir?: string;
-        };
-        /**
-         * @description Запись каталога модулей. name — полное имя без state-суффикса
-         *     (`core.cmd` / `official.postgres-user`). kind — core | plugin.
-         */
-        ModuleCatalogItem: {
-            name: string;
-            /** @enum {string} */
-            kind: "core" | "plugin";
-            /** @description namespace plugin-модуля; пусто у core. */
-            namespace?: string;
-            description?: string;
-            /** @description Допустимые state-/verb-суффиксы (полный адрес — `<name>.<state>`). */
-            states: string[];
-            /**
-             * @description Хотя бы один state модуля безопасен к ad-hoc-вызову через Errand
-             *     (ADR-033). Для фильтра `?errand_safe=true` в Run→Command.
-             */
-            errand_safe: boolean;
-            /** @description Параметры (из manifest для plugin; пусто для core). */
-            params: components["schemas"]["ModuleParam"][];
-        };
-        ModuleCatalogReply: {
-            items: components["schemas"]["ModuleCatalogItem"][];
-        };
-        /**
-         * @description Тело `POST /v1/modules/{name}/form-prep` (ADR-045 S3). source —
-         *     дискриминатор каталога-источника; prefix — опц. фильтр SID для
-         *     автокомплита (LIKE prefix%).
-         */
-        ModuleFormPrepRequest: {
-            source: components["schemas"]["ModuleFormPrepSource"];
-            /** @description Префикс SID для автокомплита (LIKE prefix%). */
-            prefix?: string;
-        };
-        /** @description Ровно один из incarnation_hosts / choir. */
-        ModuleFormPrepSource: {
-            /** @description Имя incarnation — live SID-ы её хостов. */
-            incarnation_hosts?: string;
-            choir?: components["schemas"]["ModuleFormPrepChoirSource"];
-        };
-        /** @description Координаты Choir-source — incarnation + имя Choir-а (ADR-044). */
-        ModuleFormPrepChoirSource: {
-            incarnation: string;
-            name: string;
-        };
-        /** @description Резолвленные SID-ы source-каталога формы (отсортированы, ≤ cap). */
-        ModuleFormPrepReply: {
-            sids: string[];
-            /** @description true → результат обрезан по cap, есть ещё. */
-            truncated: boolean;
-        };
-        /**
-         * @description Один action в составе resource. selector_keys — ОБЩИЙ список допустимых
-         *     ключей скоупа (per-permission-метаданных в каталоге MVP нет).
-         */
-        PermissionAction: {
-            /** @description Action permission-а (`<resource>.<action>`, может содержать дефис — `ssh-target-update`). */
-            action: string;
-            /** @description Общий список допустимых ключей скоупа (service / coven / incarnation / host). */
-            selector_keys: string[];
-        };
-        /** @description Группа actions одного resource в каталоге RBAC-permissions. */
-        PermissionCatalogItem: {
-            /** @description Resource permission-а (`<resource>.<action>`). */
-            resource: string;
-            actions: components["schemas"]["PermissionAction"][];
-        };
-        PermissionCatalogReply: {
-            items: components["schemas"]["PermissionCatalogItem"][];
-        };
-        /**
-         * @description Область событий прогонов, на которую допустима area-glob-подписка Tiding
-         *     (`<name>.*`) — а также точные типы внутри неё (`<name>.<action>`).
-         */
-        EventTypeArea: {
-            /** @description Имя области (`scenario_run` / `command_run` / `voyage` / `cadence`). */
-            name: string;
-        };
-        /**
-         * @description Точечный event-type вне area-glob-областей, допустимый для подписки
-         *     целиком (`incarnation.run_completed`). Область целиком в scope НЕ входит.
-         */
-        EventTypePoint: {
-            /** @description Полное имя точечного event-type (`<area>.<action>`). */
-            name: string;
-        };
-        /**
-         * @description Каталог event-types, допустимых для подписки Tiding (`GET /v1/event-types`,
-         *     ADR-052(b)). areas — области area-glob-подписки; point_events — точечные
-         *     типы вне area-glob. Оба списка детерминированно отсортированы по name.
-         */
-        EventTypeCatalogReply: {
-            areas: components["schemas"]["EventTypeArea"][];
-            point_events: components["schemas"]["EventTypePoint"][];
-        };
-        /**
-         * @description Scope-сводка одного эффективного права, достаточная для UI: либо
-         *     unrestricted, либо набор конкретных ограничений по измерениям. Поля-
-         *     измерения опускаются при пустоте. Пустой scope без unrestricted =
-         *     «ограничен, но без coven/regex/soulprint-вклада» (право в другом
-         *     измерении, например host=). regex/soulprint отдаются как есть — UI решает
-         *     отображение (RE2-паттерны по SID / CEL-предикаты `soulprint.self.*`).
-         */
-        MyPermissionScope: {
-            /** @description Нет scope-ограничений для этого права (bare / `*` / coven=*). */
-            unrestricted: boolean;
-            /** @description Конкретные coven-метки, на которые распространяется право. */
-            covens?: string[];
-            /** @description RE2-паттерны по SID (ADR-047 regex-измерение). */
-            regex?: string[];
-            /** @description CEL-предикаты `soulprint.self.*` (ADR-047 soulprint-измерение). */
-            soulprint?: string[];
-            /** @description CEL-предикаты state-scope (ADR-047 state-измерение). */
-            state?: string[];
-        };
-        /**
-         * @description Одно эффективное право текущего оператора. wildcard=true → cluster-admin
-         *     (`*`): resource/action/scope не несутся (UI трактует как «можно всё»).
-         *     Иначе resource.action (action может быть `*` — resource-wildcard) + scope.
-         */
-        MyPermission: {
-            /** @description Оператор имеет full-`*` (cluster-admin). При true остальные поля пусты. */
-            wildcard?: boolean;
-            /** @description Resource права (`incarnation`/`soul`/…). Пуст при wildcard. */
-            resource?: string;
-            /** @description Action права (`run`/`list`/…) или `*` (resource-wildcard). Пуст при wildcard. */
-            action?: string;
-            scope?: components["schemas"]["MyPermissionScope"];
-        };
-        /** @description Эффективные права текущего Архонта (`GET /v1/me/permissions`). */
-        MyPermissionsReply: {
-            permissions: components["schemas"]["MyPermission"][];
-        };
-        /**
-         * @description Ввод нового ключа подписи Sigil. Тело опционально (пустое = make_primary
-         *     false). Keypair генерируется Keeper-ом, клиент его НЕ передаёт.
-         */
-        SigilKeyIntroduceRequest: {
-            /**
-             * @description Сделать новый ключ primary (новые Sigil-ы подписываются им).
-             * @default false
-             */
-            make_primary: boolean;
-        };
-        /**
-         * @description Результат ввода ключа. БЕЗ приватника (он в Vault; security-инвариант
-         *     ADR-026(d)).
-         */
-        SigilKeyIntroduceReply: {
-            /** @description Стабильный id ключа (SHA-256(SPKI), hex). */
-            key_id: string;
-            /** @description Публичная часть (SPKI PEM). */
-            pubkey_pem: string;
-            is_primary: boolean;
-            /** @enum {string} */
-            status: "active" | "retired";
-            /** Format: date-time */
-            introduced_at: string;
-        };
-        /** @description Проекция active-ключа подписи. БЕЗ vault_ref. */
-        SigilKeyView: {
-            key_id: string;
-            is_primary: boolean;
-            /** @enum {string} */
-            status: "active" | "retired";
-            /** Format: date-time */
-            introduced_at: string;
-        };
-        SigilKeyListReply: {
-            items: components["schemas"]["SigilKeyView"][];
-        };
-        IncarnationCreateRequest: {
-            /** @description Имя нового instance (kebab-case), корневая Coven-метка. */
-            name: string;
-            /** @description Имя сервиса из keeper.yml services. */
-            service: string;
-            /** @description Declared environment-теги incarnation (ADR-008 amendment a). Опциональны (по умолчанию пустой массив). Несут RBAC coven-scope incarnation-операций: эффективный scope = covens ∪ {name}. Coven-scoped оператор не может создать incarnation с тегом вне своего scope. */
-            covens?: string[];
-            /** @description Input для scenario create. По умолчанию пустой объект. */
-            input?: {
-                [key: string]: unknown;
-            };
-        };
-        IncarnationCreateReply: {
-            /**
-             * @description ULID запуска scenario `create`. null/отсутствует, если
-             *     манифест сервиса объявил `lifecycle.auto_create: false` —
-             *     инкарнация создана в `ready` без прогона, оператор запускает
-             *     `create` вручную.
-             */
-            apply_id?: string | null;
-            /** @description Имя созданного instance (echo). */
-            incarnation: string;
-        };
-        IncarnationRunRequest: {
-            /** @description Имя instance (echo из path-param). */
-            name?: string;
-            /** @description Имя сценария (echo из path-param). */
-            scenario?: string;
-            /** @description Input scenario. */
-            input?: {
-                [key: string]: unknown;
-            };
-        };
-        /** @description Classic single-run reply (без `wave`-поля). */
-        IncarnationRunReply: {
-            apply_id: string;
-            incarnation: string;
-            scenario: string;
-        };
-        /** @description ADR-031 Slice C. Counts-агрегат последнего drift-скана incarnation, хранимый в колонке `incarnation.last_drift_summary`. Симметричен scenario.DriftSummary плюс `total_hosts`/`scanned_at` для дискриминации устаревших скан-данных. Полный DriftReport в БД не хранится — только эти счётчики. */
-        DriftScanSummary: {
-            /** @description Число хостов с обнаруженным дрейфом конфигурации. */
-            hosts_drifted: number;
-            /** @description Число хостов без дрейфа (фактическое состояние совпало). */
-            hosts_clean: number;
-            /** @description Число хостов, не поддержавших dry_run-проверку дрейфа. */
-            hosts_unsupported: number;
-            /** @description Число хостов, на которых проверка дрейфа упала с ошибкой. */
-            hosts_failed: number;
-            /** @description Общее число хостов в скане (сумма перечисленных категорий). */
-            total_hosts: number;
-            /**
-             * Format: date-time
-             * @description Время завершения скана (RFC3339Nano, UTC). Совпадает с `last_drift_check_at` родительского объекта.
-             */
-            scanned_at: string;
-        };
-        IncarnationGetReply: {
-            name: string;
-            service: string;
-            /** @description Пин-версия сервиса (git-ref). */
-            service_version: string;
-            /**
-             * Format: int32
-             * @description Версия state_schema (ADR-019).
-             */
-            state_schema_version: number;
-            /** @description Declared environment-теги incarnation (ADR-008 amendment a). Источник RBAC coven-scope (covens ∪ {name}). Всегда массив (пустой, если тегов нет). */
-            covens: string[];
-            /** @description jsonb — то, что задекларировал оператор. */
-            spec: {
-                [key: string]: unknown;
-            } | null;
-            /** @description jsonb — текущая структурированная конфигурация. */
-            state: {
-                [key: string]: unknown;
-            } | null;
-            status: components["schemas"]["IncarnationStatus"];
-            /** @description Детали ошибки, если status локирующий. */
-            status_details: {
-                [key: string]: unknown;
-            } | null;
-            /** @description AID Архонта-создателя (NULL после ревокации FK). */
-            created_by_aid?: string | null;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-            /**
-             * Format: date-time
-             * @description ADR-031 Slice C. Время завершения последнего dry_run-прогона converge (фон или on-demand из Slice B). Отсутствует, если incarnation ни разу не сканировалась.
-             */
-            last_drift_check_at?: string | null;
-            /** @description ADR-031 Slice C. Counts-агрегат последнего DriftReport-а из колонки `incarnation.last_drift_summary` (typed). Отсутствует, если incarnation ни разу не сканировалась. */
-            last_drift_summary?: components["schemas"]["DriftScanSummary"] | null;
-        };
-        IncarnationListReply: {
-            items: components["schemas"]["IncarnationGetReply"][];
-            /** Format: int32 */
-            offset: number;
-            /** Format: int32 */
-            limit: number;
-            /** Format: int32 */
-            total: number;
-        };
-        IncarnationHistoryReply: {
-            items: components["schemas"]["StateHistoryEntry"][];
-            /** Format: int32 */
-            offset: number;
-            /** Format: int32 */
-            limit: number;
-            /** Format: int32 */
-            total: number;
-        };
-        /** @description Запись state_history (architecture.md → state_history). */
-        StateHistoryEntry: {
-            /** @description PK записи, UUID. */
-            history_id: string;
-            /** @description Имя сценария, приведшего к изменению ("migration" для шагов миграции). */
-            scenario: string;
-            state_before: {
-                [key: string]: unknown;
-            } | null;
-            state_after: {
-                [key: string]: unknown;
-            } | null;
-            /** @description AID Архонта, изменившего state (NULL после ревокации FK / для migration-шагов). */
-            changed_by_aid?: string | null;
-            apply_id: string;
-            /** Format: date-time */
-            created_at: string;
-        };
-        IncarnationUnlockRequest: {
-            /** @description Имя instance (echo из path-param). */
-            name?: string;
-            /** @description Свободный текст; пишется в state_history.metadata.unlock_reason. */
-            reason: string;
-        };
-        IncarnationUnlockReply: {
-            name: string;
-            previous_status: components["schemas"]["IncarnationStatus"];
-            status: components["schemas"]["IncarnationStatus"];
-            unlocked_by_aid: string;
-            /** Format: date-time */
-            unlocked_at: string;
-        };
-        IncarnationUpgradeRequest: {
-            /** @description Имя instance (echo из path-param). */
-            name?: string;
-            /** @description Целевая версия сервиса (git-ref). */
-            to_version: string;
-        };
-        IncarnationUpgradeReply: {
-            apply_id: string;
-        };
-        IncarnationRerunCreateRequest: {
-            /**
-             * @description Свободный текст подтверждения оператора; пишется в
-             *     audit-payload incarnation.create_rerun.
-             */
-            reason: string;
-        };
-        IncarnationRerunCreateReply: {
-            /** @description ULID перезапущенного scenario create. */
-            apply_id: string;
-            /** @description Имя инкарнации (echo path-param). */
-            incarnation: string;
-        };
-        IncarnationDestroyReply: {
-            apply_id: string;
-        };
-        /**
-         * @description Одна запись declared `spec.hosts[]` (ADR-008). Source of truth для
-         *     bootstrap-create + topology resolver-а (`soulprint.hosts[].role`).
-         */
-        IncarnationSpecHost: {
-            /** @description SID хоста (FQDN), обязан существовать в реестре `souls`. */
-            sid: string;
-            /**
-             * @description Declared-роль (kebab-case, 1..63 символа). Опциональна — ADR-008
-             *     допускает null для хостов вне declared-spec. Operator-asserted
-             *     строка; список не предопределён (master/replica — частые, но не
-             *     исчерпывающие).
-             */
-            role?: string;
-        };
-        /**
-         * @description Body PATCH /v1/incarnations/{name}/hosts. Три mode-семантики над
-         *     declared `spec.hosts[]` (ADR-008): replace / append / remove.
-         */
-        IncarnationUpdateHostsRequest: {
-            /**
-             * @description Список hosts для применения mode-операции. Для `remove` `role`
-             *     игнорируется (важен только `sid`). Пустой массив legitimate для
-             *     `replace` (очистить declared-spec).
-             */
-            hosts: components["schemas"]["IncarnationSpecHost"][];
-            /**
-             * @description Тип операции над existing `spec.hosts[]`. `replace` — полная замена;
-             *     `append` — insert-or-update role по SID; `remove` — удалить
-             *     переданные SID-ы.
-             * @enum {string}
-             */
-            mode: "replace" | "append" | "remove";
-        };
-        /**
-         * @description Choir — именованная топология хостов ВНУТРИ инкарнации (declared-«партия
-         *     хора», ADR-044). Источник правды — таблица `incarnation_choirs`, НЕ
-         *     `incarnation.state`.
-         */
-        Choir: {
-            incarnation_name: string;
-            choir_name: string;
-            description: string | null;
-            /** @description Опциональный нижний лимит размера партии (> 0). */
-            min_size: number | null;
-            /** @description Опциональный верхний лимит размера партии (≥ min_size). */
-            max_size: number | null;
-            /** Format: date-time */
-            created_at: string;
-            /** @description AID Архонта-создателя (из JWT-контекста; NULL после ревокации FK). */
-            created_by_aid: string | null;
-        };
-        /**
-         * @description Voice — членство SID в Choir-е (ADR-044). PK — тройка
-         *     (incarnation_name, choir_name, sid); один SID легально является Voice в
-         *     Choir-ах разных инкарнаций.
-         */
-        Voice: {
-            incarnation_name: string;
-            choir_name: string;
-            sid: string;
-            /** @description Поглощённая declared-роль (kebab-case или null, ADR-044). */
-            role: string | null;
-            /** @description Порядковый индекс внутри партии (≥ 0 или null). */
-            position: number | null;
-            /** Format: date-time */
-            added_at: string;
-            /** @description AID Архонта, добавившего Voice (из JWT-контекста). */
-            added_by_aid: string | null;
-        };
-        /**
-         * @description Body POST /v1/incarnations/{name}/choirs. `created_by_aid` НЕ принимается
-         *     из тела — берётся из JWT-контекста.
-         */
-        ChoirCreateRequest: {
-            choir_name: string;
-            description?: string | null;
-            min_size?: number | null;
-            max_size?: number | null;
-        };
-        /**
-         * @description Body POST /v1/incarnations/{name}/choirs/{choir}/voices. `added_by_aid`
-         *     НЕ принимается из тела — берётся из JWT-контекста.
-         */
-        VoiceAddRequest: {
-            sid: string;
-            /** @description Опциональная declared-роль (kebab-case, 1..63 символа). */
-            role?: string | null;
-            /** @description Опциональный порядковый индекс (≥ 0). */
-            position?: number | null;
-        };
-        /** @description Список Choir-ов инкарнации (ADR-044). */
-        ChoirListReply: {
-            items: components["schemas"]["Choir"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /** @description Список Voice-ов Choir-а (ADR-044). */
-        VoiceListReply: {
-            items: components["schemas"]["Voice"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Body POST /v1/incarnations/{name}/check-drift. Все поля опциональны:
-         *     input override converge-параметров (перекрывает auto-from-state по
-         *     конвенции имени). Пустое тело допустимо — drift-проверка идёт только по
-         *     incarnation.state.
-         */
-        IncarnationCheckDriftRequest: {
-            /**
-             * @description Override converge-параметров. Имена/типы совпадают со схемой
-             *     input: в scenario/converge/main.yml сервиса.
-             */
-            input?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * @description Финальный отчёт Scry-проверки drift (ADR-031 Slice B). Содержит per-host
-         *     агрегаты + summary. incarnation.status переводится handler-ом в `drift`
-         *     post-check, если есть hosts_drifted/hosts_failed > 0 (информационно, НЕ
-         *     блокирует remediation — ADR-031(d)).
-         */
-        DriftReport: {
-            /** Format: date-time */
-            checked_at: string;
-            incarnation: string;
-            /** @description Имя сценария Scry — `converge`. */
-            scenario_ref: string;
-            hosts: components["schemas"]["DriftHostReport"][];
-            summary: components["schemas"]["DriftSummary"];
-        };
-        DriftHostReport: {
-            sid: string;
-            /**
-             * @description clean — все task-ы хоста вернули changed=false;
-             *     drifted — хотя бы один task changed=true;
-             *     unsupported — хотя бы один community-модуль без PlanReadSafe-
-             *     capability (default-deny, ADR-031); failed — реальная ошибка Plan.
-             * @enum {string}
-             */
-            status: "clean" | "drifted" | "unsupported" | "failed";
-            tasks: components["schemas"]["DriftTaskResult"][];
-        };
-        DriftTaskResult: {
-            /** @description task_idx из scenario.tasks[] после include-expand. */
-            idx: number;
-            /** @description `<namespace>.<module>.<state>` из RenderedTask.Module. */
-            module: string;
-            /** @description Имя задачи (RenderedTask.Name), пустое если name не задан. */
-            action?: string;
-            /** @description true → drift на этом task-е. */
-            changed: boolean;
-            /**
-             * @description Operator-facing описание (пустое для clean). Заполняется только для
-             *     failed/unsupported из error_summary первой упавшей задачи.
-             */
-            message?: string;
-        };
-        DriftSummary: {
-            hosts_drifted: number;
-            hosts_clean: number;
-            hosts_unsupported: number;
-            hosts_failed: number;
-        };
-        SoulCreateRequest: {
-            /** @description SID нового хоста = FQDN (docs/soul/identity.md). */
-            sid: string;
-            transport: components["schemas"]["SoulTransport"];
-            /**
-             * @description Стабильные Coven-метки хоста (ADR-008): kebab-case, привязываются
-             *     при онбординге. Default []. Дальнейшие изменения набора — через
-             *     scenario-шаг core.soul.registered (append/replace/remove).
-             */
-            covens?: string[];
-        };
-        /**
-         * @description SENSITIVE: поле bootstrap_token отдаётся один раз (только для
-         *     transport: agent); secret-masking middleware вырезает его из
-         *     логов/OTel-spans/audit-trail.
-         */
-        SoulCreateReply: {
-            sid: string;
-            transport: components["schemas"]["SoulTransport"];
-            covens?: string[];
-            status: components["schemas"]["SoulStatus"];
-            /** Format: date-time */
-            registered_at: string;
-            /** @description AID Архонта, выполнившего запрос (из JWT.sub). */
-            created_by_aid: string;
-            /**
-             * @description SENSITIVE: never log. Plain bootstrap-токен, присутствует только
-             *     для transport: agent. Возвращается один раз — повторный выпуск
-             *     через POST /v1/souls/{sid}/issue-token.
-             */
-            bootstrap_token?: string;
-            /**
-             * Format: date-time
-             * @description Срок истечения bootstrap-токена (вместе с bootstrap_token).
-             */
-            expires_at?: string;
-        };
-        /**
-         * @description SENSITIVE: поле bootstrap_token отдаётся один раз; masking-правила
-         *     те же, что для SoulCreateReply.bootstrap_token.
-         */
-        SoulIssueTokenReply: {
-            sid: string;
-            /** @description SENSITIVE: never log. Новый plain bootstrap-токен, TTL по умолчанию. */
-            bootstrap_token: string;
-            /** Format: date-time */
-            expires_at: string;
-        };
-        /**
-         * @description Per-host SSH-реквизиты push-flow (ADR-032 amendment 2026-05-26 S7-1 +
-         *     amendment 2026-05-27 P2 W-1). Хранится в souls.ssh_target jsonb;
-         *     читается PGFallbackTargetResolver перед SshDispatcher.SendApply.
-         */
-        SoulSshTarget: {
-            /** @description TCP-порт SSH-сервера на хосте. */
-            ssh_port: number;
-            /** @description SSH-пользователь, под которым Keeper открывает сессию. */
-            ssh_user: string;
-            /**
-             * @description Абсолютный путь к soul-бинарю на хосте (соул-агент уже установлен
-             *     до push-а либо доставляется Deliverer-ом с sha256-кешем).
-             */
-            soul_path: string;
-            /**
-             * @description Optional per-SID explicit SshProvider plugin name (P2 W-1
-             *     multi-provider routing, Level 1). Когда задано — побеждает над
-             *     coven_default / cluster_default. Пусто / отсутствует → routing
-             *     идёт через push.coven_default_providers / push.cluster_default_provider.
-             */
-            ssh_provider?: string;
-        };
-        SoulSshTargetRequest: components["schemas"]["SoulSshTarget"];
-        /** @description Snapshot сохранённой ssh_target-записи после PUT. */
-        SoulSshTargetReply: {
-            sid: string;
-            ssh_target: components["schemas"]["SoulSshTarget"];
-        };
-        /**
-         * @description Запись реестра push_providers (ADR-032 amendment 2026-05-26, S7-2).
-         *     Per-provider env-payload params SSH-плагина push-flow; key params —
-         *     opaque-форма самого плагина (vault_addr/role/proxy_addr/…). Sensitive
-         *     ключи (secret_id/token/password/private_key) обязаны быть vault-refs.
-         */
-        PushProvider: {
-            /** @description Имя плагина (= plugins.ssh_providers[].name). */
-            name: string;
-            /** @description Opaque params; sensitive — vault-refs. */
-            params: Record<string, never>;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-            created_by_aid: string;
-            updated_by_aid?: string | null;
-        };
-        PushProviderCreateRequest: {
-            name: string;
-            params?: Record<string, never>;
-        };
-        PushProviderUpdateRequest: {
-            params: Record<string, never>;
-        };
-        PushProviderListReply: {
-            items: components["schemas"]["PushProvider"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Запись реестра heralds (ADR-052, S4) — канал доставки уведомлений о
-         *     событиях прогонов. type — closed-enum (webhook в MVP). config — per-type
-         *     конфигурация (для webhook: url + опц. headers + опц. SSRF-opt-out-флаги
-         *     http_allowed/allow_private). secret_ref (nullable) — vault-ref на
-         *     signing-token: при заданном секрете webhook-доставка подписывает тело
-         *     заголовком X-SoulStack-Signature (`sha256=<hex>`, HMAC-SHA256). Сам
-         *     секрет в записи НЕ хранится (vault-ref, не cleartext).
-         */
-        Herald: {
-            name: string;
-            /**
-             * @description Тип канала (closed-enum, webhook в MVP).
-             * @enum {string}
-             */
-            type: "webhook";
-            /**
-             * @description Per-type config. Для webhook: { url, опц. headers }. SSRF-контур
-             *     (https-only + deny приватных IP) взведён по умолчанию; снимается
-             *     флагами config.http_allowed=true / config.allow_private=true.
-             */
-            config: Record<string, never>;
-            /**
-             * @description vault-ref на signing-token (vault:<mount>/<path>); подпись webhook —
-             *     X-SoulStack-Signature: sha256=<hex>. null — без подписи.
-             */
-            secret_ref?: string | null;
-            enabled: boolean;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-            created_by_aid?: string | null;
-        };
-        HeraldCreateRequest: {
-            name: string;
-            /** @enum {string} */
-            type: "webhook";
-            /** @description Per-type config (webhook — { url, опц. headers, опц. http_allowed/allow_private }). */
-            config: Record<string, never>;
-            /** @description Опц. vault-ref на signing-token (vault:<mount>/<path>). */
-            secret_ref?: string | null;
-            /** @description Канал включён (default — задаётся сервером, опц. в запросе). */
-            enabled?: boolean;
-        };
-        /** @description Replace-семантика — поля полностью заменяют существующие (name immutable). */
-        HeraldUpdateRequest: {
-            /** @enum {string} */
-            type: "webhook";
-            config: Record<string, never>;
-            secret_ref?: string | null;
-            enabled?: boolean;
-        };
-        HeraldListReply: {
-            items: components["schemas"]["Herald"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Запись реестра tidings (ADR-052, S4) — правило подписки на уведомления.
-         *     event_types — непустой список audit-event-types с area-glob
-         *     (scenario_run.*) в scope прогонов. herald — FK на heralds(name).
-         *     only_failures/only_changes — фильтры. incarnation/cadence (nullable) —
-         *     опц. селекторы привязки к источнику прогона.
-         */
-        Tiding: {
-            name: string;
-            /** @description Имя Herald-канала доставки (FK на heralds.name). */
-            herald: string;
-            /**
-             * @description Список audit-event-types (area-glob `scenario_run.*` или точный
-             *     `incarnation.drift_checked`) в scope прогонов: scenario_run /
-             *     command_run / voyage / cadence + incarnation.drift_checked.
-             */
-            event_types: string[];
-            only_failures: boolean;
-            only_changes: boolean;
-            /** @description Опц. селектор привязки к инкарнации-источнику прогона. */
-            incarnation?: string | null;
-            /** @description Опц. селектор привязки к Cadence-расписанию-источнику. */
-            cadence?: string | null;
-            /** @description Опц. селектор подписки на КОНКРЕТНУЮ задачу прогона по её адресу (register ∪ id из changed_tasks события incarnation.run_completed, ADR-052 §l/§j). null = без фильтра. Непустое значение → правило матчит incarnation.run_completed, только если в его changed_tasks есть задача с register или id, равным селектору (присутствие в changed_tasks = задача изменилась хотя бы на одном хосте). */
-            task?: string | null;
-            /** @description Статические поля оператора (JSON-объект верхнего уровня), мержатся в тело webhook-доставки ключом `annotations` (ADR-052(h)). Пусто/опущено — нет статических полей. Доступно и постоянному правилу: оператор управляет телом доставки одинаково для постоянных и разовых (ephemeral) подписок. */
-            annotations?: {
-                [key: string]: unknown;
-            };
-            /** @description Allow-list путей payload (ADR-052(h)), отбирающий, какие поля события попадут в тело доставки; пусто/опущено — полная форма. Каждый путь — сегменты `[a-z0-9_]`, разделённые `.` (`summary.succeeded`). */
-            projection?: string[];
-            /** @description Разовое правило, привязанное к одному прогону (ADR-052(g)). Серверное: оператор напрямую ephemeral-Tiding не создаёт — такие правила материализует keeper из notify-блока `POST /v1/voyages` (см. VoyageNotify). Инвариант `ephemeral=true ⟺ voyage_id != null`. Постоянное правило — `ephemeral=false`, `voyage_id=null`. */
-            readonly ephemeral: boolean;
-            /** @description ID Voyage, к которому привязано разовое (ephemeral) правило (ADR-052(g)). Серверное (см. ephemeral). У постоянного правила — `null`. */
-            readonly voyage_id?: string | null;
-            enabled: boolean;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-            created_by_aid?: string | null;
-        };
-        /** @description Создание ПОСТОЯННОГО Tiding-правила. Поля ephemeral/voyage_id здесь отсутствуют — они серверные (ADR-052(g)): разовое правило оператор не создаёт напрямую, его материализует keeper из notify-блока Voyage. */
-        TidingCreateRequest: {
-            name: string;
-            herald: string;
-            event_types: string[];
-            only_failures?: boolean;
-            only_changes?: boolean;
-            incarnation?: string | null;
-            cadence?: string | null;
-            /** @description Опц. селектор подписки на конкретную задачу прогона по адресу register ∪ id из changed_tasks (ADR-052 §l). null = без фильтра. */
-            task?: string | null;
-            /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h)). Опц. */
-            annotations?: {
-                [key: string]: unknown;
-            };
-            /** @description Allow-list путей payload (ADR-052(h)); пусто/опущено — полная форма. */
-            projection?: string[];
-            enabled?: boolean;
-        };
-        /** @description Replace-семантика — поля полностью заменяют существующие (name immutable). Поля ephemeral/voyage_id отсутствуют — серверные (см. TidingCreateRequest). */
-        TidingUpdateRequest: {
-            herald: string;
-            event_types: string[];
-            only_failures?: boolean;
-            only_changes?: boolean;
-            incarnation?: string | null;
-            cadence?: string | null;
-            /** @description Опц. селектор подписки на конкретную задачу прогона по адресу register ∪ id из changed_tasks (ADR-052 §l). Replace — отсутствие очищает (null = без фильтра). */
-            task?: string | null;
-            /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h)). Replace — отсутствие очищает. */
-            annotations?: {
-                [key: string]: unknown;
-            };
-            /** @description Allow-list путей payload (ADR-052(h)); пусто/опущено — полная форма. */
-            projection?: string[];
-            enabled?: boolean;
-        };
-        TidingListReply: {
-            items: components["schemas"]["Tiding"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Страница списка Souls. Гибрид offset/keyset (ADR-047 S3b-2a): режим
-         *     выбирает СЕРВЕР из Purview оператора, не клиент.
-         *       - coven-only / cluster-admin → offset-режим: `total` точен,
-         *         `total_approximate` опущено (false), `next_cursor` отсутствует
-         *         (backward-compatible).
-         *       - есть regex-измерение → keyset-режим: `total` опущен (0),
-         *         `total_approximate:true`, `next_cursor` присутствует, пока БД не
-         *         пройдена (отсутствует ⟺ набор исчерпан).
-         */
-        SoulListReply: {
-            items: components["schemas"]["SoulListEntry"][];
-            /** Format: int32 */
-            offset: number;
-            /** Format: int32 */
-            limit: number;
-            /**
-             * Format: int32
-             * @description Общее количество с учётом scope/фильтров. Значимо только когда
-             *     `total_approximate` отсутствует/false (offset-режим); в keyset-режиме
-             *     опущено (0).
-             */
-            total: number;
-            /**
-             * @description `total` НЕ точен. Присутствует (true) только в keyset-режиме
-             *     (regex-scope) — клиент НЕ должен трактовать `total` как размер набора,
-             *     листает через `next_cursor`. В offset-режиме поле опущено (точный
-             *     total по умолчанию).
-             */
-            total_approximate?: boolean;
-            /**
-             * @description Opaque keyset-курсор следующей страницы (keyset-режим). Передаётся
-             *     обратно как `?cursor=`. Отсутствует в offset-режиме и когда набор
-             *     исчерпан.
-             */
-            next_cursor?: string;
-        };
-        /** @description Проекция реестра souls (docs/keeper/storage.md, docs/soul/identity.md). */
-        SoulListEntry: {
-            /** @description SID = FQDN хоста. */
-            sid: string;
-            transport: components["schemas"]["SoulTransport"];
-            status: components["schemas"]["SoulStatus"];
-            /** @description Coven-метки хоста (стабильные теги, ADR-008). */
-            covens: string[];
-            /** Format: date-time */
-            last_seen_at?: string | null;
-            /** @description KID Keeper-инстанса, видевшего последний контакт. */
-            last_seen_by_kid?: string | null;
-            /** Format: date-time */
-            registered_at: string;
-            /**
-             * Format: date-time
-             * @description Момент CSR-запроса онбординга; null до запроса.
-             */
-            requested_at?: string | null;
-            /** @description AID Архонта-создателя; null после ревокации FK / для self-онбординга. */
-            created_by_aid?: string | null;
-        };
-        /**
-         * @description `GET /v1/souls/{sid}/soulprint`: проекция `souls.{soulprint_facts,
-         *     soulprint_collected_at, soulprint_received_at}` — последний полученный
-         *     typed-SoulprintReport (ADR-018). Ключи внутри typed_facts — proto field
-         *     names (snake_case, `pkg_mgr`/`init_system`), форма по
-         *     proto SoulprintFacts.
-         */
-        SoulprintReadReply: {
-            sid: string;
-            /**
-             * @description Typed-факты Soulprint (ADR-018, форма по proto SoulprintFacts —
-             *     см. схему SoulprintFacts). byte-passthrough JSONB (категория D,
-             *     ADR-051): Keeper отдаёт сырые байты `souls.soulprint_facts` as-is,
-             *     без unmarshal→map→re-marshal. Это гарантирует forward-compat —
-             *     новые proto-поля Soul-агента доезжают на wire без рекомпиляции
-             *     Keeper-а. Порядок ключей — PG-jsonb-нормализованный.
-             */
-            typed_facts: Record<string, never>;
-            /**
-             * Format: date-time
-             * @description Soul-side timestamp момента сбора фактов.
-             */
-            collected_at?: string;
-            /**
-             * Format: date-time
-             * @description Keeper-side timestamp приёма стрима.
-             */
-            received_at?: string;
-        };
-        /**
-         * @description `GET /v1/souls/{sid}/history`: per-host operation timeline (scenario
-         *     apply_runs + ad-hoc errands), merge started_at DESC. Конверт паритетен
-         *     paged-list (items/offset/limit/total) + top-level `sid` (echo хоста).
-         */
-        SoulHistoryReply: {
-            sid: string;
-            items: components["schemas"]["SoulHistoryItem"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Одна запись per-host timeline. type-дискриминатор источника; поля,
-         *     специфичные для одного источника, опускаются для другого
-         *     (incarnation/scenario — scenario; module — errand).
-         */
-        SoulHistoryItem: {
-            /** @enum {string} */
-            type: "scenario" | "errand";
-            /** @description apply_id (scenario) | errand_id (errand). */
-            id: string;
-            /** @description scenario-only — инкарнация прогона. */
-            incarnation?: string;
-            /** @description scenario-only — имя scenario. */
-            scenario?: string;
-            /** @description errand-only — fully-qualified модуль exec-а. */
-            module?: string;
-            status: string;
-            /** Format: date-time */
-            started_at: string;
-            /**
-             * Format: date-time
-             * @description Опускается, пока запись не терминальна.
-             */
-            finished_at?: string;
-            /** @description Back-link на Voyage (ADR-043); опускается для не-Voyage / standalone / исторических прогонов. */
-            voyage_id?: string;
-        };
-        /**
-         * @description Typed-факты Soulprint (ADR-018, docs/soul/soulprint.md). Соответствует
-         *     proto-сообщению `SoulprintFacts` (proto/keeper/v1/soulprint.proto).
-         *     Все вложенные поля собираются Soul-агентом; пост-MVP-расширения
-         *     (uptime/timezone/virtualization/cloud_provider/disks/bios) — additional
-         *     field-номера в proto, additionalProperties для wire-compat.
-         */
-        SoulprintFacts: {
-            /** @description Echo SID для логов; authority — mTLS peer cert. */
-            sid?: string;
-            /** @description Короткое имя хоста, `uname -n`. */
-            hostname?: string;
-            os?: components["schemas"]["SoulprintOsFacts"];
-            kernel?: components["schemas"]["SoulprintKernelFacts"];
-            cpu?: components["schemas"]["SoulprintCpuFacts"];
-            memory?: components["schemas"]["SoulprintMemoryFacts"];
-            network?: components["schemas"]["SoulprintNetworkFacts"];
-        };
-        /** @description Факты об операционной системе (ADR-018). */
-        SoulprintOsFacts: {
-            /** @description debian / rhel / alpine / windows / darwin. */
-            family?: string;
-            distro?: string;
-            version?: string;
-            codename?: string;
-            /** @description amd64 / arm64. */
-            arch?: string;
-            /** @description apt / dnf / apk / pacman. */
-            pkg_mgr?: string;
-            /** @description systemd / openrc / sysv / launchd. */
-            init_system?: string;
-        };
-        SoulprintKernelFacts: {
-            /** @description Полная версия с dist-suffix (5.15.0-101-generic). */
-            version?: string;
-            /** @description Только версия ядра (5.15.0). */
-            release?: string;
-        };
-        SoulprintCpuFacts: {
-            /**
-             * Format: int32
-             * @description Количество logical CPUs (с учётом HT/SMT).
-             */
-            count?: number;
-            model?: string;
-            vendor?: string;
-        };
-        /** @description Объёмы памяти в МБ. */
-        SoulprintMemoryFacts: {
             /** Format: int64 */
-            total_mb?: number;
-            /** Format: int64 */
-            available_mb?: number;
-            /** Format: int64 */
-            swap_mb?: number;
-        };
-        SoulprintNetworkFacts: {
-            /** @description Основной IPv4 (интерфейс с default-route). */
-            primary_ip?: string;
-            fqdn?: string;
-            interfaces?: components["schemas"]["SoulprintNetworkInterface"][];
-        };
-        SoulprintNetworkInterface: {
-            name?: string;
-            /** @description IPv4-адреса в CIDR (10.0.0.1/24). */
-            ipv4?: string[];
-            ipv6?: string[];
-            mac?: string;
-            /** Format: int32 */
-            mtu?: number;
-        };
-        /**
-         * @description Bulk coven-assign: одна метка за вызов (append/remove) или набор
-         *     целиком (replace). XOR-форма: append/remove → label, replace → labels.
-         */
-        SoulCovenAssignRequest: {
-            /**
-             * @description append — добавить метку; remove — снять; replace — заменить набор
-             *     Coven-меток хоста целиком.
-             * @enum {string}
-             */
-            mode: "append" | "remove" | "replace";
-            /**
-             * @description Назначаемая/снимаемая Coven-метка для append/remove (kebab-case,
-             *     ADR-008). Запрещён для mode=replace (используйте labels).
-             */
-            label?: string;
-            /**
-             * @description Набор Coven-меток для mode=replace (может быть пустым = «снять
-             *     все»). КАЖДАЯ метка обязана быть в coven-scope оператора.
-             *     Запрещён для mode=append/remove (используйте label).
-             */
-            labels?: string[];
-            selector: components["schemas"]["SoulCovenAssignSelector"];
-            /**
-             * @description true — посчитать matched под selector ∩ scope без UPDATE.
-             *     Объединяется по OR с query-параметром ?dry_run.
-             * @default false
-             */
-            dry_run: boolean;
-        };
-        /**
-         * @description Подмножество словаря таргетинга soul.* (all/sids/coven/incarnation/
-         *     status). CEL-предикат сознательно не поддержан (доказуемость
-         *     scope-проверки). Должен задавать хотя бы один критерий (all=true или
-         *     sids/coven/incarnation/status). Комбинации критериев соединяются AND.
-         */
-        SoulCovenAssignSelector: {
-            /**
-             * @description Без host-фильтра (весь реестр ∩ scope оператора).
-             * @default false
-             */
-            all: boolean;
-            /** @description Точечный список хостов (SID = FQDN). */
-            sids?: string[];
-            /** @description Хосты, у которых уже есть эта Coven-метка. */
-            coven?: string;
-            /**
-             * @description Хосты этой incarnation. Имя incarnation — корневая Coven-метка
-             *     (ADR-008); матчинг через `name = ANY(coven)`.
-             */
-            incarnation?: string;
-            /** @description Фильтр по статусу. */
-            status?: components["schemas"]["SoulStatus"];
-        };
-        SoulCovenAssignReply: {
-            /** @enum {string} */
-            mode: "append" | "remove" | "replace";
-            /** @description Применённая метка для append/remove (зеркало input). */
-            label: string;
-            /** @description Применённый набор меток для replace (зеркало input). */
-            labels?: string[];
-            /**
-             * Format: int32
-             * @description Сколько хостов попало под selector ∩ scope.
-             */
-            matched: number;
-            /**
-             * Format: int32
-             * @description Сколько строк фактически изменено (идемпотентный отсев не считается).
-             */
-            changed: number;
-            /**
-             * @description completed — все чанки закоммичены (или dry_run); partial — фейл
-             *     середины, 1..K-1 чанков зафиксированы (безопасно до-повторяется).
-             * @enum {string}
-             */
-            status: "completed" | "partial";
-            dry_run: boolean;
-        };
-        PushApplyRequest: {
-            /**
-             * @description Список SID (FQDN) target-хостов. Хосты должны существовать
-             *     в реестре souls с transport: ssh.
-             */
-            inventory: string[];
-            /**
-             * @description Ссылка на Destiny в форме "<name>@<ref>" — name из
-             *     default_destiny_source + git-tag/branch.
-             */
-            destiny: string;
-            /** @description Input для destiny. */
-            input?: {
-                [key: string]: unknown;
-            };
-            /**
-             * @description Имя SshProvider из keeper.yml plugins.ssh_providers[].name.
-             *     По умолчанию — первый зарегистрированный.
-             */
-            ssh_provider?: string;
-            /**
-             * @description Удалить устаревшие версии soul-бинаря/модулей в той же SSH-сессии.
-             * @default false
-             */
-            cleanup_stale_versions: boolean;
-        };
-        PushApplyReply: {
-            apply_id: string;
-        };
-        /**
-         * @description Страница push-прогонов (UI-4 Push-runs page). Возвращается
-         *     GET /v1/push-runs. Compact-форма entry: вырезаны тяжёлые поля
-         *     `input` и `summary.hosts[]`, остались агрегированные `summary_counts`.
-         *     Полная запись с per-host исходами — через GET /v1/push/{apply_id}.
-         */
-        PushRunListReply: {
-            items: components["schemas"]["PushRunListEntry"][];
             offset: number;
-            limit: number;
+            /** Format: int64 */
             total: number;
         };
-        /**
-         * @description Compact-форма строки push_runs для list-эндпоинта. summary редуцирован
-         *     до агрегированных counts (`summary_counts`); полный массив hosts[]
-         *     живёт только в detail-эндпоинте GET /v1/push/{apply_id}.
-         */
-        PushRunListEntry: {
-            apply_id: string;
-            inventory_sids: string[];
-            /** @description <name>@<ref> запроса. */
-            destiny_ref: string;
-            ssh_provider?: string;
-            cleanup_stale: boolean;
-            /** @enum {string} */
-            status: "pending" | "running" | "success" | "partial_failed" | "failed" | "cancelled";
-            /** Format: date-time */
-            started_at: string;
-            /**
-             * Format: date-time
-             * @description Отсутствует пока статус pending/running.
-             */
-            finished_at?: string;
-            started_by_aid?: string;
-            summary_counts?: components["schemas"]["PushSummaryCounts"];
-        };
-        /**
-         * @description Агрегированные counts из push_runs.summary jsonb. Все поля опциональны
-         *     (omitempty): pending/running прогоны не имеют summary; для терминальных
-         *     статусов orchestrator (pushorch.summarize) пишет всю тройку.
-         */
-        PushSummaryCounts: {
-            total?: number;
-            success_count?: number;
-            fail_count?: number;
-        };
-        /**
-         * @description Состояние push-прогона (Variant C orchestrator, docs/keeper/push.md).
-         *     Возвращается GET /v1/push/{apply_id}.
-         */
-        PushApplyView: {
-            apply_id: string;
-            inventory_sids: string[];
-            /** @description <name>@<ref> запроса. */
-            destiny_ref: string;
-            ssh_provider?: string;
-            input?: {
-                [key: string]: unknown;
-            };
-            cleanup_stale: boolean;
-            /** @enum {string} */
-            status: "pending" | "running" | "success" | "partial_failed" | "failed" | "cancelled";
-            /** Format: date-time */
-            started_at: string;
-            /**
-             * Format: date-time
-             * @description Отсутствует пока статус pending/running.
-             */
-            finished_at?: string;
-            started_by_aid?: string;
-            /**
-             * @description Per-host исходы прогона (присутствует для терминальных статусов).
-             *     Форма: {hosts: [{sid, status, error?}], total, success_count, fail_count}.
-             *     Для cancelled (Reaper orphan-purge) — дополнительно orphan_purged: true + reason.
-             */
-            summary?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * @description POST /v1/souls/{sid}/exec body (ADR-033). Содержит fully-qualified
-         *     имя модуля, input + опц. timeout/dry_run. input проходит
-         *     input-validation (input_schema модуля) и CEL-render-фазу
-         *     (templating.md) на Keeper-side ДО отправки Soul-у.
-         */
-        ErrandRunRequest: {
-            /**
-             * @description Fully-qualified `<ns>.<name>.<state>`. Допускаются только
-             *     `core.cmd.shell` / `core.exec.run` либо модули, реализующие
-             *     ErrandReadSafe (default-deny на Soul-side).
-             */
-            module: string;
-            /** @description Input для модуля (валидируется против input_schema). */
-            input?: {
-                [key: string]: unknown;
-            };
-            /**
-             * @description Полный timeout Errand-а. Server-cap для sync-ответа — 30s
-             *     (если timeout > 30s и Errand не завершился за 30s, handler
-             *     отдаёт 202 + Location, выполнение продолжается).
-             * @default 30
-             */
-            timeout_seconds: number;
-            /**
-             * @description true — только для модулей с PlanReadSafe; для verb-модулей
-             *     (shell/exec) → 400 errand_dry_run_unsupported (slice E3).
-             * @default false
-             */
-            dry_run: boolean;
-        };
-        /**
-         * @description 202-body при async-эскалации `POST /v1/souls/{sid}/exec` либо при
-         *     `GET /v1/errands/{errand_id}` пока строка ещё running.
-         */
-        ErrandAccepted: {
-            errand_id: string;
-            /** @enum {string} */
-            status: "running";
-        };
-        /**
-         * @description Финальное состояние Errand-а (ADR-033). Симметрично push_runs JSON-
-         *     форме, но БЕЗ state_changes/inventory: Errand single-host, не
-         *     мутирует incarnation.state. stdout/stderr cap-нуты до 64 KiB и
-         *     маскированы общим secret-masking на keeper-side write-path-е.
-         */
-        ErrandResult: {
-            errand_id: string;
-            sid: string;
-            module: string;
-            /** @enum {string} */
-            status: "running" | "success" | "failed" | "timed_out" | "cancelled" | "module_not_allowed";
-            /**
-             * Format: int32
-             * @description Для shell/exec; null для read-safe-модулей без exit-кода.
-             */
-            exit_code?: number;
-            /** @description Captured stdout (cap 64 KiB, маскированный). Опционально. */
-            stdout?: string;
-            /** @description Captured stderr (cap 64 KiB, маскированный). Опционально. */
-            stderr?: string;
-            /** @description true — stdout превысил cap, обрезан. */
-            stdout_truncated?: boolean;
-            /** @description true — stderr превысил cap, обрезан. */
-            stderr_truncated?: boolean;
-            /**
-             * Format: int64
-             * @description Длительность Errand-а на Soul-side.
-             */
-            duration_ms?: number;
-            /**
-             * @description Маскированная причина для failed/timed_out/module_not_allowed.
-             *     Для success — пусто.
-             */
-            error_message?: string;
-            /** @description Структурный output read-safe-модулей. Для shell/exec — null. */
-            output?: {
-                [key: string]: unknown;
-            };
-            started_by_aid: string;
-            /** Format: date-time */
-            started_at: string;
-            /**
-             * Format: date-time
-             * @description Отсутствует пока status=running.
-             */
-            finished_at?: string;
-        };
-        /**
-         * @description GET /v1/errands paged-list. items — ErrandResult[] (включая running);
-         *     offset/limit/total — стандартная сквозная пагинация.
-         */
-        ErrandListReply: {
-            items: components["schemas"]["ErrandResult"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /**
-         * @description Declarative target Voyage (резолвится в snapshot единиц). scenario-режим
-         *     читает incarnations[]/service/coven; command-режим — sids[]/coven/where.
-         */
-        VoyageTarget: {
-            /** @description scenario — exact-match имена инкарнаций. */
-            incarnations?: string[];
-            /** @description scenario — фильтр incarnation.service (exact). */
-            service?: string;
-            /** @description command — exact-match SID-снапшот. */
-            sids?: string[];
-            /** @description command — CEL-предикат (MVP сохраняется, не evaluate-ится). */
-            where?: string;
-            /** @description scenario — env-тег incarnation (any-of) / command — coven-метка хоста (AND). */
-            coven?: string[];
-        };
-        /** @description Body POST /v1/voyages (ADR-043 §4/§6). */
-        VoyageCreateRequest: {
-            /** @enum {string} */
-            kind: "scenario" | "command";
-            /** @description Обязательно для kind=scenario; запрещено для command. */
-            scenario_name?: string;
-            /** @description Обязательно для kind=command; запрещено для scenario. */
-            module?: string;
-            /** @description Параметры прогона (НЕ логируются в audit, инвариант A ADR-027). */
-            input?: {
-                [key: string]: unknown;
-            };
-            target: components["schemas"]["VoyageTarget"];
-            /**
-             * @description Размер батча: `N` = число единиц | `N%` = процент (1-100) от резолвнутого scope. Взаимоисключающе с batch_size/batch_percent — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$`. Пустая строка трактуется как «не задано» (весь прогон один Leg). Осмыслен только для batch_mode=barrier: непустой `batch` с batch_mode=window → 422 (ширина окна = concurrency; поле не игнорируется молча).
-             * @example 20%
-             */
-            batch?: string;
-            /**
-             * @description Порог провалов: `N` абсолют | `N%` процент от единиц прогона (инкарнации для scenario / хосты для command). Взаимоисключающе с fail_threshold — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$` (процент 1-100). Пустая строка трактуется как «не задано». Работает в обоих batch_mode.
-             * @example 25%
-             */
-            max_failures?: string;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `batch`. Размер Leg (число единиц в батче). null/опущен — весь прогон один Leg. Взаимоисключающий с batch_percent (оба заданы → 422). Не используется при batch_mode=window (ширина окна = concurrency); явно заданный с batch_mode=window → 422.
-             */
-            batch_size?: number;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `batch` (формат `N%`). Размер Leg как % от резолвнутого scope (ADR-043 amendment, parity Salt `-b 25%`). Эффективный batch_size = ceil(scope * pct/100). Взаимоисключающий с batch_size (оба заданы → 422). Осмыслен только для batch_mode=barrier; с batch_mode=window → 422.
-             */
-            batch_percent?: number;
-            /**
-             * @description batch_mode=barrier — параллелизм внутри Leg; batch_mode=window — ширина скользящего окна (держать N активных).
-             * @default 50
-             */
-            concurrency: number;
-            /**
-             * @description Режим батчинга (ADR-043 amendment). barrier — последовательные Leg-и с барьером между пачками (по умолчанию). window — скользящее окно по хостам (только kind=command в этом релизе): пул concurrency воркеров из общей очереди, без барьеров; batch_size не используется, batch_index=0 у всех единиц.
-             * @default barrier
-             * @enum {string}
-             */
-            batch_mode: "barrier" | "window";
-            /** @default false */
-            dry_run: boolean;
-            /**
-             * Format: date-time
-             * @description Отложенный старт (status=scheduled, S4).
-             */
-            schedule_at?: string;
-            /** @description Пауза между Leg-ами в миллисекундах (контролируемая выкатка, batch_mode=barrier). */
-            inter_batch_interval_ms?: number;
-            /** @description Per-unit пауза перед спавном следующей единицы окна, в миллисекундах (ADR-043 amendment, parity inter_batch_interval). Применима только к batch_mode=window; в barrier игнорируется. */
-            inter_unit_interval_ms?: number;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `max_failures`. Порог абсолютного числа провалов: накоплено N провалов → прогон останавливается (новые Leg-и / единицы окна не стартуют). ADR-043 amendment. on_failure=abort ≡ fail_threshold=1; on_failure=continue ≡ отсутствие порога. Работает в обоих batch_mode.
-             */
-            fail_threshold?: number;
-            /**
-             * @description Presence-фильтр живых (ADR-043 amendment): при true scope-резолв отсекает Soul-ы без живого presence-lease. Снимок после фильтра фиксируется в target_resolved. Применяется только к kind=command.
-             * @default false
-             */
-            require_alive: boolean;
-            /**
-             * @default continue
-             * @enum {string}
-             */
-            on_failure: "abort" | "continue";
-            /** @description Разовые подписки на ЭТОТ прогон (ADR-052(g), amendment N2). Каждый элемент материализуется keeper-ом в ephemeral-Tiding (ephemeral=true, voyage_id=<новый voyage_id>) в той же транзакции, что создаёт Voyage. Инициатор обязан держать herald.read на каждый указанный канал (403 иначе); несуществующий канал → 422. Очистка ephemeral-правил — фоном Reaper-ом после терминала прогона. */
-            notify?: components["schemas"]["VoyageNotify"][];
-        };
-        /** @description Разовая подписка на уведомления о ЭТОМ прогоне (ADR-052(g)). Поля фильтров/тела совпадают с постоянным Tiding (only_failures/only_changes/ annotations/projection); event_types выводится keeper-ом из `on` по kind прогона. */
-        VoyageNotify: {
-            /** @description Имя Herald-канала доставки (FK на heralds.name). */
-            herald: string;
-            /** @description Какие терминалы прогона уведомлять. Маппится keeper-ом в event_types по kind прогона: scenario → scenario_run.{completed|failed| partial_failed}, command → command_run.{...}. Пусто/опущено — все три терминала. */
-            on?: ("completed" | "failed" | "partial")[];
-            /** @default false */
-            only_failures: boolean;
-            /** @default false */
-            only_changes: boolean;
-            /** @description Статические поля оператора, мержатся в тело webhook ключом `annotations` (ADR-052(h), применяет worker доставки). */
-            annotations?: {
-                [key: string]: unknown;
-            };
-            /** @description Allow-list путей payload (ADR-052(h)); пусто = полная форма. */
-            projection?: string[];
-        };
-        VoyageCreateReply: {
-            voyage_id: string;
-            /** @enum {string} */
-            kind: "scenario" | "command";
-            /** @description Число резолвнутых единиц (инкарнаций / хостов). */
-            scope_size: number;
-            /** @enum {string} */
-            status: "pending" | "scheduled";
-            location: string;
-        };
-        /** @description Body 200 POST /v1/voyages/preview (ADR-043 amendment §4). Dry-resolve scope БЕЗ создания Voyage и БЕЗ раскрытия SID-списка (только числа — предпоказ числа батчей для late-binding target-а: coven/require_alive, где число хостов резолвит Keeper). batch_mode присутствует всегда и объясняет семантику остальных полей. */
-        VoyagePreviewReply: {
-            /** @enum {string} */
-            kind: "scenario" | "command";
-            /** @description Число резолвнутых единиц (инкарнаций для scenario / хостов для command). */
-            scope_size: number;
-            /** @description barrier — число Leg-ов = ceil(scope_size / effective_batch_size); window — 1 (плоский прогон одной волной-окном). */
-            total_batches: number;
-            /**
-             * @description Режим батчинга (нормализованный: отсутствие в запросе → barrier). window → effective_batch_size опущен (ширина окна = concurrency).
-             * @enum {string}
-             */
-            batch_mode: "barrier" | "window";
-            /** @description Резолвнутый размер Leg (barrier): ceil(scope_size * batch_percent/100) для процента, либо batch_size, либо весь scope одним Leg. Опущен, если batch не задан (весь scope один Leg) ИЛИ batch_mode=window (поле неприменимо — смотри concurrency). */
-            effective_batch_size?: number;
-        };
-        VoyageSummary: {
-            total: number;
-            succeeded: number;
-            failed: number;
-            cancelled: number;
-            no_match?: number;
-        };
-        /** @description Snapshot Voyage-прогона (GET detail / list item). */
-        Voyage: {
-            voyage_id: string;
-            /** @enum {string} */
-            kind: "scenario" | "command";
-            scenario_name?: string;
-            module?: string;
-            /** @enum {string} */
-            status: "scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled";
-            scope_size: number;
-            batch_size?: number;
-            batch_percent?: number;
+        Cadence: {
             /** @enum {string} */
             batch_mode?: "barrier" | "window";
+            /** Format: int64 */
+            batch_percent?: number;
+            /** Format: int64 */
+            batch_size?: number;
+            /** @description ULID расписания */
+            cadence_id: string;
+            /** Format: int64 */
             concurrency?: number;
-            dry_run: boolean;
-            total_batches: number;
-            current_batch_index: number;
-            /** @enum {string} */
-            on_failure?: "abort" | "continue";
-            fail_threshold?: number;
-            require_alive?: boolean;
-            target?: components["schemas"]["VoyageTarget"];
-            /** Format: date-time */
-            schedule_at?: string;
-            attempt: number;
-            started_by_aid: string;
             /** Format: date-time */
             created_at: string;
-            /** Format: date-time */
-            started_at?: string;
-            /** Format: date-time */
-            finished_at?: string;
-            summary?: components["schemas"]["VoyageSummary"];
-        };
-        VoyageListReply: {
-            items: components["schemas"]["Voyage"][];
-            offset: number;
-            limit: number;
-            total: number;
-        };
-        /** @description Одна строка voyage_targets (All-runs drill). */
-        VoyageTargetEntry: {
+            created_by_aid: string;
+            cron_expr?: string;
+            enabled: boolean;
+            /** Format: int64 */
+            fail_threshold?: number;
+            /** Format: int64 */
+            fail_threshold_percent?: number;
+            /** Format: int64 */
+            interval_seconds?: number;
             /** @enum {string} */
-            target_kind: "incarnation" | "sid";
-            target_id: string;
-            batch_index: number;
-            /** @enum {string} */
-            status: "awaiting" | "running" | "succeeded" | "failed" | "cancelled" | "no_match";
-            /** @description back-link на apply_runs (kind=scenario). */
-            apply_id?: string;
-            /** @description back-link на errands (kind=command). */
-            errand_id?: string;
+            kind: "scenario" | "command";
             /** Format: date-time */
-            finished_at?: string;
-        };
-        VoyageTargetsReply: {
-            voyage_id: string;
-            targets: components["schemas"]["VoyageTargetEntry"][];
-        };
-        VoyageCancelReply: {
-            voyage_id: string;
+            last_run_at?: string;
+            module?: string;
+            name: string;
+            /** Format: date-time */
+            next_run_at?: string;
             /** @enum {string} */
-            status: "cancelled";
+            on_failure?: "abort" | "continue";
+            /** @enum {string} */
+            overlap_policy: "skip" | "queue" | "parallel";
+            require_alive?: boolean;
+            scenario_name?: string;
+            /** @enum {string} */
+            schedule_kind: "interval" | "cron";
+            /** @description декларативный таргет прогона (declarative, отдаётся as-is) */
+            target?: components["schemas"]["VoyageTarget"];
+            /** Format: date-time */
+            updated_at: string;
         };
-        /**
-         * @description Body POST /v1/cadences (ADR-046 §3/§7). Рецепт прогона (parity
-         *     VoyageCreateRequest) + правило повторения + overlap_policy.
-         */
-        CadenceCreateRequest: {
-            /** @description Человекочитаемое имя расписания. */
+        CadenceCreateReply: {
+            /** @description ULID созданного расписания */
+            cadence_id: string;
+            enabled: boolean;
+            /** @description относительный URL ресурса */
+            location: string;
             name: string;
             /**
-             * @description Включено ли расписание (default-ON; false → пауза).
-             * @default true
+             * Format: date-time
+             * @description RFC3339 время следующего запуска
              */
-            enabled: boolean;
+            next_run_at?: string;
+        };
+        CadenceCreateRequest: {
+            /** @description размер батча: N хостов/инкарнаций или N% */
+            batch?: string;
+            batch_mode?: string;
+            /** Format: int64 */
+            batch_percent?: number;
+            /** Format: int64 */
+            batch_size?: number;
+            /** Format: int64 */
+            concurrency?: number;
+            /** @description cron-выражение для schedule_kind=cron */
+            cron_expr?: string;
+            /** @description вкл/выкл планировщика (default true) */
+            enabled?: boolean;
+            /** Format: int64 */
+            fail_threshold?: number;
+            /** @description параметры рецепта */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** Format: int64 */
+            inter_batch_interval_ms?: number;
+            /** Format: int64 */
+            inter_unit_interval_ms?: number;
             /**
-             * @description Вид правила повторения (interval XOR cron).
+             * Format: int64
+             * @description период для schedule_kind=interval
+             */
+            interval_seconds?: number;
+            /**
+             * @description тип рецепта прогона
              * @enum {string}
              */
-            schedule_kind: "interval" | "cron";
-            /** @description Период для schedule_kind=interval (XOR с cron_expr). Минимум 30s (floor-лимит, ADR-046 Pass B): для реакции быстрее 30s — Beacons (Vigil/Oracle, ADR-030). interval_seconds < 30 → 422. */
-            interval_seconds?: number;
-            /** @description Стандартное 5-полевое cron-выражение (UTC) для schedule_kind=cron (XOR с interval_seconds). */
-            cron_expr?: string;
+            kind: "scenario" | "command";
+            /** @description порог провалов: N абсолют или N% */
+            max_failures?: string;
+            /** @description модуль для kind=command */
+            module?: string;
+            /** @description человекочитаемое имя расписания */
+            name: string;
+            /** @description подписки на уведомления о прогонах этого расписания */
+            notify?: components["schemas"]["VoyageNotify"][] | null;
+            on_failure?: string;
             /**
-             * @description Поведение при наложении (предыдущий ребёнок ещё не терминален).
+             * @description политика наложения прогонов
              * @enum {string}
              */
             overlap_policy: "skip" | "queue" | "parallel";
-            /** @enum {string} */
-            kind: "scenario" | "command";
-            /** @description Обязательно для kind=scenario; запрещено для command. */
+            require_alive?: boolean;
+            /** @description имя сценария для kind=scenario */
             scenario_name?: string;
-            /** @description Обязательно для kind=command; запрещено для scenario. */
-            module?: string;
-            /** @description Параметры прогона (НЕ логируются в audit, инвариант A ADR-027). */
-            input?: {
-                [key: string]: unknown;
-            };
-            target: components["schemas"]["VoyageTarget"];
             /**
-             * @description Размер Leg: `N` = число единиц | `N%` = процент (1-100) от spawn-scope (резолвится на спавне Voyage — у Cadence scope неизвестен на создании). Взаимоисключающе с batch_size/batch_percent — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$`. Пустая строка трактуется как «не задано».
-             * @example 20%
-             */
-            batch?: string;
-            /**
-             * @description Порог провалов: `N` абсолют | `N%` процент от единиц прогона spawn-scope (инкарнации для scenario / хосты для command; резолвится на спавне). Взаимоисключающе с fail_threshold — смешение → 422 voyage_batch_spec_conflict. keeper-parse, grammar `^(\d+)%?$` (процент 1-100). Пустая строка трактуется как «не задано».
-             * @example 25%
-             */
-            max_failures?: string;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `batch`. Размер Leg (взаимоисключающий с batch_percent).
-             */
-            batch_size?: number;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `batch` (формат `N%`). Размер Leg как % от scope (взаимоисключающий с batch_size).
-             */
-            batch_percent?: number;
-            /** @description Параллелизм внутри Leg (barrier) / ширина окна (window). */
-            concurrency?: number;
-            /**
-             * @description Режим батчинга (NULL ⇒ barrier).
+             * @description тип расписания
              * @enum {string}
              */
-            batch_mode?: "barrier" | "window";
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `max_failures`. Порог абсолютного числа провалов → стоп.
-             */
-            fail_threshold?: number;
-            /** @description Пауза между Leg-ами, мс (batch_mode=barrier). */
-            inter_batch_interval_ms?: number;
-            /** @description Per-unit пауза, мс (batch_mode=window). */
-            inter_unit_interval_ms?: number;
-            /**
-             * @description Presence-фильтр живых на резолве scope (kind=command).
-             * @default false
-             */
-            require_alive: boolean;
-            /** @enum {string} */
-            on_failure?: "abort" | "continue";
-            /** @description Подписки на уведомления о прогонах ЭТОГО расписания (ADR-052 §m). В отличие от voyage.notify (разовое правило на один прогон), каждый элемент материализуется keeper-ом в ПОСТОЯННЫЙ Tiding (ephemeral=false), привязанный по ULID расписания (cadences.id): селектором Cadence (слать только про прогоны этого расписания) + origin-маркером created_from_cadence_id. Insert правил — в той же транзакции, что создаёт Cadence (атомарно). DELETE cadence каскадно сносит эти правила (ADR-046 §9). Имя автоправила — <name>-notify[-N]. Инициатор обязан держать herald.read на каждый указанный канал (403 иначе); несуществующий канал → 422. */
-            notify?: components["schemas"]["VoyageNotify"][];
-        };
-        /**
-         * @description Body PATCH /v1/cadences/{id} (ADR-046 S4). Все поля опциональны: заданное —
-         *     перезапись, опущенное — текущее значение сохраняется. kind не меняется.
-         */
-        CadencePatchRequest: {
-            name?: string;
-            enabled?: boolean;
-            /** @enum {string} */
-            schedule_kind?: "interval" | "cron";
-            /** @description Период для schedule_kind=interval. Минимум 30s (floor-лимит, ADR-046 Pass B): interval_seconds < 30 → 422 (для суб-30s — Beacons, ADR-030). */
-            interval_seconds?: number;
-            cron_expr?: string;
-            /** @enum {string} */
-            overlap_policy?: "skip" | "queue" | "parallel";
-            scenario_name?: string;
-            module?: string;
-            input?: {
-                [key: string]: unknown;
-            };
-            target?: components["schemas"]["VoyageTarget"];
-            /**
-             * @description Размер Leg: `N` | `N%` (parity create). Взаимоисключающе с batch_size/batch_percent в том же PATCH → 422 voyage_batch_spec_conflict. Переключение формата поверх хранимого встречного значения обнуляет встречное поле (batch `N` сбрасывает хранимый batch_percent и наоборот).
-             * @example 20%
-             */
-            batch?: string;
-            /**
-             * @description Порог провалов: `N` абсолют | `N%` процент spawn-scope (parity create). Взаимоисключающе с fail_threshold в том же PATCH → 422 voyage_batch_spec_conflict. Переключение формата поверх хранимого встречного обнуляет встречное поле (`N` сбрасывает fail_threshold_percent и наоборот).
-             * @example 25%
-             */
-            max_failures?: string;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `batch`.
-             */
-            batch_size?: number;
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `batch` (формат `N%`).
-             */
-            batch_percent?: number;
-            concurrency?: number;
-            /** @enum {string} */
-            batch_mode?: "barrier" | "window";
-            /**
-             * @deprecated
-             * @description DEPRECATED — используйте `max_failures`.
-             */
-            fail_threshold?: number;
-            require_alive?: boolean;
-            /** @enum {string} */
-            on_failure?: "abort" | "continue";
-        };
-        CadenceCreateReply: {
-            cadence_id: string;
-            name: string;
-            enabled: boolean;
-            /** Format: date-time */
-            next_run_at?: string;
-            location: string;
+            schedule_kind: "interval" | "cron";
+            /** @description таргет прогона (резолвится на спавне) */
+            target: components["schemas"]["VoyageTarget"];
         };
         CadenceEnabledReply: {
             cadence_id: string;
             enabled: boolean;
         };
-        /** @description Деталь / list-item Cadence-расписания (input НЕ отдаётся). */
-        Cadence: {
-            cadence_id: string;
-            name: string;
-            enabled: boolean;
-            /** @enum {string} */
-            schedule_kind: "interval" | "cron";
-            interval_seconds?: number;
-            cron_expr?: string;
-            /** @enum {string} */
-            overlap_policy: "skip" | "queue" | "parallel";
-            /** @enum {string} */
-            kind: "scenario" | "command";
-            scenario_name?: string;
-            module?: string;
-            target?: components["schemas"]["VoyageTarget"];
-            batch_size?: number;
+        CadenceListReply: {
+            /** @description страница расписаний */
+            items: components["schemas"]["Cadence"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число записей в наборе
+             */
+            total: number;
+        };
+        CadencePatchRequest: {
+            /** @description размер батча: N хостов/инкарнаций или N% */
+            batch?: string;
+            batch_mode?: string;
+            /** Format: int64 */
             batch_percent?: number;
+            /** Format: int64 */
+            batch_size?: number;
+            /** Format: int64 */
             concurrency?: number;
-            /** @enum {string} */
-            batch_mode?: "barrier" | "window";
+            /** @description cron-выражение (пустая строка → очистить) */
+            cron_expr?: string;
+            /** @description вкл/выкл планировщика */
+            enabled?: boolean;
+            /** Format: int64 */
             fail_threshold?: number;
-            /** @description Порог провалов в процентах spawn-scope (колонка 070, резолвится в абсолют на спавне Voyage). Взаимоисключающ с fail_threshold. null — задан fail_threshold или порога нет. */
-            fail_threshold_percent?: number | null;
+            /** @description параметры рецепта */
+            input?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: int64
+             * @description период для schedule_kind=interval
+             */
+            interval_seconds?: number;
+            /** @description порог провалов: N абсолют или N% */
+            max_failures?: string;
+            /** @description модуль для kind=command (пустая строка → очистить) */
+            module?: string;
+            /** @description человекочитаемое имя расписания */
+            name?: string;
+            /** @description abort|continue (пустая строка → очистить) */
+            on_failure?: string;
+            /**
+             * @description политика наложения прогонов
+             * @enum {string}
+             */
+            overlap_policy?: "skip" | "queue" | "parallel";
             require_alive?: boolean;
-            /** @enum {string} */
-            on_failure?: "abort" | "continue";
-            /** Format: date-time */
-            next_run_at?: string;
-            /** Format: date-time */
-            last_run_at?: string;
-            created_by_aid: string;
+            /** @description имя сценария (пустая строка → очистить) */
+            scenario_name?: string;
+            /**
+             * @description тип расписания
+             * @enum {string}
+             */
+            schedule_kind?: "interval" | "cron";
+            /** @description таргет прогона */
+            target?: components["schemas"]["VoyageTarget"];
+        };
+        Choir: {
+            choir_name: string;
             /** Format: date-time */
             created_at: string;
+            created_by_aid: string | null;
+            description: string | null;
+            incarnation_name: string;
+            /** Format: int64 */
+            max_size: number | null;
+            /** Format: int64 */
+            min_size: number | null;
+        };
+        ChoirCreateRequest: {
+            /** @description имя Choir-а (^[a-z][a-z0-9_-]*$) */
+            choir_name: string;
+            /** @description человекочитаемое описание */
+            description?: string;
+            /**
+             * Format: int64
+             * @description верхний лимит размера партии (≥ min_size)
+             */
+            max_size?: number;
+            /**
+             * Format: int64
+             * @description нижний лимит размера партии (> 0)
+             */
+            min_size?: number;
+        };
+        ChoirListReply: {
+            items: components["schemas"]["Choir"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        DecreeCreateRequest: {
+            /** @description вход сценария (vault-ref едет как есть) */
+            action_input?: unknown;
+            /** @description named scenario (whitelist; raw-команда отвергнута) */
+            action_scenario: string;
+            /** @description минимальный интервал между срабатываниями per-(decree, subject) */
+            cooldown?: string;
+            /** @description субъект-метки coven (XOR с sid) */
+            coven?: string[];
+            /** @description активно ли правило (по умолчанию true) */
+            enabled?: boolean;
+            /** @description таргет-incarnation реакции (обязательно) */
+            incarnation_name: string;
+            /** @description имя Decree-а (kebab-case, 1..63) */
+            name: string;
+            /** @description имя Vigil-а, на чей Portent правило реагирует */
+            on_beacon: string;
+            /** @description субъект — один конкретный SID (XOR с coven) */
+            sid?: string;
+            /** @description опц. CEL-предикат над event.data; compile-проверяется */
+            where?: string;
+        };
+        DecreeListReply: {
+            items: components["schemas"]["DecreeView"][] | null;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int32 */
+            total: number;
+        };
+        DecreeView: {
+            action_input: unknown;
+            action_scenario: string;
+            cooldown: string;
+            coven?: string[];
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            enabled: boolean;
+            incarnation_name: string;
+            name: string;
+            on_beacon: string;
+            sid?: string;
+            /** Format: date-time */
+            updated_at: string;
+            where?: string;
+        };
+        DriftHostReport: {
+            sid: string;
+            status: string;
+            tasks: components["schemas"]["DriftTaskResult"][] | null;
+        };
+        DriftReport: {
+            /** Format: date-time */
+            checked_at: string;
+            hosts: components["schemas"]["DriftHostReport"][] | null;
+            incarnation: string;
+            scenario_ref: string;
+            summary: components["schemas"]["DriftSummary"];
+        };
+        DriftScanSummary: {
+            /** Format: int64 */
+            hosts_clean: number;
+            /** Format: int64 */
+            hosts_drifted: number;
+            /** Format: int64 */
+            hosts_failed: number;
+            /** Format: int64 */
+            hosts_unsupported: number;
+            /** Format: date-time */
+            scanned_at: string;
+            /** Format: int64 */
+            total_hosts: number;
+        };
+        DriftSummary: {
+            /** Format: int64 */
+            hosts_clean: number;
+            /** Format: int64 */
+            hosts_drifted: number;
+            /** Format: int64 */
+            hosts_failed: number;
+            /** Format: int64 */
+            hosts_unsupported: number;
+        };
+        DriftTaskResult: {
+            action?: string;
+            changed: boolean;
+            /** Format: int64 */
+            idx: number;
+            message?: string;
+            module: string;
+        };
+        ErrandAccepted: {
+            /** @description ULID запущенного Errand-а */
+            errand_id: string;
+            /**
+             * @description строка ещё выполняется (async-escalation)
+             * @enum {string}
+             */
+            status: "running";
+        };
+        ErrandListReply: {
+            items: components["schemas"]["ErrandResult"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ErrandResult: {
+            /** Format: int64 */
+            duration_ms?: number;
+            errand_id: string;
+            error_message?: string;
+            /** Format: int32 */
+            exit_code?: number;
+            /** Format: date-time */
+            finished_at?: string;
+            module: string;
+            output?: {
+                [key: string]: unknown;
+            };
+            sid: string;
+            /** Format: date-time */
+            started_at: string;
+            started_by_aid: string;
+            status: string;
+            stderr?: string;
+            stderr_truncated?: boolean;
+            stdout?: string;
+            stdout_truncated?: boolean;
+        };
+        ErrandRunRequest: {
+            /** @description только для PlanReadSafe-модулей; verb-модуль (shell/exec) → 400 */
+            dry_run?: boolean;
+            /** @description input для модуля (валидируется против input_schema) */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** @description fully-qualified <ns>.<name>.<state> (core.cmd.shell / core.exec.run / ErrandReadSafe-модуль) */
+            module: string;
+            /**
+             * Format: int64
+             * @description полный timeout Errand-а [1..300]; > server-cap (30s) → 202 + Location
+             */
+            timeout_seconds?: number;
+        };
+        EventTypeArea: {
+            name: string;
+        };
+        EventTypeCatalogReply: {
+            areas: components["schemas"]["EventTypeArea"][] | null;
+            point_events: components["schemas"]["EventTypePoint"][] | null;
+        };
+        EventTypePoint: {
+            name: string;
+        };
+        GitRef: {
+            commit: string;
+            is_default?: boolean;
+            name: string;
+            type: string;
+        };
+        GrantOperatorRequest: {
+            /** @description AID архонта, назначаемого в роль/группу (naming-rules.md) */
+            aid: string;
+        };
+        Herald: {
+            config: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            enabled: boolean;
+            name: string;
+            secret_ref?: string;
+            type: string;
             /** Format: date-time */
             updated_at: string;
         };
-        CadenceListReply: {
-            items: components["schemas"]["Cadence"][];
-            offset: number;
+        HeraldCreateRequest: {
+            /** @description per-type config (webhook — { url, опц. headers, опц. http_allowed/allow_private }) */
+            config: {
+                [key: string]: unknown;
+            };
+            /** @description канал включён (опущено → true) */
+            enabled?: boolean;
+            /** @description имя Herald-канала (kebab-case, 1..63), уникальное в кластере */
+            name: string;
+            /** @description опц. vault-ref на signing-token (vault:<mount>/<path>); сам секрет не хранится */
+            secret_ref?: string;
+            /**
+             * @description тип канала (closed-enum, webhook в MVP); значение вне enum → 422
+             * @enum {string}
+             */
+            type: "webhook";
+        };
+        HeraldListReply: {
+            items: components["schemas"]["Herald"][] | null;
+            /** Format: int64 */
             limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
             total: number;
         };
+        HeraldUpdateRequest: {
+            /** @description per-type config (replace — полностью заменяет существующий) */
+            config: {
+                [key: string]: unknown;
+            };
+            /** @description канал включён (опущено → true) */
+            enabled?: boolean;
+            /** @description опц. vault-ref на signing-token; отсутствие очищает подпись */
+            secret_ref?: string;
+            /**
+             * @description тип канала (closed-enum, webhook в MVP)
+             * @enum {string}
+             */
+            type: "webhook";
+        };
+        HumaProblemError: {
+            detail?: string;
+            instance?: string;
+            /** Format: int64 */
+            status: number;
+            title: string;
+            type: string;
+        };
+        IncarnationCheckDriftRequest: {
+            /** @description override converge-параметров (ADR-031 Slice B) */
+            input?: {
+                [key: string]: unknown;
+            };
+        };
+        IncarnationCreateReply: {
+            apply_id?: string;
+            incarnation: string;
+        };
+        IncarnationCreateRequest: {
+            /** @description declared environment-теги (ADR-008 amendment a) */
+            covens?: string[] | null;
+            /** @description input для scenario create */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** @description имя нового instance (kebab-case), корневая Coven-метка */
+            name: string;
+            /** @description имя сервиса из реестра (ADR-029) */
+            service: string;
+        };
+        IncarnationDestroyReply: {
+            apply_id: string;
+        };
+        IncarnationGetReply: {
+            covens: string[] | null;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid: string | null;
+            /** Format: date-time */
+            last_drift_check_at?: string;
+            last_drift_summary?: components["schemas"]["DriftScanSummary"];
+            name: string;
+            service: string;
+            service_version: string;
+            spec: {
+                [key: string]: unknown;
+            };
+            state: {
+                [key: string]: unknown;
+            };
+            /** Format: int32 */
+            state_schema_version: number;
+            status: components["schemas"]["IncarnationStatus"];
+            status_details: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            updated_at: string;
+        };
+        IncarnationHistoryReply: {
+            /** @description страница записей state_history */
+            items: components["schemas"]["StateHistoryEntry"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число записей в наборе
+             */
+            total: number;
+        };
+        IncarnationListReply: {
+            /** @description страница инкарнаций */
+            items: components["schemas"]["IncarnationGetReply"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число записей в наборе
+             */
+            total: number;
+        };
+        IncarnationRerunCreateReply: {
+            apply_id: string;
+            incarnation: string;
+        };
+        IncarnationRerunCreateRequest: {
+            /** @description свободный текст подтверждения */
+            reason: string;
+        };
+        IncarnationRunReply: {
+            apply_id: string;
+            incarnation: string;
+            scenario: string;
+        };
+        IncarnationRunRequest: {
+            /** @description input scenario */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** @description echo path-name (игнорируется) */
+            name?: string;
+            /** @description echo path-scenario (игнорируется) */
+            scenario?: string;
+        };
+        IncarnationSpecHost: {
+            /** @description declared-роль (kebab-case 1..63) или null */
+            role?: string;
+            /** @description SID (FQDN) хоста — обязан существовать в souls */
+            sid: string;
+        };
+        /**
+         * @description Статус runtime-инстанса. В proto константы имеют family-prefix (INCARNATION_STATUS_READY), в JSON API — короткие формы. `drift` — информационный статус Scry (ADR-031), НЕ блокирующий: remediation = обычный apply, который при успехе вернёт incarnation в `ready`.
+         * @enum {string}
+         */
+        IncarnationStatus: "provisioning" | "ready" | "applying" | "error_locked" | "migration_failed" | "drift" | "destroying" | "destroy_failed";
+        IncarnationUnlockReply: {
+            name: string;
+            previous_status: components["schemas"]["IncarnationStatus"];
+            status: components["schemas"]["IncarnationStatus"];
+            /** Format: date-time */
+            unlocked_at: string;
+            unlocked_by_aid: string;
+        };
+        IncarnationUnlockRequest: {
+            /** @description echo path-name (игнорируется) */
+            name?: string;
+            /** @description свободный текст подтверждения */
+            reason: string;
+        };
+        IncarnationUpdateHostsRequest: {
+            /** @description список hosts для mode-операции (пустой legitimate для replace) */
+            hosts: components["schemas"]["IncarnationSpecHost"][] | null;
+            /**
+             * @description тип операции над spec.hosts[]
+             * @enum {string}
+             */
+            mode: "replace" | "append" | "remove";
+        };
+        IncarnationUpgradeReply: {
+            apply_id: string;
+        };
+        IncarnationUpgradeRequest: {
+            /** @description echo path-name (игнорируется) */
+            name?: string;
+            /** @description целевая версия сервиса (git-ref) */
+            to_version: string;
+        };
+        IssueTokenReply: {
+            aid: string;
+            /** Format: date-time */
+            expires_at: string;
+            jwt: string;
+        };
+        ModuleCatalogItem: {
+            description?: string;
+            errand_safe: boolean;
+            kind: string;
+            name: string;
+            namespace?: string;
+            params: components["schemas"]["ModuleParam"][] | null;
+            states: string[] | null;
+        };
+        ModuleCatalogReply: {
+            items: components["schemas"]["ModuleCatalogItem"][] | null;
+        };
+        ModuleFormPrepChoirSource: {
+            /** @description имя incarnation Choir-а */
+            incarnation: string;
+            /** @description имя Choir-а */
+            name: string;
+        };
+        ModuleFormPrepReply: {
+            sids: string[] | null;
+            truncated: boolean;
+        };
+        ModuleFormPrepRequest: {
+            /** @description префикс SID для автокомплита (LIKE prefix%) */
+            prefix?: string;
+            /** @description дискриминатор source-каталога (ровно один из incarnation_hosts/choir) */
+            source: components["schemas"]["ModuleFormPrepSource"];
+        };
+        ModuleFormPrepSource: {
+            /** @description координаты Choir-source (incarnation + имя Choir-а) */
+            choir?: components["schemas"]["ModuleFormPrepChoirSource"];
+            /** @description имя incarnation — live SID-ы её хостов */
+            incarnation_hosts?: string;
+        };
+        ModuleInputSource: {
+            choir?: string;
+            incarnation_hosts?: boolean;
+        };
+        ModuleParam: {
+            description?: string;
+            enum?: unknown[] | null;
+            example?: string;
+            format?: string;
+            items?: components["schemas"]["ModuleParam"];
+            multiline?: boolean;
+            name: string;
+            pattern?: string;
+            required: boolean;
+            secret?: boolean;
+            source?: components["schemas"]["ModuleInputSource"];
+            type?: string;
+        };
+        MyPermission: {
+            action?: string;
+            resource?: string;
+            scope?: components["schemas"]["MyPermissionScope"];
+            wildcard?: boolean;
+        };
+        MyPermissionScope: {
+            covens?: string[];
+            regex?: string[];
+            soulprint?: string[];
+            state?: string[];
+            unrestricted: boolean;
+        };
+        MyPermissionsReply: {
+            permissions: components["schemas"]["MyPermission"][] | null;
+        };
+        OmenCreateRequest: {
+            /** @description vault-ref на master-credential (vault:<mount>/<path>); сам секрет не хранится */
+            auth_ref: string;
+            /** @description URL внешней системы (не секрет) */
+            endpoint: string;
+            /** @description имя Omen-а (kebab-case, 1..63) */
+            name: string;
+            /**
+             * @description тип внешней системы; значение вне enum → 422
+             * @enum {string}
+             */
+            source_type: "vault" | "prometheus" | "elk";
+        };
+        OmenListReply: {
+            items: components["schemas"]["OmenView"][] | null;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int32 */
+            total: number;
+        };
+        OmenView: {
+            auth_ref: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            endpoint: string;
+            name: string;
+            source_type: string;
+        };
+        Operator: {
+            aid: string;
+            auth_method: string;
+            bootstrap_initial: boolean;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            display_name: string;
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            revoked_at?: string;
+        };
+        OperatorCreateReply: {
+            aid: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid: string;
+            display_name: string;
+            jwt: string;
+            roles?: string[];
+        };
+        OperatorCreateRequest: {
+            /** @description AID нового Архонта (naming-rules.md) */
+            aid: string;
+            /** @description человекочитаемое имя для UI/аудита */
+            display_name?: string;
+            /** @description опц. список ролей для atomic create+grant (онбординг одним вызовом); ошибка роли → rollback */
+            roles?: string[] | null;
+        };
+        OperatorListReply: {
+            /** @description страница операторов */
+            items: components["schemas"]["Operator"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число записей в наборе
+             */
+            total: number;
+        };
+        OperatorRevokeRequest: {
+            /** @description свободный текст причины для audit-trail (optional) */
+            reason?: string;
+        };
+        PermissionAction: {
+            action: string;
+            selector_keys: string[] | null;
+        };
+        PermissionCatalogItem: {
+            actions: components["schemas"]["PermissionAction"][] | null;
+            resource: string;
+        };
+        PermissionCatalogReply: {
+            items: components["schemas"]["PermissionCatalogItem"][] | null;
+        };
+        PluginSigilAllowReply: {
+            name: string;
+            namespace: string;
+            ref: string;
+            sha256: string;
+        };
+        PluginSigilAllowRequest: {
+            /** @description имя плагина (как в manifest.name) */
+            name: string;
+            /** @description namespace плагина (тип — cloud/ssh/mod) */
+            namespace: string;
+            /** @description git-tag-ref допуска (стабильная метка, без слешей) */
+            ref: string;
+        };
+        PluginSigilListReply: {
+            items: components["schemas"]["PluginSigilView"][] | null;
+        };
+        PluginSigilView: {
+            /** Format: date-time */
+            allowed_at: string;
+            allowed_by_aid: string;
+            name: string;
+            namespace: string;
+            ref: string;
+            /** Format: date-time */
+            revoked_at?: string;
+            sha256: string;
+        };
+        PushApplyReply: {
+            apply_id: string;
+        };
+        PushApplyRequest: {
+            /** @description удалить устаревшие версии soul-бинаря/модулей в той же SSH-сессии */
+            cleanup_stale_versions?: boolean;
+            /** @description ссылка на Destiny в форме <name>@<ref> */
+            destiny: string;
+            /** @description input для destiny */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** @description список SID (FQDN) target-хостов (transport: ssh) */
+            inventory: string[] | null;
+            /** @description имя SshProvider; по умолчанию первый зарегистрированный */
+            ssh_provider?: string;
+        };
+        PushApplyView: {
+            apply_id: string;
+            cleanup_stale: boolean;
+            destiny_ref: string;
+            /** Format: date-time */
+            finished_at?: string;
+            input?: {
+                [key: string]: unknown;
+            };
+            inventory_sids: string[] | null;
+            ssh_provider?: string;
+            /** Format: date-time */
+            started_at: string;
+            started_by_aid?: string;
+            status: string;
+            summary?: {
+                [key: string]: unknown;
+            };
+        };
+        PushProvider: {
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid: string;
+            name: string;
+            params: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            updated_at: string;
+            updated_by_aid?: string;
+        };
+        PushProviderCreateRequest: {
+            /** @description имя Push-Provider-а (= plugins.ssh_providers[].name) */
+            name: string;
+            /** @description opaque params; sensitive — vault-refs (значения не логируются) */
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        PushProviderListReply: {
+            items: components["schemas"]["PushProvider"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        PushProviderUpdateRequest: {
+            /** @description полный новый набор params (replace); sensitive — vault-refs */
+            params: {
+                [key: string]: unknown;
+            };
+        };
+        PushRunListEntry: {
+            apply_id: string;
+            cleanup_stale: boolean;
+            destiny_ref: string;
+            /** Format: date-time */
+            finished_at?: string;
+            inventory_sids: string[] | null;
+            ssh_provider?: string;
+            /** Format: date-time */
+            started_at: string;
+            started_by_aid?: string;
+            status: string;
+            summary_counts?: components["schemas"]["PushSummaryCounts"];
+        };
+        PushRunListReply: {
+            items: components["schemas"]["PushRunListEntry"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        PushSummaryCounts: {
+            /** Format: int64 */
+            fail_count?: number;
+            /** Format: int64 */
+            success_count?: number;
+            /** Format: int64 */
+            total?: number;
+        };
+        RiteCreateRequest: {
+            /** @description allow-list; форма по source_type Omen-а (передаётся как есть) */
+            allow: unknown;
+            /** @description субъект-grant по Coven-метке (XOR с sid) */
+            coven?: string;
+            /** @description false — брокер (MVP-1); true — делегация (MVP-2) */
+            delegate?: boolean;
+            /** @description Omen, к которому относится grant */
+            omen: string;
+            /** @description субъект-grant по конкретному SID (XOR с coven) */
+            sid?: string;
+            /**
+             * Format: int64
+             * @description лимит использований токена; только vault-delegate
+             */
+            token_num_uses?: number;
+            /** @description TTL минтуемого scoped-токена; только vault-delegate */
+            token_ttl?: string;
+        };
+        RiteListReply: {
+            items: components["schemas"]["RiteView"][] | null;
+        };
+        RiteView: {
+            allow: unknown;
+            coven?: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            delegate: boolean;
+            /** Format: int64 */
+            id: number;
+            omen: string;
+            sid?: string;
+            /** Format: int64 */
+            token_num_uses?: number;
+            token_ttl?: string;
+        };
+        RoleCreateRequest: {
+            /** @description селектор scope роли формы key=v1,v2,… (service/coven/incarnation/host); omitted/null → роль без scope */
+            default_scope?: string;
+            /** @description человекочитаемое описание роли для UI/аудита */
+            description?: string;
+            /** @description имя роли (kebab-case), уникальное в кластере */
+            name: string;
+            /** @description набор permission-строк роли (например incarnation.run, soul.*, *) */
+            permissions?: string[] | null;
+        };
+        RoleListReply: {
+            /** @description каталог ролей (метаданные + permissions + operators) */
+            items: components["schemas"]["RoleView"][] | null;
+        };
+        RolePermissionsUpdateRequest: {
+            /** @description селектор scope: omitted → scope не трогается; присутствует (вкл. null) → заменяет (null снимает scope) */
+            default_scope?: string | null;
+            /** @description полный новый набор permission-строк (replace) */
+            permissions: string[] | null;
+        };
+        RoleView: {
+            builtin: boolean;
+            default_scope?: string;
+            description?: string;
+            name: string;
+            operators: string[] | null;
+            permissions: string[] | null;
+        };
+        Scenario: {
+            description?: string;
+            input_schema?: {
+                [key: string]: unknown;
+            };
+            kind: string;
+            name: string;
+            path: string;
+            runnable: boolean;
+            tags?: string[] | null;
+        };
+        ServiceDependenciesReply: {
+            destiny: components["schemas"]["ServiceDependency"][] | null;
+            modules: components["schemas"]["ServiceDependency"][] | null;
+            ref: string;
+            service: string;
+        };
+        ServiceDependency: {
+            git?: string;
+            name: string;
+            ref: string;
+        };
+        ServiceListReply: {
+            items: components["schemas"]["ServiceView"][] | null;
+        };
+        ServiceRefsListReply: {
+            refs: components["schemas"]["GitRef"][] | null;
+            service: string;
+        };
+        ServiceRegisterRequest: {
+            /** @description git-источник service-репо (URL; не секрет) */
+            git: string;
+            /** @description имя Service-а (kebab-case) */
+            name: string;
+            /** @description git ref (tag/branch) — версия Service-а (ADR-007) */
+            ref: string;
+            /** @description опц. duration авто-refresh ('5m'); опущено — без авто-refresh */
+            refresh?: string;
+        };
+        ServiceScenariosListReply: {
+            /** @description git-ref, на котором составлен listing */
+            ref: string;
+            /** @description scenario из снапшота git-репо Service-а */
+            scenarios: components["schemas"]["Scenario"][] | null;
+            /** @description имя Service-а (дубль path-параметра) */
+            service: string;
+        };
+        ServiceStateSchemaReply: {
+            migrations: components["schemas"]["StateSchemaMigration"][] | null;
+            ref: string;
+            schema?: {
+                [key: string]: unknown;
+            };
+            service: string;
+            /** Format: int64 */
+            state_schema_version: number;
+        };
+        ServiceUpdateRequest: {
+            /** @description новый git-источник */
+            git: string;
+            /** @description новый git ref */
+            ref: string;
+            /** @description опц. duration авто-refresh ('5m') */
+            refresh?: string;
+        };
+        ServiceView: {
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            git: string;
+            name: string;
+            ref: string;
+            refresh?: string;
+            /** Format: date-time */
+            updated_at: string;
+            updated_by_aid?: string;
+        };
+        SigilKeyIntroduceReply: {
+            /** Format: date-time */
+            introduced_at: string;
+            is_primary: boolean;
+            key_id: string;
+            pubkey_pem: string;
+            status: string;
+        };
+        SigilKeyIntroduceRequest: {
+            /** @description сделать новый ключ primary (новые Sigil-ы подписываются им); default false */
+            make_primary?: boolean;
+        };
+        SigilKeyListReply: {
+            items: components["schemas"]["SigilKeyView"][] | null;
+        };
+        SigilKeyView: {
+            /** Format: date-time */
+            introduced_at: string;
+            is_primary: boolean;
+            key_id: string;
+            status: string;
+        };
+        SoulCovenAssignReply: {
+            /**
+             * Format: int32
+             * @description сколько строк фактически изменено
+             */
+            changed: number;
+            /** @description dry-run-прогон без записи */
+            dry_run: boolean;
+            /** @description применённая метка для append/remove (зеркало input) */
+            label: string;
+            /** @description применённый набор меток для replace (зеркало input) */
+            labels?: string[] | null;
+            /**
+             * Format: int32
+             * @description сколько хостов попало под selector ∩ scope
+             */
+            matched: number;
+            /** @description тип операции над covens[] */
+            mode: string;
+            /**
+             * @description completed — все чанки закоммичены; partial — фейл середины
+             * @enum {string}
+             */
+            status: "completed" | "partial";
+        };
+        SoulCovenAssignRequest: {
+            /** @description посчитать matched без UPDATE */
+            dry_run?: boolean;
+            /** @description метка для append/remove (запрещена для replace) */
+            label?: string;
+            /** @description набор для replace (может быть пустым = снять все; запрещён для append/remove) */
+            labels?: string[] | null;
+            /**
+             * @description append — добавить метку; remove — снять; replace — заменить набор
+             * @enum {string}
+             */
+            mode: "append" | "remove" | "replace";
+            /** @description таргетинг (хотя бы один критерий; комбинации AND) */
+            selector: components["schemas"]["SoulCovenAssignSelector"];
+        };
+        SoulCovenAssignSelector: {
+            /** @description без host-фильтра (весь реестр ∩ scope) */
+            all?: boolean;
+            /** @description хосты с этой Coven-меткой */
+            coven?: string;
+            /** @description хосты этой incarnation (корневая Coven-метка) */
+            incarnation?: string;
+            /** @description точечный список хостов (SID = FQDN) */
+            sids?: string[] | null;
+            /**
+             * @description статус Soul в реестре
+             * @enum {string}
+             */
+            status?: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
+        };
+        SoulCreateReply: {
+            bootstrap_token?: string;
+            covens?: string[];
+            created_by_aid: string;
+            /** Format: date-time */
+            expires_at?: string;
+            /** Format: date-time */
+            registered_at: string;
+            sid: string;
+            status: components["schemas"]["SoulStatus"];
+            transport: components["schemas"]["SoulTransport"];
+        };
+        SoulCreateRequest: {
+            /** @description стабильные Coven-метки хоста (kebab-case, ADR-008) */
+            covens?: string[] | null;
+            /** @description server-only заметка (souls.note) */
+            note?: string;
+            /** @description SID нового хоста = FQDN */
+            sid: string;
+            /**
+             * @description способ доставки: agent (mTLS gRPC stream) / ssh (push без агента)
+             * @enum {string}
+             */
+            transport: "agent" | "ssh";
+        };
+        SoulHistoryItem: {
+            /** Format: date-time */
+            finished_at?: string;
+            id: string;
+            incarnation?: string;
+            module?: string;
+            scenario?: string;
+            /** Format: date-time */
+            started_at: string;
+            status: string;
+            type: string;
+            voyage_id?: string;
+        };
+        SoulHistoryReply: {
+            items: components["schemas"]["SoulHistoryItem"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            sid: string;
+            /** Format: int64 */
+            total: number;
+        };
+        SoulIssueTokenReply: {
+            bootstrap_token: string;
+            /** Format: date-time */
+            expires_at: string;
+            sid: string;
+        };
+        SoulListEntry: {
+            covens: string[] | null;
+            created_by_aid: string | null;
+            /** Format: date-time */
+            last_seen_at: string | null;
+            last_seen_by_kid: string | null;
+            /** Format: date-time */
+            registered_at: string;
+            /** Format: date-time */
+            requested_at: string | null;
+            sid: string;
+            status: components["schemas"]["SoulStatus"];
+            transport: components["schemas"]["SoulTransport"];
+        };
+        SoulListReply: {
+            /** @description страница реестра souls */
+            items: components["schemas"]["SoulListEntry"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /** @description opaque keyset-курсор следующей страницы (keyset-режим); отсутствует в offset-режиме и когда набор исчерпан */
+            next_cursor?: string;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора (offset-режим)
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число записей; значимо только в offset-режиме
+             */
+            total: number;
+            /** @description total НЕ точен (keyset-режим); в offset-режиме опущено */
+            total_approximate?: boolean;
+        };
+        SoulSshTarget: {
+            /** @description абсолютный путь установки soul-бинаря (начинается с /) */
+            soul_path: string;
+            /**
+             * Format: int64
+             * @description SSH-порт [1..65535]
+             */
+            ssh_port: number;
+            /** @description опц. имя SshProvider (3-tier routing); пусто → coven/cluster default */
+            ssh_provider?: string;
+            /** @description SSH-пользователь */
+            ssh_user: string;
+        };
+        SoulSshTargetReply: {
+            sid: string;
+            ssh_target: components["schemas"]["SoulSshTarget"];
+        };
+        /**
+         * @description Статус Soul в реестре.
+         * @enum {string}
+         */
+        SoulStatus: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
+        /**
+         * @description Способ доставки конфигурации. agent — демон soul поверх mTLS gRPC stream; ssh — push без агента.
+         * @enum {string}
+         */
+        SoulTransport: "agent" | "ssh";
+        SoulprintCpuFacts: {
+            /**
+             * Format: int32
+             * @description количество logical CPUs (с учётом HT/SMT)
+             */
+            count?: number;
+            model?: string;
+            vendor?: string;
+        };
+        SoulprintFacts: {
+            cpu?: components["schemas"]["SoulprintCpuFacts"];
+            /** @description короткое имя хоста, uname -n */
+            hostname?: string;
+            kernel?: components["schemas"]["SoulprintKernelFacts"];
+            /** @description объёмы памяти в МБ */
+            memory?: components["schemas"]["SoulprintMemoryFacts"];
+            network?: components["schemas"]["SoulprintNetworkFacts"];
+            /** @description факты об операционной системе (ADR-018) */
+            os?: components["schemas"]["SoulprintOsFacts"];
+            /** @description echo SID для логов; authority — mTLS peer cert */
+            sid?: string;
+        };
+        SoulprintKernelFacts: {
+            /** @description только версия ядра (5.15.0) */
+            release?: string;
+            /** @description полная версия с dist-suffix (5.15.0-101-generic) */
+            version?: string;
+        };
+        SoulprintMemoryFacts: {
+            /** Format: int64 */
+            available_mb?: number;
+            /** Format: int64 */
+            swap_mb?: number;
+            /** Format: int64 */
+            total_mb?: number;
+        };
+        SoulprintNetworkFacts: {
+            fqdn?: string;
+            interfaces?: components["schemas"]["SoulprintNetworkInterface"][];
+            /** @description основной IPv4 (интерфейс с default-route) */
+            primary_ip?: string;
+        };
+        SoulprintNetworkInterface: {
+            /** @description IPv4-адреса в CIDR (10.0.0.1/24) */
+            ipv4?: string[];
+            ipv6?: string[];
+            mac?: string;
+            /** Format: int32 */
+            mtu?: number;
+            name?: string;
+        };
+        SoulprintOsFacts: {
+            /** @description amd64 / arm64 */
+            arch?: string;
+            codename?: string;
+            distro?: string;
+            /** @description debian / rhel / alpine / windows / darwin */
+            family?: string;
+            /** @description systemd / openrc / sysv / launchd */
+            init_system?: string;
+            /** @description apt / dnf / apk / pacman */
+            pkg_mgr?: string;
+            version?: string;
+        };
+        SoulprintReadReply: {
+            /**
+             * Format: date-time
+             * @description Soul-side timestamp момента сбора фактов
+             */
+            collected_at?: string;
+            /**
+             * Format: date-time
+             * @description Keeper-side timestamp приёма стрима
+             */
+            received_at?: string;
+            /** @description SID (FQDN) Soul-а */
+            sid: string;
+            /** @description typed-факты Soulprint (ADR-018); byte-passthrough JSONB на wire, форма по proto SoulprintFacts */
+            typed_facts: components["schemas"]["SoulprintFacts"];
+        };
+        StateHistoryEntry: {
+            apply_id: string;
+            changed_by_aid?: string;
+            /** Format: date-time */
+            created_at: string;
+            history_id: string;
+            scenario: string;
+            state_after: {
+                [key: string]: unknown;
+            };
+            state_before: {
+                [key: string]: unknown;
+            };
+        };
+        StateSchemaMigration: {
+            /** Format: int64 */
+            from: number;
+            path: string;
+            /** Format: int64 */
+            to: number;
+        };
+        SynodCreateRequest: {
+            /** @description человекочитаемое описание группы для UI/аудита */
+            description?: string;
+            /** @description имя Synod-группы (kebab-case), уникальное в кластере */
+            name: string;
+        };
+        SynodGrantRoleRequest: {
+            /** @description имя роли, добавляемой в bundle группы */
+            role: string;
+        };
+        SynodListReply: {
+            items: components["schemas"]["SynodView"][] | null;
+        };
+        SynodUpdateRequest: {
+            /** @description новое человекочитаемое описание группы для UI/аудита */
+            description: string;
+        };
+        SynodView: {
+            builtin: boolean;
+            description?: string;
+            name: string;
+            operators: string[] | null;
+            roles: string[] | null;
+        };
+        Tiding: {
+            annotations?: {
+                [key: string]: unknown;
+            };
+            cadence?: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            enabled: boolean;
+            ephemeral?: boolean;
+            event_types: string[] | null;
+            herald: string;
+            incarnation?: string;
+            name: string;
+            only_changes: boolean;
+            only_failures: boolean;
+            projection?: string[];
+            task?: string;
+            /** Format: date-time */
+            updated_at: string;
+            voyage_id?: string;
+        };
+        TidingCreateRequest: {
+            /** @description статические поля оператора, мержатся в тело webhook ключом annotations */
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description опц. селектор привязки к Cadence-расписанию-источнику */
+            cadence?: string;
+            /** @description правило включено (опущено → true) */
+            enabled?: boolean;
+            /** @description список event-types в scope прогонов (area-glob или точный); пустой → 422 */
+            event_types: string[] | null;
+            /** @description имя Herald-канала доставки (FK на heralds.name) */
+            herald: string;
+            /** @description опц. селектор привязки к инкарнации-источнику */
+            incarnation?: string;
+            /** @description имя Tiding-правила (kebab-case, 1..63) */
+            name: string;
+            /** @description доставлять только при изменениях (опущено → false) */
+            only_changes?: boolean;
+            /** @description доставлять только провалы (опущено → false) */
+            only_failures?: boolean;
+            /** @description allow-list путей payload; пусто/опущено — полная форма */
+            projection?: string[];
+            /** @description опц. селектор подписки на конкретную задачу (register ∪ id из changed_tasks) */
+            task?: string;
+        };
+        TidingListReply: {
+            items: components["schemas"]["Tiding"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        TidingUpdateRequest: {
+            /** @description статические поля оператора (replace — отсутствие очищает) */
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description опц. селектор привязки к Cadence; отсутствие очищает */
+            cadence?: string;
+            /** @description правило включено (опущено → true) */
+            enabled?: boolean;
+            /** @description список event-types в scope прогонов (replace) */
+            event_types: string[] | null;
+            /** @description имя Herald-канала доставки (FK) */
+            herald: string;
+            /** @description опц. селектор привязки к инкарнации; отсутствие очищает */
+            incarnation?: string;
+            /** @description доставлять только при изменениях (опущено → false) */
+            only_changes?: boolean;
+            /** @description доставлять только провалы (опущено → false) */
+            only_failures?: boolean;
+            /** @description allow-list путей payload (replace — отсутствие = полная форма) */
+            projection?: string[];
+            /** @description опц. селектор подписки на задачу; отсутствие очищает */
+            task?: string;
+        };
+        VigilCreateRequest: {
+            /** @description адрес core-beacon (напр. 'core.beacon.file_changed') */
+            check: string;
+            /** @description субъект-метки coven (XOR с sid) */
+            coven?: string[];
+            /** @description активна ли проверка (по умолчанию true) */
+            enabled?: boolean;
+            /** @description частота проверки (duration-конвенция, напр. '30s') */
+            interval: string;
+            /** @description имя Vigil-а (kebab-case, 1..63) */
+            name: string;
+            /** @description параметры проверки; форма зависит от check (передаётся как есть) */
+            params?: unknown;
+            /** @description субъект — один конкретный SID (XOR с coven) */
+            sid?: string;
+        };
+        VigilListReply: {
+            items: components["schemas"]["VigilView"][] | null;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            /** Format: int32 */
+            total: number;
+        };
+        VigilView: {
+            check: string;
+            coven?: string[];
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            enabled: boolean;
+            interval: string;
+            name: string;
+            params: unknown;
+            sid?: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        Voice: {
+            /** Format: date-time */
+            added_at: string;
+            added_by_aid: string | null;
+            choir_name: string;
+            incarnation_name: string;
+            /** Format: int64 */
+            position: number | null;
+            role: string | null;
+            sid: string;
+        };
+        VoiceAddRequest: {
+            /**
+             * Format: int64
+             * @description порядковый индекс в партии (≥ 0)
+             */
+            position?: number;
+            /** @description declared-роль (kebab-case, 1..63) */
+            role?: string;
+            /** @description SID (FQDN) хоста — член инкарнации */
+            sid: string;
+        };
+        VoiceListReply: {
+            items: components["schemas"]["Voice"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        Voyage: {
+            /** Format: int64 */
+            attempt: number;
+            batch_mode?: string;
+            /** Format: int64 */
+            batch_percent?: number;
+            /** Format: int64 */
+            batch_size?: number;
+            /** Format: int64 */
+            concurrency?: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            current_batch_index: number;
+            dry_run: boolean;
+            /** Format: int64 */
+            fail_threshold?: number;
+            /** Format: date-time */
+            finished_at?: string;
+            kind: string;
+            module?: string;
+            on_failure?: string;
+            require_alive?: boolean;
+            scenario_name?: string;
+            /** Format: date-time */
+            schedule_at?: string;
+            /** Format: int64 */
+            scope_size: number;
+            /** Format: date-time */
+            started_at?: string;
+            started_by_aid: string;
+            status: string;
+            summary?: components["schemas"]["VoyageSummary"];
+            target?: components["schemas"]["VoyageTarget"];
+            /** Format: int64 */
+            total_batches: number;
+            voyage_id: string;
+        };
+        VoyageCancelReply: {
+            status: string;
+            voyage_id: string;
+        };
+        VoyageCreateReply: {
+            kind: string;
+            location: string;
+            /** Format: int64 */
+            scope_size: number;
+            status: string;
+            voyage_id: string;
+        };
+        VoyageCreateRequest: {
+            /** @description размер батча: N хостов или N% */
+            batch?: string;
+            /** @description barrier (default) | window */
+            batch_mode?: string;
+            /** Format: int64 */
+            batch_percent?: number;
+            /** Format: int64 */
+            batch_size?: number;
+            /** Format: int64 */
+            concurrency?: number;
+            dry_run?: boolean;
+            /** Format: int64 */
+            fail_threshold?: number;
+            /** @description параметры рецепта */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** Format: int64 */
+            inter_batch_interval_ms?: number;
+            /** Format: int64 */
+            inter_unit_interval_ms?: number;
+            /**
+             * @description тип рецепта прогона
+             * @enum {string}
+             */
+            kind: "scenario" | "command";
+            /** @description порог провалов: N абсолют или N% */
+            max_failures?: string;
+            /** @description модуль для kind=command */
+            module?: string;
+            /** @description разовые подписки на ЭТОТ прогон (ephemeral) */
+            notify?: components["schemas"]["VoyageNotify"][] | null;
+            /** @description abort | continue (default) */
+            on_failure?: string;
+            require_alive?: boolean;
+            /** @description имя сценария для kind=scenario */
+            scenario_name?: string;
+            /**
+             * Format: date-time
+             * @description RFC3339 отложенный старт
+             */
+            schedule_at?: string;
+            /** @description декларативный таргет (резолвится в snapshot единиц) */
+            target: components["schemas"]["VoyageTarget"];
+        };
+        VoyageListReply: {
+            items: components["schemas"]["Voyage"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        VoyageNotify: {
+            annotations?: {
+                [key: string]: unknown;
+            };
+            /** @description имя канала-герольда */
+            herald: string;
+            /** @description терминалы/типы событий: completed|failed|partial */
+            on?: string[] | null;
+            only_changes?: boolean;
+            only_failures?: boolean;
+            projection?: string[] | null;
+        };
+        VoyagePreviewReply: {
+            batch_mode: string;
+            /** Format: int64 */
+            effective_batch_size?: number;
+            kind: string;
+            /** Format: int64 */
+            scope_size: number;
+            /** Format: int64 */
+            total_batches: number;
+        };
+        VoyageSummary: {
+            /** Format: int64 */
+            cancelled: number;
+            /** Format: int64 */
+            failed: number;
+            /** Format: int64 */
+            no_match?: number;
+            /** Format: int64 */
+            succeeded: number;
+            /** Format: int64 */
+            total: number;
+        };
+        VoyageTarget: {
+            /** @description coven-метки (env-тег scenario / метка хоста command) */
+            coven?: string[] | null;
+            /** @description имена инкарнаций (scenario-режим) */
+            incarnations?: string[] | null;
+            /** @description имя сервиса (scenario-режим) */
+            service?: string;
+            /** @description SID-ы хостов (command-режим) */
+            sids?: string[] | null;
+            /** @description CEL-предикат как ДОПОЛНЕНИЕ к sids/coven (command-режим) */
+            where?: string;
+        };
+        VoyageTargetEntry: {
+            apply_id?: string;
+            /** Format: int64 */
+            batch_index: number;
+            errand_id?: string;
+            /** Format: date-time */
+            finished_at?: string;
+            status: string;
+            target_id: string;
+            target_kind: string;
+        };
+        VoyageTargetsReply: {
+            targets: components["schemas"]["VoyageTargetEntry"][] | null;
+            voyage_id: string;
+        };
     };
-    responses: {
-        /** @description Malformed request (синтаксис JSON, неверные query-params). */
-        Problem400: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /** @description Unauthenticated — JWT отсутствует, не валиден или истёк. */
-        Problem401: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /** @description Forbidden — RBAC-проверка не прошла. */
-        Problem403: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /**
-         * @description Ресурс не существует (not-found, role-not-found — роли нет или AID
-         *     не член роли).
-         */
-        Problem404: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /**
-         * @description Conflict (incarnation-locked, migration-failed, would-lock-out-cluster,
-         *     incarnation-already-exists, operator-already-exists, soul-already-exists,
-         *     bootstrap-token-active, role-already-exists, role-builtin).
-         */
-        Problem409: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /**
-         * @description Validation failed — семантическая ошибка (input не соответствует
-         *     scenario input-схеме, profile params не соответствует profile_schema,
-         *     невалидный AID, отсутствует allow_destroy).
-         */
-        Problem422: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /** @description Internal error. */
-        Problem500: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /**
-         * @description Bad gateway — upstream-ресурс (внешний git, …) недоступен или вернул
-         *     ошибку. Keeper исправен, проблема за его пределами.
-         */
-        Problem502: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-        /**
-         * @description Too many requests — per-AID rate-limit Tempo превышен (tempo-exceeded,
-         *     ADR-050): оператор слишком часто дёргает resolver-тяжёлый write-эндпоинт.
-         *     Заголовок Retry-After — секунды до пополнения хотя бы одного токена.
-         */
-        Problem429: {
-            headers: {
-                /** @description Секунды до пополнения хотя бы одного токена бакета. */
-                "Retry-After"?: number;
-                [name: string]: unknown;
-            };
-            content: {
-                "application/problem+json": components["schemas"]["ProblemDetails"];
-            };
-        };
-    };
-    parameters: {
-        /** @description AID Архонта (naming-rules.md). */
-        AidPath: string;
-        /** @description Имя incarnation (kebab-case). */
-        IncarnationNamePath: string;
-        /** @description Имя роли (kebab-case). */
-        RoleNamePath: string;
-        /** @description Имя Synod-группы (kebab-case). */
-        SynodNamePath: string;
-        /** @description Имя роли в bundle Synod-группы (kebab-case). */
-        SynodRoleNamePath: string;
-        /** @description Имя Service-а (kebab-case). */
-        ServiceNamePath: string;
-        /** @description Имя Omen-а (kebab-case, 1..63). */
-        OmenNamePath: string;
-        /** @description Суррогатный id Rite-а. */
-        RiteIDPath: number;
-        /** @description Имя Omen-а — обязательный фильтр списка Rite-ов (augur.md §6). */
-        RiteOmenQuery: string;
-        /** @description Имя Vigil-а / Decree-а (kebab-case, 1..63). */
-        OracleNamePath: string;
-        /**
-         * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-         *     экранирования). См. operator-api.md → Conventions → ID в path.
-         */
-        SidPath: string;
-        /** @description Имя Choir-а внутри инкарнации (kebab/snake, начинается с буквы, ADR-044). */
-        ChoirNamePath: string;
-        /** @description Сдвиг от начала набора (default 0). */
-        OffsetQuery: number;
-        /** @description Размер страницы (1..1000, default 50). */
-        LimitQuery: number;
-        /**
-         * @description Opaque keyset-курсор (ADR-047 S3b-2a): значение `next_cursor` из
-         *     предыдущего ответа. Взаимоисключающ с `offset>0` (одновременно → 422).
-         *     Битый курсор → 400.
-         */
-        CursorQuery: string;
-        /** @description Namespace плагина (тип — cloud / ssh / mod). */
-        PluginNamespacePath: string;
-        /** @description Имя плагина (kebab-case, как в manifest.name). */
-        PluginNamePath: string;
-        /**
-         * @description Operator-asserted метка версии (tag-ref вида v1.2.3). Одиночный
-         *     path-сегмент; branch-ref со слешем в MVP не поддерживается.
-         */
-        PluginRefPath: string;
-        /** @description id ключа подписи (SHA-256(SPKI), hex lowercase). */
-        SigilKeyIDPath: string;
-    };
+    responses: never;
+    parameters: never;
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    GetHealthz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Процесс жив. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthStatus"];
-                };
-            };
-        };
-    };
-    GetReadyz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Все зависимости доступны. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthStatus"];
-                };
-            };
-            /** @description Какая-либо зависимость недоступна. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReadinessStatus"];
-                };
-            };
-        };
-    };
-    GetOpenapiSpec: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OpenAPI 3.0.3 spec. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/yaml": string;
-                };
-            };
-        };
-    };
-    ListOperators: {
+    listAuditEvents: {
         parameters: {
             query?: {
-                /** @description Фильтр по форме credential. */
-                auth_method?: "jwt" | "mtls" | "combined";
-                /**
-                 * @description false — только активные (revoked_at IS NULL). true — включая
-                 *     ревокнутых. Default = false (UI-friendly).
-                 */
-                revoked?: boolean;
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Лента Архонтов под фильтром. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OperatorListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OperatorCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Архонт создан, JWT выпущен. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OperatorCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description AID Архонта (naming-rules.md). */
-                aid: components["parameters"]["AidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Archon найден. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Operator"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListAuditEvents: {
-        parameters: {
-            query?: {
-                /** @description Multi-value `?type=X&type=Y`. Exact-match OR (event_type IN (X,Y)). */
-                type?: string[];
-                /** @description Multi-value `?source=api&source=mcp`. Exact-match OR. */
-                source?: ("signal" | "api" | "mcp" | "keeper_internal" | "soul_grpc" | "background")[];
-                /** @description AID Архонта-инициатора (exact match). */
+                /** @description multi-value ?type=X&type=Y — exact-match OR по event_type */
+                type?: string[] | null;
+                /** @description multi-value ?source=api&source=mcp — exact-match OR; значение вне enum → 422 */
+                source?: ("signal" | "api" | "mcp" | "keeper_internal" | "soul_grpc" | "background" | "config_bootstrap")[] | null;
+                /** @description AID Архонта-инициатора (exact match) */
                 archon_aid?: string;
-                /** @description ULID цепочки связанных событий (exact match). */
+                /** @description ULID цепочки связанных событий (exact match) */
                 correlation_id?: string;
-                /**
-                 * @description Имя Herald-канала из payload (`payload->>'herald'`, exact match).
-                 *     Для истории доставок одного канала (события herald.delivered /
-                 *     herald.failed несут поле herald в payload).
-                 */
+                /** @description имя Herald-канала из payload->>'herald' (exact match) */
                 payload_herald?: string;
-                /**
-                 * @description voyage_id из payload (`payload->>'voyage_id'`, exact match). Для
-                 *     Voyage detail: собирает per-incarnation run-события вояжа
-                 *     (incarnation.run_completed несёт correlation_id=apply_id, а не
-                 *     voyage_id, поэтому фильтр по correlation_id их не находит).
-                 */
+                /** @description voyage_id из payload->>'voyage_id' (exact match) */
                 payload_voyage?: string;
-                /** @description created_at >= started_after (RFC3339, включающая). */
+                /** @description created_at >= started_after (RFC3339, включающая); bad-value → 400 */
                 started_after?: string;
-                /** @description created_at <= started_before (RFC3339, включающая). */
+                /** @description created_at <= started_before (RFC3339, включающая); bad-value → 400 */
                 started_before?: string;
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -5201,7 +3542,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Лента audit-events под фильтром. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5210,2584 +3551,51 @@ export interface operations {
                     "application/json": components["schemas"]["AuditEventListReply"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RevokeOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description AID Архонта (naming-rules.md). */
-                aid: components["parameters"]["AidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["OperatorRevokeRequest"];
-            };
-        };
-        responses: {
-            /** @description Архонт отозван. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    IssueOperatorToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description AID Архонта (naming-rules.md). */
-                aid: components["parameters"]["AidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description JWT выпущен. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IssueTokenReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListRoles: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Каталог ролей. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RoleListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateRole: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RoleCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Роль создана. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DeleteRole: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя роли (kebab-case). */
-                name: components["parameters"]["RoleNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Роль удалена. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpdateRolePermissions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя роли (kebab-case). */
-                name: components["parameters"]["RoleNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RolePermissionsUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Набор permissions заменён. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GrantRoleOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя роли (kebab-case). */
-                name: components["parameters"]["RoleNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GrantOperatorRequest"];
-            };
-        };
-        responses: {
-            /** @description Оператор назначен в роль. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RevokeRoleOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя роли (kebab-case). */
-                name: components["parameters"]["RoleNamePath"];
-                /** @description AID Архонта (naming-rules.md). */
-                aid: components["parameters"]["AidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Оператор снят с роли. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListSynods: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Каталог групп. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SynodListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateSynod: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SynodCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Группа создана. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DeleteSynod: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Synod-группы (kebab-case). */
-                name: components["parameters"]["SynodNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Группа удалена. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpdateSynod: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Synod-группы (kebab-case). */
-                name: components["parameters"]["SynodNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SynodUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Описание группы изменено. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    AddSynodOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Synod-группы (kebab-case). */
-                name: components["parameters"]["SynodNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GrantOperatorRequest"];
-            };
-        };
-        responses: {
-            /** @description Архон добавлен в группу. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RemoveSynodOperator: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Synod-группы (kebab-case). */
-                name: components["parameters"]["SynodNamePath"];
-                /** @description AID Архонта (naming-rules.md). */
-                aid: components["parameters"]["AidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Архон убран из группы. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GrantSynodRole: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Synod-группы (kebab-case). */
-                name: components["parameters"]["SynodNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SynodGrantRoleRequest"];
-            };
-        };
-        responses: {
-            /** @description Роль добавлена в bundle. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RevokeSynodRole: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Synod-группы (kebab-case). */
-                name: components["parameters"]["SynodNamePath"];
-                /** @description Имя роли в bundle Synod-группы (kebab-case). */
-                role_name: components["parameters"]["SynodRoleNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Роль снята из bundle. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListIncarnations: {
-        parameters: {
-            query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-                /** @description Фильтр по имени сервиса. */
-                service?: string;
-                /** @description Фильтр по статусу. */
-                status?: components["schemas"]["IncarnationStatus"];
-                /**
-                 * @description Фильтр по declared env-тегу incarnation (exact-match по any-of
-                 *     в `incarnation.covens[]`, ADR-008 amendment a). Multi-value (OR) —
-                 *     пост-MVP (`?coven_any=`).
-                 */
-                coven?: string;
-                /**
-                 * @description Фильтр по полю jsonb-колонки `state` (jsonb-pushdown, фаза 1).
-                 *     Семейство динамических query-параметров: `state.<field>=<value>`
-                 *     (равенство) либо `state.<field>=<op>:<value>` для сравнения, где
-                 *     `<op>` ∈ `eq|ne|gt|gte|lt|lte` (gt/gte/lt/lte — числовое сравнение
-                 *     через `::numeric`). Несколько `state.*`-параметров AND-комбинируются.
-                 *     `<field>` валидируется форматным whitelist-ом `^[a-z][a-z0-9_]*$`
-                 *     (только top-level ключи; вложенный путь — не MVP). Существование
-                 *     поля против service-specific state_schema НЕ проверяется:
-                 *     несуществующее поле даёт пустой результат. Невалидный `<field>`,
-                 *     `<op>` либо нечисловое `<value>` при числовом `<op>`
-                 *     (`gt/gte/lt/lte`) → 422. Примеры: `?state.redis_version=8.0`,
-                 *     `?state.memory_mb=gt:1000`.
-                 */
-                "state.{field}"?: string;
-                /**
-                 * @description Поле сортировки: базовая колонка `created_at` / `name` / `status` /
-                 *     `service` либо `state.<field>` (сортировка по jsonb-полю через
-                 *     `->>`, текстовое сравнение). По умолчанию (не задан) — порядок
-                 *     `created_at DESC, name ASC`. Tie-break по `name ASC` добавляется
-                 *     всегда (стабильная пагинация). Неизвестное поле → 422.
-                 */
-                sort?: string;
-                /**
-                 * @description Направление сортировки для `sort`. По умолчанию `asc`. Игнорируется
-                 *     без `sort`. Любое значение кроме `asc`/`desc` → 422.
-                 */
-                sort_dir?: "asc" | "desc";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница списка. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateIncarnation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncarnationCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Запуск принят. apply_id для опроса статуса. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetIncarnation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Состояние incarnation-а. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationGetReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DestroyIncarnation: {
-        parameters: {
-            query: {
-                /**
-                 * @description Confirmation flag (обязателен; отсутствует/не-boolean → 400).
-                 *     false — destroy через teardown scenario `destroy` (нет scenario в
-                 *     снапшоте сервиса → 422); true — снос без teardown (force, DELETE
-                 *     строки напрямую). Маппится в internal force. Симметрия с MCP-tool
-                 *     keeper.incarnation.destroy.
-                 */
-                allow_destroy: boolean;
-            };
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Запуск destroy принят. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationDestroyReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RunIncarnationScenario: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-                /** @description Имя сценария из scenario/<scenario>/. */
-                scenario: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["IncarnationRunRequest"];
-            };
-        };
-        responses: {
-            /** @description Запуск scenario принят. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationRunReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetIncarnationHistory: {
-        parameters: {
-            query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-            };
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница state_history. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationHistoryReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UnlockIncarnation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncarnationUnlockRequest"];
-            };
-        };
-        responses: {
-            /** @description Unlock выполнен. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationUnlockReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CheckIncarnationDrift: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["IncarnationCheckDriftRequest"];
-            };
-        };
-        responses: {
-            /** @description DriftReport собран. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DriftReport"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpgradeIncarnation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncarnationUpgradeRequest"];
-            };
-        };
-        responses: {
-            /** @description Запуск upgrade принят. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationUpgradeReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RerunCreateIncarnation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncarnationRerunCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Rerun-create принят. apply_id для опроса статуса. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationRerunCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpdateIncarnationHosts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncarnationUpdateHostsRequest"];
-            };
-        };
-        responses: {
-            /** @description Обновлённый incarnation. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationGetReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListChoirs: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Список Choir-ов. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChoirListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateChoir: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChoirCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Choir создан. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Choir"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DeleteChoir: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-                /** @description Имя Choir-а внутри инкарнации (kebab/snake, начинается с буквы, ADR-044). */
-                choir: components["parameters"]["ChoirNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Choir удалён. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListVoices: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-                /** @description Имя Choir-а внутри инкарнации (kebab/snake, начинается с буквы, ADR-044). */
-                choir: components["parameters"]["ChoirNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Список Voice-ов. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoiceListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    AddVoice: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-                /** @description Имя Choir-а внутри инкарнации (kebab/snake, начинается с буквы, ADR-044). */
-                choir: components["parameters"]["ChoirNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VoiceAddRequest"];
-            };
-        };
-        responses: {
-            /** @description Voice добавлен. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Voice"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RemoveVoice: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя incarnation (kebab-case). */
-                name: components["parameters"]["IncarnationNamePath"];
-                /** @description Имя Choir-а внутри инкарнации (kebab/snake, начинается с буквы, ADR-044). */
-                choir: components["parameters"]["ChoirNamePath"];
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Voice удалён. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListSouls: {
-        parameters: {
-            query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-                /**
-                 * @description Opaque keyset-курсор (ADR-047 S3b-2a): значение `next_cursor` из
-                 *     предыдущего ответа. Взаимоисключающ с `offset>0` (одновременно → 422).
-                 *     Битый курсор → 400.
-                 */
-                cursor?: components["parameters"]["CursorQuery"];
-                /**
-                 * @description Фильтр по coven-меткам (exact-match по любому значению из
-                 *     souls.coven[]). Несколько значений — повторение query-параметра.
-                 */
-                coven?: string[];
-                /** @description Фильтр по статусу. */
-                status?: components["schemas"]["SoulStatus"];
-                /** @description Фильтр по транспорту. */
-                transport?: components["schemas"]["SoulTransport"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница списка Souls. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateSoul: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SoulCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Soul зарегистрирована; для agent — bootstrap-токен выпущен. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    AssignSoulCoven: {
-        parameters: {
-            query?: {
-                /**
-                 * @description true — посчитать matched под selector ∩ scope без UPDATE.
-                 *     Эквивалент поля dry_run в теле (OR-объединение).
-                 */
-                dry_run?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SoulCovenAssignRequest"];
-            };
-        };
-        responses: {
-            /**
-             * @description Операция выполнена (status: completed) или частично (status:
-             *     partial — часть чанков закоммичена до фейла). dry_run — matched без
-             *     изменений.
-             */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulCovenAssignReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetSoul: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Запись Soul (та же проекция, что в list). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulListEntry"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetSoulprint: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Typed-SoulprintReport. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulprintReadReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            /** @description Soulprint не приходил (запись Soul-а есть, фактов нет). */
-            410: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetSoulHistory: {
-        parameters: {
-            query?: {
-                /**
-                 * @description Фильтр по источнику (multi-value OR, ?type=scenario&type=errand).
-                 *     Пусто — оба источника.
-                 */
-                type?: ("scenario" | "errand")[];
-                /** @description RFC3339; вернуть только записи с started_at > value. */
-                since?: string;
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-            };
-            header?: never;
-            path: {
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Per-host timeline (paged, started_at DESC). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulHistoryReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    IssueSoulToken: {
-        parameters: {
-            query?: {
-                /**
-                 * @description true — истечь активный токен и выпустить новый. При false и
-                 *     наличии активного токена → 409 bootstrap-token-active.
-                 */
-                force?: boolean;
-            };
-            header?: never;
-            path: {
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Новый bootstrap-токен выпущен. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulIssueTokenReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpdateSoulSshTarget: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SoulSshTargetRequest"];
-            };
-        };
-        responses: {
-            /** @description Snapshot сохранённой записи ssh_target. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SoulSshTargetReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ErrandExec: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description SID = FQDN хоста, URL-encoded в path-сегменте (точки допустимы без
-                 *     экранирования). См. operator-api.md → Conventions → ID в path.
-                 */
-                sid: components["parameters"]["SidPath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ErrandRunRequest"];
-            };
-        };
-        responses: {
-            /** @description Errand завершился синхронно (терминал получен до server-cap). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrandResult"];
-                };
-            };
-            /**
-             * @description Async-эскалация: server-cap 30s превышен, Errand продолжает выполняться.
-             *     Location-header — URL для polling-а. Финальный результат — GET /v1/errands/{errand_id}.
-             */
-            202: {
-                headers: {
-                    /** @description URL для polling-а финального результата. */
-                    Location?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrandAccepted"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListErrands: {
-        parameters: {
-            query?: {
-                /** @description FQDN целевого Soul. */
-                sid?: string;
-                /** @description Терминальный или running статус. */
-                status?: "running" | "success" | "failed" | "timed_out" | "cancelled" | "module_not_allowed";
-                /** @description Фильтр по началу (started_at > value). */
-                started_after?: string;
-                /**
-                 * @description Multi-value `?module=X&module=Y`. Exact-match OR (module IN (X,Y));
-                 *     regex/glob не поддерживается (ТЗ UI iter 2).
-                 */
-                module?: string[];
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Список Errand-ов под фильтром. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrandListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetErrand: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description ULID Errand-а. */
-                errand_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Терминальное состояние Errand-а. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrandResult"];
-                };
-            };
-            /** @description Errand ещё running, повторите запрос позже. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrandAccepted"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CancelErrand: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description ULID Errand-а. */
-                errand_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cancel-сигнал отправлен Soul-у. Финальный статус — GET /v1/errands/{errand_id}. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListVoyages: {
-        parameters: {
-            query?: {
-                /** @description Exact-match по kind. */
-                kind?: "scenario" | "command";
-                /** @description Multi-value `?status=X&status=Y`; OR-семантика. */
-                status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[];
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница Voyage-прогонов под фильтром. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoyageListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateVoyage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VoyageCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Voyage создан (pending/scheduled). VoyageWorker подберёт через claim-loop. */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoyageCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            429: components["responses"]["Problem429"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    PreviewVoyage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VoyageCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Резолвнутый scope (числа, без SID-списка). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoyagePreviewReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            429: components["responses"]["Problem429"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetVoyage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description ULID Voyage-а. */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Snapshot. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Voyage"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CancelVoyage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Voyage отменён (pending/scheduled → cancelled). */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoyageCancelReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListVoyageTargets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Единицы прогона. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoyageTargetsReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListCadences: {
-        parameters: {
-            query?: {
-                /** @description true → только enabled; false / опущен → все. */
-                enabled?: "true" | "false";
-                /** @description Exact-match по kind рецепта. */
-                kind?: "scenario" | "command";
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница Cadence-расписаний под фильтром. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CadenceListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreateCadence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CadenceCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Cadence создан. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CadenceCreateReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            /** @description Невалидный рецепт/расписание: XOR interval/cron, enum overlap/kind, kind↔scenario_name/module, битый cron, sane-bounds, либо floor-лимит (interval_seconds < 30s, ADR-046 Pass B). */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetCadence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description ULID Cadence. */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Деталь. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Cadence"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DeleteCadence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cadence снят. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    PatchCadence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CadencePatchRequest"];
-            };
-        };
-        responses: {
-            /** @description Cadence обновлён. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Cadence"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            /** @description Невалидный рецепт/расписание, либо floor-лимит (interval_seconds < 30s, ADR-046 Pass B) — в т.ч. при переводе расписания на interval. */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            500: components["responses"]["Problem500"];
-        };
-    };
-    EnableCadence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cadence включён. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CadenceEnabledReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DisableCadence: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cadence выключен. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CadenceEnabledReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListCadenceRuns: {
-        parameters: {
-            query?: {
-                /** @description Multi-value `?status=X&status=Y`; OR-семантика. */
-                status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[];
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница дочерних Voyage-прогонов. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VoyageListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListPluginSigils: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Лента активных допусков. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginSigilListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    AllowPluginSigil: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PluginSigilAllowRequest"];
-            };
-        };
-        responses: {
-            /** @description Плагин допущен; в теле sha256 одобренного бинаря. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PluginSigilAllowReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RevokePluginSigil: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Namespace плагина (тип — cloud / ssh / mod). */
-                namespace: components["parameters"]["PluginNamespacePath"];
-                /** @description Имя плагина (kebab-case, как в manifest.name). */
-                name: components["parameters"]["PluginNamePath"];
-                /**
-                 * @description Operator-asserted метка версии (tag-ref вида v1.2.3). Одиночный
-                 *     path-сегмент; branch-ref со слешем в MVP не поддерживается.
-                 */
-                ref: components["parameters"]["PluginRefPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Допуск отозван. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListSigilKeys: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Лента active-ключей подписи. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SigilKeyListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    IntroduceSigilKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["SigilKeyIntroduceRequest"];
-            };
-        };
-        responses: {
-            /** @description Ключ введён; в теле key_id + публичный ключ (без приватника). */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SigilKeyIntroduceReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    SetPrimarySigilKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description id ключа подписи (SHA-256(SPKI), hex lowercase). */
-                key_id: components["parameters"]["SigilKeyIDPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Ключ стал primary. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RetireSigilKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description id ключа подписи (SHA-256(SPKI), hex lowercase). */
-                key_id: components["parameters"]["SigilKeyIDPath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Ключ выведен. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListServices: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Реестр Service-ов. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    RegisterService: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ServiceRegisterRequest"];
-            };
-        };
-        responses: {
-            /** @description Service зарегистрирован. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceView"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetService: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Запись Service-а. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceView"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DeregisterService: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Service удалён из реестра. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpdateService: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ServiceUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Service обновлён. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceView"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListServiceRefs: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Список ref-ов. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceRefsListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-            502: components["responses"]["Problem502"];
-        };
-    };
-    ListServiceScenarios: {
-        parameters: {
-            query?: {
-                /**
-                 * @description git-ref для проверки. Если не задан — берётся ref из реестра
-                 *     Service-а.
-                 */
-                ref?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Список scenario. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceScenariosListReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-            502: components["responses"]["Problem502"];
-        };
-    };
-    ListServiceStateSchema: {
-        parameters: {
-            query?: {
-                /**
-                 * @description git-ref для проверки. Если не задан — берётся ref из реестра
-                 *     Service-а.
-                 */
-                ref?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description state_schema-метаданные. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceStateSchemaReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-            502: components["responses"]["Problem502"];
-        };
-    };
-    ListServiceDependencies: {
-        parameters: {
-            query?: {
-                /**
-                 * @description git-ref для проверки. Если не задан — берётся ref из реестра
-                 *     Service-а.
-                 */
-                ref?: string;
-            };
-            header?: never;
-            path: {
-                /** @description Имя Service-а (kebab-case). */
-                name: components["parameters"]["ServiceNamePath"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description git-зависимости сервиса. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ServiceDependenciesReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-            502: components["responses"]["Problem502"];
-        };
-    };
-    ListModules: {
-        parameters: {
-            query?: {
-                /**
-                 * @description При `true` — только модули с хотя бы одним errand-safe state
-                 *     (core.cmd / core.exec / core.http + plugin-модули с marker-ом
-                 *     ErrandReadSafe, ADR-033).
-                 */
-                errand_safe?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Каталог модулей. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModuleCatalogReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetModule: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Полное имя модуля без state-суффикса (`core.cmd`). */
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Запись каталога. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModuleCatalogItem"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    moduleFormPrep: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Полное имя модуля без state-суффикса (per-module форма). */
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModuleFormPrepRequest"];
-            };
-        };
-        responses: {
-            /** @description Резолвленные SID-ы (отсортированы, ≤ cap). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModuleFormPrepReply"];
-                };
-            };
-            /** @description Нечитаемое тело / неизвестные поля. */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProblemDetails"];
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
-            /** @description source не задан / задан более одного / пустые координаты. */
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProblemDetails"];
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
-            /** @description Сбой резолва. */
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProblemDetails"];
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
         };
     };
-    ListPermissions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Каталог permissions. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PermissionCatalogReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListMyPermissions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Эффективные права текущего оператора. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MyPermissionsReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListEventTypes: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Каталог event-types. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventTypeCatalogReply"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListOmens: {
+    listOmens: {
         parameters: {
             query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -7795,7 +3603,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Страница Omen-ов. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7804,13 +3612,45 @@ export interface operations {
                     "application/json": components["schemas"]["OmenListReply"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    CreateOmen: {
+    createOmen: {
         parameters: {
             query?: never;
             header?: never;
@@ -7823,7 +3663,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Omen создан. */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7832,27 +3672,66 @@ export interface operations {
                     "application/json": components["schemas"]["OmenView"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    GetOmen: {
+    getOmen: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Имя Omen-а (kebab-case, 1..63). */
-                name: components["parameters"]["OmenNamePath"];
+                /** @description имя Omen-а */
+                name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Запись Omen-а. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7861,44 +3740,106 @@ export interface operations {
                     "application/json": components["schemas"]["OmenView"];
                 };
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    DeleteOmen: {
+    deleteOmen: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Имя Omen-а (kebab-case, 1..63). */
-                name: components["parameters"]["OmenNamePath"];
+                /** @description имя Omen-а */
+                name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Omen удалён. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    ListRites: {
+    listRites: {
         parameters: {
-            query: {
-                /** @description Имя Omen-а — обязательный фильтр списка Rite-ов (augur.md §6). */
-                omen: components["parameters"]["RiteOmenQuery"];
+            query?: {
+                /** @description фильтр by-omen (обязателен в MVP); пустой/битый → 422 */
+                omen?: string;
             };
             header?: never;
             path?: never;
@@ -7906,7 +3847,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Rite-ы Omen-а. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7915,13 +3856,36 @@ export interface operations {
                     "application/json": components["schemas"]["RiteListReply"];
                 };
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    CreateRite: {
+    createRite: {
         parameters: {
             query?: never;
             header?: never;
@@ -7934,7 +3898,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Rite создан. */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -7943,47 +3907,121 @@ export interface operations {
                     "application/json": components["schemas"]["RiteView"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    DeleteRite: {
+    deleteRite: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Суррогатный id Rite-а. */
-                id: components["parameters"]["RiteIDPath"];
+                /** @description числовой id Rite-а */
+                id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Rite удалён. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    ListVigils: {
+    listCadences: {
         parameters: {
             query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
+                /** @description фильтр по enabled: true → только включённые, false → все (без фильтра); опущен → все */
+                enabled?: "true" | "false";
+                /** @description фильтр по типу рецепта (exact); вне набора → 422 */
+                kind?: "scenario" | "command";
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -7991,22 +4029,54 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Страница Vigil-ов. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VigilListReply"];
+                    "application/json": components["schemas"]["CadenceListReply"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    CreateVigil: {
+    createCadence: {
         parameters: {
             query?: never;
             header?: never;
@@ -8015,88 +4085,446 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VigilCreateRequest"];
+                "application/json": components["schemas"]["CadenceCreateRequest"];
             };
         };
         responses: {
-            /** @description Vigil создан. */
+            /** @description Created */
             201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceCreateReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VigilView"];
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    GetVigil: {
+    getCadence: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Имя Vigil-а / Decree-а (kebab-case, 1..63). */
-                name: components["parameters"]["OracleNamePath"];
+                /** @description ULID расписания */
+                id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Запись Vigil-а. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VigilView"];
+                    "application/json": components["schemas"]["Cadence"];
                 };
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    DeleteVigil: {
+    deleteCadence: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Имя Vigil-а / Decree-а (kebab-case, 1..63). */
-                name: components["parameters"]["OracleNamePath"];
+                /** @description ULID расписания */
+                id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Vigil удалён. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    ListDecrees: {
+    patchCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID расписания */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CadencePatchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cadence"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    disableCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID расписания */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceEnabledReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    enableCadence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID расписания */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CadenceEnabledReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listCadenceRuns: {
         parameters: {
             query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
+                /** @description multi-value ?status=X&status=Y — exact-match OR; значение вне enum → 422 */
+                status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[] | null;
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description ULID расписания */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyageListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listDecrees: {
+        parameters: {
+            query?: {
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -8104,7 +4532,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Страница Decree-ов. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8113,13 +4541,45 @@ export interface operations {
                     "application/json": components["schemas"]["DecreeListReply"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    CreateDecree: {
+    createDecree: {
         parameters: {
             query?: never;
             header?: never;
@@ -8132,7 +4592,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Decree создан. */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -8141,27 +4601,66 @@ export interface operations {
                     "application/json": components["schemas"]["DecreeView"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    GetDecree: {
+    getDecree: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Имя Vigil-а / Decree-а (kebab-case, 1..63). */
-                name: components["parameters"]["OracleNamePath"];
+                /** @description имя Decree-а */
+                name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Запись Decree-а. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8170,287 +4669,340 @@ export interface operations {
                     "application/json": components["schemas"]["DecreeView"];
                 };
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    DeleteDecree: {
+    deleteDecree: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Имя Vigil-а / Decree-а (kebab-case, 1..63). */
-                name: components["parameters"]["OracleNamePath"];
+                /** @description имя Decree-а */
+                name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Decree удалён. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    PushApply: {
+    listErrands: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description фильтр по целевому Soul (FQDN); битый формат → 422 */
+                sid?: string;
+                /** @description фильтр по статусу Errand-а; значение вне enum → 422 */
+                status?: "running" | "success" | "failed" | "timed_out" | "cancelled" | "module_not_allowed";
+                /** @description фильтр по началу (started_at > value, RFC3339); bad value → 400 */
+                started_after?: string;
+                /** @description multi-value exact-match OR по имени модуля (?module=X&module=Y) */
+                module?: string[] | null;
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PushApplyRequest"];
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrandListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
         };
+    };
+    getErrand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID Errand-а */
+                errand_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
-            /** @description Push-прогон принят. */
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Accepted */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PushApplyReply"];
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    PushGet: {
+    cancelErrand: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID push-прогона. */
-                apply_id: string;
+                /** @description ULID Errand-а */
+                errand_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Запись push-прогона. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushApplyView"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListPushRuns: {
-        parameters: {
-            query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-                /**
-                 * @description Multi-value-фильтр по статусу push-прогона (повторяющийся
-                 *     `?status=`-параметр). Несколько значений объединяются через OR.
-                 *     Невалидное значение → 422.
-                 */
-                status?: ("pending" | "running" | "success" | "partial_failed" | "failed" | "cancelled")[];
-                /** @description Exact-match-фильтр по push_runs.ssh_provider. */
-                ssh_provider?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница push-прогонов. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushRunListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    ListPushProviders: {
-        parameters: {
-            query?: {
-                /** @description LIKE-форма префикса имени (например, vault%). */
-                name_pattern?: string;
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Страница списка. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushProviderListReply"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    CreatePushProvider: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PushProviderCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description Запись создана. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushProvider"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    GetPushProvider: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Запись. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushProvider"];
-                };
-            };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    UpdatePushProvider: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PushProviderUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Обновлённая запись. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PushProvider"];
-                };
-            };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
-        };
-    };
-    DeletePushProvider: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Удалено. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    ListHeralds: {
+    listEventTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventTypeCatalogReply"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listHeralds: {
         parameters: {
             query?: {
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -8458,7 +5010,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Страница списка. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8467,13 +5019,45 @@ export interface operations {
                     "application/json": components["schemas"]["HeraldListReply"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    CreateHerald: {
+    createHerald: {
         parameters: {
             query?: never;
             header?: never;
@@ -8486,7 +5070,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Канал создан. */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -8495,26 +5079,66 @@ export interface operations {
                     "application/json": components["schemas"]["Herald"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    GetHerald: {
+    getHerald: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description имя Herald-канала */
                 name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Канал. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8523,18 +5147,50 @@ export interface operations {
                     "application/json": components["schemas"]["Herald"];
                 };
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    UpdateHerald: {
+    updateHerald: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description имя Herald-канала (immutable) */
                 name: string;
             };
             cookie?: never;
@@ -8545,7 +5201,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Обновлённый канал. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8554,51 +5210,127 @@ export interface operations {
                     "application/json": components["schemas"]["Herald"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    DeleteHerald: {
+    deleteHerald: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description имя Herald-канала */
                 name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Удалено. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    ListTidings: {
+    listIncarnations: {
         parameters: {
             query?: {
-                /**
-                 * @description true → включить и разовые (ephemeral) правила. По умолчанию
-                 *     (false) listing их скрывает.
-                 */
-                include_ephemeral?: boolean;
-                /** @description Сдвиг от начала набора (default 0). */
-                offset?: components["parameters"]["OffsetQuery"];
-                /** @description Размер страницы (1..1000, default 50). */
-                limit?: components["parameters"]["LimitQuery"];
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+                /** @description фильтр по имени сервиса */
+                service?: string;
+                /** @description фильтр по статусу (ready/applying/error_locked/migration_failed); невалидный → 422 */
+                status?: string;
+                /** @description exact-match по covens[] (ADR-008); невалидная метка → 422 */
+                coven?: string;
+                /** @description поле сортировки (created_at/name/status/service или state.<field>) */
+                sort?: string;
+                /** @description направление сортировки (asc/desc) */
+                sort_dir?: string;
             };
             header?: never;
             path?: never;
@@ -8606,7 +5338,4819 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Страница списка. */
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createIncarnation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationCreateReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getIncarnation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationGetReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    destroyIncarnation: {
+        parameters: {
+            query: {
+                /** @description confirmation-flag: true → destroy без teardown */
+                allow_destroy: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationDestroyReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    checkIncarnationDrift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IncarnationCheckDriftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriftReport"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listChoirs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChoirListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createChoir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChoirCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Choir"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteChoir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description имя Choir-а */
+                choir: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listVoices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description имя Choir-а */
+                choir: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    addVoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description имя Choir-а */
+                choir: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoiceAddRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Voice"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    removeVoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description имя Choir-а */
+                choir: string;
+                /** @description SID (FQDN) хоста */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getIncarnationHistory: {
+        parameters: {
+            query?: {
+                /** @description опц. ULID-фильтр по state_history.apply_id; не-ULID → 400 */
+                apply_id?: string;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationHistoryReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateIncarnationHosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationUpdateHostsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationGetReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    rerunCreateIncarnation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationRerunCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationRerunCreateReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    runIncarnationScenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description имя сценария */
+                scenario: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["IncarnationRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationRunReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    unlockIncarnation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationUnlockRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationUnlockReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    upgradeIncarnation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationUpgradeRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationUpgradeReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listMyPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPermissionsReply"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listModules: {
+        parameters: {
+            query?: {
+                /** @description только модули с хотя бы одним errand-safe state (для Run→Command whitelist) */
+                errand_safe?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleCatalogReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getModule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description полное имя модуля без state-суффикса */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleCatalogItem"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    moduleFormPrep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description полное имя модуля (per-module контракт, при резолве не используется) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModuleFormPrepRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleFormPrepReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listOperators: {
+        parameters: {
+            query?: {
+                /** @description фильтр по форме credential; значение вне enum → 422 */
+                auth_method?: "jwt" | "mtls" | "combined";
+                /** @description включать ревокнутых (false — только активные); bad-value → 400 */
+                revoked?: boolean;
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorCreateReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID Архонта */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Operator"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    issueOperatorToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID Архонта, для которого выпускается новый JWT */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueTokenReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID Архонта для отзыва */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorRevokeRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionCatalogReply"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listPluginSigils: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSigilListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    allowPluginSigil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginSigilAllowRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSigilAllowReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokePluginSigil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description namespace плагина */
+                namespace: string;
+                /** @description имя плагина */
+                name: string;
+                /** @description git-tag-ref допуска */
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listPushProviders: {
+        parameters: {
+            query?: {
+                /** @description LIKE-prefix-фильтр по имени (опц.) */
+                name_pattern?: string;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushProviderListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createPushProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushProviderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushProvider"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getPushProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Push-Provider-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushProvider"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updatePushProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Push-Provider-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushProviderUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushProvider"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deletePushProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Push-Provider-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listPushRuns: {
+        parameters: {
+            query?: {
+                /** @description multi-value ?status=X&status=Y — exact-match OR; значение вне enum → 422 */
+                status?: ("pending" | "running" | "success" | "partial_failed" | "failed" | "cancelled")[] | null;
+                /** @description exact-match по push_runs.ssh_provider */
+                ssh_provider?: string;
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushRunListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    pushApply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushApplyReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    pushGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID push-прогона */
+                apply_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushApplyView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleListReply"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя роли */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    grantRoleOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя роли */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantOperatorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeRoleOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя роли */
+                name: string;
+                /** @description AID оператора-члена роли */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateRolePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя роли */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolePermissionsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listServices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    registerService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceRegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Service-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deregisterService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Service-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Service-а (immutable) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listServiceDependencies: {
+        parameters: {
+            query?: {
+                /** @description опц. git-ref override (опущено → ref из реестра) */
+                ref?: string;
+            };
+            header?: never;
+            path: {
+                /** @description имя Service-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceDependenciesReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listServiceRefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Service-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRefsListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listServiceScenarios: {
+        parameters: {
+            query?: {
+                /** @description опц. git-ref override (опущено → ref из реестра) */
+                ref?: string;
+            };
+            header?: never;
+            path: {
+                /** @description имя Service-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceScenariosListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listServiceStateSchema: {
+        parameters: {
+            query?: {
+                /** @description опц. git-ref override (опущено → ref из реестра) */
+                ref?: string;
+            };
+            header?: never;
+            path: {
+                /** @description имя Service-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceStateSchemaReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listSigilKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigilKeyListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    introduceSigilKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SigilKeyIntroduceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigilKeyIntroduceReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    retireSigilKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description key_id ключа подписи для вывода (SHA-256(SPKI), 64 hex) */
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setPrimarySigilKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description key_id ключа подписи (SHA-256(SPKI), 64 hex) */
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listSouls: {
+        parameters: {
+            query?: {
+                /** @description фильтр по Coven-метке (AND внутри scope) */
+                coven?: string;
+                /** @description фильтр по статусу; вне enum → 422 */
+                status?: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
+                /** @description фильтр по transport; вне enum → 422 */
+                transport?: "agent" | "ssh";
+                /** @description keyset-курсор продолжения (regex-режим scope) */
+                cursor?: string;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400; offset+cursor → 422) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createSoul: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SoulCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulCreateReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    assignSoulCoven: {
+        parameters: {
+            query?: {
+                /** @description посчитать matched без UPDATE (OR с body.dry_run) */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SoulCovenAssignRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulCovenAssignReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getSoul: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description SID (FQDN) Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulListEntry"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    ErrandExec: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description SID (FQDN) целевого Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErrandRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getSoulHistory: {
+        parameters: {
+            query?: {
+                /** @description multi-value ?type=X&type=Y — OR по источнику; вне enum → 422 */
+                type?: ("scenario" | "errand")[] | null;
+                /** @description started_at > since (RFC3339); bad value → 400 */
+                since?: string;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description SID (FQDN) Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulHistoryReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    issueSoulToken: {
+        parameters: {
+            query?: {
+                /** @description истечь активный токен и выписать новый */
+                force?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description SID (FQDN) Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulIssueTokenReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getSoulprint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description SID (FQDN) Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulprintReadReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateSoulSSHTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description SID (FQDN) Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SoulSshTarget"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulSshTargetReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listSynods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynodListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createSynod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynodCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteSynod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Synod-группы */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateSynod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Synod-группы (immutable) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynodUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    addSynodOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Synod-группы */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantOperatorRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    removeSynodOperator: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Synod-группы */
+                name: string;
+                /** @description AID архонта-члена группы */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    grantSynodRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Synod-группы */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SynodGrantRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeSynodRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Synod-группы */
+                name: string;
+                /** @description имя роли в bundle группы */
+                role_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listTidings: {
+        parameters: {
+            query?: {
+                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                limit?: number;
+                /** @description отдавать разовые (ephemeral) правила (отладка); опущено → false скрывает разовые (ADR-052(g)) */
+                include_ephemeral?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8615,13 +10159,45 @@ export interface operations {
                     "application/json": components["schemas"]["TidingListReply"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    CreateTiding: {
+    createTiding: {
         parameters: {
             query?: never;
             header?: never;
@@ -8634,7 +10210,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Правило создано. */
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -8643,27 +10219,75 @@ export interface operations {
                     "application/json": components["schemas"]["Tiding"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            409: components["responses"]["Problem409"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    GetTiding: {
+    getTiding: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description имя Tiding-правила */
                 name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Правило. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8672,18 +10296,50 @@ export interface operations {
                     "application/json": components["schemas"]["Tiding"];
                 };
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    UpdateTiding: {
+    updateTiding: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description имя Tiding-правила (immutable) */
                 name: string;
             };
             cookie?: never;
@@ -8694,7 +10350,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Обновлённое правило. */
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8703,37 +10359,762 @@ export interface operations {
                     "application/json": components["schemas"]["Tiding"];
                 };
             };
-            400: components["responses"]["Problem400"];
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
-    DeleteTiding: {
+    deleteTiding: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description имя Tiding-правила */
                 name: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Удалено. */
+            /** @description No Content */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Problem401"];
-            403: components["responses"]["Problem403"];
-            404: components["responses"]["Problem404"];
-            422: components["responses"]["Problem422"];
-            500: components["responses"]["Problem500"];
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listVigils: {
+        parameters: {
+            query?: {
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VigilListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createVigil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VigilCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VigilView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getVigil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Vigil-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VigilView"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteVigil: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Vigil-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listVoyages: {
+        parameters: {
+            query?: {
+                /** @description фильтр по kind; вне enum → 422 */
+                kind?: "scenario" | "command";
+                /** @description multi-value ?status=X&status=Y OR; вне enum → 422 */
+                status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[] | null;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyageListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createVoyage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoyageCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyageCreateReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    previewVoyage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoyageCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyagePreviewReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getVoyage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID Voyage-прогона */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Voyage"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    cancelVoyage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID Voyage-прогона */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyageCancelReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listVoyageTargets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID Voyage-прогона */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoyageTargetsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
         };
     };
 }

@@ -132,10 +132,10 @@ export function TidingsTab() {
                 </td>
                 <td
                   style={{ fontFamily: 'var(--font-mono)', fontSize: 12, maxWidth: 220 }}
-                  title={item.event_types.join(', ')}
+                  title={(item.event_types ?? []).join(', ')}
                 >
-                  {item.event_types.slice(0, 2).join(', ')}
-                  {item.event_types.length > 2 ? ` +${item.event_types.length - 2}` : ''}
+                  {(item.event_types ?? []).slice(0, 2).join(', ')}
+                  {(item.event_types ?? []).length > 2 ? ` +${(item.event_types ?? []).length - 2}` : ''}
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   {filterSummary(t, item)}

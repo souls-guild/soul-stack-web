@@ -120,7 +120,7 @@ export function RunsFeed() {
     queryKey: ['runs-feed', 'voyages'],
     queryFn: () => keeperApi.voyages.list({ limit: LIMIT }),
     refetchInterval: (q) =>
-      q.state.data ? (q.state.data.items.some((v) => isRunning(v.status)) ? 5000 : false) : false,
+      q.state.data ? ((q.state.data.items ?? []).some((v) => isRunning(v.status)) ? 5000 : false) : false,
     retry: false,
   });
 
@@ -129,14 +129,14 @@ export function RunsFeed() {
     queryKey: ['runs-feed', 'push'],
     queryFn: () => keeperApi.pushRuns.list({ limit: LIMIT }),
     refetchInterval: (q) =>
-      q.state.data ? (q.state.data.items.some((p) => isRunning(p.status)) ? 5000 : false) : false,
+      q.state.data ? ((q.state.data.items ?? []).some((p) => isRunning(p.status)) ? 5000 : false) : false,
     retry: false,
   });
   const errandsQ = useQuery({
     queryKey: ['runs-feed', 'errands'],
     queryFn: () => keeperApi.errands.list({ limit: LIMIT }),
     refetchInterval: (q) =>
-      q.state.data ? (q.state.data.items.some((e) => isRunning(e.status)) ? 5000 : false) : false,
+      q.state.data ? ((q.state.data.items ?? []).some((e) => isRunning(e.status)) ? 5000 : false) : false,
     retry: false,
   });
 

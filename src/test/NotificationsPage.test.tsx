@@ -43,7 +43,7 @@ const TIDING_SCENARIOS: Tiding = {
   cadence: undefined,
   enabled: true,
   ephemeral: false,
-  voyage_id: null,
+  voyage_id: undefined,
   annotations: undefined,
   projection: [],
   created_at: new Date().toISOString(),
@@ -61,7 +61,7 @@ const TIDING_CADENCE: Tiding = {
   cadence: 'redis-hourly',
   enabled: false,
   ephemeral: false,
-  voyage_id: null,
+  voyage_id: undefined,
   annotations: undefined,
   projection: [],
   created_at: new Date().toISOString(),
@@ -654,8 +654,10 @@ describe('PUT replace-схема — Tiding edit', () => {
       expect(parsed).toHaveProperty('event_types');
       expect(Object.prototype.hasOwnProperty.call(parsed, 'only_failures')).toBe(true);
       expect(Object.prototype.hasOwnProperty.call(parsed, 'only_changes')).toBe(true);
+      // incarnation выставлен в 'new-service' — присутствует в JSON.
       expect(Object.prototype.hasOwnProperty.call(parsed, 'incarnation')).toBe(true);
-      expect(Object.prototype.hasOwnProperty.call(parsed, 'cadence')).toBe(true);
+      // cadence пустой → отсутствует в JSON (undefined omit = "очистить" по replace-семантике).
+      expect(Object.prototype.hasOwnProperty.call(parsed, 'cadence')).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(parsed, 'enabled')).toBe(true);
     });
   });
@@ -691,7 +693,7 @@ const TIDING_WITH_ANNOT: Tiding = {
   cadence: undefined,
   enabled: true,
   ephemeral: false,
-  voyage_id: null,
+  voyage_id: undefined,
   annotations: { env: 'prod' },
   projection: ['summary.succeeded', 'voyage_id'],
   created_at: new Date().toISOString(),

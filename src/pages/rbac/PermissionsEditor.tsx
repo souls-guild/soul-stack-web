@@ -224,7 +224,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
 
   const catalogBases = new Set<string>();
   for (const res of catalog) {
-    for (const act of res.actions) catalogBases.add(`${res.resource}.${act.action}`);
+    for (const act of (res.actions ?? [])) catalogBases.add(`${res.resource}.${act.action}`);
   }
 
   // Права, которые каталог не покрывает (включая wildcard, scoped-rights) — не теряем при save.
@@ -290,7 +290,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
                 {res.resource}
               </legend>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {res.actions.map((act) => {
+                {(res.actions ?? []).map((act) => {
                   const base = `${res.resource}.${act.action}`;
                   const id = `${groupId}-${base}`;
                   const isChecked = selected.has(base);
@@ -327,7 +327,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
                       </label>
                       {isChecked && hasSelectorKeys ? (
                         <ScopePicker
-                          selectorKeys={act.selector_keys}
+                          selectorKeys={act.selector_keys ?? []}
                           scope={currentScope}
                           onChange={(s) => updateScope(base, s)}
                         />

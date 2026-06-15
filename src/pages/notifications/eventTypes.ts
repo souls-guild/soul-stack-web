@@ -46,8 +46,8 @@ export function useEventTypeCatalog() {
     retry: 1,
   });
 
-  const areas = q.data?.areas.map((a) => a.name) ?? [];
-  const pointEvents = q.data?.point_events.map((p) => p.name) ?? [];
+  const areas = (q.data?.areas ?? []).map((a) => a.name);
+  const pointEvents = (q.data?.point_events ?? []).map((p) => p.name);
   const allTypes = [...areas, ...pointEvents];
 
   return {

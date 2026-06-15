@@ -470,13 +470,13 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
             : String(incs.error)}
         </div>
       ) : null}
-      {incs.data && incs.data.items.length === 0 ? (
+      {incs.data && (incs.data.items ?? []).length === 0 ? (
         <div className={styles.empty}>
           {t('admin:svcIncEmpty')}{' '}
           <code className="mono">create</code>.
         </div>
       ) : null}
-      {incs.data && incs.data.items.length > 0 ? (
+      {incs.data && (incs.data.items ?? []).length > 0 ? (
         <div style={needsScroll ? { overflowX: 'auto' } : undefined}>
           <table className={styles.table} data-testid="svc-inc-table">
             <thead>
@@ -495,7 +495,7 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
               </tr>
             </thead>
             <tbody>
-              {incs.data.items.map((inc) => (
+              {(incs.data.items ?? []).map((inc) => (
                 <tr key={inc.name}>
                   <td>
                     <Link to={`/incarnations/${encodeURIComponent(inc.name)}`}>{inc.name}</Link>
@@ -507,7 +507,7 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
                       <Badge tone={incarnationTone(inc.status)}>{inc.status}</Badge>
                     </span>
                   </td>
-                  <td className="mono">{inc.covens.join(', ') || '—'}</td>
+                  <td className="mono">{(inc.covens ?? []).join(', ') || '—'}</td>
                   {scalarFields.map((f) => (
                     <td key={f.name} className="mono">
                       {scalarCell((inc.state as Record<string, unknown> | undefined)?.[f.name])}

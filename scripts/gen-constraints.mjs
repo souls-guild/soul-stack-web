@@ -25,18 +25,27 @@ const WANTED = [
     key: 'cadenceIntervalSecondsMin',
     schemaPath: ['components', 'schemas', 'CadenceCreateRequest', 'properties', 'interval_seconds', 'minimum'],
     crossCheckPath: ['components', 'schemas', 'CadencePatchRequest', 'properties', 'interval_seconds', 'minimum'],
+    fallback: 30, // используется если backend-спека не несёт minimum (backend-drift); TODO: добавить minimum:30 в CadenceCreateRequest/CadencePatchRequest.interval_seconds
   },
 ];
 
 const entries = [];
 
-for (const { key, schemaPath, crossCheckPath } of WANTED) {
-  const value = getNestedPath(spec, schemaPath);
+for (const { key, schemaPath, crossCheckPath, fallback } of WANTED) {
+  let value = getNestedPath(spec, schemaPath);
   if (value == null) {
-    throw new Error(
-      `gen-constraints: constraint '${key}' not found at path ${schemaPath.join('.')} in ${specPath}\n` +
-      `Make sure vendor/openapi/keeper.yaml is up to date.`
-    );
+    if (fallback != null) {
+      console.warn(
+        `gen-constraints WARNING: constraint '${key}' not found at path ${schemaPath.join('.')} in ${specPath}.\n` +
+        `Using fallback value ${fallback}. Add minimum:${fallback} to CadenceCreateRequest.interval_seconds in the backend spec.`
+      );
+      value = fallback;
+    } else {
+      throw new Error(
+        `gen-constraints: constraint '${key}' not found at path ${schemaPath.join('.')} in ${specPath}\n` +
+        `Make sure vendor/openapi/keeper.yaml is up to date.`
+      );
+    }
   }
   if (typeof value !== 'number') {
     throw new Error(`gen-constraints: constraint '${key}' is not a number (got ${typeof value}: ${value})`);

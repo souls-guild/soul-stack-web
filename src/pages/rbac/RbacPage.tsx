@@ -42,8 +42,8 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
             <td className="mono">{r.name}</td>
             <td>{r.builtin ? <Badge tone="info">builtin</Badge> : '—'}</td>
             <td>{r.description ?? '—'}</td>
-            <td className="mono">{r.permissions.length}</td>
-            <td className="mono">{r.operators.length}</td>
+            <td className="mono">{(r.permissions ?? []).length}</td>
+            <td className="mono">{(r.operators ?? []).length}</td>
             <td>
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                 <button
@@ -117,11 +117,11 @@ function PermissionsTab({ roles, onEdit }: PermissionsTabProps) {
           {r.description ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{r.description}</div>
           ) : null}
-          {r.permissions.length === 0 ? (
+          {(r.permissions ?? []).length === 0 ? (
             <div className={styles.empty}>{t('pages:noPermissions')}</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {r.permissions.map((p) => (
+              {(r.permissions ?? []).map((p) => (
                 <code
                   key={p}
                   style={{
@@ -168,7 +168,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
   const byOperator = useMemo(() => {
     const acc = new Map<string, string[]>();
     for (const r of roles) {
-      for (const aid of r.operators) {
+      for (const aid of (r.operators ?? [])) {
         const prev = acc.get(aid);
         if (prev) prev.push(r.name);
         else acc.set(aid, [r.name]);
@@ -307,7 +307,7 @@ export function RbacPage() {
     retry: false,
   });
   const catalog = useMemo(
-    () => normalizePermissionCatalog(permsQ.data?.items),
+    () => normalizePermissionCatalog(permsQ.data?.items ?? undefined),
     [permsQ.data],
   );
 

@@ -125,7 +125,7 @@ export function TidingDetail() {
 
           <dt className={styles.metaKey}>{t('tidingColEventTypes')}</dt>
           <dd className={styles.metaVal} style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-            {td.event_types.join(', ')}
+            {(td.event_types ?? []).join(', ')}
           </dd>
 
           <dt className={styles.metaKey}>{t('tidingFieldOnlyFailures')}</dt>

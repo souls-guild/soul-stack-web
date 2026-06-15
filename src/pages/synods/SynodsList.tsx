@@ -138,10 +138,10 @@ function SynodRow({
         <td>{synod.description ?? '—'}</td>
         <td>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-            {synod.operators.length === 0 ? (
+            {(synod.operators ?? []).length === 0 ? (
               <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>
             ) : (
-              synod.operators.map((aid) =>
+              (synod.operators ?? []).map((aid) =>
                 chip({
                   label: aid,
                   onRemove: () => { setRowError(null); removeOpMut.mutate(aid); },
@@ -166,10 +166,10 @@ function SynodRow({
         </td>
         <td>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-            {synod.roles.length === 0 ? (
+            {(synod.roles ?? []).length === 0 ? (
               <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>—</span>
             ) : (
-              synod.roles.map((r) =>
+              (synod.roles ?? []).map((r) =>
                 chip({
                   label: r,
                   onRemove: () => { setRowError(null); revokeRoleMut.mutate(r); },
@@ -339,7 +339,7 @@ export function SynodsList() {
         <AddOperatorModal
           open={true}
           synodName={addingOpTo.name}
-          currentMembers={addingOpTo.operators}
+          currentMembers={addingOpTo.operators ?? []}
           onClose={() => setAddingOpTo(null)}
         />
       ) : null}
@@ -348,7 +348,7 @@ export function SynodsList() {
         <GrantRoleModal
           open={true}
           synodName={grantingRoleTo.name}
-          currentRoles={grantingRoleTo.roles}
+          currentRoles={grantingRoleTo.roles ?? []}
           onClose={() => setGrantingRoleTo(null)}
         />
       ) : null}

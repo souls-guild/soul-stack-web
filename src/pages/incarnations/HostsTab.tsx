@@ -244,12 +244,12 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
           {t('incarnations:hostsLoadFailed', { detail: String(connected.error) })}
         </div>
       ) : null}
-      {connected.data && connected.data.items.length === 0 ? (
+      {connected.data && (connected.data.items ?? []).length === 0 ? (
         <div className={styles.empty}>
           {t('incarnations:noConnectedSouls', { name: incarnationName })}
         </div>
       ) : null}
-      {connected.data && connected.data.items.length > 0 ? (
+      {connected.data && (connected.data.items ?? []).length > 0 ? (
         <table className={styles.table}>
           <thead>
             <tr>
@@ -260,7 +260,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
             </tr>
           </thead>
           <tbody>
-            {connected.data.items.map((s: SoulListEntry) => (
+            {(connected.data.items ?? []).map((s: SoulListEntry) => (
               <tr key={s.sid}>
                 <td className="mono">
                   <Link to={`/souls/${encodeURIComponent(s.sid)}`}>{s.sid}</Link>

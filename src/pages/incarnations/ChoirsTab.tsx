@@ -47,9 +47,9 @@ function CreateChoirModal({ open, incarnationName, onClose }: CreateChoirModalPr
     mutationFn: () =>
       keeperApi.choirs.create(incarnationName, {
         choir_name: choirName.trim(),
-        description: description.trim() || null,
-        min_size: minSize !== '' ? parseInt(minSize, 10) : null,
-        max_size: maxSize !== '' ? parseInt(maxSize, 10) : null,
+        description: description.trim() || undefined,
+        min_size: minSize !== '' ? parseInt(minSize, 10) : undefined,
+        max_size: maxSize !== '' ? parseInt(maxSize, 10) : undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['incarnation-choirs', incarnationName] });
@@ -310,8 +310,8 @@ function AddVoiceModal({ open, incarnationName, choirName, existingVoiceSids, on
     mutationFn: () =>
       keeperApi.choirs.addVoice(incarnationName, choirName, {
         sid,
-        role: role.trim() || null,
-        position: position !== '' ? parseInt(position, 10) : null,
+        role: role.trim() || undefined,
+        position: position !== '' ? parseInt(position, 10) : undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['choir-voices', incarnationName, choirName] });
@@ -492,10 +492,10 @@ function VoicesTable({ incarnationName, choirName }: VoicesTableProps) {
       {removeError ? (
         <div className={styles.errorBox}>{removeError}</div>
       ) : null}
-      {voices.data && voices.data.items.length === 0 ? (
+      {voices.data && (voices.data.items ?? []).length === 0 ? (
         <div className={styles.empty}>{t('incarnations:choirNoVoices')}</div>
       ) : null}
-      {voices.data && voices.data.items.length > 0 ? (
+      {voices.data && (voices.data.items ?? []).length > 0 ? (
         <table className={styles.table}>
           <thead>
             <tr>
@@ -507,7 +507,7 @@ function VoicesTable({ incarnationName, choirName }: VoicesTableProps) {
             </tr>
           </thead>
           <tbody>
-            {voices.data.items.map((v: Voice) => (
+            {(voices.data.items ?? []).map((v: Voice) => (
               <tr key={v.sid}>
                 <td className="mono">{v.sid}</td>
                 <td className="mono">{v.role ?? '—'}</td>
@@ -614,12 +614,12 @@ export function ChoirsTab({ incarnationName }: Props) {
           <div>{t('incarnations:choirsDegradedHint')}</div>
         </div>
       ) : null}
-      {choirs.data && choirs.data.items.length === 0 ? (
+      {choirs.data && (choirs.data.items ?? []).length === 0 ? (
         <div className={styles.empty}>{t('incarnations:choirsEmpty')}</div>
       ) : null}
-      {choirs.data && choirs.data.items.length > 0 ? (
+      {choirs.data && (choirs.data.items ?? []).length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {choirs.data.items.map((choir: Choir) => {
+          {(choirs.data.items ?? []).map((choir: Choir) => {
             const expanded = expandedChoirs.has(choir.choir_name);
             return (
               <div

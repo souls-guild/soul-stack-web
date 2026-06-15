@@ -1560,14 +1560,14 @@ function Step3CommandParams({
   });
   useEffect(() => {
     if (!catalogQ.data || hasParams(value.moduleParams) || !value.moduleName) return;
-    const item = catalogQ.data.items.find((m) => m.name === value.moduleName);
-    if (!item || !hasParams(item.params)) return;
+    const item = (catalogQ.data.items ?? []).find((m) => m.name === value.moduleName);
+    if (!item || !hasParams(item.params ?? undefined)) return;
     onChange({
       ...value,
       moduleStates: item.states ?? value.moduleStates,
       moduleKind: item.kind,
       moduleParams: item.params ?? [],
-      paramFields: defaultsFromSchema(paramsToInputSchema(item.params ?? [])),
+      paramFields: defaultsFromSchema(paramsToInputSchema(item.params ?? undefined)),
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogQ.data]);
@@ -1583,7 +1583,7 @@ function Step3CommandParams({
       moduleStates: states,
       moduleKind: item.kind,
       moduleParams: item.params ?? [],
-      paramFields: hasParams(item.params) ? defaultsFromSchema(paramsToInputSchema(item.params)) : {},
+      paramFields: hasParams(item.params ?? undefined) ? defaultsFromSchema(paramsToInputSchema(item.params ?? undefined)) : {},
     };
     onChange(next);
   }

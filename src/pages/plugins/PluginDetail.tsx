@@ -37,7 +37,7 @@ export function PluginDetail() {
   });
 
   const row: PluginSigilView | undefined = useMemo(() => {
-    return list.data?.items.find(
+    return (list.data?.items ?? []).find(
       (it) => it.namespace === namespace && it.name === name && it.ref === ref,
     );
   }, [list.data, namespace, name, ref]);
@@ -57,7 +57,7 @@ export function PluginDetail() {
 
   const matched = useMemo<AuditEvent[]>(() => {
     if (!audit.data) return [];
-    return audit.data.items.filter((ev) => {
+    return (audit.data?.items ?? []).filter((ev) => {
       const p = ev.payload as Record<string, unknown> | undefined;
       if (!p) return false;
       return p.namespace === namespace && p.name === name && p.ref === ref;

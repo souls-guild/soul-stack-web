@@ -24,7 +24,7 @@ export function useMyPermissions() {
     // Пока грузим или ошибка — показываем кнопки (optimistic).
     if (!q.data) return true;
 
-    const perms = q.data.permissions;
+    const perms = q.data.permissions ?? [];
     // Cluster-admin: wildcard=true → всё разрешено.
     if (perms.some((p) => p.wildcard)) return true;
 

@@ -1,8 +1,8 @@
 // Typed-обёртки над Keeper Operator API. Соответствует vendor/openapi/keeper.yaml.
 //
 // Типы импортируются из ./types.gen.ts (сгенерены `npm run gen:api`).
-// types.gen.ts в .gitignore — сгенерится локально; до первого `npm run gen:api`
-// узкая часть типов продублирована вручную (минимальный fallback).
+// Ручные fallback-интерфейсы (SoulprintFacts, ErrandAccepted) удалены после
+// финального regen на полной huma-OpenAPI-спеке (все схемы теперь в компонентах).
 
 import { apiGet, apiSend, ApiError } from './client';
 import { tokenStore } from './tokenStore';
@@ -37,13 +37,8 @@ export type IncarnationCheckDriftRequest = components['schemas']['IncarnationChe
 
 export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
-// typed_facts в OpenAPI-схеме — opaque (json.RawMessage / x-go-type, ADR-051).
-// Генератор производит Record<string, never>. Переопределяем в правильный тип
-// через SoulprintFacts (схема сохранилась в components), чтобы UI мог работать
-// со структурированными полями. На wire данные приходят корректно.
-export type SoulprintReadReply = Omit<components['schemas']['SoulprintReadReply'], 'typed_facts'> & {
-  typed_facts: SoulprintFacts;
-};
+// typed_facts теперь типизирован напрямую в сгенерированной схеме SoulprintReadReply.
+export type SoulprintReadReply = components['schemas']['SoulprintReadReply'];
 export type SoulIssueTokenReply = components['schemas']['SoulIssueTokenReply'];
 export type SoulCreateRequest = components['schemas']['SoulCreateRequest'];
 export type SoulCreateReply = components['schemas']['SoulCreateReply'];
@@ -53,13 +48,14 @@ export type SoulCovenAssignSelector = components['schemas']['SoulCovenAssignSele
 export type SoulHistoryReply = components['schemas']['SoulHistoryReply'];
 export type SoulHistoryItem = components['schemas']['SoulHistoryItem'];
 export type SoulHistoryType = NonNullable<SoulHistoryItem['type']>;
-export type SoulprintFacts = components['schemas']['SoulprintFacts'];
-export type SoulprintOsFacts = components['schemas']['SoulprintOsFacts'];
-export type SoulprintKernelFacts = components['schemas']['SoulprintKernelFacts'];
-export type SoulprintCpuFacts = components['schemas']['SoulprintCpuFacts'];
-export type SoulprintMemoryFacts = components['schemas']['SoulprintMemoryFacts'];
-export type SoulprintNetworkFacts = components['schemas']['SoulprintNetworkFacts'];
+// SoulprintFacts и вложенные схемы — из сгенерированных компонентов (финальная huma-спека).
 export type SoulprintNetworkInterface = components['schemas']['SoulprintNetworkInterface'];
+export type SoulprintNetworkFacts = components['schemas']['SoulprintNetworkFacts'];
+export type SoulprintMemoryFacts = components['schemas']['SoulprintMemoryFacts'];
+export type SoulprintCpuFacts = components['schemas']['SoulprintCpuFacts'];
+export type SoulprintKernelFacts = components['schemas']['SoulprintKernelFacts'];
+export type SoulprintOsFacts = components['schemas']['SoulprintOsFacts'];
+export type SoulprintFacts = components['schemas']['SoulprintFacts'];
 
 // Расширение OperatorCreateRequest: опциональное `roles[]` — список имён ролей,
 // в которые сразу зачислить нового Архонта. Поле появилось в backend slice
@@ -91,6 +87,7 @@ export type PushRunStatus = NonNullable<PushRunListEntry['status']>;
 // Типы не экспортируются; keeperApi.tides сохранён как заглушка до очистки страниц.
 
 export type ErrandRunRequest = components['schemas']['ErrandRunRequest'];
+// ErrandAccepted теперь из сгенерированных компонентов (финальная huma-спека).
 export type ErrandAccepted = components['schemas']['ErrandAccepted'];
 export type ErrandResult = components['schemas']['ErrandResult'];
 export type ErrandListReply = components['schemas']['ErrandListReply'];

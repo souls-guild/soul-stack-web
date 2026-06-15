@@ -178,7 +178,7 @@ export function IncarnationsList() {
 
   function handleRunSet() {
     if (!canRunSet || !q.data) return;
-    const names = q.data.items.map((it: IncarnationGetReply) => it.name);
+    const names = (q.data.items ?? []).map((it: IncarnationGetReply) => it.name);
     const regex = buildSnapshotRegex(names);
     // Передаём в RunWizard через incarnation_regex (сырой готовый regex, без повторного escape).
     // НЕ используем incarnation (одиночное имя) — это другой param, RunWizard обернул бы его
@@ -405,9 +405,9 @@ export function IncarnationsList() {
                   </span>
                 </td>
                 <td className="mono">
-                  {row.covens.length > 0 ? (
+                  {(row.covens ?? []).length > 0 ? (
                     <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
-                      {row.covens.map((c) => (
+                      {(row.covens ?? []).map((c) => (
                         <Badge key={c} tone="muted">{c}</Badge>
                       ))}
                     </span>

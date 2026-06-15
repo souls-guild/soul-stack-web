@@ -212,7 +212,7 @@ function SoulHistoryTab({ sid }: { sid: string }) {
     enabled: Boolean(sid),
     retry: false,
     refetchInterval: (query) =>
-      query.state.data?.items.some((it) => soulHistoryIsRunning(it.status)) ? 5000 : false,
+      (query.state.data?.items ?? []).some((it) => soulHistoryIsRunning(it.status)) ? 5000 : false,
   });
 
   function toggleType(tp: SoulHistoryType) {

@@ -135,7 +135,7 @@ export function SoulsList() {
       // Сначала обновляем ref — до setState, чтобы loadMore увидел новый ключ
       // немедленно, даже если рендер ещё не случился.
       filterKeyRef.current = serverFilterKey;
-      setAccumulated(q.data.items);
+      setAccumulated(q.data.items ?? []);
       setNextCursor(q.data.next_cursor ?? undefined);
       setTotalApproximate(q.data.total_approximate ?? false);
       setServerTotal(q.data.total);
@@ -168,7 +168,7 @@ export function SoulsList() {
       setAccumulated((prev) => {
         // Дедупликация по sid на случай двойного клика.
         const existingSids = new Set(prev.map((it) => it.sid));
-        const fresh = result.items.filter((it) => !existingSids.has(it.sid));
+        const fresh = (result.items ?? []).filter((it) => !existingSids.has(it.sid));
         return [...prev, ...fresh];
       });
       setNextCursor(result.next_cursor ?? undefined);

@@ -140,7 +140,7 @@ export function PushRunsList() {
             </thead>
             <tbody>
               {items.map((p) => {
-                const total = p.summary_counts?.total ?? p.inventory_sids.length;
+                const total = p.summary_counts?.total ?? (p.inventory_sids ?? []).length;
                 const ok = p.summary_counts?.success_count ?? '—';
                 const failed = p.summary_counts?.fail_count ?? '—';
                 return (
