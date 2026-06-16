@@ -75,12 +75,14 @@ export function UnlockModal({ open, incarnationName, onClose }: Props) {
           {t('incarnations:unlockDesc')}
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 13 }}>Reason</span>
+          <span style={{ fontSize: 13 }}>{t('incarnations:reasonLabel')}</span>
           <textarea
             rows={4}
             placeholder={t('incarnations:unlockReasonPlaceholder')}
             spellCheck={false}
             aria-invalid={errors.reason ? 'true' : undefined}
+            // maxLength синхронизирован с backend incarnation.ReasonMaxLen=500
+            maxLength={500}
             {...register('reason')}
             style={{
               padding: 10,

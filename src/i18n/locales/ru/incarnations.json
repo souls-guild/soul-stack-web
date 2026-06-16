@@ -141,6 +141,7 @@
   "noTopLevelFields": "нет top-level полей",
   "perHostDataDesc": "Convention: scenario записывает per-host state в",
   "perHostRuntimeDesc": "Per-host подсекция incarnation.state.hosts[<sid>] — convention: scenario записывает per-host state в эту секцию (role, pid, users и т.д.). Если scenario не использует convention — секция будет пустой.",
+  "reasonLabel": "Причина",
   "reasonMax": "максимум 500 символов",
   "reasonMin": "минимум 5 символов",
   "refsManual": "Источник — GET /v1/services/{{name}}/refs.",

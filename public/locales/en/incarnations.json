@@ -141,6 +141,7 @@
   "noTopLevelFields": "no top-level fields",
   "perHostDataDesc": "Convention: the scenario writes per-host state to",
   "perHostRuntimeDesc": "Per-host subsection incarnation.state.hosts[<sid>] — convention: the scenario writes per-host state into this section (role, pid, users, etc.). If the scenario does not use the convention — the section is empty.",
+  "reasonLabel": "Reason",
   "reasonMax": "maximum 500 characters",
   "reasonMin": "minimum 5 characters",
   "refsManual": "Source — GET /v1/services/{{name}}/refs.",

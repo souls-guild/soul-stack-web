@@ -275,6 +275,61 @@ describe('RerunCreateModal — happy-path', () => {
 });
 
 // ────────────────────────────────────────────────────────────
+// 4b. reasonMax: >500 символов — клиентская ошибка, POST не уходит
+// ────────────────────────────────────────────────────────────
+describe('RerunCreateModal — reasonMax 500 символов', () => {
+  it('reason длиннее 500 символов — показывает ошибку, POST не уходит', async () => {
+    tokenStore.clear();
+    let postCount = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      if (method === 'POST' && urlStr.includes('rerun-create')) postCount++;
+      return new Response(JSON.stringify(makeIncarnation('error_locked')), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }));
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/test-inc',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /перезапустить create/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Вводим строку длиннее 500 символов (501 'a').
+    // fireEvent.change используется намеренно: jsdom не применяет HTML-атрибут maxLength,
+    // поэтому только через прямое изменение значения можно протестировать Zod-валидацию.
+    const textarea = screen.getByRole('textbox');
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(501) } });
+
+    const dialog = screen.getByRole('dialog');
+    const btns = within(dialog).getAllByRole('button', { name: /перезапустить create/i });
+    await user.click(btns[0]);
+
+    // POST не ушёл
+    expect(postCount).toBe(0);
+    // Показано клиентское сообщение об ошибке
+    await waitFor(() => {
+      expect(screen.getByText(/максимум 500 символов/i)).toBeInTheDocument();
+    });
+  });
+});
+
+// ────────────────────────────────────────────────────────────
 // 5. 409 — показывает пояснительный текст
 // ────────────────────────────────────────────────────────────
 describe('RerunCreateModal — 409 conflict', () => {
