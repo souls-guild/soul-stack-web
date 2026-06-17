@@ -99,7 +99,7 @@ export function HelpModal({ open, onClose }: Props) {
           <p className={styles.lead}>{t('admin:helpDocsLead')}</p>
           <div className={styles.row}>
             <a
-              href="https://github.com/soul-stack/soul-stack/blob/main/docs/README.md"
+              href="https://github.com/souls-guild/soul-stack/blob/main/docs/README.md"
               target="_blank"
               rel="noopener noreferrer"
               className={styles.linkBtn}
@@ -107,7 +107,7 @@ export function HelpModal({ open, onClose }: Props) {
               <FileText size={12} /> docs/README.md
             </a>
             <a
-              href="https://github.com/soul-stack/soul-stack/blob/main/docs/architecture.md"
+              href="https://github.com/souls-guild/soul-stack/blob/main/docs/architecture.md"
               target="_blank"
               rel="noopener noreferrer"
               className={styles.linkBtn}
