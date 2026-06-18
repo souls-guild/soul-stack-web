@@ -107,10 +107,10 @@ export const vigilFormSchema = z
     interval: durationSchema,
     check: z.string().min(1, 'beacons:errCheckRequired'),
     sid: sidSchema,
-    coven: z.array(covenItemSchema).default([]),
-    enabled: z.boolean().default(true),
+    coven: z.array(covenItemSchema),
+    enabled: z.boolean(),
     // params — динамика per check; валидируется отдельно поверх kind-схемы.
-    params_json: z.string().default('{}'),
+    params_json: z.string(),
   })
   .superRefine((v, ctx) => {
     // XOR coven/sid.
@@ -173,7 +173,7 @@ export const decreeFormSchema = z
     on_beacon: nameSchema, // имя Vigil-а — тот же kebab-case pattern.
     where: z.string().optional().or(z.literal('')),
     sid: sidSchema,
-    coven: z.array(covenItemSchema).default([]),
+    coven: z.array(covenItemSchema),
     incarnation_name: z
       .string()
       .min(1, 'beacons:errIncarnationRequired')
@@ -182,9 +182,9 @@ export const decreeFormSchema = z
       .string()
       .min(1, 'beacons:errActionScenarioRequired')
       .regex(/^[a-z][a-z0-9_]*$/, 'beacons:errActionScenarioSnake'),
-    action_input_json: z.string().default('{}'),
+    action_input_json: z.string(),
     cooldown: durationSchema.optional().or(z.literal('')),
-    enabled: z.boolean().default(false), // default-deny: opt-in для safety.
+    enabled: z.boolean(), // default-deny: opt-in для safety; default задаётся в defaultValues.
   })
   .superRefine((v, ctx) => {
     const hasSid = !!(v.sid && v.sid.length > 0);

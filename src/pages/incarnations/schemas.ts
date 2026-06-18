@@ -81,7 +81,7 @@ export function makeDestroySchema(expectedName: string) {
       .string()
       .trim()
       .refine((v) => v === expectedName, { message: 'incarnations:confirmNameMismatch' }),
-    allowDestroy: z.boolean().default(false),
+    allowDestroy: z.boolean(),
   });
 }
 

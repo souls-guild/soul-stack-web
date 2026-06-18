@@ -19,9 +19,8 @@ export const issueTokenSchema = z.object({
   ttl_seconds: z
     .number({ invalid_type_error: 'souls:zodTtlType' })
     .int('souls:zodTtlInt')
-    .min(60, 'souls:zodTtlMin')
-    .default(3600),
-  force: z.boolean().default(false),
+    .min(60, 'souls:zodTtlMin'),
+  force: z.boolean(),
 });
 export type IssueTokenInput = z.infer<typeof issueTokenSchema>;
 
