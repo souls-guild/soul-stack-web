@@ -70,6 +70,15 @@ export type IssueTokenReply = components['schemas']['IssueTokenReply'];
 export type Operator = components['schemas']['Operator'];
 export type OperatorListReply = components['schemas']['OperatorListReply'];
 export type OperatorAuthMethod = NonNullable<Operator['auth_method']>;
+export type OperatorCreatedVia = NonNullable<Operator['created_via']>;
+
+// Provisioning-policy — способы создания операторов (ADR-058 Часть B).
+// GET/PUT /v1/provisioning-policy. Тип из схемы; enum методов — из контракта.
+export type ProvisioningPolicyReply = components['schemas']['ProvisioningPolicyReply'];
+export type ProvisioningPolicyUpdateRequest = components['schemas']['ProvisioningPolicyUpdateRequest'];
+// ProvisioningMethod выводится из generated-схемы — при добавлении метода на бэке
+// gen-тип обновится автоматически, этот alias подхватит без ручной правки.
+export type ProvisioningMethod = NonNullable<ProvisioningPolicyUpdateRequest['allowed_methods']>[number];
 
 export type AuditEvent = components['schemas']['AuditEvent'];
 export type AuditEventListReply = components['schemas']['AuditEventListReply'];
@@ -711,6 +720,17 @@ export const keeperApi = {
 
   // Tide-runs (ADR-040 W-4). Глобальный list + detail-snapshot.
   // Tide-API удалён (Voyage заменяет Tide, ADR-043).
+
+  // Provisioning-policy — список разрешённых методов создания операторов (ADR-058 Часть B).
+  provisioning: {
+    // GET /v1/provisioning-policy → ProvisioningPolicyReply.
+    // policy_set=false → политика не задана (все методы разрешены по умолчанию).
+    getPolicy: () => apiGet<ProvisioningPolicyReply>('/v1/provisioning-policy'),
+    // PUT /v1/provisioning-policy → ProvisioningPolicyReply (replace-семантика).
+    // 422 — пустой список (anti-lockout) или метод вне {user,ldap,oidc}.
+    updatePolicy: (body: ProvisioningPolicyUpdateRequest) =>
+      apiSend<ProvisioningPolicyReply>('/v1/provisioning-policy', 'PUT', { body }),
+  },
 
   operators: {
     // 200 → OperatorListReply (paged + auth_method/revoked фильтры).

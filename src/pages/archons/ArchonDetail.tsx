@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
-import { keeperApi, type OperatorAuthMethod } from '../../api/keeper';
+import { keeperApi, type OperatorAuthMethod, type OperatorCreatedVia } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -25,6 +25,22 @@ function authMethodTone(m: OperatorAuthMethod | string | undefined):
       return 'warn';
     default:
       return 'muted';
+  }
+}
+
+function createdViaTone(v: OperatorCreatedVia | string | undefined):
+  'ok' | 'warn' | 'info' | 'muted' {
+  switch (v) {
+    case 'ldap':
+    case 'oidc':
+      return 'info';
+    case 'bootstrap':
+      return 'warn';
+    case 'system':
+      return 'muted';
+    case 'user':
+    default:
+      return 'ok';
   }
 }
 
@@ -145,6 +161,16 @@ export function ArchonDetail() {
             <span className={styles.metaVal}>{op.display_name}</span>
             <span className={styles.metaKey}>{t('pages:archonAuthMethod')}</span>
             <span className={styles.metaVal}>{op.auth_method}</span>
+            <span className={styles.metaKey}>{t('admin:archonCreatedVia')}</span>
+            <span className={styles.metaVal}>
+              {op.created_via ? (
+                <span data-testid={`created-via-${op.aid}`}>
+                  <Badge tone={createdViaTone(op.created_via)}>{op.created_via}</Badge>
+                </span>
+              ) : (
+                <span data-testid={`created-via-${op.aid}`}>—</span>
+              )}
+            </span>
             <span className={styles.metaKey}>Created at</span>
             <span className={styles.metaVal}>{op.created_at}</span>
             <span className={styles.metaKey}>Created by</span>

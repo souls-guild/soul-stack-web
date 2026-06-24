@@ -12,6 +12,7 @@ const SAMPLE_LIST = {
       aid: 'archon-bootstrap',
       display_name: 'Bootstrap Archon',
       auth_method: 'jwt',
+      created_via: 'bootstrap',
       created_at: '2026-05-01T00:00:00Z',
       created_by_aid: null,
       revoked_at: null,
@@ -21,6 +22,7 @@ const SAMPLE_LIST = {
       aid: 'archon-alice',
       display_name: 'Alice Ops',
       auth_method: 'jwt',
+      created_via: 'user',
       created_at: '2026-05-10T10:00:00Z',
       created_by_aid: 'archon-bootstrap',
       revoked_at: null,
@@ -30,6 +32,7 @@ const SAMPLE_LIST = {
       aid: 'archon-old',
       display_name: 'Old Ops',
       auth_method: 'jwt',
+      created_via: 'ldap',
       created_at: '2026-04-01T00:00:00Z',
       created_by_aid: 'archon-bootstrap',
       revoked_at: '2026-05-20T00:00:00Z',
@@ -519,6 +522,41 @@ describe('ArchonsList', () => {
     expect(JSON.parse(postBodies[1]).roles).toBeUndefined();
     // Подсказка пользователю про unsupported.
     expect(screen.getByRole('status')).toHaveTextContent(/backend не поддерживает/i);
+  });
+
+  // --- Колонка created_via ---
+
+  it('created_via отображается как Badge в таблице', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+    });
+    // archon-alice (hide-revoked ON → archon-old скрыт):
+    // bootstrap → badge для archon-bootstrap, user → badge для archon-alice
+    expect(screen.getByTestId('created-via-archon-bootstrap')).toHaveTextContent('bootstrap');
+    expect(screen.getByTestId('created-via-archon-alice')).toHaveTextContent('user');
+    // archon-old скрыт (hide-revoked по умолчанию ON)
+    expect(screen.queryByTestId('created-via-archon-old')).not.toBeInTheDocument();
+  });
+
+  it('created_via=ldap отображается при снятом hide-revoked', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+    });
+    // Снимаем hide-revoked → archon-old виден
+    await user.click(screen.getByLabelText(/Скрыть отозванных/i));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('created-via-archon-old')).toHaveTextContent('ldap');
   });
 
   // --- AID-паттерн: новый формат ADR-014 amendment ---

@@ -10,6 +10,10 @@ const keeperTarget = process.env.VITE_KEEPER_API ?? 'http://localhost:8080';
 
 export default defineConfig({
   plugins: [react()],
+  // base: '/ui/' необходим для go:embed-раздачи SPA из /ui (ADR-055).
+  // Все asset-ссылки в dist/index.html становятся /ui/assets/..., а не /assets/...
+  // В dev-режиме vite dev-server отдаёт приложение на localhost:5173/ui/
+  base: '/ui/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

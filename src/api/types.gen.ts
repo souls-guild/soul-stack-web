@@ -4,6 +4,66 @@
  */
 
 export interface paths {
+    "/auth/ldap/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Логин оператора через LDAP
+         * @description Федеративная аутентификация (ADR-058): LDAP search-bind → маппинг на operators(aid)+роли → внутренний JWT в HttpOnly+Secure cookie. Тело ответа пустое.
+         */
+        post: operations["ldapLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * OIDC-callback оператора
+         * @description Валидирует id_token (JWKS-подпись/iss/aud/exp/nonce), маппит на operators(aid)+роли, выпускает внутренний JWT в HttpOnly+Secure cookie и редиректит (302) в UI. Ошибка валидации/маппинга → 401/403.
+         */
+        get: operations["oidcCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/oidc/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Старт OIDC-логина оператора
+         * @description Федеративная аутентификация (ADR-058): генерирует state+nonce+PKCE и редиректит (302) на authorization_endpoint внешнего IdP.
+         */
+        get: operations["oidcLogin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/audit": {
         parameters: {
             query?: never;
@@ -628,6 +688,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{name}/scenarios/{scenario}/form-prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pre-fill day-2-формы сценария из incarnation.state
+         * @description Текущие значения state под поля схемы сценария с prefill_from_state (docs/input.md). Path-whitelist (клиент путь не задаёт), secret-поля исключены. Вне RBAC-scope → 404. Permission incarnation.get. Read-only, без audit.
+         */
+        post: operations["incarnationFormPrefill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations/{name}/unlock": {
         parameters: {
             query?: never;
@@ -891,6 +971,30 @@ export interface paths {
          * @description Снимает активный допуск (namespace,name,ref) из allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — активной записи нет.
          */
         delete: operations["revokePluginSigil"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/provisioning-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Политика способов создания операторов
+         * @description Текущий список разрешённых способов СОЗДАНИЯ оператора (provisioning_allowed_methods, ADR-058 Часть B). policy_set=false → политика не задана (дефолт: все способы разрешены). Permission provisioning.read. Read-only, без audit.
+         */
+        get: operations["getProvisioningPolicy"];
+        /**
+         * Сменить политику способов создания операторов
+         * @description Replace-семантика списка разрешённых способов СОЗДАНИЯ оператора (provisioning_allowed_methods, ADR-058 Часть B). Permission provisioning.update. 422 — пустой список (anti-lockout) или метод вне {user,ldap,oidc}. Гейтит ТОЛЬКО создание оператора; существующие логинятся независимо от политики.
+         */
+        put: operations["updateProvisioningPolicy"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1895,7 +1999,7 @@ export interface components {
             inter_unit_interval_ms?: number;
             /**
              * Format: int64
-             * @description период для schedule_kind=interval
+             * @description период для schedule_kind=interval (минимум 30с — абсолютный poll_floor, ADR-046/048)
              */
             interval_seconds?: number;
             /**
@@ -1973,7 +2077,7 @@ export interface components {
             };
             /**
              * Format: int64
-             * @description период для schedule_kind=interval
+             * @description период для schedule_kind=interval (минимум 30с — абсолютный poll_floor, ADR-046/048)
              */
             interval_seconds?: number;
             /** @description порог провалов: N абсолют или N% */
@@ -2182,7 +2286,7 @@ export interface components {
             module: string;
             /**
              * Format: int64
-             * @description полный timeout Errand-а [1..300]; > server-cap (30s) → 202 + Location
+             * @description полный timeout Errand-а [1..300]; 0/опущено → дефолт 30s; > server-cap (30s) → 202 + Location
              */
             timeout_seconds?: number;
         };
@@ -2293,6 +2397,12 @@ export interface components {
         };
         IncarnationDestroyReply: {
             apply_id: string;
+        };
+        IncarnationFormPrefillReply: {
+            /** @description field → текущее значение из incarnation.state (prefill-hint) */
+            values: {
+                [key: string]: unknown;
+            };
         };
         IncarnationGetReply: {
             covens: string[] | null;
@@ -2430,6 +2540,15 @@ export interface components {
             expires_at: string;
             jwt: string;
         };
+        LDAPLoginRequest: {
+            /**
+             * Format: password
+             * @description пароль (не логируется, не возвращается)
+             */
+            password: string;
+            /** @description имя пользователя для LDAP search-bind */
+            username: string;
+        };
         ModuleCatalogItem: {
             description?: string;
             errand_safe: boolean;
@@ -2536,6 +2655,8 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             created_by_aid?: string;
+            /** @enum {string} */
+            created_via: "bootstrap" | "user" | "ldap" | "oidc" | "system";
             display_name: string;
             metadata?: {
                 [key: string]: unknown;
@@ -2621,6 +2742,14 @@ export interface components {
             /** Format: date-time */
             revoked_at?: string;
             sha256: string;
+        };
+        ProvisioningPolicyReply: {
+            allowed_methods: string[] | null;
+            policy_set: boolean;
+        };
+        ProvisioningPolicyUpdateRequest: {
+            /** @description разрешённые способы создания оператора (anti-lockout: непустой список из {user,ldap,oidc}) */
+            allowed_methods: ("user" | "ldap" | "oidc")[] | null;
         };
         PushApplyReply: {
             apply_id: string;
@@ -3512,6 +3641,183 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    ldapLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LDAPLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    oidcCallback: {
+        parameters: {
+            query?: {
+                /** @description authorization code от IdP */
+                code?: string;
+                /** @description opaque CSRF-state, выданный на /auth/oidc/login */
+                state?: string;
+                /** @description код ошибки от IdP (если аутентификация отклонена) */
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Found */
+            302: {
+                headers: {
+                    Location?: string;
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    oidcLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Found */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listAuditEvents: {
         parameters: {
             query?: {
@@ -6371,6 +6677,67 @@ export interface operations {
             };
         };
     };
+    incarnationFormPrefill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description имя сценария */
+                scenario: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationFormPrefillReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     unlockIncarnation: {
         parameters: {
             query?: never;
@@ -6738,7 +7105,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description фильтр по форме credential; значение вне enum → 422 */
-                auth_method?: "jwt" | "mtls" | "combined";
+                auth_method?: "jwt" | "mtls" | "combined" | "ldap" | "oidc";
                 /** @description включать ревокнутых (false — только активные); bad-value → 400 */
                 revoked?: boolean;
                 /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
@@ -7241,6 +7608,113 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getProvisioningPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvisioningPolicyReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateProvisioningPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProvisioningPolicyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvisioningPolicyReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {

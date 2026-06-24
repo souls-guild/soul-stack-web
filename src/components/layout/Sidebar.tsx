@@ -16,6 +16,7 @@ import {
   HelpCircle,
   CalendarClock,
   Bell,
+  Settings,
 } from 'lucide-react';
 import { SidebarToggleIcon } from '../icons/SidebarToggleIcon';
 import { HelpModal } from './HelpModal';
@@ -53,6 +54,7 @@ const REGISTRY: NavItem[] = [
   { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
   { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
   { to: '/synods', label: 'Synods', icon: Users2, matchPrefix: '/synods' },
+  { to: '/provisioning-policy', label: 'Provisioning Policy', icon: Settings },
 ];
 
 const ORACLE: NavItem[] = [

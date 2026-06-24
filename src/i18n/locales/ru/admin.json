@@ -252,5 +252,22 @@
   "helpMcpCopyAria": "Скопировать MCP URL",
   "helpMcpHint": "Для Claude Desktop пропишите endpoint в claude_desktop_config.json под ключом mcpServers.soul-stack.",
   "helpDocsTitle": "Документация",
-  "helpDocsLead": "Документация и ADR — в репозитории soul-stack/docs/."
+  "helpDocsLead": "Документация и ADR — в репозитории soul-stack/docs/.",
+
+  "provPolicyCrumbs": "политика провижининга операторов",
+  "provPolicyTitle": "Provisioning Policy",
+  "provPolicyDesc": "Определяет, какими способами можно создавать новых операторов (Архонтов). Не влияет на вход уже существующих операторов.",
+  "provPolicyAllowedMethods": "Разрешённые методы",
+  "provPolicyDefaultHint": "Политика не задана — все методы разрешены (значение по умолчанию).",
+  "provPolicySaveBtn": "Сохранить",
+  "provPolicySaving": "Сохраняем…",
+  "provPolicySaved": "Политика обновлена.",
+  "provPolicyLoadError": "Не удалось загрузить политику.",
+  "provPolicySaveError": "Не удалось сохранить политику.",
+  "provPolicyAntiLockout": "Нельзя оставить пустой список — это заблокирует создание новых операторов.",
+  "provMethodUser": "ручное создание через API/UI",
+  "provMethodLdap": "авто-провижининг из LDAP",
+  "provMethodOidc": "авто-провижининг через OIDC",
+
+  "archonCreatedVia": "Created via"
 }

@@ -12,6 +12,7 @@ import { SoulDetail } from './pages/souls/SoulDetail';
 import { AuditLog } from './pages/audit/AuditLog';
 import { ArchonsList } from './pages/archons/ArchonsList';
 import { ArchonDetail } from './pages/archons/ArchonDetail';
+import { ProvisioningPolicy } from './pages/archons/ProvisioningPolicy';
 import { PushApply } from './pages/push/PushApply';
 import { ErrandsList } from './pages/errands/ErrandsList';
 import { ErrandNewForm } from './pages/errands/ErrandNewForm';
@@ -78,7 +79,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/ui">
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to={landingTarget()} replace />} />
@@ -90,6 +91,7 @@ export function App() {
             <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
             <Route path="/archons" element={<Protected><ArchonsList /></Protected>} />
             <Route path="/archons/:aid" element={<Protected><ArchonDetail /></Protected>} />
+            <Route path="/provisioning-policy" element={<Protected><ProvisioningPolicy /></Protected>} />
             <Route path="/push" element={<Protected><PushApply /></Protected>} />
             <Route path="/errands" element={<Protected><ErrandsList /></Protected>} />
             <Route path="/errands/new" element={<Protected><ErrandNewForm /></Protected>} />

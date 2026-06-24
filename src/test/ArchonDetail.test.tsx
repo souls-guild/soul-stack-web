@@ -28,6 +28,7 @@ describe('ArchonDetail', () => {
           aid: 'archon-alice',
           display_name: 'Alice Ops',
           auth_method: 'jwt',
+          created_via: 'user',
           created_at: '2026-05-10T10:00:00Z',
           created_by_aid: 'archon-bootstrap',
           revoked_at: null,
@@ -44,6 +45,8 @@ describe('ArchonDetail', () => {
     expect(screen.getByText('archon-bootstrap')).toBeInTheDocument();
     // Metadata JsonViewer.
     expect(screen.getByText(/platform/)).toBeInTheDocument();
+    // created_via badge — устойчивый матч по data-testid
+    expect(screen.getByTestId('created-via-archon-alice')).toHaveTextContent('user');
   });
 
   it('показывает revoked + bootstrap initial badges', async () => {
@@ -55,6 +58,7 @@ describe('ArchonDetail', () => {
           aid: 'archon-bootstrap',
           display_name: 'Bootstrap',
           auth_method: 'jwt',
+          created_via: 'bootstrap',
           created_at: '2026-05-01T00:00:00Z',
           created_by_aid: null,
           revoked_at: '2026-05-20T00:00:00Z',
@@ -74,6 +78,59 @@ describe('ArchonDetail', () => {
     expect(screen.getByText(/metadata пустой/i)).toBeInTheDocument();
   });
 
+  // ── Guard-тесты: created_via badge ────────────────────────────────────────
+
+  it.each([
+    ['oidc', 'archon-oidc'],
+    ['system', 'archon-system'],
+  ] as const)('created_via=%s отображается в Badge по data-testid', async (createdVia, aid) => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: `/v1/operators/${aid}`,
+        body: {
+          aid,
+          display_name: `${createdVia} Archon`,
+          auth_method: 'jwt',
+          created_via: createdVia,
+          created_at: '2026-06-01T00:00:00Z',
+          created_by_aid: 'archon-bootstrap',
+          revoked_at: null,
+          bootstrap_initial: false,
+          metadata: {},
+        },
+      },
+    ]);
+    renderWithProviders(withParamRoute(), `/archons/${aid}`);
+    await waitFor(() => {
+      expect(screen.getByTestId(`created-via-${aid}`)).toHaveTextContent(createdVia);
+    });
+  });
+
+  it('created_via=null/undefined → показывает «—» в badge-ячейке', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/operators/archon-no-via',
+        body: {
+          aid: 'archon-no-via',
+          display_name: 'No Via',
+          auth_method: 'jwt',
+          created_via: null,
+          created_at: '2026-06-01T00:00:00Z',
+          created_by_aid: 'archon-bootstrap',
+          revoked_at: null,
+          bootstrap_initial: false,
+          metadata: {},
+        },
+      },
+    ]);
+    renderWithProviders(withParamRoute(), '/archons/archon-no-via');
+    await waitFor(() => {
+      expect(screen.getByTestId('created-via-archon-no-via')).toHaveTextContent('—');
+    });
+  });
+
   it('Revoke-кнопка отсутствует для уже-отозванного Архонта', async () => {
     installFetchMock([
       {
@@ -83,6 +140,7 @@ describe('ArchonDetail', () => {
           aid: 'archon-old',
           display_name: 'Old',
           auth_method: 'jwt',
+          created_via: 'user',
           created_at: '2026-04-01T00:00:00Z',
           created_by_aid: 'archon-bootstrap',
           revoked_at: '2026-05-20T00:00:00Z',
@@ -104,6 +162,7 @@ describe('ArchonDetail', () => {
       aid: 'archon-alice',
       display_name: 'Alice',
       auth_method: 'jwt',
+      created_via: 'user',
       created_at: '2026-05-10T10:00:00Z',
       created_by_aid: 'archon-bootstrap',
       revoked_at: null,
@@ -147,6 +206,7 @@ describe('ArchonDetail', () => {
     aid: 'archon-alice',
     display_name: 'Alice Ops',
     auth_method: 'jwt',
+    created_via: 'user',
     created_at: '2026-05-10T10:00:00Z',
     created_by_aid: 'archon-bootstrap',
     revoked_at: null,
@@ -329,6 +389,7 @@ describe('ArchonDetail', () => {
           aid: 'archon-alice',
           display_name: 'Alice',
           auth_method: 'jwt',
+          created_via: 'user',
           created_at: '2026-05-10T10:00:00Z',
           created_by_aid: 'archon-bootstrap',
           revoked_at: null,

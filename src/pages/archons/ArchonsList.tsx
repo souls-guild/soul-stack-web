@@ -8,6 +8,7 @@ import {
   type OperatorCreateReply,
   type IssueTokenReply,
   type OperatorAuthMethod,
+  type OperatorCreatedVia,
   type Operator,
   type RoleView,
 } from '../../api/keeper';
@@ -30,6 +31,22 @@ function authMethodTone(m: OperatorAuthMethod | string | undefined):
       return 'warn';
     default:
       return 'muted';
+  }
+}
+
+function createdViaTone(v: OperatorCreatedVia | string | undefined):
+  'ok' | 'warn' | 'info' | 'muted' {
+  switch (v) {
+    case 'ldap':
+    case 'oidc':
+      return 'info';
+    case 'bootstrap':
+      return 'warn';
+    case 'system':
+      return 'muted';
+    case 'user':
+    default:
+      return 'ok';
   }
 }
 
@@ -210,6 +227,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
           <th>AID</th>
           <th>{t('pages:archonDisplayName')}</th>
           <th>Auth</th>
+          <th>{t('admin:archonCreatedVia')}</th>
           <th>Created</th>
           <th>Created by</th>
           <th>Revoked</th>
@@ -230,6 +248,17 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
               </td>
               <td>{op.display_name}</td>
               <td><Badge tone={authMethodTone(op.auth_method)}>{op.auth_method}</Badge></td>
+              <td>
+                {op.created_via ? (
+                  <span data-testid={`created-via-${op.aid}`}>
+                    <Badge tone={createdViaTone(op.created_via)}>
+                      {op.created_via}
+                    </Badge>
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--text-faint)' }}>—</span>
+                )}
+              </td>
               <td className="mono">{op.created_at}</td>
               <td className="mono">{op.created_by_aid ?? '—'}</td>
               <td className="mono">{op.revoked_at ?? '—'}</td>

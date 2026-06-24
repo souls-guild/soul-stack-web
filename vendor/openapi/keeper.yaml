@@ -4,13 +4,16 @@ components:
       additionalProperties: false
       properties:
         archon_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         correlation_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         created_at:
           format: date-time
           type: string
         id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         payload:
           additionalProperties: {}
@@ -66,6 +69,7 @@ components:
           type: integer
         cadence_id:
           description: ULID расписания
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         concurrency:
           format: int64
@@ -74,6 +78,7 @@ components:
           format: date-time
           type: string
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         cron_expr:
           type: string
@@ -145,6 +150,7 @@ components:
       properties:
         cadence_id:
           description: ULID созданного расписания
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         enabled:
           type: boolean
@@ -173,12 +179,16 @@ components:
           type: string
         batch_percent:
           format: int64
+          maximum: 100
+          minimum: 1
           type: integer
         batch_size:
           format: int64
+          minimum: 1
           type: integer
         concurrency:
           format: int64
+          minimum: 1
           type: integer
         cron_expr:
           description: cron-выражение для schedule_kind=cron
@@ -188,6 +198,7 @@ components:
           type: boolean
         fail_threshold:
           format: int64
+          minimum: 1
           type: integer
         input:
           additionalProperties: {}
@@ -200,8 +211,9 @@ components:
           format: int64
           type: integer
         interval_seconds:
-          description: период для schedule_kind=interval
+          description: период для schedule_kind=interval (минимум 30с — абсолютный poll_floor, ADR-046/048)
           format: int64
+          minimum: 30
           type: integer
         kind:
           description: тип рецепта прогона
@@ -259,6 +271,7 @@ components:
       additionalProperties: false
       properties:
         cadence_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         enabled:
           type: boolean
@@ -304,12 +317,16 @@ components:
           type: string
         batch_percent:
           format: int64
+          maximum: 100
+          minimum: 1
           type: integer
         batch_size:
           format: int64
+          minimum: 1
           type: integer
         concurrency:
           format: int64
+          minimum: 1
           type: integer
         cron_expr:
           description: cron-выражение (пустая строка → очистить)
@@ -319,14 +336,16 @@ components:
           type: boolean
         fail_threshold:
           format: int64
+          minimum: 1
           type: integer
         input:
           additionalProperties: {}
           description: параметры рецепта
           type: object
         interval_seconds:
-          description: период для schedule_kind=interval
+          description: период для schedule_kind=interval (минимум 30с — абсолютный poll_floor, ADR-046/048)
           format: int64
+          minimum: 30
           type: integer
         max_failures:
           description: "порог провалов: N абсолют или N%"
@@ -371,6 +390,7 @@ components:
           format: date-time
           type: string
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type:
             - string
             - "null"
@@ -379,6 +399,7 @@ components:
             - string
             - "null"
         incarnation_name:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         max_size:
           format: int64
@@ -404,6 +425,7 @@ components:
       properties:
         choir_name:
           description: имя Choir-а (^[a-z][a-z0-9_-]*$)
+          pattern: ^[a-z][a-z0-9_-]*$
           type: string
         description:
           description: человекочитаемое описание
@@ -450,6 +472,7 @@ components:
           description: вход сценария (vault-ref едет как есть)
         action_scenario:
           description: named scenario (whitelist; raw-команда отвергнута)
+          pattern: ^[a-z][a-z0-9_]*$
           type: string
         cooldown:
           description: минимальный интервал между срабатываниями per-(decree, subject)
@@ -464,12 +487,15 @@ components:
           type: boolean
         incarnation_name:
           description: таргет-incarnation реакции (обязательно)
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         name:
           description: имя Decree-а (kebab-case, 1..63)
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         on_beacon:
           description: имя Vigil-а, на чей Portent правило реагирует
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         sid:
           description: субъект — один конкретный SID (XOR с coven)
@@ -527,10 +553,13 @@ components:
         enabled:
           type: boolean
         incarnation_name:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         name:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         on_beacon:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         sid:
           type: string
@@ -709,6 +738,7 @@ components:
           format: int64
           type: integer
         errand_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         error_message:
           type: string
@@ -724,11 +754,13 @@ components:
           additionalProperties: {}
           type: object
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
         started_at:
           format: date-time
           type: string
         started_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         status:
           type: string
@@ -762,8 +794,9 @@ components:
           description: fully-qualified <ns>.<name>.<state> (core.cmd.shell / core.exec.run / ErrandReadSafe-модуль)
           type: string
         timeout_seconds:
-          description: полный timeout Errand-а [1..300]; > server-cap (30s) → 202 + Location
+          description: полный timeout Errand-а [1..300]; 0/опущено → дефолт 30s; > server-cap (30s) → 202 + Location
           format: int64
+          maximum: 300
           type: integer
       required:
         - module
@@ -824,6 +857,7 @@ components:
       properties:
         aid:
           description: AID архонта, назначаемого в роль/группу (naming-rules.md)
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
       required:
         - aid
@@ -842,6 +876,7 @@ components:
         enabled:
           type: boolean
         name:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         secret_ref:
           type: string
@@ -870,6 +905,7 @@ components:
           type: boolean
         name:
           description: имя Herald-канала (kebab-case, 1..63), уникальное в кластере
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         secret_ref:
           description: опц. vault-ref на signing-token (vault:<mount>/<path>); сам секрет не хранится
@@ -961,8 +997,10 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         incarnation:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
       required:
         - incarnation
@@ -973,6 +1011,8 @@ components:
         covens:
           description: declared environment-теги (ADR-008 amendment a)
           items:
+            maxLength: 63
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type:
             - array
@@ -983,9 +1023,11 @@ components:
           type: object
         name:
           description: имя нового instance (kebab-case), корневая Coven-метка
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         service:
           description: имя сервиса из реестра (ADR-029)
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
       required:
         - name
@@ -995,15 +1037,27 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - apply_id
+      type: object
+    IncarnationFormPrefillReply:
+      additionalProperties: false
+      properties:
+        values:
+          additionalProperties: {}
+          description: field → текущее значение из incarnation.state (prefill-hint)
+          type: object
+      required:
+        - values
       type: object
     IncarnationGetReply:
       additionalProperties: false
       properties:
         covens:
           items:
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type:
             - array
@@ -1012,6 +1066,7 @@ components:
           format: date-time
           type: string
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type:
             - string
             - "null"
@@ -1021,6 +1076,7 @@ components:
         last_drift_summary:
           $ref: "#/components/schemas/DriftScanSummary"
         name:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         service:
           type: string
@@ -1117,8 +1173,10 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         incarnation:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
       required:
         - apply_id
@@ -1129,6 +1187,8 @@ components:
       properties:
         reason:
           description: свободный текст подтверждения
+          maxLength: 500
+          minLength: 1
           type: string
       required:
         - reason
@@ -1137,8 +1197,10 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         incarnation:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         scenario:
           type: string
@@ -1166,6 +1228,7 @@ components:
       properties:
         role:
           description: declared-роль (kebab-case 1..63) или null
+          maxLength: 63
           type: string
         sid:
           description: SID (FQDN) хоста — обязан существовать в souls
@@ -1198,6 +1261,7 @@ components:
           format: date-time
           type: string
         unlocked_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
       required:
         - name
@@ -1214,6 +1278,8 @@ components:
           type: string
         reason:
           description: свободный текст подтверждения
+          maxLength: 500
+          minLength: 1
           type: string
       required:
         - reason
@@ -1243,6 +1309,7 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - apply_id
@@ -1263,6 +1330,7 @@ components:
       additionalProperties: false
       properties:
         aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         expires_at:
           format: date-time
@@ -1273,6 +1341,22 @@ components:
         - aid
         - expires_at
         - jwt
+      type: object
+    LDAPLoginRequest:
+      additionalProperties: false
+      properties:
+        password:
+          description: пароль (не логируется, не возвращается)
+          format: password
+          minLength: 1
+          type: string
+        username:
+          description: имя пользователя для LDAP search-bind
+          minLength: 1
+          type: string
+      required:
+        - username
+        - password
       type: object
     ModuleCatalogItem:
       additionalProperties: false
@@ -1469,6 +1553,7 @@ components:
           type: string
         name:
           description: имя Omen-а (kebab-case, 1..63)
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         source_type:
           description: тип внешней системы; значение вне enum → 422
@@ -1520,6 +1605,7 @@ components:
         endpoint:
           type: string
         name:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         source_type:
           type: string
@@ -1534,6 +1620,7 @@ components:
       additionalProperties: false
       properties:
         aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         auth_method:
           type: string
@@ -1543,6 +1630,15 @@ components:
           format: date-time
           type: string
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
+          type: string
+        created_via:
+          enum:
+            - bootstrap
+            - user
+            - ldap
+            - oidc
+            - system
           type: string
         display_name:
           type: string
@@ -1557,17 +1653,20 @@ components:
         - auth_method
         - bootstrap_initial
         - created_at
+        - created_via
         - display_name
       type: object
     OperatorCreateReply:
       additionalProperties: false
       properties:
         aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         created_at:
           format: date-time
           type: string
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         display_name:
           type: string
@@ -1589,6 +1688,7 @@ components:
       properties:
         aid:
           description: AID нового Архонта (naming-rules.md)
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         display_name:
           description: человекочитаемое имя для UI/аудита
@@ -1690,6 +1790,7 @@ components:
         ref:
           type: string
         sha256:
+          pattern: ^[0-9a-f]{64}$
           type: string
       required:
         - name
@@ -1702,12 +1803,15 @@ components:
       properties:
         name:
           description: имя плагина (как в manifest.name)
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
           type: string
         namespace:
           description: namespace плагина (тип — cloud/ssh/mod)
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
           type: string
         ref:
           description: git-tag-ref допуска (стабильная метка, без слешей)
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
           type: string
       required:
         - namespace
@@ -1733,6 +1837,7 @@ components:
           format: date-time
           type: string
         allowed_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         name:
           type: string
@@ -1744,6 +1849,7 @@ components:
           format: date-time
           type: string
         sha256:
+          pattern: ^[0-9a-f]{64}$
           type: string
       required:
         - allowed_at
@@ -1753,10 +1859,44 @@ components:
         - ref
         - sha256
       type: object
+    ProvisioningPolicyReply:
+      additionalProperties: false
+      properties:
+        allowed_methods:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        policy_set:
+          type: boolean
+      required:
+        - allowed_methods
+        - policy_set
+      type: object
+    ProvisioningPolicyUpdateRequest:
+      additionalProperties: false
+      properties:
+        allowed_methods:
+          description: "разрешённые способы создания оператора (anti-lockout: непустой список из {user,ldap,oidc})"
+          items:
+            enum:
+              - user
+              - ldap
+              - oidc
+            type: string
+          minItems: 1
+          type:
+            - array
+            - "null"
+      required:
+        - allowed_methods
+      type: object
     PushApplyReply:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - apply_id
@@ -1792,6 +1932,7 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         cleanup_stale:
           type: boolean
@@ -1815,6 +1956,7 @@ components:
           format: date-time
           type: string
         started_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         status:
           type: string
@@ -1836,6 +1978,7 @@ components:
           format: date-time
           type: string
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         name:
           type: string
@@ -1846,6 +1989,7 @@ components:
           format: date-time
           type: string
         updated_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
       required:
         - created_at
@@ -1859,6 +2003,7 @@ components:
       properties:
         name:
           description: имя Push-Provider-а (= plugins.ssh_providers[].name)
+          pattern: ^[a-z][a-z0-9-]{0,62}$
           type: string
         params:
           additionalProperties: {}
@@ -1905,6 +2050,7 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         cleanup_stale:
           type: boolean
@@ -1925,6 +2071,7 @@ components:
           format: date-time
           type: string
         started_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         status:
           type: string
@@ -2032,6 +2179,7 @@ components:
           format: int64
           type: integer
         omen:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         sid:
           type: string
@@ -2058,6 +2206,7 @@ components:
           type: string
         name:
           description: имя роли (kebab-case), уникальное в кластере
+          pattern: ^[a-z][a-z0-9-]*$
           type: string
         permissions:
           description: набор permission-строк роли (например incarnation.run, soul.*, *)
@@ -2110,6 +2259,7 @@ components:
         description:
           type: string
         name:
+          pattern: ^[a-z][a-z0-9-]*$
           type: string
         operators:
           items:
@@ -2230,6 +2380,7 @@ components:
           type: string
         name:
           description: имя Service-а (kebab-case)
+          pattern: ^[a-z][a-z0-9-]*$
           type: string
         ref:
           description: git ref (tag/branch) — версия Service-а (ADR-007)
@@ -2315,6 +2466,7 @@ components:
         git:
           type: string
         name:
+          pattern: ^[a-z][a-z0-9-]*$
           type: string
         ref:
           type: string
@@ -2341,6 +2493,7 @@ components:
         is_primary:
           type: boolean
         key_id:
+          pattern: ^[0-9a-f]{64}$
           type: string
         pubkey_pem:
           type: string
@@ -2381,6 +2534,7 @@ components:
         is_primary:
           type: boolean
         key_id:
+          pattern: ^[0-9a-f]{64}$
           type: string
         status:
           type: string
@@ -2406,6 +2560,7 @@ components:
         labels:
           description: применённый набор меток для replace (зеркало input)
           items:
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type:
             - array
@@ -2439,10 +2594,13 @@ components:
           type: boolean
         label:
           description: метка для append/remove (запрещена для replace)
+          maxLength: 63
           type: string
         labels:
           description: набор для replace (может быть пустым = снять все; запрещён для append/remove)
           items:
+            maxLength: 63
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type:
             - array
@@ -2469,9 +2627,11 @@ components:
           type: boolean
         coven:
           description: хосты с этой Coven-меткой
+          maxLength: 63
           type: string
         incarnation:
           description: хосты этой incarnation (корневая Coven-метка)
+          maxLength: 63
           type: string
         sids:
           description: точечный список хостов (SID = FQDN)
@@ -2498,9 +2658,11 @@ components:
           type: string
         covens:
           items:
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type: array
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         expires_at:
           format: date-time
@@ -2509,6 +2671,7 @@ components:
           format: date-time
           type: string
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
         status:
           $ref: "#/components/schemas/SoulStatus"
@@ -2527,6 +2690,8 @@ components:
         covens:
           description: стабильные Coven-метки хоста (kebab-case, ADR-008)
           items:
+            maxLength: 63
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type:
             - array
@@ -2554,6 +2719,7 @@ components:
           format: date-time
           type: string
         id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         incarnation:
           type: string
@@ -2569,6 +2735,7 @@ components:
         type:
           type: string
         voyage_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - id
@@ -2592,6 +2759,7 @@ components:
           format: int64
           type: integer
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
         total:
           format: int64
@@ -2612,6 +2780,7 @@ components:
           format: date-time
           type: string
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
       required:
         - bootstrap_token
@@ -2623,11 +2792,13 @@ components:
       properties:
         covens:
           items:
+            pattern: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
             type: string
           type:
             - array
             - "null"
         created_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type:
             - string
             - "null"
@@ -2649,6 +2820,7 @@ components:
             - string
             - "null"
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
         status:
           $ref: "#/components/schemas/SoulStatus"
@@ -2704,16 +2876,20 @@ components:
       properties:
         soul_path:
           description: абсолютный путь установки soul-бинаря (начинается с /)
+          pattern: ^/
           type: string
         ssh_port:
           description: SSH-порт [1..65535]
           format: int64
+          maximum: 65535
+          minimum: 1
           type: integer
         ssh_provider:
           description: опц. имя SshProvider (3-tier routing); пусто → coven/cluster default
           type: string
         ssh_user:
           description: SSH-пользователь
+          minLength: 1
           type: string
       required:
         - soul_path
@@ -2724,6 +2900,7 @@ components:
       additionalProperties: false
       properties:
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
         ssh_target:
           $ref: "#/components/schemas/SoulSshTarget"
@@ -2884,13 +3061,16 @@ components:
       additionalProperties: false
       properties:
         apply_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         changed_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         created_at:
           format: date-time
           type: string
         history_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
         scenario:
           type: string
@@ -2929,9 +3109,11 @@ components:
       properties:
         description:
           description: человекочитаемое описание группы для UI/аудита
+          maxLength: 1024
           type: string
         name:
           description: имя Synod-группы (kebab-case), уникальное в кластере
+          pattern: ^[a-z][a-z0-9-]*$
           type: string
       required:
         - name
@@ -2962,6 +3144,8 @@ components:
       properties:
         description:
           description: новое человекочитаемое описание группы для UI/аудита
+          maxLength: 1024
+          minLength: 1
           type: string
       required:
         - description
@@ -2974,15 +3158,18 @@ components:
         description:
           type: string
         name:
+          pattern: ^[a-z][a-z0-9-]*$
           type: string
         operators:
           items:
+            pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
             type: string
           type:
             - array
             - "null"
         roles:
           items:
+            pattern: ^[a-z][a-z0-9-]*$
             type: string
           type:
             - array
@@ -3017,10 +3204,12 @@ components:
             - array
             - "null"
         herald:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         incarnation:
           type: string
         name:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         only_changes:
           type: boolean
@@ -3075,6 +3264,7 @@ components:
           type: string
         name:
           description: имя Tiding-правила (kebab-case, 1..63)
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         only_changes:
           description: доставлять только при изменениях (опущено → false)
@@ -3182,6 +3372,7 @@ components:
           type: string
         name:
           description: имя Vigil-а (kebab-case, 1..63)
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         params:
           description: параметры проверки; форма зависит от check (передаётся как есть)
@@ -3236,6 +3427,7 @@ components:
         interval:
           type: string
         name:
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         params: {}
         sid:
@@ -3259,12 +3451,14 @@ components:
           format: date-time
           type: string
         added_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type:
             - string
             - "null"
         choir_name:
           type: string
         incarnation_name:
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         position:
           format: int64
@@ -3276,6 +3470,7 @@ components:
             - string
             - "null"
         sid:
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
       required:
         - added_at
@@ -3298,6 +3493,7 @@ components:
           type: string
         sid:
           description: SID (FQDN) хоста — член инкарнации
+          pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
           type: string
       required:
         - sid
@@ -3377,6 +3573,7 @@ components:
           format: date-time
           type: string
         started_by_aid:
+          pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
           type: string
         status:
           type: string
@@ -3388,6 +3585,7 @@ components:
           format: int64
           type: integer
         voyage_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - attempt
@@ -3407,6 +3605,7 @@ components:
         status:
           type: string
         voyage_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - status
@@ -3425,6 +3624,7 @@ components:
         status:
           type: string
         voyage_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - kind
@@ -3444,17 +3644,23 @@ components:
           type: string
         batch_percent:
           format: int64
+          maximum: 100
+          minimum: 1
           type: integer
         batch_size:
           format: int64
+          minimum: 1
           type: integer
         concurrency:
           format: int64
+          maximum: 500
+          minimum: 1
           type: integer
         dry_run:
           type: boolean
         fail_threshold:
           format: int64
+          minimum: 1
           type: integer
         input:
           additionalProperties: {}
@@ -3536,6 +3742,7 @@ components:
           type: object
         herald:
           description: имя канала-герольда
+          pattern: ^[a-z0-9-]{1,63}$
           type: string
         "on":
           description: "терминалы/типы событий: completed|failed|partial"
@@ -3669,16 +3876,168 @@ components:
             - array
             - "null"
         voyage_id:
+          pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
           type: string
       required:
         - targets
         - voyage_id
       type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      description: "Archon JWT (Authorization: Bearer <jwt>). Все /v1-операции требуют валидный токен."
+      scheme: bearer
+      type: http
 info:
   title: Soul Stack Keeper Operator API
   version: v1
 openapi: 3.1.0
 paths:
+  /auth/ldap/login:
+    post:
+      description: "Федеративная аутентификация (ADR-058): LDAP search-bind → маппинг на operators(aid)+роли → внутренний JWT в HttpOnly+Secure cookie. Тело ответа пустое."
+      operationId: ldapLogin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LDAPLoginRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Логин оператора через LDAP
+      tags:
+        - auth
+  /auth/oidc/callback:
+    get:
+      description: Валидирует id_token (JWKS-подпись/iss/aud/exp/nonce), маппит на operators(aid)+роли, выпускает внутренний JWT в HttpOnly+Secure cookie и редиректит (302) в UI. Ошибка валидации/маппинга → 401/403.
+      operationId: oidcCallback
+      parameters:
+        - description: authorization code от IdP
+          explode: false
+          in: query
+          name: code
+          schema:
+            description: authorization code от IdP
+            type: string
+        - description: opaque CSRF-state, выданный на /auth/oidc/login
+          explode: false
+          in: query
+          name: state
+          schema:
+            description: opaque CSRF-state, выданный на /auth/oidc/login
+            type: string
+        - description: код ошибки от IdP (если аутентификация отклонена)
+          explode: false
+          in: query
+          name: error
+          schema:
+            description: код ошибки от IdP (если аутентификация отклонена)
+            type: string
+      responses:
+        "302":
+          description: Found
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              schema:
+                type: string
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unauthorized
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: OIDC-callback оператора
+      tags:
+        - auth
+  /auth/oidc/login:
+    get:
+      description: "Федеративная аутентификация (ADR-058): генерирует state+nonce+PKCE и редиректит (302) на authorization_endpoint внешнего IdP."
+      operationId: oidcLogin
+      responses:
+        "302":
+          description: Found
+          headers:
+            Location:
+              schema:
+                type: string
+        "429":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Too Many Requests
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Старт OIDC-логина оператора
+      tags:
+        - auth
   /v1/audit:
     get:
       description: Read-only-лента audit_log с фильтрами (type/source multi-OR, archon_aid/correlation_id/payload_herald/payload_voyage exact, started_after/before RFC3339) и пагинацией. Permission audit.read. Read-only, без audit (чтение не пишется — рекурсия).
@@ -5845,6 +6204,7 @@ paths:
           required: true
           schema:
             description: SID (FQDN) хоста
+            pattern: ^[a-z0-9][a-z0-9.-]{0,253}$
             type: string
       responses:
         "204":
@@ -6152,6 +6512,59 @@ paths:
       summary: Запустить сценарий инкарнации
       tags:
         - incarnation
+  /v1/incarnations/{name}/scenarios/{scenario}/form-prefill:
+    post:
+      description: Текущие значения state под поля схемы сценария с prefill_from_state (docs/input.md). Path-whitelist (клиент путь не задаёт), secret-поля исключены. Вне RBAC-scope → 404. Permission incarnation.get. Read-only, без audit.
+      operationId: incarnationFormPrefill
+      parameters:
+        - description: имя инкарнации
+          in: path
+          name: name
+          required: true
+          schema:
+            description: имя инкарнации
+            type: string
+        - description: имя сценария
+          in: path
+          name: scenario
+          required: true
+          schema:
+            description: имя сценария
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncarnationFormPrefillReply"
+          description: OK
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Not Found
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Pre-fill day-2-формы сценария из incarnation.state
+      tags:
+        - incarnation
   /v1/incarnations/{name}/unlock:
     post:
       description: error_locked / migration_failed → ready под FOR UPDATE; state не меняется (ADR-009/019). Permission incarnation.unlock.
@@ -6453,6 +6866,8 @@ paths:
               - jwt
               - mtls
               - combined
+              - ldap
+              - oidc
             type: string
         - description: включать ревокнутых (false — только активные); bad-value → 400
           explode: false
@@ -6579,6 +6994,7 @@ paths:
           required: true
           schema:
             description: AID Архонта
+            pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
             type: string
       responses:
         "200":
@@ -6625,6 +7041,7 @@ paths:
           required: true
           schema:
             description: AID Архонта, для которого выпускается новый JWT
+            pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
             type: string
       responses:
         "200":
@@ -6677,6 +7094,7 @@ paths:
           required: true
           schema:
             description: AID Архонта для отзыва
+            pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
             type: string
       requestBody:
         content:
@@ -6832,6 +7250,7 @@ paths:
           required: true
           schema:
             description: namespace плагина
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
             type: string
         - description: имя плагина
           in: path
@@ -6839,6 +7258,7 @@ paths:
           required: true
           schema:
             description: имя плагина
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
             type: string
         - description: git-tag-ref допуска
           in: path
@@ -6846,6 +7266,7 @@ paths:
           required: true
           schema:
             description: git-tag-ref допуска
+            pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
             type: string
       responses:
         "204":
@@ -6877,6 +7298,81 @@ paths:
       summary: Отозвать Sigil
       tags:
         - plugin
+  /v1/provisioning-policy:
+    get:
+      description: "Текущий список разрешённых способов СОЗДАНИЯ оператора (provisioning_allowed_methods, ADR-058 Часть B). policy_set=false → политика не задана (дефолт: все способы разрешены). Permission provisioning.read. Read-only, без audit."
+      operationId: getProvisioningPolicy
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisioningPolicyReply"
+          description: OK
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Политика способов создания операторов
+      tags:
+        - provisioning
+    put:
+      description: Replace-семантика списка разрешённых способов СОЗДАНИЯ оператора (provisioning_allowed_methods, ADR-058 Часть B). Permission provisioning.update. 422 — пустой список (anti-lockout) или метод вне {user,ldap,oidc}. Гейтит ТОЛЬКО создание оператора; существующие логинятся независимо от политики.
+      operationId: updateProvisioningPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProvisioningPolicyUpdateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisioningPolicyReply"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Bad Request
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Not Found
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Сменить политику способов создания операторов
+      tags:
+        - provisioning
   /v1/push-providers:
     get:
       description: Реестр Push-Provider-ов с пагинацией и фильтром name_pattern (ADR-032 S7-2). Permission push-provider.list. Read-only, без audit.
@@ -7001,6 +7497,7 @@ paths:
           required: true
           schema:
             description: имя Push-Provider-а
+            pattern: ^[a-z][a-z0-9-]{0,62}$
             type: string
       responses:
         "204":
@@ -7042,6 +7539,7 @@ paths:
           required: true
           schema:
             description: имя Push-Provider-а
+            pattern: ^[a-z][a-z0-9-]{0,62}$
             type: string
       responses:
         "200":
@@ -7087,6 +7585,7 @@ paths:
           required: true
           schema:
             description: имя Push-Provider-а
+            pattern: ^[a-z][a-z0-9-]{0,62}$
             type: string
       requestBody:
         content:
@@ -7491,6 +7990,7 @@ paths:
           required: true
           schema:
             description: AID оператора-члена роли
+            pattern: ^[a-z0-9][a-z0-9._@-]{1,127}$
             type: string
       responses:
         "204":
@@ -9974,3 +10474,5 @@ paths:
       summary: All-runs drill Voyage-прогона
       tags:
         - voyage
+security:
+  - bearerAuth: []
