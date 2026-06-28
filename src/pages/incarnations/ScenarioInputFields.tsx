@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ScenarioInputSchema, ScenarioInputSchemaProperty } from '../../api/keeper';
+import type { ScenarioInputSchema, ScenarioInputSchemaProperty, ScenarioForm } from '../../api/keeper';
 import {
   isCompositeType,
   isMapWithScalarItems,
   isTypedListField,
+  isArrayOfObjectField,
+  evalShowWhen,
+  isFieldRequired,
   type ScenarioFieldValue,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
@@ -26,6 +29,9 @@ interface Props {
   onInvalidMapChange?: (fieldNames: string[]) => void;
   // Callback: набор полей с pattern-ошибками (для gate на стороне caller-а).
   onPatternErrorChange?: (fieldNames: string[]) => void;
+  // Опциональный презентационный слой — разбивка полей на именованные секции.
+  // Если присутствует — рендерим секционно; иначе — плоский layout (обратная совместимость).
+  form?: ScenarioForm;
 }
 
 // Агрегатор ошибок по имени поля. Хранит карту name→hasError и оповещает
@@ -52,6 +58,7 @@ export function ScenarioInputFields({
   moduleName,
   onInvalidMapChange,
   onPatternErrorChange,
+  form,
 }: Props) {
   const { t } = useTranslation();
   const notifyMapError = useFieldErrorAggregator(onInvalidMapChange);
@@ -60,13 +67,14 @@ export function ScenarioInputFields({
   const entries = Object.entries(schema ?? {});
   if (entries.length === 0) return null;
 
-  // Разделяем на обязательные (required=true, не boolean) и опциональные.
-  // Boolean-поля считаются опциональными (всегда имеют дефолт false).
-  const requiredEntries = entries.filter(([, prop]) => Boolean(prop.required) && prop.type !== 'boolean');
-  const optionalEntries = entries.filter(([, prop]) => !prop.required || prop.type === 'boolean');
-
-  function renderField(key: string, prop: ScenarioInputSchemaProperty) {
-    const isRequired = Boolean(prop.required) && prop.type !== 'boolean';
+  function renderField(
+    key: string,
+    prop: ScenarioInputSchemaProperty,
+    labelOverride?: string,
+    placeholderOverride?: string,
+    hintOverride?: string,
+  ) {
+    const isRequired = isFieldRequired(prop, value as Record<string, unknown>);
     const v = value[key];
     const empty = v === undefined || (typeof v === 'string' && v.trim() === '');
     const missing = showErrors && isRequired && empty;
@@ -78,14 +86,78 @@ export function ScenarioInputFields({
         missing={missing}
         prop={prop}
         value={v}
+        inputState={value as Record<string, unknown>}
         onChange={(nv) => onChange({ ...value, [key]: nv })}
         incarnationContext={incarnationContext}
         moduleName={moduleName}
         onMapError={onInvalidMapChange ? notifyMapError : undefined}
         onPatternError={onPatternErrorChange ? notifyPatternError : undefined}
+        labelOverride={labelOverride}
+        placeholderOverride={placeholderOverride}
+        hintOverride={hintOverride}
       />
     );
   }
+
+  // Секционный рендер: если form задан и содержит секции — раскладываем поля по секциям.
+  // Поля, не попавшие ни в одну секцию — «Default» секция в конце (плоско).
+  // show_when: вычисляется client-side по текущим значениям input (мини-CEL).
+  if (form?.sections && form.sections.length > 0) {
+    // Строим set имён, включённых в секции, чтобы найти «остаток».
+    const assignedNames = new Set<string>();
+    for (const section of form.sections) {
+      for (const field of section.fields ?? []) {
+        assignedNames.add(field.name);
+      }
+    }
+    const residualEntries = entries.filter(([key]) => !assignedNames.has(key));
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {form.sections.map((section) => {
+          // show_when секции: если false — прячем всю секцию со всеми полями.
+          const sectionVisible = evalShowWhen(section.show_when, value as Record<string, unknown>);
+          if (!sectionVisible) return null;
+
+          const sectionFields = (section.fields ?? [])
+            .map((f) => {
+              const prop = (schema ?? {})[f.name];
+              if (!prop) return null;
+              // show_when поля: если false — поле не рендерим.
+              // Скрытое поле не отправляется (caller не включает его в payload).
+              const fieldVisible = evalShowWhen(f.show_when, value as Record<string, unknown>);
+              if (!fieldVisible) return null;
+              // label: из form.fields[].label → prop.description → имя поля
+              const labelOverride = f.label ?? prop.description ?? f.name;
+              return renderField(f.name, prop, labelOverride, f.placeholder, f.hint);
+            })
+            .filter(Boolean);
+          if (sectionFields.length === 0) return null;
+          return (
+            <FormSection
+              key={section.key}
+              sectionKey={section.key}
+              title={section.title}
+              description={section.description}
+              collapsed={section.collapsed}
+            >
+              {sectionFields}
+            </FormSection>
+          );
+        })}
+        {residualEntries.length > 0 ? (
+          <FormSection sectionKey="__default" title={t('run:formDefaultSection')}>
+            {residualEntries.map(([key, prop]) => renderField(key, prop))}
+          </FormSection>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Плоский рендер (нет form или нет секций): обратная совместимость.
+  // isFieldRequired учитывает required_when реактивно по текущему value.
+  const requiredEntries = entries.filter(([, prop]) => isFieldRequired(prop, value as Record<string, unknown>));
+  const optionalEntries = entries.filter(([, prop]) => !isFieldRequired(prop, value as Record<string, unknown>));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -116,12 +188,88 @@ export function ScenarioInputFields({
   );
 }
 
+// Секция формы: title + description + collapsed + children.
+interface FormSectionProps {
+  sectionKey: string;
+  title?: string;
+  description?: string;
+  collapsed?: boolean;
+  children: React.ReactNode;
+}
+
+function FormSection({ sectionKey, title, description, collapsed, children }: FormSectionProps) {
+  const hasHeader = Boolean(title || description);
+
+  if (collapsed) {
+    // Сворачиваемая секция через <details>.
+    return (
+      <details
+        data-testid={`form-section-${sectionKey}`}
+      >
+        <summary
+          style={{
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--text-muted)',
+            userSelect: 'none',
+            listStyle: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            marginBottom: 4,
+          }}
+        >
+          <span>&#9654;</span>
+          {title ? <span>{title}</span> : null}
+        </summary>
+        {description ? (
+          <p style={{ fontSize: 12, color: 'var(--text-faint)', margin: '0 0 8px' }}>{description}</p>
+        ) : null}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+          {children}
+        </div>
+      </details>
+    );
+  }
+
+  return (
+    <div data-testid={`form-section-${sectionKey}`}>
+      {hasHeader ? (
+        <div style={{ marginBottom: 8 }}>
+          {title ? (
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: 2,
+              }}
+            >
+              {title}
+            </div>
+          ) : null}
+          {description ? (
+            <p style={{ fontSize: 12, color: 'var(--text-faint)', margin: 0 }}>{description}</p>
+          ) : null}
+        </div>
+      ) : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
+    </div>
+  );
+}
+
 interface OneProps {
   name: string;
+  // required вычислен снаружи через isFieldRequired (учитывает required_when реактивно).
   required: boolean;
   missing: boolean;
   prop: ScenarioInputSchemaProperty;
   value: ScenarioFieldValue;
+  // Текущее состояние всех полей формы (для реактивного required_when).
+  inputState: Record<string, unknown>;
   onChange: (v: ScenarioFieldValue) => void;
   incarnationContext?: string;
   moduleName?: string;
@@ -129,11 +277,34 @@ interface OneProps {
   onMapError?: (name: string, hasError: boolean) => void;
   // Callback: (fieldName, hasError) — поднимает pattern-ошибку к родителю.
   onPatternError?: (name: string, hasError: boolean) => void;
+  // Опциональная подпись из ScenarioForm: заменяет имя поля в label.
+  labelOverride?: string;
+  // Из ScenarioFormField: placeholder и hint (оба опциональны).
+  placeholderOverride?: string;
+  hintOverride?: string;
 }
 
-function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError }: OneProps) {
+function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
   const { t } = useTranslation();
-  const labelText = `${name}${required ? ' *' : ''}`;
+  // Текст label без маркера (маркер рендерится отдельным span).
+  const labelBaseText = labelOverride ?? name;
+  // Красная звёздочка для обязательных полей.
+  const requiredMarker = required ? (
+    <span
+      data-testid={`field-required-marker-${name}`}
+      style={{ color: 'var(--danger)', marginLeft: 2 }}
+      aria-label="обязательное поле"
+    >
+      *
+    </span>
+  ) : null;
+  // labelText — строка без маркера (используется там, где нужен plain-string: placeholder MapEditor и пр.).
+  const labelText = labelBaseText;
+  // placeholder: placeholderOverride → prop.example → undefined.
+  const resolvedPlaceholder = placeholderOverride ?? prop.example;
+  // hint: hintOverride → prop.description → undefined.
+  // Hint отображается под полем; если hintOverride задан — он важнее description.
+  const resolvedHint = hintOverride ?? prop.description;
   const baseStyle: React.CSSProperties = {
     padding: '8px 10px',
     borderRadius: 'var(--radius)',
@@ -156,7 +327,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <div data-testid={`field-sid-multi-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText}
+          {labelText}{requiredMarker}
         </span>
         <SidPicker
           value={value === undefined ? undefined : String(value)}
@@ -167,8 +338,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           multi
           missing={missing}
         />
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {missingMsg}
       </div>
@@ -180,7 +351,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <div data-testid={`field-sid-single-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText}
+          {labelText}{requiredMarker}
         </span>
         <SidPicker
           value={value === undefined ? undefined : String(value)}
@@ -190,8 +361,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           moduleName={moduleName ?? ''}
           missing={missing}
         />
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {missingMsg}
       </div>
@@ -203,7 +374,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <div data-testid={`field-sid-multi-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText}
+          {labelText}{requiredMarker}
         </span>
         <SidPicker
           value={value === undefined ? undefined : String(value)}
@@ -214,8 +385,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           multi
           missing={missing}
         />
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {missingMsg}
       </div>
@@ -228,11 +399,13 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
       <TypedListField
         name={name}
         labelText={labelText}
+        required={required}
         prop={prop}
         value={value}
         onChange={onChange}
         missing={missing}
         baseStyle={baseStyle}
+        hintOverride={resolvedHint}
       />
     );
   }
@@ -243,12 +416,32 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
       <MapEditor
         name={name}
         labelText={labelText}
+        required={required}
         prop={prop}
         value={value}
         onChange={onChange}
         missing={missing}
         baseStyle={baseStyle}
         onErrorChange={onMapError}
+        hintOverride={resolvedHint}
+      />
+    );
+  }
+
+  // Array-of-object: type=array + items.type=object + items.properties → карточки.
+  // Каждый элемент массива рендерится карточкой с под-полями по items.properties.
+  if (isArrayOfObjectField(prop)) {
+    return (
+      <ArrayOfObjectField
+        name={name}
+        labelText={labelText}
+        required={required}
+        prop={prop}
+        value={value}
+        onChange={onChange}
+        missing={missing}
+        baseStyle={baseStyle}
+        hintOverride={resolvedHint}
       />
     );
   }
@@ -262,19 +455,19 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText} <span style={{ color: 'var(--text-faint)' }}>({prop.type})</span>
+          {labelText}{requiredMarker} <span style={{ color: 'var(--text-faint)' }}>({prop.type})</span>
         </span>
         <textarea
           data-testid={`field-composite-${name}`}
           rows={4}
           value={raw}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={prop.type === 'array' ? '[]' : '{}'}
+          placeholder={resolvedPlaceholder ?? (prop.type === 'array' ? '[]' : '{}')}
           spellCheck={false}
           style={{ ...baseStyle, border: `1px solid ${missing || jsonError ? 'var(--danger)' : 'var(--border)'}` }}
         />
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {jsonError ? (
           <span data-testid={`field-json-error-${name}`} style={{ color: 'var(--danger)', fontSize: 12 }}>
@@ -294,8 +487,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           onChange={(e) => onChange(e.target.checked)}
         />
         <span className="mono">{labelText}</span>
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>— {prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>— {resolvedHint}</span>
         ) : null}
       </label>
     );
@@ -304,18 +497,18 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText}
+          {labelText}{requiredMarker}
         </span>
         <input
           type="number"
           step={prop.type === 'integer' ? 1 : 'any'}
           value={value === undefined ? '' : String(value)}
           onChange={(e) => onChange(e.target.value === '' ? '' : e.target.value)}
-          placeholder={prop.example}
+          placeholder={resolvedPlaceholder}
           style={baseStyle}
         />
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {missingMsg}
       </label>
@@ -326,7 +519,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText}
+          {labelText}{requiredMarker}
         </span>
         <select
           data-testid={`field-enum-${name}`}
@@ -341,8 +534,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
             </option>
           ))}
         </select>
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {missingMsg}
       </label>
@@ -378,14 +571,14 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {labelText}
+          {labelText}{requiredMarker}
         </span>
         <textarea
           data-testid={`field-multiline-${name}`}
           rows={6}
           value={strVal}
           onChange={(e) => handleStringChange(e.target.value)}
-          placeholder={prop.example}
+          placeholder={resolvedPlaceholder}
           spellCheck={false}
           style={{
             ...baseStyle,
@@ -394,8 +587,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
             border: `1px solid ${missing || patternError ? 'var(--danger)' : 'var(--border)'}`,
           }}
         />
-        {prop.description ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+        {resolvedHint ? (
+          <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
         ) : null}
         {patternError ? (
           <span
@@ -413,18 +606,18 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        {labelText}
+        {labelText}{requiredMarker}
       </span>
       <input
         type="text"
         data-testid={`field-text-${name}`}
         value={strVal}
         onChange={(e) => handleStringChange(e.target.value)}
-        placeholder={prop.example}
+        placeholder={resolvedPlaceholder}
         style={{ ...baseStyle, border: `1px solid ${missing || patternError ? 'var(--danger)' : 'var(--border)'}` }}
       />
-      {prop.description ? (
-        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+      {resolvedHint ? (
+        <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{resolvedHint}</span>
       ) : null}
       {patternError ? (
         <span
@@ -445,14 +638,16 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
 interface TypedListFieldProps {
   name: string;
   labelText: string;
+  required: boolean;
   prop: ScenarioInputSchemaProperty;
   value: ScenarioFieldValue;
   onChange: (v: ScenarioFieldValue) => void;
   missing: boolean;
   baseStyle: React.CSSProperties;
+  hintOverride?: string;
 }
 
-function TypedListField({ name, labelText, prop, value, onChange, missing, baseStyle }: TypedListFieldProps) {
+function TypedListField({ name, labelText, required, prop, value, onChange, missing, baseStyle, hintOverride }: TypedListFieldProps) {
   const { t } = useTranslation();
   const itemsType = prop.items?.type ?? 'string';
   const isInt = itemsType === 'integer';
@@ -496,10 +691,20 @@ function TypedListField({ name, labelText, prop, value, onChange, missing, baseS
     ? items.map((s) => s.trim() !== '' && Number.isNaN(parseInt(s, 10)))
     : items.map(() => false);
 
+  const listRequiredMarker = required ? (
+    <span
+      data-testid={`field-required-marker-${name}`}
+      style={{ color: 'var(--danger)', marginLeft: 2 }}
+      aria-label="обязательное поле"
+    >
+      *
+    </span>
+  ) : null;
+
   return (
     <div data-testid={`field-typedlist-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        {labelText}{' '}
+        {labelText}{listRequiredMarker}{' '}
         <span style={{ color: 'var(--text-faint)' }}>
           ({isInt ? 'list[int]' : 'list[string]'})
         </span>
@@ -555,8 +760,219 @@ function TypedListField({ name, labelText, prop, value, onChange, missing, baseS
       >
         + {t('run:listAddItem')}
       </button>
-      {prop.description ? (
-        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+      {hintOverride ? (
+        <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{hintOverride}</span>
+      ) : null}
+      {missing ? (
+        <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
+      ) : null}
+    </div>
+  );
+}
+
+// Array-of-object виджет: каждый элемент — карточка с под-полями по items.properties.
+// Значение хранится как JSON-строка массива объектов (для совместимости с serializeFields).
+interface ArrayOfObjectFieldProps {
+  name: string;
+  labelText: string;
+  required: boolean;
+  prop: ScenarioInputSchemaProperty;
+  value: ScenarioFieldValue;
+  onChange: (v: ScenarioFieldValue) => void;
+  missing: boolean;
+  baseStyle: React.CSSProperties;
+  hintOverride?: string;
+}
+
+function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, missing, baseStyle, hintOverride }: ArrayOfObjectFieldProps) {
+  const { t } = useTranslation();
+
+  // properties под-полей из items
+  const itemProperties = (prop.items?.['properties'] ?? {}) as Record<string, ScenarioInputSchemaProperty>;
+  const itemRequiredKeys: string[] = Array.isArray(prop.items?.['required']) ? (prop.items?.['required'] as string[]) : [];
+  // x-type — имя типа элемента (опционально, из items['x-type'])
+  const xType = prop.items?.['x-type'] as string | undefined;
+
+  // Разбираем текущее значение в массив объектов
+  function parseItems(): Array<Record<string, string>> {
+    if (value === undefined || value === '') return [];
+    try {
+      const parsed = JSON.parse(String(value));
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => {
+          if (item && typeof item === 'object' && !Array.isArray(item)) {
+            // Конвертируем значения в строки для хранения в локальном state
+            const rec: Record<string, string> = {};
+            for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
+              rec[k] = v === undefined || v === null ? '' : String(v);
+            }
+            return rec;
+          }
+          return {};
+        });
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }
+
+  const [items, setItems] = useState<Array<Record<string, string>>>(() => parseItems());
+
+  function commit(next: Array<Record<string, string>>) {
+    setItems(next);
+    // Сериализуем в JSON-строку массива объектов (пустые строки сохраняем как есть)
+    onChange(JSON.stringify(next));
+  }
+
+  function handleSubfieldChange(itemIdx: number, subKey: string, subVal: string) {
+    const next = items.map((item, i) => i === itemIdx ? { ...item, [subKey]: subVal } : item);
+    commit(next);
+  }
+
+  function handleAdd() {
+    // Создаём новый элемент с пустыми значениями для всех под-полей
+    const emptyItem: Record<string, string> = {};
+    for (const k of Object.keys(itemProperties)) {
+      emptyItem[k] = '';
+    }
+    commit([...items, emptyItem]);
+  }
+
+  function handleRemove(idx: number) {
+    commit(items.filter((_, i) => i !== idx));
+  }
+
+  const requiredMarkerEl = required ? (
+    <span
+      data-testid={`field-required-marker-${name}`}
+      style={{ color: 'var(--danger)', marginLeft: 2 }}
+      aria-label="обязательное поле"
+    >
+      *
+    </span>
+  ) : null;
+
+  return (
+    <div data-testid={`field-arrayobj-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+        {labelText}{requiredMarkerEl}
+        {xType ? (
+          <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>[{xType}]</span>
+        ) : null}
+      </span>
+      {items.map((item, itemIdx) => (
+        <div
+          key={itemIdx}
+          data-testid={`field-arrayobj-card-${name}-${itemIdx}`}
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: '8px 10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            background: 'var(--surface)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+            {xType ? (
+              <span style={{ fontSize: 12, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
+                {xType} #{itemIdx + 1}
+              </span>
+            ) : (
+              <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>#{itemIdx + 1}</span>
+            )}
+            <button
+              type="button"
+              data-testid={`field-arrayobj-remove-${name}-${itemIdx}`}
+              onClick={() => handleRemove(itemIdx)}
+              style={{
+                padding: '2px 8px',
+                fontSize: 13,
+                cursor: 'pointer',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+              }}
+              title={t('run:listRemoveItem')}
+            >
+              {t('run:listRemoveItem')}
+            </button>
+          </div>
+          {Object.entries(itemProperties).map(([subKey, subProp]) => {
+            const isSubRequired = itemRequiredKeys.includes(subKey);
+            const subVal = item[subKey] ?? '';
+            const subRequiredMarker = isSubRequired ? (
+              <span
+                data-testid={`field-arrayobj-subfield-required-${name}-${itemIdx}-${subKey}`}
+                style={{ color: 'var(--danger)', marginLeft: 2 }}
+              >
+                *
+              </span>
+            ) : null;
+
+            // enum sub-field → select
+            if (subProp.enum && Array.isArray(subProp.enum) && subProp.enum.length > 0) {
+              return (
+                <label key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {subKey}{subRequiredMarker}
+                  </span>
+                  <select
+                    data-testid={`field-arrayobj-subfield-${name}-${itemIdx}-${subKey}`}
+                    value={subVal}
+                    onChange={(e) => handleSubfieldChange(itemIdx, subKey, e.target.value)}
+                    style={{ ...baseStyle, fontSize: 12 }}
+                  >
+                    <option value="">—</option>
+                    {subProp.enum.map((opt) => (
+                      <option key={String(opt)} value={String(opt)}>
+                        {String(opt)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              );
+            }
+
+            // text sub-field (string/default)
+            return (
+              <label key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {subKey}{subRequiredMarker}
+                </span>
+                <input
+                  type="text"
+                  data-testid={`field-arrayobj-subfield-${name}-${itemIdx}-${subKey}`}
+                  value={subVal}
+                  onChange={(e) => handleSubfieldChange(itemIdx, subKey, e.target.value)}
+                  placeholder={subProp.example ?? subProp.description}
+                  style={{ ...baseStyle, fontSize: 12 }}
+                />
+              </label>
+            );
+          })}
+        </div>
+      ))}
+      <button
+        type="button"
+        data-testid={`field-arrayobj-add-${name}`}
+        onClick={handleAdd}
+        style={{
+          alignSelf: 'flex-start',
+          padding: '4px 10px',
+          fontSize: 13,
+          cursor: 'pointer',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+        }}
+      >
+        + {t('run:arrayObjAddItem')}
+      </button>
+      {hintOverride ? (
+        <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{hintOverride}</span>
       ) : null}
       {missing ? (
         <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
@@ -582,6 +998,7 @@ function isParsableJson(text: string): boolean {
 interface MapEditorProps {
   name: string;
   labelText: string;
+  required: boolean;
   prop: ScenarioInputSchemaProperty;
   value: ScenarioFieldValue;
   onChange: (v: ScenarioFieldValue) => void;
@@ -589,6 +1006,7 @@ interface MapEditorProps {
   baseStyle: React.CSSProperties;
   // Callback: поднимает ошибку/её снятие к ScenarioInputFields для gate-а submit-а.
   onErrorChange?: (name: string, hasError: boolean) => void;
+  hintOverride?: string;
 }
 
 // Вычисляет ошибки пар map-редактора — единый источник правды для рендера и commitPairs.
@@ -629,7 +1047,7 @@ function parseJsonPairs(raw: ScenarioFieldValue): Array<[string, string]> {
   return [];
 }
 
-function MapEditor({ name, labelText, prop, value, onChange, missing, baseStyle, onErrorChange }: MapEditorProps) {
+function MapEditor({ name, labelText, required, prop, value, onChange, missing, baseStyle, onErrorChange, hintOverride }: MapEditorProps) {
   const { t } = useTranslation();
   const itemsType = prop.items?.type ?? 'string';
   const isInt = itemsType === 'integer';
@@ -679,10 +1097,20 @@ function MapEditor({ name, labelText, prop, value, onChange, missing, baseStyle,
     commitPairs(pairs.filter((_, i) => i !== idx));
   }
 
+  const mapRequiredMarker = required ? (
+    <span
+      data-testid={`field-required-marker-${name}`}
+      style={{ color: 'var(--danger)', marginLeft: 2 }}
+      aria-label="обязательное поле"
+    >
+      *
+    </span>
+  ) : null;
+
   return (
     <div data-testid={`field-map-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        {labelText}{' '}
+        {labelText}{mapRequiredMarker}{' '}
         <span style={{ color: 'var(--text-faint)' }}>
           ({isInt ? 'map[string]int' : 'map[string]string'})
         </span>
@@ -772,8 +1200,8 @@ function MapEditor({ name, labelText, prop, value, onChange, missing, baseStyle,
       >
         + {t('run:mapAddPair')}
       </button>
-      {prop.description ? (
-        <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{prop.description}</span>
+      {hintOverride ? (
+        <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{hintOverride}</span>
       ) : null}
       {missing ? (
         <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>

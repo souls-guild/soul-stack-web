@@ -129,6 +129,7 @@
   "sidPickerRemove": "remove",
   "patternError": "does not match pattern: {{pattern}}",
   "advancedLabel": "Advanced",
+  "arrayObjAddItem": "add",
   "listAddItem": "add",
   "listRemoveItem": "−",
   "listIntError": "not an integer",
@@ -197,5 +198,6 @@
   "notifyProjectionAddBtn": "Add path",
   "notifyProjectionRemoveBtn": "Remove",
   "notifyOnHint": "empty = all three terminals",
-  "notifyAnnotationAddBtn": "Add"
+  "notifyAnnotationAddBtn": "Add",
+  "formDefaultSection": "Other"
 }

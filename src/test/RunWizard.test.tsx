@@ -394,8 +394,7 @@ describe('RunWizard', () => {
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('hello-prod'),
     );
 
-    const greetingLabel = await screen.findByText(/^greeting \*?$/);
-    const greetingField = greetingLabel.parentElement?.querySelector('input') as HTMLInputElement;
+    const greetingField = await screen.findByTestId('field-text-greeting') as HTMLInputElement;
     await user.type(greetingField, 'hello world');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -756,8 +755,7 @@ describe('RunWizard', () => {
 
     // Params-форма по params[]: типизированное поле url (required) + timeout.
     await waitFor(() => expect(screen.getByTestId('module-params-form')).toBeInTheDocument());
-    const urlLabel = await screen.findByText(/^url \*?$/);
-    const urlField = urlLabel.parentElement?.querySelector('input') as HTMLInputElement;
+    const urlField = await screen.findByTestId('field-text-url') as HTMLInputElement;
     await user.type(urlField, 'https://example.com');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -880,8 +878,7 @@ describe('RunWizard', () => {
     expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
 
     // Заполняем → ошибка уходит, можно дальше.
-    const greetingLabel = await screen.findByText(/^greeting \*?$/);
-    const greetingField = greetingLabel.parentElement?.querySelector('input') as HTMLInputElement;
+    const greetingField = await screen.findByTestId('field-text-greeting') as HTMLInputElement;
     await user.type(greetingField, 'hi');
     await waitFor(() => expect(screen.queryByTestId('field-required-greeting')).not.toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();

@@ -1,0 +1,109 @@
+// Вкладка Settings / Appearance — выбор темы и языка.
+// Тема: useTheme() из ThemeProvider (контекст), отображает все THEME_MODES.
+// Язык: LangToggle / changeLang из i18n (react-i18next persist через localStorage).
+
+import { useTheme, THEME_MODES, type ThemeMode } from '../../hooks/useTheme';
+import { useTranslation } from 'react-i18next';
+import { changeLang, SUPPORTED_LANGS, type Lang } from '../../i18n';
+import { Sun, Moon, Monitor, Flame, Layers } from 'lucide-react';
+import { useState } from 'react';
+import styles from './AppearanceSettings.module.css';
+
+const THEME_ICONS: Record<ThemeMode, typeof Sun> = {
+  light: Sun,
+  dark: Moon,
+  system: Monitor,
+  warm: Flame,
+  deep: Layers,
+};
+
+const THEME_TITLE_KEYS: Record<ThemeMode, string> = {
+  light: 'admin:themeLight',
+  dark: 'admin:themeDark',
+  system: 'admin:themeSystem',
+  warm: 'admin:themeWarm',
+  deep: 'admin:themeDeep',
+};
+
+const THEME_DESC_KEYS: Record<ThemeMode, string> = {
+  light: 'admin:themeLightDesc',
+  dark: 'admin:themeDarkDesc',
+  system: 'admin:themeSystemDesc',
+  warm: 'admin:themeWarmDesc',
+  deep: 'admin:themeDeepDesc',
+};
+
+const LANG_LABELS: Record<Lang, string> = {
+  ru: 'Русский',
+  en: 'English',
+};
+
+export function AppearanceSettings() {
+  const { t, i18n } = useTranslation();
+  const { mode, setMode } = useTheme();
+  const currentLang = (i18n.resolvedLanguage ?? i18n.language) as Lang;
+  const [langLoading, setLangLoading] = useState(false);
+
+  const onLangSwitch = (lng: Lang) => {
+    if (lng === currentLang || langLoading) return;
+    setLangLoading(true);
+    void changeLang(lng).finally(() => setLangLoading(false));
+  };
+
+  return (
+    <div className={styles.page}>
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>{t('admin:appearanceThemeTitle')}</h2>
+        <p className={styles.sectionDesc}>{t('admin:appearanceThemeDesc')}</p>
+        <div className={styles.themeGrid} role="group" aria-label={t('admin:themeAriaGroup')}>
+          {THEME_MODES.map((m) => {
+            const Icon = THEME_ICONS[m];
+            const active = mode === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                className={active ? `${styles.themeCard} ${styles.themeCardActive}` : styles.themeCard}
+                aria-pressed={active}
+                data-testid={`appearance-theme-${m}`}
+                onClick={() => setMode(m)}
+              >
+                <span className={styles.themeIcon}>
+                  <Icon size={20} />
+                </span>
+                <span className={styles.themeLabel}>{t(THEME_TITLE_KEYS[m])}</span>
+                <span className={styles.themeDesc}>{t(THEME_DESC_KEYS[m])}</span>
+                {active && <span className={styles.themeCheck} aria-hidden="true">&#10003;</span>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>{t('admin:appearanceLangTitle')}</h2>
+        <p className={styles.sectionDesc}>{t('admin:appearanceLangDesc')}</p>
+        <div className={styles.langGrid} role="group" aria-label={t('admin:langAriaGroup')}>
+          {SUPPORTED_LANGS.map((lng) => {
+            const active = currentLang === lng;
+            return (
+              <button
+                key={lng}
+                type="button"
+                className={active ? `${styles.langCard} ${styles.langCardActive}` : styles.langCard}
+                aria-pressed={active}
+                disabled={langLoading}
+                data-testid={`appearance-lang-${lng}`}
+                onClick={() => onLangSwitch(lng)}
+              >
+                <span className={styles.langCode}>{lng.toUpperCase()}</span>
+                <span className={styles.langLabel}>{LANG_LABELS[lng]}</span>
+                {active && <span className={styles.themeCheck} aria-hidden="true">&#10003;</span>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}

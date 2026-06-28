@@ -75,7 +75,7 @@ describe('IncarnationNewForm', () => {
 
     // Типизированное поле из create.input_schema появилось.
     expect(await screen.findByTestId('create-input-fields')).toBeInTheDocument();
-    expect(screen.getByText(/^maxmemory \*?$/)).toBeInTheDocument();
+    expect(screen.getByTestId('field-text-maxmemory')).toBeInTheDocument();
 
     // converge / restart не предлагаются как поля input и нет generic-билдера.
     expect(screen.queryByText(/^converge/)).not.toBeInTheDocument();
@@ -125,8 +125,127 @@ describe('IncarnationNewForm', () => {
     expect(submitBtn).toBeDisabled();
 
     // Заполняем required → submit разблокирован.
-    const field = screen.getByText(/^maxmemory \*?$/).parentElement?.querySelector('input') as HTMLInputElement;
+    const field = screen.getByTestId('field-text-maxmemory') as HTMLInputElement;
     await user.type(field, '512mb');
+    expect(submitBtn).not.toBeDisabled();
+  });
+
+  // Guard: скрытое required-поле (show_when=false) НЕ блокирует submit.
+  it('submit-gate: скрытое required-поле (show_when=false) не блокирует кнопку', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create',
+              kind: 'lifecycle',
+              path: 'scenario/create/main.yml',
+              // mode — обычное поле; slave_of — required, но видим только когда mode=sentinel.
+              // С пустым mode show_when=false → поле скрыто → не блокирует submit.
+              input_schema: {
+                mode: { type: 'string', required: false, description: 'режим' },
+                slave_of: {
+                  type: 'string',
+                  required: true,
+                  description: 'master SID',
+                },
+              },
+              form: {
+                sections: [
+                  {
+                    fields: [
+                      { name: 'mode' },
+                      { name: 'slave_of', show_when: 'input.mode == "sentinel"' },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+    await screen.findByTestId('create-input-fields');
+
+    // slave_of required но скрыт (mode != "sentinel") → submit НЕ заблокирован.
+    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    expect(submitBtn).not.toBeDisabled();
+  });
+
+  // Guard: required_when-предикат истинен → поле блокирует submit.
+  it('submit-gate: required_when=true блокирует кнопку', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create',
+              kind: 'lifecycle',
+              path: 'scenario/create/main.yml',
+              input_schema: {
+                // required_when с предикатом который всегда true (true == true)
+                sentinel_host: {
+                  type: 'string',
+                  required_when: 'true == true',
+                  description: 'sentinel hostname',
+                },
+              },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+    await screen.findByTestId('create-input-fields');
+
+    // sentinel_host required_when=true и поле пустое → submit ЗАБЛОКИРОВАН.
+    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    expect(submitBtn).toBeDisabled();
+
+    // Заполняем поле → submit разблокирован.
+    const field = screen.getByTestId('field-text-sentinel_host') as HTMLInputElement;
+    await user.type(field, 'sentinel.example.com');
     expect(submitBtn).not.toBeDisabled();
   });
 

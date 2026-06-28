@@ -39,6 +39,8 @@ export const incarnationCreateSchema = z.object({
     .array(z.string().regex(KEBAB, 'incarnations:kebabEach'))
     .default([]),
   inputJson: jsonObjectFromString,
+  // traits: key → scalar|list (ADR-060); хранится снаружи как TraitsMap, в схеме как passthrough.
+  traits: z.record(z.union([z.string(), z.array(z.string())])).default({}),
 });
 
 export type IncarnationCreateFormInput = z.input<typeof incarnationCreateSchema>;

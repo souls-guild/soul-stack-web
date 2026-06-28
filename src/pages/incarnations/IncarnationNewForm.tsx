@@ -9,9 +9,11 @@ import { Button, Input } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { ChipsInput } from './ChipsInput';
+import { TraitsEditor, type TraitsMap } from './TraitsEditor';
 import { useServiceScenarios } from './useServiceScenarios';
 import { ScenarioInputFields } from './ScenarioInputFields';
 import {
+  computeVisibleFields,
   defaultsFromSchema,
   isSupportedInputSchema,
   missingRequiredFields,
@@ -58,7 +60,7 @@ export function IncarnationNewForm() {
       unknown,
       IncarnationCreateFormOutput
     >,
-    defaultValues: { name: '', service: prefilledService, covens: [], inputJson: '' },
+    defaultValues: { name: '', service: prefilledService, covens: [], inputJson: '', traits: {} },
   });
 
   const selectedService = watch('service');
@@ -89,13 +91,19 @@ export function IncarnationNewForm() {
 
   // Пустые required-поля create-input (зеркалит backend 422). Submit блокируется
   // до заполнения; inline-ошибка под полем — после попытки submit.
+  // visibleFields учитывает show_when секций/полей — скрытые поля не блокируют.
+  // required_when учитывается через isFieldRequired внутри missingRequiredFields.
   const missingRequired = useMemo(
-    () => (usePerField && createSchema ? missingRequiredFields(createSchema, fields) : []),
-    [usePerField, createSchema, fields],
+    () => {
+      if (!usePerField || !createSchema) return [];
+      const visibleFields = computeVisibleFields(createScenario?.form, fields);
+      return missingRequiredFields(createSchema, fields, visibleFields);
+    },
+    [usePerField, createSchema, createScenario?.form, fields],
   );
 
   const createMu = useMutation({
-    mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown> }) =>
+    mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown>; traits?: TraitsMap }) =>
       keeperApi.incarnations.create(body),
     onSuccess: (reply) => {
       setCreatedApplyId(reply.apply_id ?? null);
@@ -122,11 +130,13 @@ export function IncarnationNewForm() {
     }
     const input =
       usePerField && createSchema ? serializeFields(createSchema, fields) : {};
+    const traits = Object.keys(values.traits).length > 0 ? values.traits : undefined;
     createMu.mutate({
       name: values.name,
       service: values.service,
       covens: values.covens,
       input,
+      traits,
     });
   }
 
@@ -211,6 +221,25 @@ export function IncarnationNewForm() {
           />
         </div>
 
+        <div data-testid="traits-section">
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>
+            {t('incarnations:traitsLabel')}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 6 }}>
+            {t('incarnations:traitsHint')}
+          </div>
+          <Controller
+            control={control}
+            name="traits"
+            render={({ field }) => (
+              <TraitsEditor
+                value={field.value as TraitsMap}
+                onChange={field.onChange}
+              />
+            )}
+          />
+        </div>
+
         {selectedService && usePerField && createSchema ? (
           <div data-testid="create-input-fields">
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
@@ -221,6 +250,7 @@ export function IncarnationNewForm() {
               value={fields}
               onChange={setFields}
               showErrors={showInputErrors}
+              form={createScenario?.form}
             />
             {createScenario?.description ? (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>

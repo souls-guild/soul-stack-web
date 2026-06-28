@@ -6,7 +6,10 @@
     'topbar topbar'
     'sidebar main'
     'sidebar footer';
-  min-height: 100vh;
+  /* Фиксированная высота viewport — сайдбар не растягивается вглубь
+     при длинном/широком контенте (таблицы Audit и др.).
+     overflow: auto на .main обеспечивает скролл контента, не layout. */
+  height: 100vh;
   transition: grid-template-columns var(--dur-fast);
 }
 
@@ -23,7 +26,11 @@
   border-right: 1px solid var(--border);
   background: var(--surface);
   padding: var(--s-4) 0;
-  overflow: hidden;
+  /* Фиксированная ширина (задаётся grid-template-columns);
+     overflow-y: auto позволяет сайдбару скроллить собственный контент
+     независимо от main-области — ширина и позиция не меняются. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .main {

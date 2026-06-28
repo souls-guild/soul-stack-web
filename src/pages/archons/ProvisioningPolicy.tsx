@@ -95,15 +95,7 @@ export function ProvisioningPolicy() {
   const isEmpty = selected.size === 0;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>{t('admin:provPolicyTitle')}</h1>
-          <div className={styles.crumbs}>{t('admin:provPolicyCrumbs')}</div>
-        </div>
-      </div>
-
-      <section className={styles.section} aria-label="provisioning-policy">
+    <section className={styles.section} aria-label="provisioning-policy">
         <p style={{ margin: '0 0 16px', color: 'var(--text-muted)', fontSize: 13 }}>
           {t('admin:provPolicyDesc')}
         </p>
@@ -211,7 +203,6 @@ export function ProvisioningPolicy() {
             </Button>
           </>
         )}
-      </section>
-    </div>
+    </section>
   );
 }

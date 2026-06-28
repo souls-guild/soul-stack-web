@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/AuthProvider';
+import { ThemeProvider } from './hooks/useTheme';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Shell } from './components/layout';
 import { Login } from './pages/Login';
@@ -12,7 +13,7 @@ import { SoulDetail } from './pages/souls/SoulDetail';
 import { AuditLog } from './pages/audit/AuditLog';
 import { ArchonsList } from './pages/archons/ArchonsList';
 import { ArchonDetail } from './pages/archons/ArchonDetail';
-import { ProvisioningPolicy } from './pages/archons/ProvisioningPolicy';
+import { SettingsPage } from './pages/settings/SettingsPage';
 import { PushApply } from './pages/push/PushApply';
 import { ErrandsList } from './pages/errands/ErrandsList';
 import { ErrandNewForm } from './pages/errands/ErrandNewForm';
@@ -77,7 +78,8 @@ function landingTarget(): string {
 
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter basename="/ui">
           <Routes>
@@ -91,7 +93,9 @@ export function App() {
             <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
             <Route path="/archons" element={<Protected><ArchonsList /></Protected>} />
             <Route path="/archons/:aid" element={<Protected><ArchonDetail /></Protected>} />
-            <Route path="/provisioning-policy" element={<Protected><ProvisioningPolicy /></Protected>} />
+            {/* Редирект для совместимости со старыми ссылками */}
+            <Route path="/provisioning-policy" element={<Navigate to="/settings/provisioning-policy" replace />} />
+            <Route path="/settings/*" element={<Protected><SettingsPage /></Protected>} />
             <Route path="/push" element={<Protected><PushApply /></Protected>} />
             <Route path="/errands" element={<Protected><ErrandsList /></Protected>} />
             <Route path="/errands/new" element={<Protected><ErrandNewForm /></Protected>} />
@@ -128,6 +132,7 @@ export function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

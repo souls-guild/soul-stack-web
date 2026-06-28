@@ -106,6 +106,44 @@
   color-scheme: dark;
 }
 
+/* Тема warm — тёплая светлая (amber/cream) */
+[data-theme="warm"] {
+  --bg:            #fdf8f0;
+  --surface:       #fffcf5;
+  --surface-2:     #faf3e0;
+  --border:        #e8dcc8;
+  --border-strong: #d4c4a0;
+  --text:          #2c1a00;
+  --text-muted:    #7a5c2e;
+  --text-faint:    #b89a6a;
+  --accent:        #b45309;
+  --accent-fg:     #ffffff;
+  --success:       #15803d;
+  --warning:       #92400e;
+  --danger:        #b91c1c;
+  --info:          #1d4ed8;
+  color-scheme: light;
+}
+
+/* Тема deep — глубокая тёмная (синевато-фиолетовый accent) */
+[data-theme="deep"] {
+  --bg:            #04040a;
+  --surface:       #0d0d1a;
+  --surface-2:     #161628;
+  --border:        #1e1e35;
+  --border-strong: #2a2a4a;
+  --text:          #e8e8f5;
+  --text-muted:    #9090b8;
+  --text-faint:    #505078;
+  --accent:        #818cf8;
+  --accent-fg:     #0d0d1a;
+  --success:       #4ade80;
+  --warning:       #facc15;
+  --danger:        #f87171;
+  --info:          #60a5fa;
+  color-scheme: dark;
+}
+
 @keyframes ss-pulse {
   0%   { transform: scale(1);   opacity: 0.7; }
   100% { transform: scale(2.5); opacity: 0;   }

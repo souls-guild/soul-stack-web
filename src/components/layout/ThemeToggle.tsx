@@ -1,37 +1,43 @@
-import { Sun, Moon, Monitor } from 'lucide-react';
-import { useTheme, type ThemeMode } from '../../hooks/useTheme';
+import { Sun, Moon, Monitor, Flame, Layers } from 'lucide-react';
+import { useTheme, THEME_MODES, type ThemeMode } from '../../hooks/useTheme';
+import { useTranslation } from 'react-i18next';
 import styles from './ThemeToggle.module.css';
 
-const ORDER: ThemeMode[] = ['light', 'dark', 'system'];
-
-const ICONS = {
+const ICONS: Record<ThemeMode, typeof Sun> = {
   light: Sun,
   dark: Moon,
   system: Monitor,
-} as const;
+  warm: Flame,
+  deep: Layers,
+};
 
-const TITLES: Record<ThemeMode, string> = {
-  light: 'Светлая тема',
-  dark: 'Тёмная тема',
-  system: 'Системная тема',
+const TITLE_KEYS: Record<ThemeMode, string> = {
+  light: 'admin:themeLight',
+  dark: 'admin:themeDark',
+  system: 'admin:themeSystem',
+  warm: 'admin:themeWarm',
+  deep: 'admin:themeDeep',
 };
 
 export function ThemeToggle() {
   const { mode, setMode } = useTheme();
+  const { t } = useTranslation();
 
   return (
-    <div className={styles.group} role="group" aria-label="Тема оформления">
-      {ORDER.map((m) => {
+    <div className={styles.group} role="group" aria-label={t('admin:themeAriaGroup')}>
+      {THEME_MODES.map((m) => {
         const Icon = ICONS[m];
         const active = mode === m;
+        const title = t(TITLE_KEYS[m]);
         return (
           <button
             key={m}
             type="button"
             className={active ? `${styles.btn} ${styles.btnActive}` : styles.btn}
             aria-pressed={active}
-            aria-label={TITLES[m]}
-            title={TITLES[m]}
+            aria-label={title}
+            title={title}
+            data-testid={`theme-${m}`}
             onClick={() => setMode(m)}
           >
             <Icon size={14} />

@@ -269,5 +269,31 @@
   "provMethodLdap": "авто-провижининг из LDAP",
   "provMethodOidc": "авто-провижининг через OIDC",
 
-  "archonCreatedVia": "Created via"
+  "archonCreatedVia": "Created via",
+
+  "settingsTitle": "Settings",
+  "settingsCrumbs": "конфигурация Keeper-а",
+  "settingsNavAria": "Settings sections",
+  "settingsTabProvPolicy": "Provisioning Policy",
+  "settingsTabAppearance": "Appearance",
+
+  "appearanceThemeTitle": "Theme",
+  "appearanceThemeDesc": "Выберите тему оформления. Выбор сохраняется между сессиями.",
+  "appearanceLangTitle": "Language",
+  "appearanceLangDesc": "Выберите язык интерфейса. Выбор сохраняется между сессиями.",
+
+  "themeAriaGroup": "Тема оформления",
+  "langAriaGroup": "Язык интерфейса",
+
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "themeSystem": "System",
+  "themeWarm": "Warm",
+  "themeDeep": "Deep",
+
+  "themeLightDesc": "Светлая",
+  "themeDarkDesc": "Тёмная",
+  "themeSystemDesc": "Как в системе",
+  "themeWarmDesc": "Тёплые тона",
+  "themeDeepDesc": "Глубокая тёмная"
 }

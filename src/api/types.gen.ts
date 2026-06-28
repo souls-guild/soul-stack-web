@@ -73,7 +73,7 @@ export interface paths {
         };
         /**
          * Лента audit-events (paged + фильтры)
-         * @description Read-only-лента audit_log с фильтрами (type/source multi-OR, archon_aid/correlation_id/payload_herald/payload_voyage exact, started_after/before RFC3339) и пагинацией. Permission audit.read. Read-only, без audit (чтение не пишется — рекурсия).
+         * @description Read-only-лента audit_log с фильтрами (type/source multi-OR, archon_aid/correlation_id case-insensitive substring ILIKE, payload_herald/payload_voyage exact, started_after/before RFC3339) и пагинацией. Permission audit.read. Read-only, без audit (чтение не пишется — рекурсия).
          */
         get: operations["listAuditEvents"];
         put?: never;
@@ -708,6 +708,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{name}/traits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Заменить operator-set trait-метки инкарнации
+         * @description Целостная замена incarnation.traits (ADR-060) — источника истины, проецируемого в souls.traits хостов-членов. Permission incarnation.traits-set.
+         */
+        put: operations["setIncarnationTraits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations/{name}/unlock": {
         parameters: {
             query?: never;
@@ -971,6 +991,102 @@ export interface paths {
          * @description Снимает активный допуск (namespace,name,ref) из allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — активной записи нет.
          */
         delete: operations["revokePluginSigil"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Cloud-Profile-ей (paged)
+         * @description Реестр Cloud-Profile-ей с пагинацией и фильтром provider (ADR-017). Permission profile.read. Read-only, без audit.
+         */
+        get: operations["listProfiles"];
+        put?: never;
+        /**
+         * Создать Cloud-Profile
+         * @description Заносит Cloud-Profile (VM-spec поверх Provider-а, реестр profiles, ADR-017). Permission profile.create. 409 — name занят; 422 — provider не существует.
+         */
+        post: operations["createProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profiles/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Cloud-Profile-а
+         * @description Метаданные одного Cloud-Profile-а по имени (ADR-017). Permission profile.read. Read-only, без audit.
+         */
+        get: operations["getProfile"];
+        put?: never;
+        post?: never;
+        /**
+         * Удалить Cloud-Profile
+         * @description Удаляет запись Cloud-Profile-а (ADR-017). Permission profile.delete. 404 — записи нет.
+         */
+        delete: operations["deleteProfile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список Cloud-Provider-ов (paged)
+         * @description Реестр Cloud-Provider-ов с пагинацией (ADR-017). Permission provider.read. Read-only, без audit.
+         */
+        get: operations["listProviders"];
+        put?: never;
+        /**
+         * Создать Cloud-Provider
+         * @description Заносит Cloud-Provider (реестр providers, ADR-017). Permission provider.create. 409 — name занят. credentials_ref хранится как vault-путь, секрет не резолвится.
+         */
+        post: operations["createProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/providers/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Карточка Cloud-Provider-а
+         * @description Метаданные одного Cloud-Provider-а по имени (ADR-017). Permission provider.read. Read-only, без audit. credentials_ref — путь, секрет не резолвится.
+         */
+        get: operations["getProvider"];
+        put?: never;
+        post?: never;
+        /**
+         * Удалить Cloud-Provider
+         * @description Удаляет запись Cloud-Provider-а (ADR-017). Permission provider.delete. 404 — записи нет; 409 — есть зависимые Profile-и (FK RESTRICT).
+         */
+        delete: operations["deleteProvider"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1450,6 +1566,27 @@ export interface paths {
          * @description Bulk append/remove одной метки либо replace набора на хостах под selector ∩ scope (ADR-008). Permission soul.coven-assign. partial → 200 status:partial.
          */
         post: operations["assignSoulCoven"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/souls/traits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Массовое назначение trait-меток (deprecated)
+         * @deprecated
+         * @description DEPRECATED (ADR-060): используйте PUT /v1/incarnations/{name}/traits (incarnation.traits — источник истины, проецируется в souls.traits). Bulk merge/replace/remove operator-set trait-меток (souls.traits jsonb) на хостах под selector ∩ coven-scope. Per-soul write перетирается проекцией incarnation.traits. Permission soul.traits-assign. partial → 200 status:partial.
+         */
+        post: operations["assignSoulTraits"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2386,7 +2523,9 @@ export interface components {
         IncarnationCreateRequest: {
             /** @description declared environment-теги (ADR-008 amendment a) */
             covens?: string[] | null;
-            /** @description input для scenario create */
+            /** @description имя стартового сценария (механизм нескольких create); пусто → create */
+            create_scenario?: string;
+            /** @description input для выбранного create-сценария */
             input?: {
                 [key: string]: unknown;
             };
@@ -2394,6 +2533,10 @@ export interface components {
             name: string;
             /** @description имя сервиса из реестра (ADR-029) */
             service: string;
+            /** @description operator-set trait-метки (ключ → scalar|list of scalars), ADR-060 */
+            traits?: {
+                [key: string]: unknown;
+            };
         };
         IncarnationDestroyReply: {
             apply_id: string;
@@ -2490,6 +2633,12 @@ export interface components {
             name?: string;
             /** @description echo path-scenario (игнорируется) */
             scenario?: string;
+        };
+        IncarnationSetTraitsRequest: {
+            /** @description полный набор trait-меток (ключ → scalar|list of scalars); пустой/опущен = очистить (ADR-060) */
+            traits?: {
+                [key: string]: unknown;
+            };
         };
         IncarnationSpecHost: {
             /** @description declared-роль (kebab-case 1..63) или null */
@@ -2743,6 +2892,66 @@ export interface components {
             revoked_at?: string;
             sha256: string;
         };
+        Profile: {
+            cloud_init?: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            name: string;
+            params: {
+                [key: string]: unknown;
+            };
+            provider: string;
+        };
+        ProfileCreateRequest: {
+            /** @description сырая cloud-init userdata (опц.) */
+            cloud_init?: string;
+            /** @description имя Cloud-Profile-а (kebab) */
+            name: string;
+            /** @description opaque VM-spec (валидируется против CloudDriver.Schema на scenario-слое) */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** @description имя существующего Cloud-Provider-а */
+            provider: string;
+        };
+        ProfileListReply: {
+            items: components["schemas"]["Profile"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
+        Provider: {
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            credentials_ref: string;
+            name: string;
+            region: string;
+            type: string;
+        };
+        ProviderCreateRequest: {
+            /** @description vault-ref до credentials (vault:<path>); значение НЕ резолвится */
+            credentials_ref: string;
+            /** @description имя Cloud-Provider-а (kebab) */
+            name: string;
+            /** @description регион провайдера */
+            region: string;
+            /** @description имя CloudDriver-плагина (= plugins.cloud_drivers[].name) */
+            type: string;
+        };
+        ProviderListReply: {
+            items: components["schemas"]["Provider"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
         ProvisioningPolicyReply: {
             allowed_methods: string[] | null;
             policy_set: boolean;
@@ -2919,7 +3128,9 @@ export interface components {
             permissions: string[] | null;
         };
         Scenario: {
+            create?: boolean;
             description?: string;
+            form?: components["schemas"]["ScenarioForm"];
             input_schema?: {
                 [key: string]: unknown;
             };
@@ -2928,6 +3139,24 @@ export interface components {
             path: string;
             runnable: boolean;
             tags?: string[] | null;
+        };
+        ScenarioForm: {
+            sections?: components["schemas"]["ScenarioFormSection"][] | null;
+        };
+        ScenarioFormField: {
+            hint?: string;
+            label?: string;
+            name: string;
+            placeholder?: string;
+            show_when?: string;
+        };
+        ScenarioFormSection: {
+            collapsed?: boolean;
+            description?: string;
+            fields?: components["schemas"]["ScenarioFormField"][] | null;
+            key: string;
+            show_when?: string;
+            title?: string;
         };
         ServiceDependenciesReply: {
             destiny: components["schemas"]["ServiceDependency"][] | null;
@@ -3138,6 +3367,10 @@ export interface components {
             requested_at: string | null;
             sid: string;
             status: components["schemas"]["SoulStatus"];
+            /** @description operator-set key→value метки (ADR-060); значение — scalar или list of scalars; bare-soul → {} */
+            traits: {
+                [key: string]: unknown;
+            };
             transport: components["schemas"]["SoulTransport"];
         };
         SoulListReply: {
@@ -3185,6 +3418,46 @@ export interface components {
          * @enum {string}
          */
         SoulStatus: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
+        SoulTraitsAssignReply: {
+            /**
+             * Format: int32
+             * @description сколько строк фактически изменено
+             */
+            changed: number;
+            /** @description dry-run-прогон без записи */
+            dry_run: boolean;
+            /** @description затронутые trait-ключи (зеркало input) */
+            keys: string[] | null;
+            /**
+             * Format: int32
+             * @description сколько хостов попало под selector ∩ scope
+             */
+            matched: number;
+            /** @description режим операции (merge/replace/remove) */
+            mode: string;
+            /**
+             * @description completed — все чанки закоммичены; partial — фейл середины
+             * @enum {string}
+             */
+            status: "completed" | "partial";
+        };
+        SoulTraitsAssignRequest: {
+            /** @description посчитать matched без UPDATE */
+            dry_run?: boolean;
+            /** @description список имён ключей для remove (kebab-case); запрещён для merge/replace */
+            keys?: string[] | null;
+            /**
+             * @description merge (дефолт) — set/overwrite ключи; replace — заменить весь map; remove — удалить ключи из keys
+             * @enum {string}
+             */
+            mode?: "merge" | "replace" | "remove";
+            /** @description таргетинг (хотя бы один критерий; комбинации AND) */
+            selector: components["schemas"]["SoulCovenAssignSelector"];
+            /** @description набор ключ→значение для merge/replace (значение — scalar или list of scalars); запрещён для remove */
+            traits?: {
+                [key: string]: unknown;
+            };
+        };
         /**
          * @description Способ доставки конфигурации. agent — демон soul поверх mTLS gRPC stream; ssh — push без агента.
          * @enum {string}
@@ -3825,9 +4098,9 @@ export interface operations {
                 type?: string[] | null;
                 /** @description multi-value ?source=api&source=mcp — exact-match OR; значение вне enum → 422 */
                 source?: ("signal" | "api" | "mcp" | "keeper_internal" | "soul_grpc" | "background" | "config_bootstrap")[] | null;
-                /** @description AID Архонта-инициатора (exact match) */
+                /** @description AID Архонта-инициатора (case-insensitive substring, ILIKE) */
                 archon_aid?: string;
-                /** @description ULID цепочки связанных событий (exact match) */
+                /** @description ULID цепочки связанных событий (case-insensitive substring, ILIKE) */
                 correlation_id?: string;
                 /** @description имя Herald-канала из payload->>'herald' (exact match) */
                 payload_herald?: string;
@@ -6738,6 +7011,78 @@ export interface operations {
             };
         };
     };
+    setIncarnationTraits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationSetTraitsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationGetReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     unlockIncarnation: {
         parameters: {
             query?: never;
@@ -7620,6 +7965,509 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listProfiles: {
+        parameters: {
+            query?: {
+                /** @description фильтр по имени Provider-а (опц.) */
+                provider?: string;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Cloud-Profile-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Cloud-Profile-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listProviders: {
+        parameters: {
+            query?: {
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Provider"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Cloud-Provider-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Provider"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя Cloud-Provider-а */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9622,6 +10470,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SoulCovenAssignReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    assignSoulTraits: {
+        parameters: {
+            query?: {
+                /** @description посчитать matched без UPDATE (OR с body.dry_run) */
+                dry_run?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SoulTraitsAssignRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulTraitsAssignReply"];
                 };
             };
             /** @description Bad Request */

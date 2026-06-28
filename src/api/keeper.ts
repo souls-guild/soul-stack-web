@@ -45,6 +45,8 @@ export type SoulCreateReply = components['schemas']['SoulCreateReply'];
 export type SoulCovenAssignRequest = components['schemas']['SoulCovenAssignRequest'];
 export type SoulCovenAssignReply = components['schemas']['SoulCovenAssignReply'];
 export type SoulCovenAssignSelector = components['schemas']['SoulCovenAssignSelector'];
+export type SoulTraitsAssignRequest = components['schemas']['SoulTraitsAssignRequest'];
+export type SoulTraitsAssignReply = components['schemas']['SoulTraitsAssignReply'];
 export type SoulHistoryReply = components['schemas']['SoulHistoryReply'];
 export type SoulHistoryItem = components['schemas']['SoulHistoryItem'];
 export type SoulHistoryType = NonNullable<SoulHistoryItem['type']>;
@@ -284,6 +286,10 @@ export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
 export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
 export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
 
+// Traits-editing (PUT /v1/incarnations/{name}/traits). Источник истины — incarnation.traits
+// (ADR-060); проецируется в souls.traits. Полная замена (full-replace семантика).
+export type IncarnationSetTraitsRequest = components['schemas']['IncarnationSetTraitsRequest'];
+
 // Choir + Voice (ADR-044). Топология хостов внутри инкарнации.
 export type Choir = components['schemas']['Choir'];
 export type Voice = components['schemas']['Voice'];
@@ -314,6 +320,8 @@ export interface ScenarioInputSchemaProperty {
   type?: string;
   description?: string;
   required?: boolean;
+  /** CEL-предикат обязательности (реактивный, как show_when). Поле обязательно, когда выражение истинно. */
+  required_when?: string;
   default?: unknown;
   enum?: unknown[];
   /** Regex-ограничение значения (ADR-045). */
@@ -339,6 +347,11 @@ export interface ScenarioInputSchemaProperty {
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
 
+// ScenarioForm-типы: опц. презентационный слой для scenario input_schema (ADR-045).
+export type ScenarioForm = components['schemas']['ScenarioForm'];
+export type ScenarioFormSection = components['schemas']['ScenarioFormSection'];
+export type ScenarioFormField = components['schemas']['ScenarioFormField'];
+
 export interface ServiceScenarioInfo {
   name: string;
   // Backend отдаёт `scenario/<name>/main.yml` — read-only справочно.
@@ -354,6 +367,8 @@ export interface ServiceScenarioInfo {
   runnable?: boolean;
   description?: string;
   input_schema?: ScenarioInputSchema;
+  /** Опциональный презентационный слой: разбивает поля на секции с заголовками. */
+  form?: ScenarioForm;
 }
 // Backend-shape: `{ service, ref, scenarios: [...] }` (НЕ `{ items: [...] }`).
 export interface ServiceScenarioListReply {
@@ -538,6 +553,15 @@ export const keeperApi = {
         'PATCH',
         { body },
       ),
+    // PUT /v1/incarnations/{name}/traits — полная замена incarnation.traits (ADR-060).
+    // Источник истины; проецируется в souls.traits хостов-членов.
+    // Permission: incarnation.traits-set. 200 → обновлённый incarnation.
+    setTraits: (name: string, body: IncarnationSetTraitsRequest) =>
+      apiSend<IncarnationGetReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/traits`,
+        'PUT',
+        { body },
+      ),
   },
 
   // Choir/Voice — топология хостов внутри инкарнации (ADR-044).
@@ -637,6 +661,13 @@ export const keeperApi = {
     // mode=replace (labels). Чанкинг с per-чанк commit — status=completed|partial.
     bulkAssignCoven: (body: SoulCovenAssignRequest) =>
       apiSend<SoulCovenAssignReply>('/v1/souls/coven', 'POST', { body }),
+    // POST /v1/souls/traits. Bulk trait-assign: mode=merge/replace/remove.
+    // dry_run — посчитать matched без UPDATE. Permission soul.traits-assign.
+    assignTraits: (body: SoulTraitsAssignRequest, dryRun = false) =>
+      apiSend<SoulTraitsAssignReply>('/v1/souls/traits', 'POST', {
+        body,
+        query: dryRun ? { dry_run: true } : undefined,
+      }),
     // POST /v1/souls/{sid}/exec. 200 → ErrandResult (sync), 202 → ErrandAccepted (async).
     // Возвращаем discriminated union — caller сам решает, polling или render.
     exec: async (

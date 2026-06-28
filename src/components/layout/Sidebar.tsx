@@ -54,7 +54,6 @@ const REGISTRY: NavItem[] = [
   { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
   { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
   { to: '/synods', label: 'Synods', icon: Users2, matchPrefix: '/synods' },
-  { to: '/provisioning-policy', label: 'Provisioning Policy', icon: Settings },
 ];
 
 const ORACLE: NavItem[] = [
@@ -71,6 +70,7 @@ const HISTORY: NavItem[] = [
 const BOTTOM: NavItem[] = [
   { to: '/audit', label: 'Audit log', icon: FileText },
   { to: '/notifications', label: 'Notifications', icon: Bell, matchPrefix: '/notifications' },
+  { to: '/settings', label: 'Settings', icon: Settings, matchPrefix: '/settings' },
 ];
 
 interface ItemProps {
@@ -99,6 +99,8 @@ function Item({ item, collapsed }: ItemProps) {
     <NavLink
       to={item.to}
       title={titleAttr}
+      // end=false когда задан matchPrefix — ссылка активна на всех вложенных маршрутах.
+      end={!item.matchPrefix}
       className={({ isActive }) => (isActive ? `${styles.link} ${styles.linkActive}` : styles.link)}
     >
       <span className={styles.icon}>

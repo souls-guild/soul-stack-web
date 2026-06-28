@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Key, Shield, Terminal } from 'lucide-react';
+import { Key, Shield, Tag, Terminal } from 'lucide-react';
 import i18n from '../../i18n';
 import { Badge, Button, Dot, Pager } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
@@ -17,6 +17,7 @@ import { ApiError } from '../../api/client';
 import { soulHistoryStatusTone, soulHistoryIsRunning } from './status';
 import { IssueTokenModal } from './IssueTokenModal';
 import { CovenAssignModal } from './CovenAssignModal';
+import { TraitsAssignModal } from './TraitsAssignModal';
 import styles from '../common.module.css';
 
 const HISTORY_LIMIT = 50;
@@ -44,6 +45,7 @@ export function SoulDetail() {
   const [tab, setTab] = useState<Tab>('overview');
   const [tokenOpen, setTokenOpen] = useState(false);
   const [covenOpen, setCovenOpen] = useState(false);
+  const [traitsOpen, setTraitsOpen] = useState(false);
 
   const soulQ = useQuery({
     queryKey: ['soul', sid],
@@ -110,6 +112,10 @@ export function SoulDetail() {
               <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
               {t('souls:covenAssignment')}
             </Button>
+            <Button type="button" variant="secondary" onClick={() => setTraitsOpen(true)}>
+              <Tag size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+              {t('souls:traitAssignment')}
+            </Button>
           </div>
         </div>
       </div>
@@ -119,6 +125,11 @@ export function SoulDetail() {
         open={covenOpen}
         onClose={() => setCovenOpen(false)}
         variant={{ kind: 'single', sid: row.sid, currentCovens: row.covens ?? [] }}
+      />
+      <TraitsAssignModal
+        open={traitsOpen}
+        onClose={() => setTraitsOpen(false)}
+        variant={{ kind: 'single', sid: row.sid }}
       />
 
       <div className={styles.tabs} role="tablist">

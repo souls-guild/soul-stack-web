@@ -2,13 +2,14 @@ import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { Play, Plus, Search, Shield } from 'lucide-react';
+import { Play, Plus, Search, Shield, Tag } from 'lucide-react';
 import i18n from '../../i18n';
 import { keeperApi, SoulprintNotReceivedError, type SoulListEntry, type SoulStatus, type SoulTransport, type SoulprintReadReply } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { CovenAssignModal } from './CovenAssignModal';
+import { TraitsAssignModal } from './TraitsAssignModal';
 import { CreateSoulModal } from './CreateSoulModal';
 import { applyFilter, parseSoulprintFilter } from './soulprintFilter';
 import { filtersToCEL } from '../run/targetTranslator';
@@ -87,6 +88,7 @@ export function SoulsList() {
   const [sortKey, setSortKey] = useState<SortKey>('last_seen_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTraitOpen, setBulkTraitOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
   // accumulated — аккумулятор всех загруженных элементов.
@@ -363,6 +365,15 @@ export function SoulsList() {
           >
             <Shield size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
             {t('souls:bulkAssignCoven', { suffix: effectiveSelected.size > 0 ? ` (${effectiveSelected.size})` : '' })}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={effectiveSelected.size === 0}
+            onClick={() => setBulkTraitOpen(true)}
+          >
+            <Tag size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+            {t('souls:bulkAssignTrait', { suffix: effectiveSelected.size > 0 ? ` (${effectiveSelected.size})` : '' })}
           </Button>
           <Button
             type="button"
@@ -648,6 +659,11 @@ export function SoulsList() {
       <CovenAssignModal
         open={bulkOpen}
         onClose={() => setBulkOpen(false)}
+        variant={{ kind: 'bulk', sids: [...effectiveSelected] }}
+      />
+      <TraitsAssignModal
+        open={bulkTraitOpen}
+        onClose={() => setBulkTraitOpen(false)}
         variant={{ kind: 'bulk', sids: [...effectiveSelected] }}
       />
 

@@ -28,4 +28,14 @@ describe('Sidebar navigation', () => {
     renderSidebar();
     expect(screen.getByRole('link', { name: /All runs/ })).toHaveAttribute('href', '/runs');
   });
+
+  it('Provisioning Policy убран из REGISTRY — нет прямой ссылки на /provisioning-policy', () => {
+    renderSidebar();
+    expect(screen.queryByRole('link', { name: /Provisioning Policy/ })).not.toBeInTheDocument();
+  });
+
+  it('Settings присутствует и ведёт на /settings', () => {
+    renderSidebar();
+    expect(screen.getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/settings');
+  });
 });

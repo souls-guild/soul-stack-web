@@ -129,6 +129,7 @@
   "sidPickerRemove": "убрать",
   "patternError": "не совпадает с паттерном: {{pattern}}",
   "advancedLabel": "Дополнительно",
+  "arrayObjAddItem": "добавить",
   "listAddItem": "добавить",
   "listRemoveItem": "−",
   "listIntError": "не целое число",
@@ -197,5 +198,6 @@
   "notifyProjectionAddBtn": "Добавить путь",
   "notifyProjectionRemoveBtn": "Удалить",
   "notifyOnHint": "пусто = все три терминала",
-  "notifyAnnotationAddBtn": "Добавить"
+  "notifyAnnotationAddBtn": "Добавить",
+  "formDefaultSection": "Other"
 }

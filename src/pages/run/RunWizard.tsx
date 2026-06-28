@@ -26,6 +26,7 @@ import { useServiceScenarios } from '../incarnations/useServiceScenarios';
 import { runnableScenarios } from '../incarnations/reservedScenarios';
 import { ScenarioInputFields } from '../incarnations/ScenarioInputFields';
 import {
+  computeVisibleFields,
   defaultsFromSchema,
   invalidCompositeFields,
   isSupportedInputSchema,
@@ -518,9 +519,14 @@ export function RunWizard() {
   }, [workload, scenarioState, hostCriteria, resolvedSids]);
 
   // Пустые required-поля typed input_schema сценария (зеркалит backend 422).
+  // Учитываем show_when: скрытые поля не входят в gate.
   const scenarioMissingRequired = useMemo(
-    () => (workload === 'scenario' && usePerField ? missingRequiredFields(inputSchema, scenarioState.fields) : []),
-    [workload, usePerField, inputSchema, scenarioState.fields],
+    () => {
+      if (workload !== 'scenario' || !usePerField) return [];
+      const visibleFields = computeVisibleFields(selectedScenarioMeta?.form, scenarioState.fields);
+      return missingRequiredFields(inputSchema, scenarioState.fields, visibleFields);
+    },
+    [workload, usePerField, inputSchema, scenarioState.fields, selectedScenarioMeta?.form],
   );
 
   // Составные поля (array/object) с непарсимым JSON — блокируют submit/«Далее».
@@ -1370,6 +1376,7 @@ function Step3ScenarioIncarnations({
             showErrors={missingRequired.length > 0 || invalidComposite.length > 0}
             onInvalidMapChange={onInvalidMapChange}
             onPatternErrorChange={onPatternErrorChange}
+            form={selectedScenarioMeta?.form}
           />
           {selectedScenarioMeta?.description ? (
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>

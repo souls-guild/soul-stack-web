@@ -12,6 +12,7 @@ import {
   Play,
   RefreshCw,
   Search,
+  Tag,
   Trash,
 } from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
@@ -28,6 +29,7 @@ import { ChoirsTab } from './ChoirsTab';
 import { SpecTab } from './SpecTab';
 import { StateTab } from './StateTab';
 import { SchemaTab } from './SchemaTab';
+import { IncarnationTraitsModal } from './IncarnationTraitsModal';
 import styles from '../common.module.css';
 
 type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
@@ -46,6 +48,7 @@ export function IncarnationDetail() {
   const [rerunAcceptedId, setRerunAcceptedId] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [destroyOpen, setDestroyOpen] = useState(false);
+  const [traitsOpen, setTraitsOpen] = useState(false);
 
   const detail = useQuery({
     queryKey: ['incarnation', name],
@@ -155,6 +158,9 @@ export function IncarnationDetail() {
                 </Button>
                 <Button variant="secondary" onClick={() => setUpgradeOpen(true)} title="Upgrade">
                   <ArrowUp size={14} /> Upgrade
+                </Button>
+                <Button variant="secondary" onClick={() => setTraitsOpen(true)} title={t('incarnations:editTraitsTitle')}>
+                  <Tag size={14} /> {t('incarnations:editTraitsBtn')}
                 </Button>
                 <Button variant="danger" onClick={() => setDestroyOpen(true)} title="Destroy">
                   <Trash size={14} /> Destroy
@@ -422,6 +428,7 @@ export function IncarnationDetail() {
           </button>
         </div>
       ) : null}
+      <IncarnationTraitsModal open={traitsOpen} incarnationName={row.name} onClose={() => setTraitsOpen(false)} />
       <UnlockModal open={unlockOpen} incarnationName={row.name} onClose={() => setUnlockOpen(false)} />
       <RerunCreateModal
         open={rerunCreateOpen}
