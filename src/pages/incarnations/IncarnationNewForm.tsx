@@ -38,7 +38,7 @@ export function IncarnationNewForm() {
 
   // Pre-fill из ?service=… (приходит из ServiceDetail → «Use in incarnation»).
   // ?scenario=… игнорируем: input создаваемой incarnation берётся строго из
-  // scenario `create` выбранного сервиса.
+  // ВЫБРАННОГО create-сценария (поле create=true в каталоге сценариев сервиса).
   const prefilledService = searchParams.get('service') ?? '';
 
   const services = useQuery({
@@ -66,16 +66,25 @@ export function IncarnationNewForm() {
   const selectedService = watch('service');
   const scenarios = useServiceScenarios(selectedService || undefined);
 
-  // Input создаваемой incarnation берётся строго из scenario `create` сервиса
-  // (POST /v1/incarnations всегда вызывает именно его). Резолвим его input_schema:
-  //   - есть `create` с непустой supported-схемой → типизированные поля;
-  //   - нет `create` или схема пустая/сложная → поля input не показываем (создаём
-  //     пустую incarnation, generic-билдера тут нет).
-  const createScenario = useMemo(
-    () => scenarios.items.find((s) => s.name === 'create'),
+  // Сценарии с флагом create=true — предлагаются оператору при создании incarnation.
+  // UI не хардкодит имя 'create': backend явно помечает нужные сценарии.
+  const createScenarios = useMemo(
+    () => scenarios.items.filter((s) => s.create),
     [scenarios.items],
   );
-  const createSchema = createScenario?.input_schema;
+
+  // Выбранный create-сценарий (dropdown). Пред-выбираем первый для удобства.
+  // undefined — ни один не выбран (недопустимо, если createScenarios.length >= 1).
+  const [selectedCreateScenario, setSelectedCreateScenario] = useState<
+    (typeof createScenarios)[number] | undefined
+  >(undefined);
+
+  // Сбрасываем выбор при смене сервиса / обновлении каталога сценариев.
+  useEffect(() => {
+    setSelectedCreateScenario(createScenarios.length > 0 ? createScenarios[0] : undefined);
+  }, [createScenarios]);
+
+  const createSchema = selectedCreateScenario?.input_schema;
   const usePerField = isSupportedInputSchema(createSchema);
 
   const [fields, setFields] = useState<ScenarioFieldsState>({});
@@ -96,14 +105,17 @@ export function IncarnationNewForm() {
   const missingRequired = useMemo(
     () => {
       if (!usePerField || !createSchema) return [];
-      const visibleFields = computeVisibleFields(createScenario?.form, fields);
+      const visibleFields = computeVisibleFields(selectedCreateScenario?.form, fields);
       return missingRequiredFields(createSchema, fields, visibleFields);
     },
-    [usePerField, createSchema, createScenario?.form, fields],
+    [usePerField, createSchema, selectedCreateScenario?.form, fields],
   );
 
+  // Блокируем submit, если сервис имеет create-сценарии, но ни один не выбран.
+  const missingScenarioSelection = createScenarios.length > 0 && !selectedCreateScenario;
+
   const createMu = useMutation({
-    mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown>; traits?: TraitsMap }) =>
+    mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap }) =>
       keeperApi.incarnations.create(body),
     onSuccess: (reply) => {
       setCreatedApplyId(reply.apply_id ?? null);
@@ -122,6 +134,11 @@ export function IncarnationNewForm() {
   function onSubmit(values: IncarnationCreateFormOutput) {
     setServerError(null);
     setCreatedApplyId(null);
+    // Валидация выбора сценария — если есть create-сценарии, выбор обязателен.
+    if (missingScenarioSelection) {
+      setServerError(t('incarnations:createScenarioRequired'));
+      return;
+    }
     // Required-валидация ДО запроса (не доводим до backend 422).
     if (missingRequired.length > 0) {
       setShowInputErrors(true);
@@ -136,6 +153,8 @@ export function IncarnationNewForm() {
       service: values.service,
       covens: values.covens,
       input,
+      // Для bare-инкарнации (нет create-сценариев) — не передаём create_scenario.
+      ...(selectedCreateScenario ? { create_scenario: selectedCreateScenario.name } : {}),
       traits,
     });
   }
@@ -240,6 +259,59 @@ export function IncarnationNewForm() {
           />
         </div>
 
+        {/* Dropdown выбора create-сценария — только если сервис имеет create-сценарии */}
+        {selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length > 0 ? (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-testid="create-scenario-select-wrapper">
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {t('incarnations:createScenarioLabel')}
+            </span>
+            <select
+              data-testid="create-scenario-select"
+              value={selectedCreateScenario?.name ?? ''}
+              onChange={(e) => {
+                const found = createScenarios.find((s) => s.name === e.target.value);
+                setSelectedCreateScenario(found);
+              }}
+              style={{
+                padding: '8px 10px',
+                borderRadius: 'var(--radius)',
+                border: `1px solid ${missingScenarioSelection ? 'var(--danger)' : 'var(--border)'}`,
+                background: 'var(--surface)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+              }}
+            >
+              {createScenarios.map((s) => (
+                <option key={s.name} value={s.name}>
+                  {s.name}{s.description ? ` — ${s.description}` : ''}
+                </option>
+              ))}
+            </select>
+            {missingScenarioSelection ? (
+              <span style={{ color: 'var(--danger)', fontSize: 12 }}>
+                {t('incarnations:createScenarioRequired')}
+              </span>
+            ) : null}
+          </label>
+        ) : null}
+
+        {/* Bare-инкарнация: сервис без create-сценариев */}
+        {selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length === 0 ? (
+          <div
+            style={{
+              padding: '10px 12px',
+              background: 'color-mix(in srgb, var(--text-faint) 6%, var(--surface))',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              fontSize: 12,
+              color: 'var(--text-faint)',
+            }}
+            data-testid="create-bare-info"
+          >
+            {t('incarnations:createBareInfo')}
+          </div>
+        ) : null}
+
         {selectedService && usePerField && createSchema ? (
           <div data-testid="create-input-fields">
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
@@ -250,15 +322,15 @@ export function IncarnationNewForm() {
               value={fields}
               onChange={setFields}
               showErrors={showInputErrors}
-              form={createScenario?.form}
+              form={selectedCreateScenario?.form}
             />
-            {createScenario?.description ? (
+            {selectedCreateScenario?.description ? (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
-                {createScenario.description}
+                {selectedCreateScenario.description}
               </div>
             ) : null}
           </div>
-        ) : selectedService && !scenarios.loading && !scenarios.unavailable ? (
+        ) : selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length > 0 && selectedCreateScenario ? (
           <div style={{ fontSize: 12, color: 'var(--text-faint)' }} data-testid="create-input-empty">
             {t('incarnations:createNoInput')}
           </div>
@@ -283,7 +355,7 @@ export function IncarnationNewForm() {
           <Button
             type="submit"
             variant="primary"
-            disabled={isSubmitting || createMu.isPending || missingRequired.length > 0}
+            disabled={isSubmitting || createMu.isPending || missingRequired.length > 0 || missingScenarioSelection}
           >
             {createMu.isPending ? t('creating') : t('createIncarnation')}
           </Button>

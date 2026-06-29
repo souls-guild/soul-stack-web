@@ -365,6 +365,12 @@ export interface ServiceScenarioInfo {
    * Опционально для обратной совместимости: старый backend без поля → fallback в runnableScenarios.
    */
   runnable?: boolean;
+  /**
+   * Стартовый сценарий создания инкарнации (POST /v1/incarnations).
+   * Если true — сценарий предлагается в dropdown при создании incarnation.
+   * UI фильтрует create-сценарии по этому флагу (не по хардкоду имён).
+   */
+  create?: boolean;
   description?: string;
   input_schema?: ScenarioInputSchema;
   /** Опциональный презентационный слой: разбивает поля на секции с заголовками. */

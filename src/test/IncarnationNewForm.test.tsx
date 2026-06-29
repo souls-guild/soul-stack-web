@@ -32,7 +32,7 @@ describe('IncarnationNewForm', () => {
     expect(await screen.findByText(/обязательное поле/i)).toBeInTheDocument();
   });
 
-  it('create-input: типизированные поля из scenario `create`, converge не предлагается', async () => {
+  it('create-input: типизированные поля из scenario с create=true, converge не предлагается', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -46,6 +46,7 @@ describe('IncarnationNewForm', () => {
               kind: 'lifecycle',
               path: 'scenario/create/main.yml',
               description: 'init redis',
+              create: true,
               input_schema: { maxmemory: { type: 'string', required: true, description: 'memory cap' } },
             },
             { name: 'converge', kind: 'lifecycle', path: 'scenario/converge/main.yml', input_schema: {} },
@@ -73,6 +74,9 @@ describe('IncarnationNewForm', () => {
     });
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
+    // Dropdown выбора create-сценария появился.
+    expect(await screen.findByTestId('create-scenario-select-wrapper')).toBeInTheDocument();
+
     // Типизированное поле из create.input_schema появилось.
     expect(await screen.findByTestId('create-input-fields')).toBeInTheDocument();
     expect(screen.getByTestId('field-text-maxmemory')).toBeInTheDocument();
@@ -95,6 +99,7 @@ describe('IncarnationNewForm', () => {
               name: 'create',
               path: 'scenario/create/main.yml',
               description: 'init redis',
+              create: true,
               input_schema: { maxmemory: { type: 'string', required: true, description: 'memory cap' } },
             },
           ],
@@ -144,6 +149,7 @@ describe('IncarnationNewForm', () => {
               name: 'create',
               kind: 'lifecycle',
               path: 'scenario/create/main.yml',
+              create: true,
               // mode — обычное поле; slave_of — required, но видим только когда mode=sentinel.
               // С пустым mode show_when=false → поле скрыто → не блокирует submit.
               input_schema: {
@@ -207,6 +213,7 @@ describe('IncarnationNewForm', () => {
               name: 'create',
               kind: 'lifecycle',
               path: 'scenario/create/main.yml',
+              create: true,
               input_schema: {
                 // required_when с предикатом который всегда true (true == true)
                 sentinel_host: {
@@ -249,13 +256,31 @@ describe('IncarnationNewForm', () => {
     expect(submitBtn).not.toBeDisabled();
   });
 
-  it('POST /v1/incarnations отправляется с типизированным body', async () => {
+  it('POST /v1/incarnations отправляется с create_scenario в body', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
       const body = typeof init?.body === 'string' ? init.body : '';
       calls.push({ url, method, body });
+      if (method === 'GET' && url.includes('/v1/services/redis/scenarios')) {
+        return new Response(
+          JSON.stringify({
+            service: 'redis',
+            ref: 'v2.0.0',
+            scenarios: [
+              {
+                name: 'create',
+                kind: 'lifecycle',
+                path: 'scenario/create/main.yml',
+                create: true,
+                input_schema: {},
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
       if (method === 'GET' && url.startsWith('/v1/services')) {
         return new Response(
           JSON.stringify({
@@ -289,6 +314,8 @@ describe('IncarnationNewForm', () => {
 
     await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
+    // Ждём dropdown create-сценария.
+    await screen.findByTestId('create-scenario-select-wrapper');
     await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
 
     await waitFor(() => {
@@ -298,6 +325,143 @@ describe('IncarnationNewForm', () => {
       expect(parsed.name).toBe('redis-prod');
       expect(parsed.service).toBe('redis');
       expect(parsed.input).toEqual({});
+      // create_scenario должен присутствовать в теле.
+      expect(parsed.create_scenario).toBe('create');
     });
+  });
+
+  // Guard: сервис без create-сценариев → bare-инкарнация, POST без create_scenario.
+  it('bare-инкарнация: нет create-сценариев — показывается инфо-блок, POST без create_scenario', async () => {
+    const calls: Array<{ url: string; method: string; body: string }> = [];
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : '';
+      calls.push({ url, method, body });
+      if (method === 'GET' && url.includes('/v1/services/svc/scenarios')) {
+        return new Response(
+          JSON.stringify({
+            service: 'svc',
+            ref: 'v1.0.0',
+            scenarios: [
+              { name: 'converge', kind: 'lifecycle', path: 'scenario/converge/main.yml', create: false, input_schema: {} },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (method === 'GET' && url.startsWith('/v1/services')) {
+        return new Response(
+          JSON.stringify({
+            items: [{ name: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (method === 'POST' && url.startsWith('/v1/incarnations')) {
+        return new Response(
+          JSON.stringify({ apply_id: '01ARZ', incarnation: 'svc-prod' }),
+          { status: 202, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+        <Route path="/incarnations/:name" element={<div>detail-stub</div>} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText('redis-prod'), 'svc-prod');
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    // Инфо-блок про bare появился.
+    expect(await screen.findByTestId('create-bare-info')).toBeInTheDocument();
+
+    // Dropdown выбора create-сценария НЕ отображается.
+    expect(screen.queryByTestId('create-scenario-select-wrapper')).not.toBeInTheDocument();
+
+    // Submit не заблокирован.
+    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    expect(submitBtn).not.toBeDisabled();
+
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
+      expect(post).toBeTruthy();
+      const parsed = JSON.parse(post!.body);
+      expect(parsed.name).toBe('svc-prod');
+      // create_scenario не должен присутствовать для bare-инкарнации.
+      expect(parsed.create_scenario).toBeUndefined();
+    });
+  });
+
+  // Guard: два create-сценария → dropdown, выбор переключает input_schema.
+  it('multi-create: dropdown переключает input_schema между сценариями', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create_standalone',
+              kind: 'lifecycle',
+              path: 'scenario/create_standalone/main.yml',
+              create: true,
+              description: 'standalone mode',
+              input_schema: { port: { type: 'integer', required: true, description: 'port' } },
+            },
+            {
+              name: 'create_sentinel',
+              kind: 'lifecycle',
+              path: 'scenario/create_sentinel/main.yml',
+              create: true,
+              description: 'sentinel mode',
+              input_schema: { sentinel_port: { type: 'integer', required: true, description: 'sentinel port' } },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+
+    // Dropdown создания появился.
+    const scenarioSelect = await screen.findByTestId('create-scenario-select');
+    expect(scenarioSelect).toBeInTheDocument();
+
+    // Первый сценарий пред-выбран → подсказка поля port видна.
+    expect(await screen.findByTestId('field-hint-port')).toBeInTheDocument();
+    expect(screen.queryByTestId('field-hint-sentinel_port')).not.toBeInTheDocument();
+
+    // Переключаем на create_sentinel.
+    await user.selectOptions(scenarioSelect, 'create_sentinel');
+
+    // Теперь видна подсказка поля sentinel_port.
+    expect(await screen.findByTestId('field-hint-sentinel_port')).toBeInTheDocument();
+    expect(screen.queryByTestId('field-hint-port')).not.toBeInTheDocument();
   });
 });
