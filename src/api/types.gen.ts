@@ -288,6 +288,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cluster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * HA-топология Keeper-кластера
+         * @description Живые Keeper-инстансы из Conclave-реестра (kid + started_at + alive + is_reaper_leader) + self_kid + self_health (postgres/redis/vault текущего инстанса). Permission soul.list. Read-only, без audit. Версия агента (soul) НЕ включается.
+         */
+        get: operations["getCluster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/decrees": {
         parameters: {
             query?: never;
@@ -392,6 +412,26 @@ export interface paths {
          * @description Допустимые для подписки Tiding типы: areas (area-glob `<name>.*`) + точечные point_events (источник herald/eventtypes.go). Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
          */
         get: operations["listEventTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/herald-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Каталог типов Herald-канала
+         * @description Типы канала уведомлений и их config-поля (webhook/telegram/slack/mattermost/discord/custom/email): name/label/required/secret/kind. Источник — herald.TypeCatalog (тот же, что валидирует CRUD). Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
+         */
+        get: operations["listHeraldTypes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -662,6 +702,46 @@ export interface paths {
          * @description Снимает error_locked и тем же действием перезапускает scenario create (одна tx FOR UPDATE). Permission incarnation.create-rerun.
          */
         post: operations["rerunCreateIncarnation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список прогонов инкарнации (paged)
+         * @description Свёртка apply_runs по apply_id: статус прогона (applying/success/failed/cancelled), границы времени, инициатор. Прогон (apply_run) — НЕ Voyage. Вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         */
+        get: operations["listIncarnationRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/runs/{apply_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Детали прогона инкарнации (per-host)
+         * @description Срез по хостам одного apply_id: статус каждого хоста + адрес упавшей задачи (task_idx/plan_index/error). Чужой apply_id / вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         */
+        get: operations["getIncarnationRun"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1572,6 +1652,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/souls/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Агрегат реестра Souls (Overview)
+         * @description Сводка по status/transport/coven + total + stale_count для Souls Overview со scoped-видимостью (ADR-047). transport — agent/ssh (UI маппит на pull/push). stale_count — по mark_disconnected.stale_after. Permission soul.list. Read-only, без audit.
+         */
+        get: operations["getSoulsStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/souls/traits": {
         parameters: {
             query?: never;
@@ -2278,6 +2378,20 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ClusterInstanceEntry: {
+            alive: boolean;
+            is_reaper_leader: boolean;
+            kid: string;
+            /** Format: date-time */
+            started_at?: string;
+        };
+        ClusterReply: {
+            instances: components["schemas"]["ClusterInstanceEntry"][] | null;
+            self_health: {
+                [key: string]: string;
+            };
+            self_kid: string;
+        };
         DecreeCreateRequest: {
             /** @description вход сценария (vault-ref едет как есть) */
             action_input?: unknown;
@@ -2462,7 +2576,7 @@ export interface components {
             updated_at: string;
         };
         HeraldCreateRequest: {
-            /** @description per-type config (webhook — { url, опц. headers, опц. http_allowed/allow_private }) */
+            /** @description per-type config (форма зависит от type; см. каталог GET /v1/herald-types) */
             config: {
                 [key: string]: unknown;
             };
@@ -2473,10 +2587,10 @@ export interface components {
             /** @description опц. vault-ref на signing-token (vault:<mount>/<path>); сам секрет не хранится */
             secret_ref?: string;
             /**
-             * @description тип канала (closed-enum, webhook в MVP); значение вне enum → 422
+             * @description тип канала (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email); значение вне enum → 422
              * @enum {string}
              */
-            type: "webhook";
+            type: "custom" | "discord" | "email" | "mattermost" | "slack" | "telegram" | "webhook";
         };
         HeraldListReply: {
             items: components["schemas"]["Herald"][] | null;
@@ -2486,6 +2600,22 @@ export interface components {
             offset: number;
             /** Format: int64 */
             total: number;
+        };
+        HeraldTypeCatalogEntry: {
+            fields: components["schemas"]["HeraldTypeFieldSpec"][] | null;
+            secret_required: boolean;
+            type: string;
+        };
+        HeraldTypeCatalogReply: {
+            types: components["schemas"]["HeraldTypeCatalogEntry"][] | null;
+        };
+        HeraldTypeFieldSpec: {
+            enum_values?: string[] | null;
+            kind: string;
+            label: string;
+            name: string;
+            required: boolean;
+            secret: boolean;
         };
         HeraldUpdateRequest: {
             /** @description per-type config (replace — полностью заменяет существующий) */
@@ -2497,10 +2627,10 @@ export interface components {
             /** @description опц. vault-ref на signing-token; отсутствие очищает подпись */
             secret_ref?: string;
             /**
-             * @description тип канала (closed-enum, webhook в MVP)
+             * @description тип канала (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email)
              * @enum {string}
              */
-            type: "webhook";
+            type: "custom" | "discord" | "email" | "mattermost" | "slack" | "telegram" | "webhook";
         };
         HumaProblemError: {
             detail?: string;
@@ -2523,7 +2653,7 @@ export interface components {
         IncarnationCreateRequest: {
             /** @description declared environment-теги (ADR-008 amendment a) */
             covens?: string[] | null;
-            /** @description имя стартового сценария (механизм нескольких create); пусто → create */
+            /** @description имя стартового сценария (механизм нескольких create, scenario с create:true). Пусто: сервис предлагает create-сценарии → 422 create_scenario_required; сервис без них → bare-инкарнация (ready без прогона) */
             create_scenario?: string;
             /** @description input для выбранного create-сценария */
             input?: {
@@ -2552,6 +2682,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             created_by_aid: string | null;
+            created_scenario?: string;
             /** Format: date-time */
             last_drift_check_at?: string;
             last_drift_summary?: components["schemas"]["DriftScanSummary"];
@@ -2568,6 +2699,9 @@ export interface components {
             state_schema_version: number;
             status: components["schemas"]["IncarnationStatus"];
             status_details: {
+                [key: string]: unknown;
+            };
+            traits?: {
                 [key: string]: unknown;
             };
             /** Format: date-time */
@@ -2633,6 +2767,25 @@ export interface components {
             name?: string;
             /** @description echo path-scenario (игнорируется) */
             scenario?: string;
+        };
+        IncarnationRunsReply: {
+            /** @description страница прогонов инкарнации (свёртка apply_runs) */
+            items: components["schemas"]["RunSummaryEntry"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число прогонов инкарнации
+             */
+            total: number;
         };
         IncarnationSetTraitsRequest: {
             /** @description полный набор trait-меток (ключ → scalar|list of scalars); пустой/опущен = очистить (ADR-060) */
@@ -3127,6 +3280,43 @@ export interface components {
             operators: string[] | null;
             permissions: string[] | null;
         };
+        RunDetailReply: {
+            apply_id: string;
+            /** Format: date-time */
+            finished_at?: string;
+            hosts: components["schemas"]["RunHostStatusEntry"][] | null;
+            scenario: string;
+            /** Format: date-time */
+            started_at: string;
+            started_by_aid?: string;
+            /** @enum {string} */
+            status: "applying" | "success" | "failed" | "cancelled";
+        };
+        RunHostStatusEntry: {
+            /** Format: int32 */
+            attempt: number;
+            cancel_requested: boolean;
+            error_summary?: string;
+            /** Format: int64 */
+            failed_plan_index?: number;
+            /** Format: int64 */
+            failed_task_idx?: number;
+            /** Format: int64 */
+            passage: number;
+            sid: string;
+            status: string;
+        };
+        RunSummaryEntry: {
+            apply_id: string;
+            /** Format: date-time */
+            finished_at?: string;
+            scenario: string;
+            /** Format: date-time */
+            started_at: string;
+            started_by_aid?: string;
+            /** @enum {string} */
+            status: "applying" | "success" | "failed" | "cancelled";
+        };
         Scenario: {
             create?: boolean;
             description?: string;
@@ -3412,6 +3602,21 @@ export interface components {
         SoulSshTargetReply: {
             sid: string;
             ssh_target: components["schemas"]["SoulSshTarget"];
+        };
+        SoulStatsReply: {
+            by_coven: {
+                [key: string]: number;
+            };
+            by_status: {
+                [key: string]: number;
+            };
+            by_transport: {
+                [key: string]: number;
+            };
+            /** Format: int64 */
+            stale_count: number;
+            /** Format: int64 */
+            total: number;
         };
         /**
          * @description Статус Soul в реестре.
@@ -5097,6 +5302,44 @@ export interface operations {
             };
         };
     };
+    getCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClusterReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listDecrees: {
         parameters: {
             query?: {
@@ -5562,6 +5805,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventTypeCatalogReply"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listHeraldTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeraldTypeCatalogReply"];
                 };
             };
             /** @description Internal Server Error */
@@ -6831,6 +7103,149 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listIncarnationRuns: {
+        parameters: {
+            query?: {
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationRunsReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getIncarnationRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description ULID прогона; не-ULID → 400 */
+                apply_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetailReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10492,6 +10907,44 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getSoulsStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulStatsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

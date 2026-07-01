@@ -1,0 +1,98 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  flex-wrap: wrap;
+}
+
+.svg {
+  flex-shrink: 0;
+}
+
+.svg circle {
+  transition: stroke-dasharray 0.2s ease;
+}
+
+.centerValue {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  fill: var(--text);
+}
+
+.centerLabel {
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.legendDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.legendValue {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tone-цвета: circle использует stroke (SVG), legend-dot — background. */
+circle.ok,
+.legendDot.ok {
+  stroke: var(--success);
+  background: var(--success);
+}
+
+circle.warn,
+.legendDot.warn {
+  stroke: var(--warning);
+  background: var(--warning);
+}
+
+circle.danger,
+.legendDot.danger {
+  stroke: var(--danger);
+  background: var(--danger);
+}
+
+circle.info,
+.legendDot.info {
+  stroke: var(--info);
+  background: var(--info);
+}
+
+circle.muted,
+.legendDot.muted {
+  stroke: var(--text-faint);
+  background: var(--text-faint);
+}
+
+circle.accent,
+.legendDot.accent {
+  stroke: var(--accent);
+  background: var(--accent);
+}

@@ -11,6 +11,9 @@ src/api/types.gen.ts
 *.swp
 *.swo
 
+# Serena LSP project config (tool-specific, local)
+.serena/
+
 # logs
 npm-debug.log*
 yarn-debug.log*

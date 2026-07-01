@@ -49,6 +49,9 @@
   /* ---------- Type ---------- */
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Шрифт интерфейса — отдельный от темы селектор (Settings → Appearance → Font).
+     Дефолт = --font-sans; [data-font="..."] на <html> переопределяет ниже. */
+  --app-font-family: var(--font-sans);
 
   --t-page-title-size:   30px;
   --t-page-title-weight: 600;
@@ -143,6 +146,17 @@
   --info:          #60a5fa;
   color-scheme: dark;
 }
+
+/* ---------- Шрифт интерфейса (независим от темы, см. useFont.ts) ---------- */
+/* system — без переопределения, --app-font-family уже = --font-sans */
+[data-font="mono"]       { --app-font-family: 'JetBrains Mono', var(--font-mono); }
+[data-font="serif"]      { --app-font-family: 'Merriweather', Georgia, 'Times New Roman', serif; }
+[data-font="manrope"]    { --app-font-family: 'Manrope', var(--font-sans); }
+[data-font="quicksand"]  { --app-font-family: 'Quicksand', var(--font-sans); }
+[data-font="unbounded"]  { --app-font-family: 'Unbounded', var(--font-sans); }
+[data-font="caveat"]     { --app-font-family: 'Caveat', var(--font-sans); }
+[data-font="comfortaa"]  { --app-font-family: 'Comfortaa', var(--font-sans); }
+[data-font="comic-neue"] { --app-font-family: 'Comic Neue', var(--font-sans); }
 
 @keyframes ss-pulse {
   0%   { transform: scale(1);   opacity: 0.7; }

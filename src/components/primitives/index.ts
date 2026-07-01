@@ -7,3 +7,5 @@ export { Footer } from './Footer';
 export { Badge } from './Badge';
 export { Modal } from './Modal';
 export { Pager } from './Pager';
+export { Donut } from './Donut';
+export type { DonutSlice, DonutTone } from './Donut';

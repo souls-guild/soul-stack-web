@@ -2,12 +2,14 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/AuthProvider';
 import { ThemeProvider } from './hooks/useTheme';
+import { FontProvider } from './hooks/useFont';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Shell } from './components/layout';
 import { Login } from './pages/Login';
 import { IncarnationsList } from './pages/incarnations/IncarnationsList';
 import { IncarnationDetail } from './pages/incarnations/IncarnationDetail';
 import { IncarnationNewForm } from './pages/incarnations/IncarnationNewForm';
+import { RunDetail } from './pages/incarnations/RunDetail';
 import { SoulsList } from './pages/souls/SoulsList';
 import { SoulDetail } from './pages/souls/SoulDetail';
 import { AuditLog } from './pages/audit/AuditLog';
@@ -80,6 +82,7 @@ function landingTarget(): string {
 export function App() {
   return (
     <ThemeProvider>
+      <FontProvider>
       <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter basename="/ui">
@@ -90,6 +93,7 @@ export function App() {
             <Route path="/incarnations" element={<Protected><IncarnationsList /></Protected>} />
             <Route path="/incarnations/new" element={<Protected><IncarnationNewForm /></Protected>} />
             <Route path="/incarnations/:name" element={<Protected><IncarnationDetail /></Protected>} />
+            <Route path="/incarnations/:name/runs/:applyId" element={<Protected><RunDetail /></Protected>} />
             <Route path="/souls" element={<Protected><SoulsList /></Protected>} />
             <Route path="/souls/:sid" element={<Protected><SoulDetail /></Protected>} />
             <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
@@ -135,6 +139,7 @@ export function App() {
         </BrowserRouter>
       </AuthProvider>
       </QueryClientProvider>
+      </FontProvider>
     </ThemeProvider>
   );
 }

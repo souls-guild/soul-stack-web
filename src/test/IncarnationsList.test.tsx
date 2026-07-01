@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
 import { IncarnationsList } from '../pages/incarnations/IncarnationsList';
@@ -217,5 +217,137 @@ describe('IncarnationsList', () => {
 
     // Нет ссылок на /services/*.
     expect(screen.queryByRole('link', { name: /redis|postgres/i })).not.toBeInTheDocument();
+  });
+
+  it('колонка Traits рендерит chips и graceful "—" при отсутствии traits', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations',
+        body: {
+          items: [
+            {
+              name: 'redis-prod',
+              service: 'redis',
+              service_version: 'v2.0.0',
+              state_schema_version: 3,
+              covens: ['prod'],
+              traits: { team: 'platform' },
+              status: 'ready',
+              created_by_aid: 'archon-alice',
+              created_at: '2026-05-25T10:00:00Z',
+              updated_at: '2026-05-25T12:00:00Z',
+            },
+            {
+              name: 'postgres-stage',
+              service: 'postgres',
+              service_version: 'main',
+              state_schema_version: 1,
+              covens: ['stage'],
+              status: 'drift',
+              created_by_aid: 'archon-bob',
+              created_at: '2026-05-20T10:00:00Z',
+              updated_at: '2026-05-25T11:30:00Z',
+            },
+          ],
+          offset: 0,
+          limit: 100,
+          total: 2,
+        },
+      },
+    ]);
+
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
+
+    // Внутри таблицы: одна chip-ячейка + одна chip-опция мультиселекта — оба
+    // текстово равны 'team=platform', поэтому проверяем внутри table-скоупа.
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('team=platform')).toBeInTheDocument();
+    // postgres-stage без traits — есть хотя бы один em-dash fallback (страница не падает).
+    expect(within(table).getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('мультиселект coven+traits фильтрует client-side по AND', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations',
+        body: {
+          items: [
+            {
+              name: 'redis-prod',
+              service: 'redis',
+              service_version: 'v2.0.0',
+              state_schema_version: 3,
+              covens: ['prod'],
+              traits: { team: 'platform' },
+              status: 'ready',
+              created_by_aid: 'archon-alice',
+              created_at: '2026-05-25T10:00:00Z',
+              updated_at: '2026-05-25T12:00:00Z',
+            },
+            {
+              name: 'redis-stage',
+              service: 'redis',
+              service_version: 'v2.0.0',
+              state_schema_version: 3,
+              covens: ['stage'],
+              traits: { team: 'platform' },
+              status: 'ready',
+              created_by_aid: 'archon-alice',
+              created_at: '2026-05-25T10:00:00Z',
+              updated_at: '2026-05-25T12:00:00Z',
+            },
+            {
+              name: 'postgres-stage',
+              service: 'postgres',
+              service_version: 'main',
+              state_schema_version: 1,
+              covens: ['stage'],
+              traits: { team: 'data' },
+              status: 'drift',
+              created_by_aid: 'archon-bob',
+              created_at: '2026-05-20T10:00:00Z',
+              updated_at: '2026-05-25T11:30:00Z',
+            },
+          ],
+          offset: 0,
+          limit: 100,
+          total: 3,
+        },
+      },
+    ]);
+
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
+
+    const user = userEvent.setup();
+
+    // Выбираем coven=stage (мультиселект) — оставляет redis-stage + postgres-stage.
+    await user.click(screen.getByRole('button', { name: 'stage' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'redis-prod' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
+
+    // + trait team=platform (AND) — оставляет только redis-stage.
+    await user.click(screen.getByRole('button', { name: 'team=platform' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'postgres-stage' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
+
+    // Сброс фильтра — возвращает все три.
+    await user.click(screen.getByText('Сбросить фильтр'));
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
   });
 });

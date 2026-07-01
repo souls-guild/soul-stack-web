@@ -8,7 +8,24 @@ import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { HeraldModal } from './HeraldModal';
+import { useHeraldTypeCatalog } from './heraldTypes';
 import styles from '../common.module.css';
+
+/** Форматирует значение config-поля для read-only отображения по его Kind. */
+function formatConfigValue(kind: string, raw: unknown): string {
+  if (raw === undefined || raw === null) return '—';
+  switch (kind) {
+    case 'bool':
+      return String(Boolean(raw));
+    case 'map':
+      return typeof raw === 'object' ? Object.entries(raw as Record<string, unknown>).map(([k, v]) => `${k}: ${String(v)}`).join(', ') : String(raw);
+    case 'list':
+    case 'list_string':
+      return Array.isArray(raw) ? raw.join(', ') : String(raw);
+    default:
+      return String(raw);
+  }
+}
 
 const DELIVERIES_LIMIT = 50;
 
@@ -27,6 +44,7 @@ export function HeraldDetail() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const { hasPermission } = useMyPermissions();
+  const typeCatalog = useHeraldTypeCatalog();
   const [editOpen, setEditOpen] = useState(false);
   const [deliveriesOffset, setDeliveriesOffset] = useState(0);
 
@@ -81,6 +99,9 @@ export function HeraldDetail() {
 
   const cfg = (h.config ?? {}) as Record<string, unknown>;
   const heraldTidings = (tidingsQ.data?.items ?? []).filter((td) => td.herald === name);
+  // Дескриптор config-полей ИМЕННО этого типа канала (ADR-042 no-hardcode) —
+  // рендерим read-only список per-type, а не жёстко webhook-специфичные ключи.
+  const typeFields = typeCatalog.fieldsByType[h.type] ?? [];
 
   return (
     <div className={styles.page}>
@@ -143,21 +164,15 @@ export function HeraldDetail() {
           <dt className={styles.metaKey}>{t('heraldColType')}</dt>
           <dd className={styles.metaVal}><Badge tone="muted">{h.type}</Badge></dd>
 
-          <dt className={styles.metaKey}>{t('heraldColUrl')}</dt>
-          <dd className={styles.metaVal} style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-            {typeof cfg.url === 'string' ? cfg.url : '—'}
-          </dd>
-
           <dt className={styles.metaKey}>{t('heraldFieldSecretRef')}</dt>
           <dd className={styles.metaVal} style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
             {h.secret_ref ?? '—'}
           </dd>
 
-          <dt className={styles.metaKey}>{t('heraldFieldHttpAllowed')}</dt>
-          <dd className={styles.metaVal}>{String(Boolean(cfg.http_allowed))}</dd>
-
-          <dt className={styles.metaKey}>{t('heraldFieldAllowPrivate')}</dt>
-          <dd className={styles.metaVal}>{String(Boolean(cfg.allow_private))}</dd>
+          {/* Config-поля ИМЕННО этого типа канала (каталог GET /v1/herald-types, ADR-042 no-hardcode) */}
+          {typeFields.map((f) => (
+            <FieldRow key={f.name} label={f.label} kind={f.kind} value={cfg[f.name]} />
+          ))}
 
           <dt className={styles.metaKey}>{t('fieldCreatedAt')}</dt>
           <dd className={styles.metaVal}>{relDate(h.created_at)}</dd>
@@ -314,5 +329,21 @@ export function HeraldDetail() {
 
       <HeraldModal open={editOpen} onClose={() => setEditOpen(false)} editing={h} />
     </div>
+  );
+}
+
+/** Одна read-only строка config-поля в мета-блоке (dt/dd — часть родительского dl). */
+function FieldRow({ label, kind, value }: { label: string; kind: string; value: unknown }) {
+  return (
+    <>
+      <dt className={styles.metaKey}>{label}</dt>
+      <dd
+        className={styles.metaVal}
+        style={kind === 'bool' ? undefined : { fontFamily: 'var(--font-mono)', fontSize: 12 }}
+        data-testid={`herald-detail-field-${label}`}
+      >
+        {formatConfigValue(kind, value)}
+      </dd>
+    </>
   );
 }

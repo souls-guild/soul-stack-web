@@ -21,6 +21,13 @@ export type IncarnationSummary = IncarnationGetReply;
 export type IncarnationListReply = components['schemas']['IncarnationListReply'];
 export type StateHistoryEntry = components['schemas']['StateHistoryEntry'];
 export type IncarnationHistoryReply = components['schemas']['IncarnationHistoryReply'];
+// Run-view (GET .../runs + .../runs/{apply_id}) — apply_run НЕ Voyage: свёртка
+// apply_runs по apply_id для одной инкарнации (create/rerun-create/day-2 scenario-прогон).
+export type RunSummaryEntry = components['schemas']['RunSummaryEntry'];
+export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply'];
+export type RunDetailReply = components['schemas']['RunDetailReply'];
+export type RunHostStatusEntry = components['schemas']['RunHostStatusEntry'];
+export type RunStatus = NonNullable<RunSummaryEntry['status']>;
 export type DriftReport = components['schemas']['DriftReport'];
 export type IncarnationCreateRequest = components['schemas']['IncarnationCreateRequest'];
 export type IncarnationCreateReply = components['schemas']['IncarnationCreateReply'];
@@ -37,6 +44,9 @@ export type IncarnationCheckDriftRequest = components['schemas']['IncarnationChe
 
 export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
+export type SoulStatsReply = components['schemas']['SoulStatsReply'];
+export type ClusterReply = components['schemas']['ClusterReply'];
+export type ClusterInstanceEntry = components['schemas']['ClusterInstanceEntry'];
 // typed_facts теперь типизирован напрямую в сгенерированной схеме SoulprintReadReply.
 export type SoulprintReadReply = components['schemas']['SoulprintReadReply'];
 export type SoulIssueTokenReply = components['schemas']['SoulIssueTokenReply'];
@@ -233,6 +243,13 @@ export type Herald = components['schemas']['Herald'];
 export type HeraldCreateRequest = components['schemas']['HeraldCreateRequest'];
 export type HeraldUpdateRequest = components['schemas']['HeraldUpdateRequest'];
 export type HeraldListReply = components['schemas']['HeraldListReply'];
+
+// HeraldTypeCatalog — каталог типов Herald-канала и их config-полей (ADR-052
+// amendment, ADR-042 no-hardcode). GET /v1/herald-types — единый источник
+// правды для UI-формы (не хардкодить набор типов/полей).
+export type HeraldTypeCatalogReply = components['schemas']['HeraldTypeCatalogReply'];
+export type HeraldTypeCatalogEntry = components['schemas']['HeraldTypeCatalogEntry'];
+export type HeraldTypeFieldSpec = components['schemas']['HeraldTypeFieldSpec'];
 
 // Tiding — правило подписки на уведомления (ADR-052, S5). Типы из gen.
 export type Tiding = components['schemas']['Tiding'];
@@ -514,6 +531,19 @@ export const keeperApi = {
       apiGet<IncarnationHistoryReply>(`/v1/incarnations/${encodeURIComponent(name)}/history`, {
         query: { offset: q.offset, limit: q.limit },
       }),
+    // GET /v1/incarnations/{name}/runs — список прогонов (apply_run, НЕ Voyage):
+    // свёртка apply_runs по apply_id, статус applying/success/failed/cancelled.
+    runs: (name: string, q: { offset?: number; limit?: number } = {}) =>
+      apiGet<IncarnationRunsReply>(`/v1/incarnations/${encodeURIComponent(name)}/runs`, {
+        query: { offset: q.offset, limit: q.limit },
+      }),
+    // GET /v1/incarnations/{name}/runs/{apply_id} — детали прогона: per-host
+    // срез статусов + адрес упавшей задачи (task_idx/plan_index/error_summary).
+    // НЕ полный per-task список (TaskEvent агрегируется на Soul-е, ADR-012).
+    runDetail: (name: string, applyId: string) =>
+      apiGet<RunDetailReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(applyId)}`,
+      ),
     checkDrift: (name: string, body: IncarnationCheckDriftRequest = {}) =>
       apiSend<DriftReport>(
         `/v1/incarnations/${encodeURIComponent(name)}/check-drift`,
@@ -611,6 +641,11 @@ export const keeperApi = {
       ),
   },
 
+  // HA-топология Keeper-кластера (Conclave-реестр) + self_health текущего инстанса.
+  cluster: {
+    get: () => apiGet<ClusterReply>('/v1/cluster'),
+  },
+
   souls: {
     list: (q: ListSoulsQuery = {}) =>
       apiGet<SoulListReply>('/v1/souls', {
@@ -624,6 +659,9 @@ export const keeperApi = {
         },
       }),
     get: (sid: string) => apiGet<SoulListEntry>(`/v1/souls/${encodeURIComponent(sid)}`),
+    // GET /v1/souls/stats — сводка by_status/by_transport/by_coven + total +
+    // stale_count для Souls Overview. Scoped-видимость (ADR-047). Read-only.
+    stats: () => apiGet<SoulStatsReply>('/v1/souls/stats'),
     // GET /v1/souls/{sid}/history — per-host operation timeline (scenario apply_runs
     // + ad-hoc errands), merge started_at DESC. type — multi-value OR (scenario|errand).
     history: (sid: string, q: ListSoulHistoryQuery = {}) =>
@@ -1037,6 +1075,13 @@ export const keeperApi = {
     // DELETE /v1/heralds/{name} → 204. Каскадно удаляет Tiding-и.
     delete: (name: string) =>
       apiSend<void>(`/v1/heralds/${encodeURIComponent(name)}`, 'DELETE'),
+  },
+
+  // HeraldTypeCatalog — каталог типов Herald-канала (ADR-052 amendment, ADR-042
+  // no-hardcode). Список детерминирован и меняется только при обновлении
+  // Keeper-а → staleTime = Infinity (паттерн permissions/eventTypes).
+  heraldTypes: {
+    list: () => apiGet<HeraldTypeCatalogReply>('/v1/herald-types'),
   },
 
   // EventTypeCatalog — каталог event-types для Tiding-формы (ADR-042, ADR-052).

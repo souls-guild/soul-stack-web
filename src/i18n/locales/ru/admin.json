@@ -297,5 +297,29 @@
   "themeDarkDesc": "Тёмная",
   "themeSystemDesc": "Как в системе",
   "themeWarmDesc": "Тёплые тона",
-  "themeDeepDesc": "Глубокая тёмная"
+  "themeDeepDesc": "Глубокая тёмная",
+
+  "appearanceFontTitle": "Font",
+  "appearanceFontDesc": "Выберите шрифт интерфейса. Не зависит от темы, сохраняется между сессиями.",
+  "fontAriaGroup": "Шрифт интерфейса",
+
+  "fontSystem": "System",
+  "fontMono": "Monospace",
+  "fontSerif": "Serif",
+  "fontManrope": "Manrope",
+  "fontQuicksand": "Quicksand",
+  "fontUnbounded": "Unbounded",
+  "fontCaveat": "Caveat",
+  "fontComfortaa": "Comfortaa",
+  "fontComicNeue": "Comic Neue",
+
+  "fontSystemDesc": "Системный по умолчанию",
+  "fontMonoDesc": "Моноширинный (JetBrains Mono)",
+  "fontSerifDesc": "С засечками (Merriweather)",
+  "fontManropeDesc": "Геометричный гуманистический",
+  "fontQuicksandDesc": "Округлый гротеск",
+  "fontUnboundedDesc": "Угловатый гротеск",
+  "fontCaveatDesc": "Рукописный, читабельный",
+  "fontComfortaaDesc": "Округлый декоративный",
+  "fontComicNeueDesc": "Дружелюбный, с юмором — но читаемый"
 }

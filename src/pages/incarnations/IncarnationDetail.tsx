@@ -31,6 +31,7 @@ import { SpecTab } from './SpecTab';
 import { StateTab } from './StateTab';
 import { SchemaTab } from './SchemaTab';
 import { IncarnationTraitsModal } from './IncarnationTraitsModal';
+import { TraitsChips } from './TraitsChips';
 import styles from '../common.module.css';
 
 type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
@@ -204,6 +205,10 @@ export function IncarnationDetail() {
         </span>
         <span className={styles.metaKey}>Covens</span>
         <span className={styles.metaVal}>{(row.covens ?? []).length > 0 ? (row.covens ?? []).join(', ') : '—'}</span>
+        <span className={styles.metaKey}>Traits</span>
+        <span className={styles.metaVal}>
+          <TraitsChips traits={row.traits as Record<string, unknown> | null | undefined} />
+        </span>
         <span className={styles.metaKey}>Created by</span>
         <span className={styles.metaVal}>
           {row.created_by_aid
@@ -376,9 +381,11 @@ export function IncarnationDetail() {
                     <td className="mono">{entry.scenario}</td>
                     <td className="mono">
                       {entry.apply_id ? (
-                        // apply_id = voyage_id (scenario-voyage). Ссылаемся на /voyages/:id.
+                        // apply_id — это apply_run (create/rerun-create/day-2 scenario),
+                        // НЕ Voyage (batch-прогон по многим инкарнациям). Ссылаемся на
+                        // run-view этой инкарнации.
                         <Link
-                          to={`/voyages/${encodeURIComponent(entry.apply_id)}`}
+                          to={`/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(entry.apply_id)}`}
                           title={t('incarnations:historyApplyIdLink')}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           data-testid={`history-apply-link-${entry.history_id}`}

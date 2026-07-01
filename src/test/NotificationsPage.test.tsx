@@ -90,6 +90,72 @@ const TIDING_EPHEMERAL: Tiding = {
 
 const HERALDS_REPLY = { items: [HERALD_WEBHOOK, HERALD_DISABLED], offset: 0, limit: 200, total: 2 };
 const HERALDS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
+
+// Каталог типов Herald-канала (GET /v1/herald-types, ADR-052 amendment) —
+// подмножество полей, достаточное для тестов формы (webhook — полный набор,
+// остальные — по одному репрезентативному полю).
+const HERALD_TYPES_CATALOG = {
+  types: [
+    {
+      type: 'webhook',
+      secret_required: true,
+      fields: [
+        { name: 'url', label: 'URL', required: true, secret: false, kind: 'url' },
+        { name: 'headers', label: 'HTTP-заголовки', required: false, secret: false, kind: 'map' },
+        { name: 'http_allowed', label: 'Разрешить http://', required: false, secret: false, kind: 'bool' },
+        { name: 'allow_private', label: 'Разрешить приватные IP', required: false, secret: false, kind: 'bool' },
+      ],
+    },
+    {
+      type: 'telegram',
+      secret_required: false,
+      fields: [
+        { name: 'bot_token_ref', label: 'Vault-ref токена бота', required: true, secret: true, kind: 'vault_ref' },
+        { name: 'chat_id', label: 'ID чата/канала', required: true, secret: false, kind: 'string' },
+        { name: 'parse_mode', label: 'Формат текста', required: false, secret: false, kind: 'enum', enum_values: ['', 'MarkdownV2', 'HTML'] },
+      ],
+    },
+    {
+      type: 'slack',
+      secret_required: false,
+      fields: [
+        { name: 'webhook_url_ref', label: 'Vault-ref URL incoming-webhook', required: true, secret: true, kind: 'vault_ref' },
+      ],
+    },
+    {
+      type: 'mattermost',
+      secret_required: false,
+      fields: [
+        { name: 'webhook_url_ref', label: 'Vault-ref URL incoming-webhook', required: true, secret: true, kind: 'vault_ref' },
+        { name: 'channel', label: 'Канал (override)', required: false, secret: false, kind: 'string' },
+      ],
+    },
+    {
+      type: 'discord',
+      secret_required: false,
+      fields: [
+        { name: 'webhook_url_ref', label: 'Vault-ref URL webhook', required: true, secret: true, kind: 'vault_ref' },
+      ],
+    },
+    {
+      type: 'custom',
+      secret_required: false,
+      fields: [
+        { name: 'url', label: 'URL', required: true, secret: false, kind: 'url' },
+        { name: 'method', label: 'HTTP-метод', required: false, secret: false, kind: 'enum', enum_values: ['', 'POST', 'PUT', 'PATCH'] },
+      ],
+    },
+    {
+      type: 'email',
+      secret_required: false,
+      fields: [
+        { name: 'smtp_host', label: 'SMTP-хост', required: true, secret: false, kind: 'string' },
+        { name: 'smtp_port', label: 'SMTP-порт', required: true, secret: false, kind: 'int' },
+        { name: 'to', label: 'Получатели', required: true, secret: false, kind: 'list_string' },
+      ],
+    },
+  ],
+};
 const TIDINGS_REPLY: TidingsListReply = { items: [TIDING_SCENARIOS, TIDING_CADENCE], offset: 0, limit: 200, total: 2 };
 const TIDINGS_EMPTY: TidingsListReply = { items: [], offset: 0, limit: 200, total: 0 };
 
@@ -162,6 +228,9 @@ function setupMock(opts: MockOpts = {}): Call[] {
         ],
         point_events: [{ name: 'incarnation.run_completed' }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.startsWith('/v1/herald-types') && method === 'GET') {
+      return new Response(JSON.stringify(HERALD_TYPES_CATALOG), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.startsWith('/v1/heralds') && method === 'GET') {
       return new Response(JSON.stringify(opts.heralds ?? HERALDS_REPLY), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -267,7 +336,9 @@ describe('NotificationsPage — Heralds tab', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Создать Herald/i });
     await user.type(within(dialog).getByTestId('herald-name-input'), 'new-webhook');
-    await user.type(within(dialog).getByTestId('herald-url-input'), 'https://example.com/hook');
+    await waitFor(() => expect(within(dialog).getByRole('option', { name: 'webhook' })).toBeInTheDocument());
+    await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
+    await user.type(within(dialog).getByTestId('herald-field-url'), 'https://example.com/hook');
     await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
 
     await waitFor(() => {
@@ -346,9 +417,9 @@ describe('NotificationsPage — Heralds tab', () => {
     await user.click(screen.getByTestId('herald-create-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Создать Herald/i });
-    // Открываем advanced.
-    await user.click(within(dialog).getByTestId('herald-advanced-toggle'));
-    const httpCheckbox = within(dialog).getByTestId('herald-http-allowed');
+    await waitFor(() => expect(within(dialog).getByRole('option', { name: 'webhook' })).toBeInTheDocument());
+    await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
+    const httpCheckbox = within(dialog).getByTestId('herald-field-http_allowed');
     await user.click(httpCheckbox);
 
     // Warning должен появиться.
@@ -603,7 +674,7 @@ describe('PUT replace-схема — Herald edit', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Редактировать Herald/i });
     // Меняем URL — очищаем и вводим новый.
-    const urlInput = within(dialog).getByTestId('herald-url-input');
+    const urlInput = await within(dialog).findByTestId('herald-field-url');
     await user.clear(urlInput);
     await user.type(urlInput, 'https://new.example.com/hook');
 

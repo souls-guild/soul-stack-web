@@ -283,7 +283,7 @@ describe('IncarnationDetail', () => {
     expect(screen.getByText('host-a')).toBeInTheDocument();
   });
 
-  it('History tab: apply_id рендерится ссылкой на /voyages/:id', async () => {
+  it('History tab: apply_id рендерится ссылкой на /incarnations/:name/runs/:apply_id (НЕ /voyages/)', async () => {
     // Более специфичные пути идут ПЕРВЫМИ (fetchMock матчит первый совпавший).
     installFetchMock([
       {
@@ -346,11 +346,90 @@ describe('IncarnationDetail', () => {
     expect(historyTab).toBeDefined();
     await user.click(historyTab);
 
-    // apply_id рендерится как ссылка на /voyages/:id
+    // apply_id — apply_run (create/rerun-create/day-2 scenario), НЕ Voyage:
+    // ссылка ведёт на run-view инкарнации, не на /voyages/:id.
     await waitFor(() => {
       const link = screen.getByTestId('history-apply-link-hid-1');
       expect(link).toBeInTheDocument();
-      expect((link as HTMLAnchorElement).href).toContain('/voyages/01VOYAGE000000000000001');
+      expect((link as HTMLAnchorElement).href).toContain('/incarnations/inc-h/runs/01VOYAGE000000000000001');
+      expect((link as HTMLAnchorElement).href).not.toContain('/voyages/');
     }, { timeout: 3000 });
+  });
+
+  it('Overview показывает traits инкарнации (scalar + list) в meta-блоке', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations/redis-traits',
+        body: {
+          name: 'redis-traits',
+          service: 'redis',
+          service_version: 'main',
+          state_schema_version: 1,
+          covens: ['prod'],
+          traits: { team: 'platform', tier: ['gold', 'critical'] },
+          spec: {},
+          state: {},
+          status: 'ready',
+          created_by_aid: 'archon-x',
+          created_at: '2026-05-20T10:00:00Z',
+          updated_at: '2026-05-25T12:00:00Z',
+        },
+      },
+      { method: 'GET', url: '/v1/souls', body: { items: [], offset: 0, limit: 200, total: 0 } },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/redis-traits',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'redis-traits' })).toBeInTheDocument();
+    });
+
+    // scalar-trait — chip team=platform.
+    expect(screen.getByText('team=platform')).toBeInTheDocument();
+    // list-trait — раскрыт через запятую в одном чипе.
+    expect(screen.getByText('tier=gold, critical')).toBeInTheDocument();
+  });
+
+  it('Overview graceful empty когда incarnation.traits отсутствует (не краш)', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations/no-traits',
+        body: {
+          name: 'no-traits',
+          service: 'redis',
+          service_version: 'main',
+          state_schema_version: 1,
+          covens: [],
+          spec: {},
+          state: {},
+          status: 'ready',
+          created_by_aid: 'archon-x',
+          created_at: '2026-05-20T10:00:00Z',
+          updated_at: '2026-05-25T12:00:00Z',
+        },
+      },
+      { method: 'GET', url: '/v1/souls', body: { items: [], offset: 0, limit: 200, total: 0 } },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/no-traits',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'no-traits' })).toBeInTheDocument();
+    });
+
+    // Секция Traits присутствует, значение — em-dash fallback, страница не падает.
+    expect(screen.getByText('Traits')).toBeInTheDocument();
   });
 });

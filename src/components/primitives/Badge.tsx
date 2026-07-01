@@ -6,8 +6,13 @@ type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'muted';
 interface Props {
   tone?: Tone;
   children: ReactNode;
+  title?: string;
 }
 
-export function Badge({ tone = 'muted', children }: Props) {
-  return <span className={`${styles.badge} ${styles[tone]}`}>{children}</span>;
+export function Badge({ tone = 'muted', children, title }: Props) {
+  return (
+    <span className={`${styles.badge} ${styles[tone]}`} title={title}>
+      {children}
+    </span>
+  );
 }

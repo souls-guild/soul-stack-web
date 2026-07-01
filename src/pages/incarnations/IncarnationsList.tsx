@@ -14,6 +14,13 @@ import { incarnationDot, incarnationTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 import { StateFilterPanel } from './StateFilterPanel';
+import { TraitsChips } from './TraitsChips';
+import { CovenTraitsFilter } from './CovenTraitsFilter';
+import {
+  EMPTY_COVEN_TRAITS_FILTER,
+  matchesCovenTraitsFilter,
+  type CovenTraitsFilterValue,
+} from './covenTraitsFilter.helpers';
 import styles from '../common.module.css';
 
 // satisfies гарантирует, что список ⊆ IncarnationStatus; tsc упадёт при добавлении нового статуса в backend
@@ -72,6 +79,11 @@ export function IncarnationsList() {
   const [statePredicates, setStatePredicates] = useState<StateFilterPredicate[]>([]);
   // per-field ошибки 422 от backend.
   const [stateFieldErrors, setStateFieldErrors] = useState<Record<string, string>>({});
+
+  // Client-side мультиселект coven+traits поверх уже загруженного набора
+  // (нет server-side traits-фильтра/каталога; coven-фильтр выше — server-side
+  // single exact-match, этот — доп. AND-слой для комбинации с traits).
+  const [covenTraitsFilter, setCovenTraitsFilter] = useState<CovenTraitsFilterValue>(EMPTY_COVEN_TRAITS_FILTER);
 
   const trimmedCoven = coven.trim();
   const covenValid = trimmedCoven === '' || COVEN_PATTERN.test(trimmedCoven);
@@ -150,12 +162,21 @@ export function IncarnationsList() {
     setStateFieldErrors(errors);
   }, [stateFilter422, activePredicates]);
 
-  // Client-side search (по имени). Sort — server-side; items приходят уже sorted.
+  // Client-side search (по имени) + coven/traits мультиселект (AND). Sort —
+  // server-side; items приходят уже sorted, доп. фильтры не меняют порядок.
   const filtered = useMemo(() => {
     const items = q.data?.items ?? [];
     const term = search.trim().toLowerCase();
-    return term ? items.filter((it) => it.name.toLowerCase().includes(term)) : items;
-  }, [q.data, search]);
+    return items.filter((it) => {
+      if (term && !it.name.toLowerCase().includes(term)) return false;
+      if (!matchesCovenTraitsFilter(it, covenTraitsFilter)) return false;
+      return true;
+    });
+  }, [q.data, search, covenTraitsFilter]);
+
+  // Опции мультиселекта считаем от полного набора (до client-side filter),
+  // иначе выбор сужал бы сам себя до нуля видимых опций.
+  const covenTraitsSourceItems = q.data?.items ?? [];
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -326,6 +347,15 @@ export function IncarnationsList() {
         )}
       </div>
 
+      {/* Мультиселект coven+traits (client-side, AND, поверх уже загруженного набора) */}
+      {covenTraitsSourceItems.length > 0 ? (
+        <CovenTraitsFilter
+          items={covenTraitsSourceItems}
+          value={covenTraitsFilter}
+          onChange={setCovenTraitsFilter}
+        />
+      ) : null}
+
       {/* Счётчик total */}
       {total !== undefined && !q.isLoading ? (
         <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -376,6 +406,7 @@ export function IncarnationsList() {
                 </button>
               </th>
               <th>{t('incarnations:colCovens')}</th>
+              <th>{t('incarnations:colTraits')}</th>
               <th>
                 <button type="button" onClick={() => toggleSort('created_at')} style={{ all: 'unset', cursor: 'pointer' }}>
                   {t('incarnations:colCreated')}{sortArrow('created_at')}
@@ -412,6 +443,9 @@ export function IncarnationsList() {
                       ))}
                     </span>
                   ) : '—'}
+                </td>
+                <td className="mono">
+                  <TraitsChips traits={row.traits as Record<string, unknown> | null | undefined} maxVisible={3} />
                 </td>
                 <td className="mono" title={row.created_at}>{formatTimeAgo(row.created_at)}</td>
                 <td className="mono">{formatTimeAgo(row.last_drift_check_at)}</td>
