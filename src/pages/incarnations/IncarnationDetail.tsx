@@ -14,6 +14,7 @@ import {
   Search,
   Tag,
   Trash,
+  ExternalLink,
 } from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
@@ -62,6 +63,14 @@ export function IncarnationDetail() {
     enabled: Boolean(name) && tab === 'history',
   });
 
+  // Connected souls для Overview-карточки «Hosts» — тот же источник, что HostsTab.
+  // Грузим всегда (не только на tab=hosts), чтобы Overview показывал реальный count.
+  const connectedSouls = useQuery({
+    queryKey: ['incarnation-souls', name],
+    queryFn: () => keeperApi.souls.list({ coven: [name], limit: 200 }),
+    enabled: Boolean(name),
+  });
+
   const driftMu = useMutation({
     mutationFn: () => keeperApi.incarnations.checkDrift(name),
     onSuccess: (data) => {
@@ -86,15 +95,11 @@ export function IncarnationDetail() {
     if (spec && Array.isArray((spec as Record<string, unknown>).hosts)) {
       declaredHosts = ((spec as Record<string, unknown>).hosts as unknown[]).length;
     }
-    let runtimeHosts = 0;
-    if (state && typeof state === 'object') {
-      const hosts = (state as Record<string, unknown>).hosts;
-      if (hosts && typeof hosts === 'object' && !Array.isArray(hosts)) {
-        runtimeHosts = Object.keys(hosts as Record<string, unknown>).length;
-      }
-    }
-    return { specKeys, stateKeys, declaredHosts, runtimeHosts };
-  }, [detail.data]);
+    // onlineHosts — реальные connected souls (coven=incarnation.name), тот же
+    // источник что HostsTab. Показываем «N online» (+«M declared» если spec.hosts непустой).
+    const onlineHosts = connectedSouls.data?.items?.length ?? null;
+    return { specKeys, stateKeys, declaredHosts, onlineHosts };
+  }, [detail.data, connectedSouls.data]);
 
   if (detail.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (detail.error) {
@@ -281,7 +286,12 @@ export function IncarnationDetail() {
             <button type="button" className={styles.summaryCard} onClick={() => setTab('hosts')}>
               <span className={styles.summaryCardLabel}>Hosts</span>
               <span className={styles.summaryCardValue}>
-                {summary.declaredHosts} declared · {summary.runtimeHosts} runtime
+                {summary.onlineHosts !== null
+                  ? t('incarnations:hostsCardOnline', { n: summary.onlineHosts })
+                  : t('incarnations:hostsCardLoading')}
+                {summary.declaredHosts > 0
+                  ? ` · ${t('incarnations:hostsCardDeclared', { n: summary.declaredHosts })}`
+                  : null}
               </span>
               <span className={styles.summaryCardHint}>{t('incarnations:hostsCardHint')}</span>
             </button>
@@ -364,8 +374,27 @@ export function IncarnationDetail() {
                 {(history.data.items ?? []).map((entry) => (
                   <tr key={entry.history_id}>
                     <td className="mono">{entry.scenario}</td>
-                    <td className="mono">{entry.apply_id}</td>
-                    <td className="mono">{entry.changed_by_aid ?? '—'}</td>
+                    <td className="mono">
+                      {entry.apply_id ? (
+                        // apply_id = voyage_id (scenario-voyage). Ссылаемся на /voyages/:id.
+                        <Link
+                          to={`/voyages/${encodeURIComponent(entry.apply_id)}`}
+                          title={t('incarnations:historyApplyIdLink')}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                          data-testid={`history-apply-link-${entry.history_id}`}
+                        >
+                          {entry.apply_id}
+                          <ExternalLink size={11} style={{ opacity: 0.6, flexShrink: 0 }} />
+                        </Link>
+                      ) : '—'}
+                    </td>
+                    <td className="mono">
+                      {entry.changed_by_aid ? (
+                        <Link to={`/archons/${encodeURIComponent(entry.changed_by_aid)}`}>
+                          {entry.changed_by_aid}
+                        </Link>
+                      ) : '—'}
+                    </td>
                     <td className="mono">{entry.created_at}</td>
                   </tr>
                 ))}

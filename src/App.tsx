@@ -43,6 +43,7 @@ import { SynodDetail } from './pages/synods/SynodDetail';
 import { NotificationsPage } from './pages/notifications/NotificationsPage';
 import { HeraldDetail } from './pages/notifications/HeraldDetail';
 import { TidingDetail } from './pages/notifications/TidingDetail';
+import { OverviewPage } from './pages/overview/OverviewPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,10 +63,10 @@ function Protected({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Default landing — `/runs` (unified feed), с возможностью запомнить иной маршрут
+// Default landing — `/overview` (дашборд), с возможностью запомнить иной маршрут
 // в localStorage('landing'). Валидируем сохранённое значение (только known-маршрут),
-// иначе fallback на /runs.
-const KNOWN_LANDINGS = new Set(['/runs', '/incarnations', '/run', '/souls']);
+// иначе fallback на /overview.
+const KNOWN_LANDINGS = new Set(['/overview', '/runs', '/incarnations', '/run', '/souls']);
 function landingTarget(): string {
   try {
     const saved = localStorage.getItem('landing');
@@ -73,7 +74,7 @@ function landingTarget(): string {
   } catch {
     // localStorage недоступен — дефолт.
   }
-  return '/runs';
+  return '/overview';
 }
 
 export function App() {
@@ -85,6 +86,7 @@ export function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to={landingTarget()} replace />} />
+            <Route path="/overview" element={<Protected><OverviewPage /></Protected>} />
             <Route path="/incarnations" element={<Protected><IncarnationsList /></Protected>} />
             <Route path="/incarnations/new" element={<Protected><IncarnationNewForm /></Protected>} />
             <Route path="/incarnations/:name" element={<Protected><IncarnationDetail /></Protected>} />

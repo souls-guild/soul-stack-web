@@ -14,8 +14,11 @@ import { useServiceScenarios } from './useServiceScenarios';
 import { ScenarioInputFields } from './ScenarioInputFields';
 import {
   computeVisibleFields,
+  computeRequiredHostCount,
   defaultsFromSchema,
   isSupportedInputSchema,
+  isProvisionObjectField,
+  readProvisionEnabled,
   missingRequiredFields,
   serializeFields,
   type ScenarioFieldsState,
@@ -113,6 +116,25 @@ export function IncarnationNewForm() {
 
   // Блокируем submit, если сервис имеет create-сценарии, но ни один не выбран.
   const missingScenarioSelection = createScenarios.length > 0 && !selectedCreateScenario;
+
+  // Pre-submit предупреждение: provision выключен, но сценарий требует хосты.
+  // Вычисляем: есть ли provision-поле в схеме, включён ли provision, сколько нужно хостов.
+  const provisionWarning = useMemo(() => {
+    if (!createSchema || !usePerField) return null;
+    // Ищем поле provision в схеме (объект с properties.enabled:boolean).
+    const provisionEntry = Object.entries(createSchema).find(
+      ([, prop]) => isProvisionObjectField(prop),
+    );
+    if (!provisionEntry) return null;
+    const [provisionKey] = provisionEntry;
+    const provisionRaw = fields[provisionKey];
+    // Если provision включён — предупреждение не нужно.
+    if (readProvisionEnabled(provisionRaw)) return null;
+    // Нужно ли N хостов? Считаем из replicas_per_master/shards.
+    const requiredHosts = computeRequiredHostCount(fields);
+    if (requiredHosts === null) return null;
+    return requiredHosts;
+  }, [createSchema, usePerField, fields]);
 
   const createMu = useMutation({
     mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap }) =>
@@ -295,6 +317,34 @@ export function IncarnationNewForm() {
           </label>
         ) : null}
 
+        {/* Хелп-блок create_from_souls: напоминает про onboarding souls до запуска */}
+        {selectedCreateScenario?.name?.includes('from_souls') ? (
+          <div
+            style={{
+              padding: '10px 12px',
+              background: 'color-mix(in srgb, var(--accent) 6%, var(--surface))',
+              border: '1px solid color-mix(in srgb, var(--accent) 25%, var(--border))',
+              borderRadius: 'var(--radius)',
+              fontSize: 12,
+              color: 'var(--text-muted)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+            }}
+            data-testid="create-from-souls-hint"
+          >
+            <span>
+              {t('incarnations:createFromSoulsHint', { coven: watch('name') || '…' })}
+            </span>
+            <Link
+              to="/souls"
+              style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
+            >
+              {t('incarnations:createFromSoulsHostsLink')}
+            </Link>
+          </div>
+        ) : null}
+
         {/* Bare-инкарнация: сервис без create-сценариев */}
         {selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length === 0 ? (
           <div
@@ -323,6 +373,7 @@ export function IncarnationNewForm() {
               onChange={setFields}
               showErrors={showInputErrors}
               form={selectedCreateScenario?.form}
+              incarnationName={watch('name') || undefined}
             />
             {selectedCreateScenario?.description ? (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
@@ -333,6 +384,34 @@ export function IncarnationNewForm() {
         ) : selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length > 0 && selectedCreateScenario ? (
           <div style={{ fontSize: 12, color: 'var(--text-faint)' }} data-testid="create-input-empty">
             {t('incarnations:createNoInput')}
+          </div>
+        ) : null}
+
+        {/* Pre-submit предупреждение: provision выключен, но топология требует хостов */}
+        {provisionWarning !== null ? (
+          <div
+            data-testid="provision-host-warning"
+            style={{
+              padding: '10px 14px',
+              background: 'color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--surface))',
+              border: '1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--border))',
+              borderRadius: 'var(--radius)',
+              fontSize: 13,
+              color: 'var(--text)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>
+              {t('incarnations:provisionHostWarningTitle')}
+            </span>
+            <span>
+              {t('incarnations:provisionHostWarningBody', {
+                n: provisionWarning,
+                coven: watch('name') || '…',
+              })}
+            </span>
           </div>
         ) : null}
 

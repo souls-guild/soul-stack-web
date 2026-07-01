@@ -5,6 +5,7 @@ import {
   Users,
   Users2,
   FileText,
+  LayoutDashboard,
   Package,
   Puzzle,
   ShieldCheck,
@@ -43,6 +44,7 @@ interface NavItem {
 }
 
 const PRIMARY: NavItem[] = [
+  { to: '/overview', label: 'Overview', icon: LayoutDashboard },
   { to: '/run', label: 'Run', icon: Play, matchPrefix: '/run' },
 ];
 

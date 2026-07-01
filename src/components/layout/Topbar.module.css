@@ -107,6 +107,22 @@
   background: var(--surface-2);
 }
 
+.settingsLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.settingsLink:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
 .menuMeta {
   padding: 8px 10px;
   font-size: 11.5px;

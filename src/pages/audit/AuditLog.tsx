@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Link2 } from 'lucide-react';
 import {
   keeperApi,
   type AuditEvent,
@@ -91,9 +92,17 @@ function localToRfc3339(local: string): string | undefined {
   return `${local}:00Z`;
 }
 
+// Строит URL для deep-link на конкретное audit-событие по correlation_id.
+// Формат: /ui/audit?correlation_id=<id>
+function buildAuditCorrLink(correlationId: string): string {
+  const base = window.location.origin;
+  return `${base}/ui/audit?correlation_id=${encodeURIComponent(correlationId)}`;
+}
+
 function EventCard({ ev }: { ev: AuditEvent }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const { value, truncated } = useMemo(() => maybeTruncatePayload(ev.payload), [ev.payload]);
   // Получаем лейбл через i18n (graceful: если ключ не найден — undefined).
   const evLabel = useMemo(() => {
@@ -103,6 +112,17 @@ function EventCard({ ev }: { ev: AuditEvent }) {
     // i18next возвращает сам ключ если перевода нет → проверяем совпадение.
     return raw !== key ? raw : undefined;
   }, [ev.type, t]);
+
+  function handleCopyLink(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!ev.correlation_id) return;
+    const url = buildAuditCorrLink(ev.correlation_id);
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {/* silent — clipboard может быть недоступен */});
+  }
+
   return (
     <div className={styles.timelineItem}>
       <div
@@ -128,7 +148,31 @@ function EventCard({ ev }: { ev: AuditEvent }) {
               </span>
             ) : null}
           </span>
-          <span style={{ color: 'var(--text-muted)' }}>{ev.created_at}</span>
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-muted)' }}>{ev.created_at}</span>
+            {ev.correlation_id ? (
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                title={t('admin:auditCopyLinkTitle')}
+                aria-label={t('admin:auditCopyLinkAria')}
+                data-testid={`audit-copy-link-${ev.id}`}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: copied ? 'var(--accent)' : 'var(--text-muted)',
+                  padding: '2px 4px',
+                  borderRadius: 'var(--radius)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  transition: 'color 0.15s',
+                }}
+              >
+                <Link2 size={13} />
+              </button>
+            ) : null}
+          </span>
         </div>
         <div className={styles.timelineHead} style={{ fontSize: 12 }}>
           <span className="mono">{t('admin:auditArchonPrefix')} {ev.archon_aid ?? '—'}</span>

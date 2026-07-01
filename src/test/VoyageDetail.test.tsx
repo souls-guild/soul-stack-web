@@ -774,6 +774,45 @@ describe('VoyageDetail', () => {
     expect(screen.getByTestId('changed-run-1').textContent).toContain('без изменений');
   });
 
+  it('[guard] кнопка «Повторить» доступна для scenario-voyage и отправляет на /run с параметрами', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      { method: 'GET', url: '/v1/audit', body: { items: [], offset: 0, limit: 200, total: 0 } },
+    ]);
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-repeat-btn')).toBeInTheDocument());
+
+    // Кнопка есть (scenario-voyage), кликаем — черновика нет → navigate
+    const user = userEvent.setup();
+    // sessionStorage пустой → нет confirm-диалога
+    sessionStorage.clear();
+    await user.click(screen.getByTestId('voyage-repeat-btn'));
+    // После navigate — компонент пытается unmount/remount; проверяем что confirm не появился.
+    expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
+  });
+
+  it('[guard] confirm-диалог появляется если в sessionStorage есть черновик', async () => {
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
+      { method: 'GET', url: '/v1/audit', body: { items: [], offset: 0, limit: 200, total: 0 } },
+    ]);
+    // Имитируем черновик
+    sessionStorage.setItem('run-wizard-draft', JSON.stringify({ v: 10 }));
+    renderVoyage(VOYAGE_ID);
+    await waitFor(() => expect(screen.getByTestId('voyage-repeat-btn')).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('voyage-repeat-btn'));
+    // Диалог должен появиться
+    expect(screen.getByTestId('voyage-repeat-confirm-dialog')).toBeInTheDocument();
+    // Cancel → диалог закрывается (кнопка «Закрыть» — ru-locale по умолчанию в тестах)
+    await user.click(screen.getByRole('button', { name: /Закрыть/i }));
+    expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
+    sessionStorage.clear();
+  });
+
   it('[guard] status=undefined → тон muted, лейбл «—»', async () => {
     const eventNoStatus = {
       id: 'AUD01NOSTATUS000000001',

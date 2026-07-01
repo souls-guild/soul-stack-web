@@ -58,7 +58,10 @@ i18n
     ns: namespaces,
     defaultNS: 'common',
     backend: {
-      loadPath: '/locales/{{lng}}/{{ns}}.json',
+      // import.meta.env.BASE_URL = '/ui/' при сборке (base: '/ui/' в vite.config.ts).
+      // Абсолютный путь /locales/... даёт 404 когда UI встроен под /ui/ в Keeper.
+      // BASE_URL гарантирует корректный prefix и в dev (/ui/) и в prod.
+      loadPath: `${import.meta.env.BASE_URL}locales/{{lng}}/{{ns}}.json`,
     },
     interpolation: {
       escapeValue: false, // React сам экранирует.

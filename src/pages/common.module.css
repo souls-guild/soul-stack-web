@@ -285,3 +285,14 @@
   justify-content: center;
   margin-top: 16px;
 }
+
+/* RolesPicker — выравнивание с Input.field (flex-column, gap 6px, label font-size) */
+.rolesPickerField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--t-label-size);
+  font-weight: var(--t-label-weight);
+  color: var(--text);
+  min-width: 280px;
+}

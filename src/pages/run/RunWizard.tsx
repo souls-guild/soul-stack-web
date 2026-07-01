@@ -1756,341 +1756,360 @@ function Step4Options({
 
   return (
     <>
-      {/* Batch mode */}
-      <fieldset
-        style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
-      >
-        <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>
-          {t('run:batchModeLabel')}
-        </legend>
-        <div style={{ display: 'flex', gap: 14 }}>
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="batch_mode"
-              value="barrier"
-              checked={value.batchMode === 'barrier'}
-              onChange={() => onChange({ ...value, batchMode: 'barrier' })}
-              aria-label="batch_mode_barrier"
-            />
-            barrier
-          </label>
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="batch_mode"
-              value="window"
-              checked={value.batchMode === 'window'}
-              onChange={() => onChange({ ...value, batchMode: 'window', batch: '' })}
-              aria-label="batch_mode_window"
-            />
-            window
-          </label>
-        </div>
-        <div className={styles.hint} style={{ marginTop: 6 }}>
-          {isWindow ? t('run:batchModeWindowHint') : t('run:batchModeBarrierHint')}
-        </div>
-      </fieldset>
+      {/* Секция «Батчинг» — размер/порог пачки + поведение при провале batch-раннера
+          (on_failure логически про сам батчинг, не про время запуска). */}
+      <fieldset className={styles.optionsSection}>
+        <legend className={styles.optionsSectionLegend}>{t('run:sectionBatchingLabel')}</legend>
 
-      {/* Единое текстовое поле batch (N | N%) — скрыть при window */}
-      {!isWindow ? (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:batchLabel')}</span>
-          <input
-            type="text"
-            className={styles.field}
-            value={value.batch}
-            onChange={(e) => onChange({ ...value, batch: e.target.value })}
-            placeholder={t('run:batchPlaceholder')}
-            aria-label="Batch"
-          />
-          <span className={styles.hint}>{t('run:batchHint')}</span>
-          {!batchValid && value.batch.trim() ? (
-            <span className={styles.warn}>{t('run:batchError')}</span>
-          ) : null}
-        </label>
-      ) : (
-        <div className={styles.hint} style={{ marginTop: 4 }}>
-          {t('run:batchSizeWindowHidden')}
-        </div>
-      )}
-
-      {/* max_failures — всегда видимо (работает в обоих batch_mode) */}
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>
-          {t('run:maxFailuresLabel')}
-          {' '}
-          <span
-            title={t('run:maxFailuresTooltip')}
-            style={{ cursor: 'help', color: 'var(--text-faint)', fontSize: 12 }}
-            aria-label={t('run:maxFailuresTooltip')}
-          >
-            (?)
-          </span>
-        </span>
-        <input
-          type="text"
-          className={styles.field}
-          value={value.maxFailures}
-          onChange={(e) => onChange({ ...value, maxFailures: e.target.value })}
-          placeholder={t('run:maxFailuresPlaceholder')}
-          aria-label="Max failures"
-        />
-        <span className={styles.hint}>{t('run:maxFailuresHint')}</span>
-      </label>
-
-      {/* Предпоказ числа батчей */}
-      {!isWindow && (isLateBinding ? (
-        previewLoading ? (
-          <div className={styles.hint} aria-label="batch preview">
-            {t('run:batchPreviewLoading')}
-          </div>
-        ) : previewData ? (
-          <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
-            {previewData.batch_mode === 'window'
-              ? t('run:batchPreviewWindow')
-              : t('run:batchPreviewBatches', { count: previewData.total_batches, scope: previewData.scope_size })}
-          </div>
-        ) : null
-      ) : (
-        localBatchCount !== null && snapshotScope > 0 ? (
-          <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
-            {t('run:batchPreviewBatches', { count: localBatchCount, scope: snapshotScope })}
-          </div>
-        ) : null
-      ))}
-
-      <label className={styles.fieldRow}>
-        <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
-        <input
-          type="number"
-          className={styles.field}
-          min={1}
-          max={500}
-          value={value.concurrency}
-          onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
-          aria-label="Concurrency"
-        />
-        <span className={styles.hint}>
-          {isWindow ? t('run:concurrencyWindowHint') : t('run:concurrencyHint')}
-        </span>
-      </label>
-
-      <fieldset
-        style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
-      >
-        <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>On-failure</legend>
-        <div style={{ display: 'flex', gap: 14 }}>
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="on_failure"
-              value="abort"
-              checked={value.onFailure === 'abort'}
-              onChange={() => onChange({ ...value, onFailure: 'abort' })}
-            />
-            abort
-          </label>
-          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="on_failure"
-              value="continue"
-              checked={value.onFailure === 'continue'}
-              onChange={() => onChange({ ...value, onFailure: 'continue' })}
-            />
-            continue
-          </label>
-        </div>
-      </fieldset>
-
-      {/* inter_batch_interval_ms — только для barrier */}
-      {!isWindow ? (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:interBatchIntervalLabel')}</span>
-          <input
-            type="number"
-            className={styles.field}
-            min={0}
-            value={value.interBatchIntervalMs}
-            onChange={(e) => onChange({ ...value, interBatchIntervalMs: e.target.value })}
-            placeholder={t('run:interBatchIntervalPlaceholder')}
-            aria-label="Inter-batch interval ms"
-          />
-          <span className={styles.hint}>{t('run:interBatchIntervalHint')}</span>
-        </label>
-      ) : null}
-
-      {/* inter_unit_interval_ms — только для window */}
-      {isWindow ? (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:interUnitIntervalLabel')}</span>
-          <input
-            type="number"
-            className={styles.field}
-            min={0}
-            value={value.interUnitIntervalMs}
-            onChange={(e) => onChange({ ...value, interUnitIntervalMs: e.target.value })}
-            placeholder={t('run:interUnitIntervalPlaceholder')}
-            aria-label="Inter-unit interval ms"
-          />
-          <span className={styles.hint}>{t('run:interUnitIntervalHint')}</span>
-        </label>
-      ) : null}
-
-      {runMode === 'cadence' ? (
-        /* Cadence-поля вместо scheduleAt */
+        {/* Batch mode */}
         <fieldset
           style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
         >
           <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>
-            {t('run:cadenceScheduleLabel')}
+            {t('run:batchModeLabel')}
           </legend>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <input
+                type="radio"
+                name="batch_mode"
+                value="barrier"
+                checked={value.batchMode === 'barrier'}
+                onChange={() => onChange({ ...value, batchMode: 'barrier' })}
+                aria-label="batch_mode_barrier"
+              />
+              barrier
+            </label>
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <input
+                type="radio"
+                name="batch_mode"
+                value="window"
+                checked={value.batchMode === 'window'}
+                onChange={() => onChange({ ...value, batchMode: 'window', batch: '' })}
+                aria-label="batch_mode_window"
+              />
+              window
+            </label>
+          </div>
+          <div className={styles.hint} style={{ marginTop: 6 }}>
+            {isWindow ? t('run:batchModeWindowHint') : t('run:batchModeBarrierHint')}
+          </div>
+        </fieldset>
 
-          {/* Имя Cadence */}
+        {/* Единое текстовое поле batch (N | N%) — скрыть при window */}
+        {!isWindow ? (
           <label className={styles.fieldRow}>
-            <span className={styles.fieldLabel}>{t('run:cadenceNameLabel')}</span>
+            <span className={styles.fieldLabel}>{t('run:batchLabel')}</span>
             <input
               type="text"
               className={styles.field}
-              value={cadenceState.cadenceName}
-              onChange={(e) => onCadenceChange({ ...cadenceState, cadenceName: e.target.value })}
-              placeholder={t('run:cadenceNamePlaceholder')}
-              aria-label="Cadence name"
-              data-testid="cadence-name"
+              value={value.batch}
+              onChange={(e) => onChange({ ...value, batch: e.target.value })}
+              placeholder={t('run:batchPlaceholder')}
+              aria-label="Batch"
             />
-            {!cadenceState.cadenceName.trim() && !cadenceValid ? (
-              <span className={styles.warn}>{t('run:cadenceNameRequired')}</span>
+            <span className={styles.hint}>{t('run:batchHint')}</span>
+            {!batchValid && value.batch.trim() ? (
+              <span className={styles.warn}>{t('run:batchError')}</span>
             ) : null}
           </label>
-
-          {/* schedule_kind */}
-          <div className={styles.fieldRow}>
-            <span className={styles.fieldLabel}>{t('run:cadenceKindLabel')}</span>
-            <div style={{ display: 'flex', gap: 14 }}>
-              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-                <input
-                  type="radio"
-                  name="schedule_kind"
-                  value="interval"
-                  checked={cadenceState.scheduleKind === 'interval'}
-                  onChange={() => onCadenceChange({ ...cadenceState, scheduleKind: 'interval' })}
-                  aria-label="schedule_kind_interval"
-                />
-                {t('run:cadenceKindInterval')}
-              </label>
-              <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
-                <input
-                  type="radio"
-                  name="schedule_kind"
-                  value="cron"
-                  checked={cadenceState.scheduleKind === 'cron'}
-                  onChange={() => onCadenceChange({ ...cadenceState, scheduleKind: 'cron' })}
-                  aria-label="schedule_kind_cron"
-                />
-                {t('run:cadenceKindCron')}
-              </label>
-            </div>
+        ) : (
+          <div className={styles.hint} style={{ marginTop: 4 }}>
+            {t('run:batchSizeWindowHidden')}
           </div>
+        )}
 
-          {cadenceState.scheduleKind === 'interval' ? (
-            <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{t('run:cadenceIntervalLabel')}</span>
+        {/* max_failures — всегда видимо (работает в обоих batch_mode) */}
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>
+            {t('run:maxFailuresLabel')}
+            {' '}
+            <span
+              title={t('run:maxFailuresTooltip')}
+              style={{ cursor: 'help', color: 'var(--text-faint)', fontSize: 12 }}
+              aria-label={t('run:maxFailuresTooltip')}
+            >
+              (?)
+            </span>
+          </span>
+          <input
+            type="text"
+            className={styles.field}
+            value={value.maxFailures}
+            onChange={(e) => onChange({ ...value, maxFailures: e.target.value })}
+            placeholder={t('run:maxFailuresPlaceholder')}
+            aria-label="Max failures"
+          />
+          <span className={styles.hint}>{t('run:maxFailuresHint')}</span>
+        </label>
+
+        {/* Предпоказ числа батчей */}
+        {!isWindow && (isLateBinding ? (
+          previewLoading ? (
+            <div className={styles.hint} aria-label="batch preview">
+              {t('run:batchPreviewLoading')}
+            </div>
+          ) : previewData ? (
+            <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
+              {previewData.batch_mode === 'window'
+                ? t('run:batchPreviewWindow')
+                : t('run:batchPreviewBatches', { count: previewData.total_batches, scope: previewData.scope_size })}
+            </div>
+          ) : null
+        ) : (
+          localBatchCount !== null && snapshotScope > 0 ? (
+            <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
+              {t('run:batchPreviewBatches', { count: localBatchCount, scope: snapshotScope })}
+            </div>
+          ) : null
+        ))}
+
+        <label className={styles.fieldRow}>
+          <span className={styles.fieldLabel}>{t('run:concurrencyLabel')}</span>
+          <input
+            type="number"
+            className={styles.field}
+            min={1}
+            max={500}
+            value={value.concurrency}
+            onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
+            aria-label="Concurrency"
+          />
+          <span className={styles.hint}>
+            {isWindow ? t('run:concurrencyWindowHint') : t('run:concurrencyHint')}
+          </span>
+        </label>
+
+        <fieldset
+          style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
+        >
+          <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>
+            {t('run:onFailureLabel')}
+          </legend>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
               <input
-                type="number"
-                className={styles.field}
-                min={CONSTRAINTS.cadenceIntervalSecondsMin}
-                value={cadenceState.intervalSeconds}
-                onChange={(e) => onCadenceChange({ ...cadenceState, intervalSeconds: e.target.value })}
-                placeholder="3600"
-                aria-label="Interval seconds"
-                data-testid="cadence-interval"
+                type="radio"
+                name="on_failure"
+                value="abort"
+                checked={value.onFailure === 'abort'}
+                onChange={() => onChange({ ...value, onFailure: 'abort' })}
               />
-              <span className={styles.hint}>{t('run:cadenceIntervalHint', { min: CONSTRAINTS.cadenceIntervalSecondsMin })}</span>
+              abort
             </label>
-          ) : (
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+              <input
+                type="radio"
+                name="on_failure"
+                value="continue"
+                checked={value.onFailure === 'continue'}
+                onChange={() => onChange({ ...value, onFailure: 'continue' })}
+              />
+              continue
+            </label>
+          </div>
+        </fieldset>
+
+        {/* inter_batch_interval_ms — только для barrier */}
+        {!isWindow ? (
+          <label className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>{t('run:interBatchIntervalLabel')}</span>
+            <input
+              type="number"
+              className={styles.field}
+              min={0}
+              value={value.interBatchIntervalMs}
+              onChange={(e) => onChange({ ...value, interBatchIntervalMs: e.target.value })}
+              placeholder={t('run:interBatchIntervalPlaceholder')}
+              aria-label="Inter-batch interval ms"
+            />
+            <span className={styles.hint}>{t('run:interBatchIntervalHint')}</span>
+          </label>
+        ) : null}
+
+        {/* inter_unit_interval_ms — только для window */}
+        {isWindow ? (
+          <label className={styles.fieldRow}>
+            <span className={styles.fieldLabel}>{t('run:interUnitIntervalLabel')}</span>
+            <input
+              type="number"
+              className={styles.field}
+              min={0}
+              value={value.interUnitIntervalMs}
+              onChange={(e) => onChange({ ...value, interUnitIntervalMs: e.target.value })}
+              placeholder={t('run:interUnitIntervalPlaceholder')}
+              aria-label="Inter-unit interval ms"
+            />
+            <span className={styles.hint}>{t('run:interUnitIntervalHint')}</span>
+          </label>
+        ) : null}
+      </fieldset>
+
+      {/* Секция «Планирование» — когда стартует прогон: разово (schedule_at) или
+          по расписанию (Cadence: interval/cron/overlap_policy). */}
+      <fieldset className={styles.optionsSection}>
+        <legend className={styles.optionsSectionLegend}>{t('run:sectionSchedulingLabel')}</legend>
+
+        {runMode === 'cadence' ? (
+          /* Cadence-поля вместо scheduleAt */
+          <fieldset
+            style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
+          >
+            <legend style={{ fontSize: 13, color: 'var(--text-muted)', padding: '0 6px' }}>
+              {t('run:cadenceScheduleLabel')}
+            </legend>
+
+            {/* Имя Cadence */}
             <label className={styles.fieldRow}>
-              <span className={styles.fieldLabel}>{t('run:cadenceCronLabel')}</span>
+              <span className={styles.fieldLabel}>{t('run:cadenceNameLabel')}</span>
               <input
                 type="text"
                 className={styles.field}
-                value={cadenceState.cronExpr}
-                onChange={(e) => onCadenceChange({ ...cadenceState, cronExpr: e.target.value })}
-                placeholder="0 */6 * * *"
-                aria-label="Cron expression"
-                data-testid="cadence-cron"
+                value={cadenceState.cadenceName}
+                onChange={(e) => onCadenceChange({ ...cadenceState, cadenceName: e.target.value })}
+                placeholder={t('run:cadenceNamePlaceholder')}
+                aria-label="Cadence name"
+                data-testid="cadence-name"
               />
-              <span className={styles.hint}>{t('run:cadenceCronHint')}</span>
+              {!cadenceState.cadenceName.trim() && !cadenceValid ? (
+                <span className={styles.warn}>{t('run:cadenceNameRequired')}</span>
+              ) : null}
             </label>
-          )}
 
-          {/* overlap_policy */}
+            {/* schedule_kind */}
+            <div className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:cadenceKindLabel')}</span>
+              <div style={{ display: 'flex', gap: 14 }}>
+                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                  <input
+                    type="radio"
+                    name="schedule_kind"
+                    value="interval"
+                    checked={cadenceState.scheduleKind === 'interval'}
+                    onChange={() => onCadenceChange({ ...cadenceState, scheduleKind: 'interval' })}
+                    aria-label="schedule_kind_interval"
+                  />
+                  {t('run:cadenceKindInterval')}
+                </label>
+                <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                  <input
+                    type="radio"
+                    name="schedule_kind"
+                    value="cron"
+                    checked={cadenceState.scheduleKind === 'cron'}
+                    onChange={() => onCadenceChange({ ...cadenceState, scheduleKind: 'cron' })}
+                    aria-label="schedule_kind_cron"
+                  />
+                  {t('run:cadenceKindCron')}
+                </label>
+              </div>
+            </div>
+
+            {cadenceState.scheduleKind === 'interval' ? (
+              <label className={styles.fieldRow}>
+                <span className={styles.fieldLabel}>{t('run:cadenceIntervalLabel')}</span>
+                <input
+                  type="number"
+                  className={styles.field}
+                  min={CONSTRAINTS.cadenceIntervalSecondsMin}
+                  value={cadenceState.intervalSeconds}
+                  onChange={(e) => onCadenceChange({ ...cadenceState, intervalSeconds: e.target.value })}
+                  placeholder="3600"
+                  aria-label="Interval seconds"
+                  data-testid="cadence-interval"
+                />
+                <span className={styles.hint}>{t('run:cadenceIntervalHint', { min: CONSTRAINTS.cadenceIntervalSecondsMin })}</span>
+              </label>
+            ) : (
+              <label className={styles.fieldRow}>
+                <span className={styles.fieldLabel}>{t('run:cadenceCronLabel')}</span>
+                <input
+                  type="text"
+                  className={styles.field}
+                  value={cadenceState.cronExpr}
+                  onChange={(e) => onCadenceChange({ ...cadenceState, cronExpr: e.target.value })}
+                  placeholder="0 */6 * * *"
+                  aria-label="Cron expression"
+                  data-testid="cadence-cron"
+                />
+                <span className={styles.hint}>{t('run:cadenceCronHint')}</span>
+              </label>
+            )}
+
+            {/* overlap_policy */}
+            <label className={styles.fieldRow}>
+              <span className={styles.fieldLabel}>{t('run:cadenceOverlapLabel')}</span>
+              <select
+                className={styles.field}
+                value={cadenceState.overlapPolicy}
+                onChange={(e) => onCadenceChange({ ...cadenceState, overlapPolicy: e.target.value as CadenceOverlapPolicy })}
+                aria-label="Overlap policy"
+                data-testid="cadence-overlap"
+              >
+                <option value="skip">{t('run:cadenceOverlapSkip')}</option>
+                <option value="queue">{t('run:cadenceOverlapQueue')}</option>
+                <option value="parallel">{t('run:cadenceOverlapParallel')}</option>
+              </select>
+              <span className={styles.hint}>{t(`run:cadenceOverlapHint_${cadenceState.overlapPolicy}`)}</span>
+            </label>
+          </fieldset>
+        ) : (
           <label className={styles.fieldRow}>
-            <span className={styles.fieldLabel}>{t('run:cadenceOverlapLabel')}</span>
-            <select
+            <span className={styles.fieldLabel}>{t('run:scheduleAtLabel')}</span>
+            <input
+              type="datetime-local"
               className={styles.field}
-              value={cadenceState.overlapPolicy}
-              onChange={(e) => onCadenceChange({ ...cadenceState, overlapPolicy: e.target.value as CadenceOverlapPolicy })}
-              aria-label="Overlap policy"
-              data-testid="cadence-overlap"
-            >
-              <option value="skip">{t('run:cadenceOverlapSkip')}</option>
-              <option value="queue">{t('run:cadenceOverlapQueue')}</option>
-              <option value="parallel">{t('run:cadenceOverlapParallel')}</option>
-            </select>
-            <span className={styles.hint}>{t(`run:cadenceOverlapHint_${cadenceState.overlapPolicy}`)}</span>
+              value={value.scheduleAt}
+              onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
+              aria-label="Schedule at"
+            />
+            <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
+            {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
+            {!scheduleAtValid ? <span className={styles.warn}>{t('run:scheduleAtPastError')}</span> : null}
           </label>
-        </fieldset>
-      ) : (
-        <label className={styles.fieldRow}>
-          <span className={styles.fieldLabel}>{t('run:scheduleAtLabel')}</span>
-          <input
-            type="datetime-local"
-            className={styles.field}
-            value={value.scheduleAt}
-            onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
-            aria-label="Schedule at"
-          />
-          <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
-          {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
-          {!scheduleAtValid ? <span className={styles.warn}>{t('run:scheduleAtPastError')}</span> : null}
-        </label>
-      )}
+        )}
+      </fieldset>
 
-      {workload === 'scenario' ? (
+      {/* Секция «Флаги» — булевы переключатели поведения прогона. */}
+      <fieldset className={styles.optionsSection}>
+        <legend className={styles.optionsSectionLegend}>{t('run:sectionFlagsLabel')}</legend>
+
+        {workload === 'scenario' ? (
+          <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={value.dryRun}
+              onChange={(e) => onChange({ ...value, dryRun: e.target.checked })}
+              aria-label="dry_run"
+            />
+            {t('run:dryRunLabel')}
+          </label>
+        ) : null}
         <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
           <input
             type="checkbox"
-            checked={value.dryRun}
-            onChange={(e) => onChange({ ...value, dryRun: e.target.checked })}
-            aria-label="dry_run"
+            checked={value.requireAlive}
+            onChange={(e) => onChange({ ...value, requireAlive: e.target.checked })}
+            aria-label="require_alive"
           />
-          {t('run:dryRunLabel')}
+          {t('run:requireAliveLabel')}
+          {workload === 'scenario' ? (
+            <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+              {' '}({t('run:requireAliveScenarioNote')})
+            </span>
+          ) : null}
         </label>
-      ) : null}
-      <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-        <input
-          type="checkbox"
-          checked={value.requireAlive}
-          onChange={(e) => onChange({ ...value, requireAlive: e.target.checked })}
-          aria-label="require_alive"
-        />
-        {t('run:requireAliveLabel')}
-        {workload === 'scenario' ? (
-          <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
-            {' '}({t('run:requireAliveScenarioNote')})
-          </span>
-        ) : null}
-      </label>
-      <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-        <input
-          type="checkbox"
-          checked={value.wait}
-          onChange={(e) => onChange({ ...value, wait: e.target.checked })}
-          aria-label="wait"
-        />
-        {t('run:waitLabel')}
-      </label>
+        <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+          <input
+            type="checkbox"
+            checked={value.wait}
+            onChange={(e) => onChange({ ...value, wait: e.target.checked })}
+            aria-label="wait"
+          />
+          {t('run:waitLabel')}
+        </label>
+      </fieldset>
 
       {/* Блок уведомлений — для Voyage (разовые) и Cadence (постоянные, mode=permanent) */}
       <NotifyBlock

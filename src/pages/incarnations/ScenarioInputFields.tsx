@@ -6,6 +6,12 @@ import {
   isMapWithScalarItems,
   isTypedListField,
   isArrayOfObjectField,
+  isProvisionObjectField,
+  getObjectProperties,
+  readProvisionEnabled,
+  setProvisionEnabled,
+  setProvisionSubField,
+  readProvisionSubField,
   evalShowWhen,
   isFieldRequired,
   type ScenarioFieldValue,
@@ -32,6 +38,8 @@ interface Props {
   // Опциональный презентационный слой — разбивка полей на именованные секции.
   // Если присутствует — рендерим секционно; иначе — плоский layout (обратная совместимость).
   form?: ScenarioForm;
+  // Имя создаваемой инкарнации (для подсказки existing-souls в ProvisionField).
+  incarnationName?: string;
 }
 
 // Агрегатор ошибок по имени поля. Хранит карту name→hasError и оповещает
@@ -59,6 +67,7 @@ export function ScenarioInputFields({
   onInvalidMapChange,
   onPatternErrorChange,
   form,
+  incarnationName,
 }: Props) {
   const { t } = useTranslation();
   const notifyMapError = useFieldErrorAggregator(onInvalidMapChange);
@@ -74,6 +83,22 @@ export function ScenarioInputFields({
     placeholderOverride?: string,
     hintOverride?: string,
   ) {
+    // Provision-поле (object с properties.enabled:boolean) рендерится специально.
+    if (isProvisionObjectField(prop)) {
+      const v = value[key];
+      return (
+        <ProvisionField
+          key={key}
+          name={key}
+          prop={prop}
+          value={v}
+          onChange={(nv) => onChange({ ...value, [key]: nv })}
+          labelOverride={labelOverride}
+          incarnationName={incarnationName}
+        />
+      );
+    }
+
     const isRequired = isFieldRequired(prop, value as Record<string, unknown>);
     const v = value[key];
     const empty = v === undefined || (typeof v === 'string' && v.trim() === '');
@@ -830,13 +855,22 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
     commit(next);
   }
 
+  // Пресеты значений по умолчанию для известных x-type.
+  // Цель: быстрый старт оператора без ручного ввода безопасных дефолтов.
+  const ACL_USER_PRESET: Record<string, string> = {
+    perms: 'allchannels allkeys +@all -@admin -@dangerous +info',
+    state: 'on',
+  };
+
   function handleAdd() {
-    // Создаём новый элемент с пустыми значениями для всех под-полей
-    const emptyItem: Record<string, string> = {};
+    // Создаём новый элемент с пустыми значениями для всех под-полей.
+    // Для типа AclUser применяем preset безопасных дефолтов.
+    const preset = xType === 'AclUser' ? ACL_USER_PRESET : {};
+    const newItem: Record<string, string> = {};
     for (const k of Object.keys(itemProperties)) {
-      emptyItem[k] = '';
+      newItem[k] = preset[k] ?? '';
     }
-    commit([...items, emptyItem]);
+    commit([...items, newItem]);
   }
 
   function handleRemove(idx: number) {
@@ -988,6 +1022,155 @@ function isParsableJson(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// ProvisionField — специальный рендер для cloud-provision object-поля.
+//
+// Показывает toggle «Создать VM автоматически» (enabled) вверху секции.
+// Когда enabled=true: отображаются под-поля (provider/profile/await_timeout/
+// ssh_provider и любые другие из properties, кроме enabled).
+// Когда enabled=false: показывает подсказку о режиме existing-souls.
+// ---------------------------------------------------------------------------
+interface ProvisionFieldProps {
+  name: string;
+  prop: ScenarioInputSchemaProperty;
+  value: ScenarioFieldValue;
+  onChange: (v: ScenarioFieldValue) => void;
+  labelOverride?: string;
+  // Имя инкарнации (для подсказки «coven <name>»).
+  incarnationName?: string;
+}
+
+function ProvisionField({ name, prop, value, onChange, labelOverride, incarnationName }: ProvisionFieldProps) {
+  const { t } = useTranslation();
+
+  const enabled = readProvisionEnabled(value);
+
+  function handleToggle(e: React.ChangeEvent<HTMLInputElement>) {
+    const next = setProvisionEnabled(value, e.target.checked);
+    onChange(next);
+  }
+
+  function handleSubChange(subKey: string, subVal: string) {
+    const next = setProvisionSubField(value, subKey, subVal);
+    onChange(next);
+  }
+
+  // Sub-поля из properties, исключаем enabled (рендерится как toggle).
+  const subProps = getObjectProperties(prop);
+  const subEntries = Object.entries(subProps).filter(([k]) => k !== 'enabled');
+
+  const baseStyle: React.CSSProperties = {
+    padding: '8px 10px',
+    borderRadius: 'var(--radius)',
+    border: '1px solid var(--border)',
+    background: 'var(--surface)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 13,
+  };
+
+  const sectionTitle = labelOverride ?? prop.description ?? name;
+
+  return (
+    <div data-testid={`field-provision-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Заголовок секции */}
+      {sectionTitle ? (
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {sectionTitle}
+        </div>
+      ) : null}
+
+      {/* Главный toggle — enabled */}
+      <label
+        data-testid={`field-provision-toggle-${name}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '10px 12px',
+          background: enabled
+            ? 'color-mix(in srgb, var(--accent) 6%, var(--surface))'
+            : 'var(--surface)',
+          border: `1px solid ${enabled ? 'color-mix(in srgb, var(--accent) 30%, var(--border))' : 'var(--border)'}`,
+          borderRadius: 'var(--radius)',
+          cursor: 'pointer',
+          transition: 'background 0.15s, border-color 0.15s',
+        }}
+      >
+        <input
+          type="checkbox"
+          data-testid={`field-provision-enabled-${name}`}
+          checked={enabled}
+          onChange={handleToggle}
+          style={{ width: 16, height: 16, cursor: 'pointer' }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+          {t('incarnations:provisionToggleLabel')}
+        </span>
+      </label>
+
+      {/* Под-поля — только когда enabled */}
+      {enabled ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 12, borderLeft: '2px solid color-mix(in srgb, var(--accent) 30%, var(--border))' }}>
+          {subEntries.map(([subKey, subProp]) => {
+            const subVal = readProvisionSubField(value, subKey);
+            const subLabel = subProp.description ?? subKey;
+            const subPlaceholder = subProp.example;
+            const subHint = subProp.description !== subLabel ? subProp.description : undefined;
+
+            if (subProp.type === 'boolean') {
+              return (
+                <label key={subKey} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    data-testid={`field-provision-sub-${name}-${subKey}`}
+                    checked={subVal === 'true'}
+                    onChange={(e) => handleSubChange(subKey, e.target.checked ? 'true' : 'false')}
+                  />
+                  <span className="mono">{subLabel}</span>
+                </label>
+              );
+            }
+
+            return (
+              <label key={subKey} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  {subLabel}
+                </span>
+                <input
+                  type="text"
+                  data-testid={`field-provision-sub-${name}-${subKey}`}
+                  value={subVal}
+                  onChange={(e) => handleSubChange(subKey, e.target.value)}
+                  placeholder={subPlaceholder}
+                  style={baseStyle}
+                />
+                {subHint ? (
+                  <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>{subHint}</span>
+                ) : null}
+              </label>
+            );
+          })}
+        </div>
+      ) : (
+        /* Подсказка: existing-souls режим */
+        <div
+          data-testid={`field-provision-disabled-hint-${name}`}
+          style={{
+            padding: '10px 12px',
+            background: 'color-mix(in srgb, var(--text-faint) 6%, var(--surface))',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: 12,
+            color: 'var(--text-faint)',
+          }}
+        >
+          {t('incarnations:provisionDisabledHint', { coven: incarnationName || '…' })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ADR-045 B2: KEY→VALUE-редактор для type=map + scalar items.

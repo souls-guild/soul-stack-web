@@ -226,6 +226,8 @@
   "auditPrev": "← Prev",
   "auditNext": "Next →",
   "auditPageInfo": "Page {{page}} / {{pages}} · {{from}}–{{to}} of {{total}}",
+  "auditCopyLinkTitle": "Скопировать ссылку на событие",
+  "auditCopyLinkAria": "Скопировать ссылку на событие по correlation_id",
 
   "loginSubtitle": "Keeper UI · вход Архонта",
   "loginTokenLabel": "JWT-токен",

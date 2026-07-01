@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Settings } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { ThemeToggle } from './ThemeToggle';
-import { LangToggle } from './LangToggle';
 import styles from './Topbar.module.css';
 
 function initialsOf(aid: string): string {
@@ -47,8 +46,15 @@ export function Topbar() {
         <span className={styles.sub}>Keeper UI</span>
       </div>
       <div className={styles.right}>
-        <LangToggle />
-        <ThemeToggle />
+        <Link
+          to="/settings/appearance"
+          className={styles.settingsLink}
+          title={t('common:settings')}
+          aria-label={t('common:settings')}
+          data-testid="topbar-settings-link"
+        >
+          <Settings size={16} />
+        </Link>
         {identity ? (
           <div className={styles.menu} ref={menuRef}>
             <button

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Anchor, Ban } from 'lucide-react';
+import { Anchor, Ban, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import {
   keeperApi,
@@ -255,11 +255,31 @@ function summaryTone(s: 'succeeded' | 'failed' | 'cancelled', n: number): 'ok' |
   return n > 0 ? 'warn' : 'muted';
 }
 
+// Строит URL для /run с параметрами из Voyage (scenario-режим).
+// input данных нет в Voyage-ответе — оператор вводит вручную.
+function buildRepeatUrl(voyage: Voyage): string | null {
+  if (voyage.kind !== 'scenario') return null;
+  const params = new URLSearchParams({ workload: 'scenario' });
+  if (voyage.target?.service) params.set('service', voyage.target.service);
+  if (voyage.scenario_name) params.set('scenario', voyage.scenario_name);
+  const incarnations = voyage.target?.incarnations ?? [];
+  if (incarnations.length === 1) {
+    params.set('incarnation', incarnations[0]);
+  } else if (incarnations.length > 1) {
+    // Множество инкарнаций → regex-OR (паттерн из IncarnationsList).
+    const escaped = incarnations.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    params.set('incarnation_regex', `^(${escaped.join('|')})$`);
+  }
+  return `/run?${params.toString()}`;
+}
+
 export function VoyageDetail() {
   const { t } = useTranslation();
   const { id = '' } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [repeatConfirmOpen, setRepeatConfirmOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   const q = useQuery({
@@ -328,6 +348,30 @@ export function VoyageDetail() {
     ? voyage.scenario_name ?? '—'
     : voyage.module ?? '—';
 
+  const repeatUrl = buildRepeatUrl(voyage);
+
+  function handleRepeat() {
+    if (!repeatUrl) return;
+    // Проверяем наличие черновика в sessionStorage — если есть, предупреждаем.
+    const hasDraft = (() => {
+      try {
+        return Boolean(sessionStorage.getItem('run-wizard-draft'));
+      } catch {
+        return false;
+      }
+    })();
+    if (hasDraft) {
+      setRepeatConfirmOpen(true);
+    } else {
+      navigate(repeatUrl);
+    }
+  }
+
+  function handleRepeatConfirmed() {
+    setRepeatConfirmOpen(false);
+    if (repeatUrl) navigate(repeatUrl);
+  }
+
   return (
     <div className={styles.page}>
       <div>
@@ -345,6 +389,17 @@ export function VoyageDetail() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <Badge tone={runStatusTone(voyage.status)}>{voyage.status}</Badge>
+            {repeatUrl ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleRepeat}
+                title={t('runhistory:voyageRepeatTitle')}
+                data-testid="voyage-repeat-btn"
+              >
+                <RotateCcw size={14} /> {t('runhistory:voyageRepeatBtn')}
+              </Button>
+            ) : null}
             {isRunning ? (
               <Button type="button" variant="ghost" onClick={() => setCancelOpen(true)}>
                 <Ban size={14} /> {t('cancelShort')}
@@ -540,6 +595,55 @@ export function VoyageDetail() {
         <h2 className={styles.sectionTitle}>{t('runhistory:voyageChangedTitle')}</h2>
         <VoyageChangedTasks events={changedQ.data?.items ?? []} isLoading={changedQ.isLoading} error={changedQ.error} />
       </section>
+
+      {repeatConfirmOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('runhistory:voyageRepeatConfirmTitle')}
+          data-testid="voyage-repeat-confirm-dialog"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: 20,
+              maxWidth: 440,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontWeight: 500 }}>{t('runhistory:voyageRepeatConfirmTitle')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {t('runhistory:voyageRepeatConfirmBody')}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button type="button" variant="ghost" onClick={() => setRepeatConfirmOpen(false)}>
+                {t('close')}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleRepeatConfirmed}
+                data-testid="voyage-repeat-confirm-ok"
+              >
+                {t('runhistory:voyageRepeatConfirmOk')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {cancelOpen ? (
         <div

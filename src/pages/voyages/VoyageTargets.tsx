@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VoyageTargetEntry, type VoyageTargetStatus } from '../../api/keeper';
 import { Badge } from '../../components/primitives';
@@ -62,7 +63,8 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
         <tr>
           <th style={thStyle}>{t('voyageTargetsColTarget')}</th>
           <th style={thStyle}>{t('voyageTargetsColStatus')}</th>
-          <th style={{ ...thStyle, textAlign: 'right' }}>{t('voyageTargetsColFinishedAt')}</th>
+          <th style={thStyle}>{t('voyageTargetsColFinishedAt')}</th>
+          <th style={thStyle}>{t('voyageTargetsColApplyId')}</th>
         </tr>
       </thead>
       <tbody>
@@ -70,7 +72,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
           <React.Fragment key={batchIdx}>
             <tr>
               <td
-                colSpan={3}
+                colSpan={4}
                 data-testid={`batch-heading-${batchIdx}`}
                 style={batchSepStyle}
               >
@@ -80,15 +82,50 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
             {(grouped.get(batchIdx) ?? []).map((entry) => (
               <tr key={`${entry.target_kind}:${entry.target_id}`}>
                 <td style={tdStyle}>
-                  <span className="mono" style={{ fontSize: 13 }}>
-                    {entry.target_id}
-                  </span>
+                  {/* incarnation-target → ссылка на detail; soul-target → ссылка на soul */}
+                  {entry.target_kind === 'incarnation' ? (
+                    <Link
+                      to={`/incarnations/${encodeURIComponent(entry.target_id)}`}
+                      className="mono"
+                      style={{ fontSize: 13 }}
+                    >
+                      {entry.target_id}
+                    </Link>
+                  ) : entry.target_kind === 'soul' ? (
+                    <Link
+                      to={`/souls/${encodeURIComponent(entry.target_id)}`}
+                      className="mono"
+                      style={{ fontSize: 13 }}
+                    >
+                      {entry.target_id}
+                    </Link>
+                  ) : (
+                    <span className="mono" style={{ fontSize: 13 }}>
+                      {entry.target_id}
+                    </span>
+                  )}
                 </td>
                 <td style={tdStyle}>
                   <Badge tone={runStatusTone(entry.status)}>{entry.status}</Badge>
                 </td>
-                <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: 12, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
                   {entry.finished_at ?? '—'}
+                </td>
+                <td style={tdStyle}>
+                  {/* apply_id = voyage_id данного шага. Ссылаемся на /voyages/:id */}
+                  {entry.apply_id ? (
+                    <Link
+                      to={`/voyages/${encodeURIComponent(entry.apply_id)}`}
+                      className="mono"
+                      style={{ fontSize: 12 }}
+                      title={t('voyageTargetsApplyIdLink')}
+                      data-testid={`target-apply-link-${entry.target_id}`}
+                    >
+                      {entry.apply_id.slice(0, 12)}…
+                    </Link>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                  )}
                 </td>
               </tr>
             ))}

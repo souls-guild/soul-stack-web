@@ -171,3 +171,23 @@
   color: var(--text-faint, var(--text-muted));
   font-size: 12px;
 }
+
+/* Верхнеуровневая группа Step4 Options (Батчинг / Планирование / Флаги) —
+   крупнее внутренних fieldset-ов (batch_mode/on_failure/cadence), чтобы
+   визуально отделить группировку секций от группировки полей внутри секции. */
+.optionsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin: 0;
+}
+
+.optionsSectionLegend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 0 6px;
+}

@@ -208,6 +208,45 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     expect(screen.queryByText('pg-prod-3')).toBeNull();
   });
 
+  it('[guard] apply_id рендерится ссылкой на /voyages/:apply_id если присутствует', async () => {
+    const targetsWithApplyId = {
+      voyage_id: VOYAGE_ID,
+      targets: [
+        {
+          target_kind: 'incarnation',
+          target_id: 'redis-prod',
+          status: 'succeeded',
+          batch_index: 0,
+          finished_at: '2026-06-30T10:05:00Z',
+          apply_id: '01APPLYID00000000000001',
+        },
+        {
+          target_kind: 'incarnation',
+          target_id: 'redis-stage',
+          status: 'failed',
+          batch_index: 0,
+          finished_at: '2026-06-30T10:06:00Z',
+          // Нет apply_id → должен показать «—»
+        },
+      ],
+    };
+    installFetchMock([
+      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: targetsWithApplyId },
+    ]);
+
+    renderWithProviders(
+      <VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} />,
+    );
+
+    await waitFor(() => expect(screen.getByText('redis-prod')).toBeInTheDocument());
+    // Ссылка на voyage по apply_id
+    const link = screen.getByTestId('target-apply-link-redis-prod');
+    expect(link).toBeInTheDocument();
+    expect((link as HTMLAnchorElement).href).toContain('/voyages/01APPLYID00000000000001');
+    // Без apply_id — «—»
+    expect(screen.queryByTestId('target-apply-link-redis-stage')).not.toBeInTheDocument();
+  });
+
   it('statusFilter с 0 совпадений → сообщение "нет targets с таким статусом"', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },

@@ -595,4 +595,51 @@ describe('ArchonsList', () => {
       expect(btnDisabled).toBe(true);
     }
   });
+
+  // --- Поиск в списке Архонтов ---
+
+  it('search по AID — фильтрует client-side по aid', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+    });
+    const searchInput = screen.getByPlaceholderText(/AID или имя/i);
+    await user.type(searchInput, 'alice');
+    // Только alice видна, bootstrap скрыт.
+    expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'archon-bootstrap' })).not.toBeInTheDocument();
+    // Счётчик обновился: "Найдено 1 из 2"
+    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/1/);
+  });
+
+  it('search по display_name — фильтрует client-side по display_name', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    const user = userEvent.setup();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-bootstrap' })).toBeInTheDocument();
+    });
+    const searchInput = screen.getByPlaceholderText(/AID или имя/i);
+    // display_name = 'Bootstrap Archon'
+    await user.type(searchInput, 'Bootstrap');
+    expect(screen.getByRole('link', { name: 'archon-bootstrap' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'archon-alice' })).not.toBeInTheDocument();
+  });
+
+  it('search пустой — показывает всех', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
+    ]);
+    renderWithProviders(<ArchonsList />, '/archons');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'archon-bootstrap' })).toBeInTheDocument();
+    });
+  });
 });

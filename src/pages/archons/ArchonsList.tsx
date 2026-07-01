@@ -125,7 +125,7 @@ function RolesPicker({
   const { t } = useTranslation();
   const remaining = roles.filter((r) => !selected.includes(r.name));
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 280 }}>
+    <label className={styles.rolesPickerField}>
       <span className={styles.metaKey}>{t('pages:archonRolesOptional')}</span>
       <div
         aria-label="выбранные роли"
@@ -195,10 +195,10 @@ function RolesPicker({
         >
           <option value="" key="__placeholder">
             {disabled
-              ? '— роли недоступны —'
+              ? t('pages:archonRolesUnavailable')
               : remaining.length === 0
-                ? '— все роли выбраны —'
-                : '— добавить роль —'}
+                ? t('pages:archonRolesAllSelected')
+                : t('pages:archonRolesAdd')}
           </option>
           {remaining.map((r) => (
             <option key={`role-${r.name}`} value={r.name}>
@@ -333,6 +333,8 @@ export function ArchonsList() {
   );
 
   const [authMethod, setAuthMethod] = useState<OperatorAuthMethod | ''>('');
+  // Клиентская строка поиска: фильтрует по aid и display_name среди загруженной страницы.
+  const [searchQuery, setSearchQuery] = useState('');
   // Default ON: revoked-Архонты не маячат в списке. Снять чекбокс — показать всех
   // (включая revoked, с красным chip и disabled-action-кнопками).
   const [hideRevoked, setHideRevoked] = useState(true);
@@ -397,7 +399,16 @@ export function ArchonsList() {
   // Belt-and-suspenders: даже если backend вернёт revoked в выдаче, при включённом
   // фильтре их не показываем. Y в счётчике = total из API (включая то, что
   // отфильтровано клиентом), X = реально видимые после client-side фильтра.
-  const items = hideRevoked ? rawItems.filter((op) => !op.revoked_at) : rawItems;
+  const afterRevoke = hideRevoked ? rawItems.filter((op) => !op.revoked_at) : rawItems;
+  // Client-side поиск по aid и display_name (без учёта регистра).
+  const needle = searchQuery.trim().toLowerCase();
+  const items = needle
+    ? afterRevoke.filter(
+        (op) =>
+          op.aid.toLowerCase().includes(needle) ||
+          (op.display_name ?? '').toLowerCase().includes(needle),
+      )
+    : afterRevoke;
   const total = list.data?.total ?? 0;
   const visibleCount = items.length;
 
@@ -414,8 +425,8 @@ export function ArchonsList() {
         <JwtReveal jwt={revealed.jwt} expiresAt={revealed.expiresAt} onClose={() => setRevealed(null)} />
       ) : null}
 
-      <section className={styles.section} aria-label="Создать Архонта">
-        <h2 className={styles.sectionTitle}>Создать Архонта</h2>
+      <section className={styles.section} aria-label={t('pages:archonCreateSection')}>
+        <h2 className={styles.sectionTitle}>{t('pages:archonCreateSection')}</h2>
         <div className={styles.filters}>
           <Input
             label="AID"
@@ -430,14 +441,14 @@ export function ArchonsList() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder={t('pages:archonDisplayNamePlaceholder')}
-            error={displayNameTrimmed.length > 128 ? 'максимум 128 символов' : undefined}
+            error={displayNameTrimmed.length > 128 ? t('pages:archonDisplayNameMax') : undefined}
           />
           <RolesPicker
             roles={availableRoles}
             selected={selectedRoles}
             onChange={setSelectedRoles}
             disabled={rolesQ.isLoading || Boolean(rolesQ.error)}
-            error={rolesQ.error ? 'не удалось загрузить роли' : undefined}
+            error={rolesQ.error ? t('pages:archonRolesLoadError') : undefined}
           />
           <div style={{ alignSelf: 'flex-end' }}>
             <Button
@@ -471,9 +482,27 @@ export function ArchonsList() {
         ) : null}
       </section>
 
-      <section className={styles.section} aria-label="Список Архонтов">
-        <h2 className={styles.sectionTitle}>Существующие</h2>
+      <section className={styles.section} aria-label={t('pages:archonListSection')}>
+        <h2 className={styles.sectionTitle}>{t('pages:archonListSection')}</h2>
         <div className={styles.filters}>
+          <label>
+            <div className={styles.metaKey}>{t('pages:archonSearch')}</div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('pages:archonSearchPlaceholder')}
+              aria-label={t('pages:archonSearch')}
+              style={{
+                padding: '8px 10px',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                fontFamily: 'var(--font-mono)',
+                minWidth: 200,
+              }}
+            />
+          </label>
           <label>
             <div className={styles.metaKey}>{t('pages:archonAuthMethod')}</div>
             <select
@@ -481,7 +510,7 @@ export function ArchonsList() {
               onChange={(e) => { setAuthMethod(e.target.value as OperatorAuthMethod | ''); setOffset(0); }}
               style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
             >
-              <option value="">— все —</option>
+              <option value="">{t('pages:archonAllOption')}</option>
               {AUTH_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </label>
@@ -512,7 +541,9 @@ export function ArchonsList() {
             aria-label="счётчик архонтов"
             style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
           >
-            {t('showing', { shown: visibleCount, total })}
+            {needle
+              ? t('pages:archonSearchResults', { shown: visibleCount, total: afterRevoke.length })
+              : t('showing', { shown: visibleCount, total })}
           </div>
         ) : null}
 

@@ -434,3 +434,124 @@ function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false 
     return { ok: false };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cloud-provision helpers (UX-clarity, ADR-061)
+//
+// Provision-поле — объект с вложенным enabled:boolean (enabled=false по
+// умолчанию). Специальный рендер: toggle + под-поля; подсказка об existing-souls.
+// ---------------------------------------------------------------------------
+
+/**
+ * Распознаёт provision-поле: object с properties.enabled.type=boolean.
+ * Это признак «cloud-create opt-in»-секции, которую рендерим специально.
+ */
+export function isProvisionObjectField(prop: ScenarioInputSchemaProperty): boolean {
+  if (prop.type !== 'object') return false;
+  const props = prop['properties'] as Record<string, ScenarioInputSchemaProperty> | undefined;
+  if (!props || typeof props !== 'object') return false;
+  const enabledProp = props['enabled'];
+  return Boolean(enabledProp && enabledProp.type === 'boolean');
+}
+
+/**
+ * Вычисляет ожидаемое число хостов из текущего input-state.
+ * sentinel → 1 + replicas_per_master
+ * cluster  → shards × (1 + replicas_per_master)
+ * Возвращает null, если нужных полей нет или значения не числа.
+ */
+export function computeRequiredHostCount(state: ScenarioFieldsState): number | null {
+  const replicas = toInt(state['replicas_per_master']);
+  const shards = toInt(state['shards']);
+  const redisType = state['redis_type'];
+
+  if (redisType === 'cluster') {
+    if (shards === null || replicas === null) return null;
+    return shards * (1 + replicas);
+  }
+  // sentinel / любой режим с replicas_per_master
+  if (replicas !== null) {
+    return 1 + replicas;
+  }
+  return null;
+}
+
+function toInt(v: ScenarioFieldValue): number | null {
+  if (v === undefined || v === '') return null;
+  const n = typeof v === 'number' ? v : parseInt(String(v), 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+/**
+ * Извлекает properties объектного поля (provision). Если поле — не object
+ * с properties — возвращает пустой объект.
+ */
+export function getObjectProperties(
+  prop: ScenarioInputSchemaProperty,
+): Record<string, ScenarioInputSchemaProperty> {
+  const props = prop['properties'] as Record<string, ScenarioInputSchemaProperty> | undefined;
+  return props && typeof props === 'object' ? props : {};
+}
+
+/**
+ * Читает значение enabled из сериализованного JSON-объекта provision-поля.
+ * Возвращает false если поле пустое / unparseable.
+ */
+export function readProvisionEnabled(raw: ScenarioFieldValue): boolean {
+  if (!raw || raw === '') return false;
+  const parsed = tryParseJson(String(raw));
+  if (!parsed.ok || typeof parsed.value !== 'object' || parsed.value === null) return false;
+  const obj = parsed.value as Record<string, unknown>;
+  return Boolean(obj['enabled']);
+}
+
+/**
+ * Возвращает новую сериализованную строку объекта provision с обновлённым enabled.
+ * Если raw пустой — создаёт объект с нуля.
+ */
+export function setProvisionEnabled(raw: ScenarioFieldValue, enabled: boolean): string {
+  let obj: Record<string, unknown> = {};
+  if (raw && raw !== '') {
+    const parsed = tryParseJson(String(raw));
+    if (parsed.ok && typeof parsed.value === 'object' && parsed.value !== null) {
+      obj = { ...(parsed.value as Record<string, unknown>) };
+    }
+  }
+  obj['enabled'] = enabled;
+  return JSON.stringify(obj);
+}
+
+/**
+ * Возвращает новую сериализованную строку с обновлённым sub-полем.
+ */
+export function setProvisionSubField(
+  raw: ScenarioFieldValue,
+  subKey: string,
+  subValue: string,
+): string {
+  let obj: Record<string, unknown> = {};
+  if (raw && raw !== '') {
+    const parsed = tryParseJson(String(raw));
+    if (parsed.ok && typeof parsed.value === 'object' && parsed.value !== null) {
+      obj = { ...(parsed.value as Record<string, unknown>) };
+    }
+  }
+  if (subValue === '') {
+    delete obj[subKey];
+  } else {
+    obj[subKey] = subValue;
+  }
+  return JSON.stringify(obj);
+}
+
+/**
+ * Читает строковое sub-поле из сериализованного provision JSON.
+ */
+export function readProvisionSubField(raw: ScenarioFieldValue, subKey: string): string {
+  if (!raw || raw === '') return '';
+  const parsed = tryParseJson(String(raw));
+  if (!parsed.ok || typeof parsed.value !== 'object' || parsed.value === null) return '';
+  const obj = parsed.value as Record<string, unknown>;
+  const v = obj[subKey];
+  return v === undefined || v === null ? '' : String(v);
+}

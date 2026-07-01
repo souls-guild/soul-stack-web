@@ -38,6 +38,20 @@ describe('IncarnationDetail', () => {
           last_drift_check_at: '2026-05-25T11:30:00Z',
         },
       },
+      // Connected souls для Overview Hosts-карточки (реальный count online).
+      {
+        method: 'GET',
+        url: '/v1/souls',
+        body: {
+          items: [
+            { sid: 'agent-04.local', status: 'active', covens: ['redis-prod'], transport: 'agent' },
+            { sid: 'soul-debian-01.local', status: 'active', covens: ['redis-prod'], transport: 'agent' },
+          ],
+          offset: 0,
+          limit: 200,
+          total: 2,
+        },
+      },
     ]);
 
     renderWithProviders(
@@ -53,9 +67,11 @@ describe('IncarnationDetail', () => {
 
     // Default tab — Overview, видим Data summary.
     expect(screen.getByRole('heading', { name: 'Data summary' })).toBeInTheDocument();
-    // 4 summary-карточки. Проверим счётчики: 1 declared, 2 runtime.
+    // Hosts-карточка: 2 online (из souls API) + 1 declared (из spec.hosts).
+    await waitFor(() => {
+      expect(screen.getByText(/2 online/i)).toBeInTheDocument();
+    });
     expect(screen.getByText(/1 declared/i)).toBeInTheDocument();
-    expect(screen.getByText(/2 runtime/i)).toBeInTheDocument();
 
     // Action-bar для status=ready.
     expect(screen.getByRole('button', { name: /Run Scenario/i })).toBeInTheDocument();
@@ -265,5 +281,76 @@ describe('IncarnationDetail', () => {
     // На вкладке Hosts видим Per-host runtime data секцию с host-a.
     expect(screen.getByRole('heading', { name: /Per-host runtime data/i })).toBeInTheDocument();
     expect(screen.getByText('host-a')).toBeInTheDocument();
+  });
+
+  it('History tab: apply_id рендерится ссылкой на /voyages/:id', async () => {
+    // Более специфичные пути идут ПЕРВЫМИ (fetchMock матчит первый совпавший).
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations/inc-h/history',
+        body: {
+          items: [
+            {
+              history_id: 'hid-1',
+              scenario: 'deploy',
+              apply_id: '01VOYAGE000000000000001',
+              changed_by_aid: 'archon-x',
+              created_at: '2026-05-25T12:00:00Z',
+            },
+          ],
+          offset: 0,
+          limit: 50,
+          total: 1,
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/incarnations/inc-h',
+        body: {
+          name: 'inc-h',
+          service: 'svc',
+          service_version: 'main',
+          state_schema_version: 1,
+          covens: [],
+          spec: {},
+          state: {},
+          status: 'ready',
+          created_by_aid: 'archon-x',
+          created_at: '2026-05-20T10:00:00Z',
+          updated_at: '2026-05-25T12:00:00Z',
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/souls',
+        body: { items: [], offset: 0, limit: 200, total: 0 },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/inc-h',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'inc-h' })).toBeInTheDocument();
+    });
+
+    const user = userEvent.setup();
+    // Ищем таб по role=tab + aria-selected=false, матчим по тексту History
+    const tabs = screen.getAllByRole('tab');
+    const historyTab = tabs.find((t) => /History/i.test(t.textContent ?? ''))!;
+    expect(historyTab).toBeDefined();
+    await user.click(historyTab);
+
+    // apply_id рендерится как ссылка на /voyages/:id
+    await waitFor(() => {
+      const link = screen.getByTestId('history-apply-link-hid-1');
+      expect(link).toBeInTheDocument();
+      expect((link as HTMLAnchorElement).href).toContain('/voyages/01VOYAGE000000000000001');
+    }, { timeout: 3000 });
   });
 });

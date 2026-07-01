@@ -88,6 +88,8 @@
   "createScenarioLabel": "Стартовый сценарий",
   "createScenarioRequired": "Выберите стартовый сценарий",
   "createBareInfo": "Сервис не предлагает стартовых сценариев — будет создана пустая инкарнация; операции выполняются через day-2-сценарии.",
+  "createFromSoulsHint": "Этому сценарию нужны уже онбордженные souls в coven «{{coven}}». Добавь их через вкладку Hosts у инкарнации перед запуском.",
+  "createFromSoulsHostsLink": "→ Перейти к Souls",
   "dataSummaryDesc": "Где искать параметры incarnation:",
   "dataSummaryHostsTail": "— declared + connected + per-host runtime data.",
   "dataSummarySchemaTail": "— версия структуры state",
@@ -117,6 +119,10 @@
   "forceAddWarningTitle": "Опасная операция.",
   "historyEmpty": "История пуста.",
   "hostsCardHint": "+ connected souls по coven",
+  "hostsCardOnline": "{{n}} online",
+  "hostsCardDeclared": "{{n}} declared",
+  "hostsCardLoading": "…",
+  "historyApplyIdLink": "Открыть прогон",
   "hostsLoadFailed": "Не удалось загрузить souls: {{detail}}",
   "incarnationNotFound": "Incarnation не найдена.",
   "inputComplexJson": "Схема сценария содержит сложные типы — JSON-режим.",
@@ -233,5 +239,9 @@
   "editTraitsNoCurrentNote": "Текущие значения traits недоступны без обновления backend (нет GET /traits). Чтобы обновить выборочно — сначала ознакомьтесь с текущими traits через API.",
   "editTraitsSaving": "Сохраняем…",
   "editTraitsSave": "Сохранить",
-  "editTraitsSuccess": "Traits инкарнации обновлены"
+  "editTraitsSuccess": "Traits инкарнации обновлены",
+  "provisionToggleLabel": "Создать VM автоматически (cloud provision)",
+  "provisionDisabledHint": "Прогон запустится на уже онбордженных souls в coven «{{coven}}». Добавьте их через вкладку Hosts у инкарнации до запуска.",
+  "provisionHostWarningTitle": "Внимание: нет хостов в roster",
+  "provisionHostWarningBody": "Этому прогону нужно {{n}} хост(ов). Включите cloud provision (создаст VM автоматически) ИЛИ онбордите нужное количество souls в coven «{{coven}}» через Hosts перед запуском."
 }

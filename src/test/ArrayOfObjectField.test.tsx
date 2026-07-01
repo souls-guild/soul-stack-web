@@ -201,6 +201,62 @@ describe('ArrayOfObjectField рендер', () => {
 });
 
 // --------------------------------------------------------------------------
+describe('ArrayOfObjectField AclUser preset', () => {
+  it('при добавлении AclUser-элемента перms и state заполнены preset-значениями', () => {
+    const captured: ScenarioFieldsState[] = [];
+    render(<StatefulFields schema={aclUserSchema} onChangeSpy={(s) => captured.push(s)} />);
+    fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
+
+    // Проверяем preset через onChange (captured state содержит JSON-строку)
+    const last = captured[captured.length - 1];
+    expect(typeof last.users).toBe('string');
+    const parsed = JSON.parse(last.users as string) as Array<Record<string, string>>;
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed[0].perms).toBe('allchannels allkeys +@all -@admin -@dangerous +info');
+    expect(parsed[0].state).toBe('on');
+    expect(parsed[0].name).toBe('');
+  });
+
+  it('preset значение perms отображается в input после добавления', () => {
+    render(<StatefulFields schema={aclUserSchema} />);
+    fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
+    const permsInput = screen.getByTestId('field-arrayobj-subfield-users-0-perms') as HTMLInputElement;
+    expect(permsInput.value).toBe('allchannels allkeys +@all -@admin -@dangerous +info');
+  });
+
+  it('preset state=on выбран в select после добавления', () => {
+    render(<StatefulFields schema={aclUserSchema} />);
+    fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
+    const stateSelect = screen.getByTestId('field-arrayobj-subfield-users-0-state') as HTMLSelectElement;
+    expect(stateSelect.value).toBe('on');
+  });
+
+  it('non-AclUser array-of-object добавляет пустые значения (нет preset)', () => {
+    const genericSchema: ScenarioInputSchema = {
+      hosts: {
+        type: 'array',
+        required: false,
+        items: {
+          type: 'object',
+          properties: {
+            host: { type: 'string' },
+            port: { type: 'string' },
+          },
+        } as unknown as ScenarioInputSchemaProperty,
+      },
+    };
+    const captured: ScenarioFieldsState[] = [];
+    render(<StatefulFields schema={genericSchema} onChangeSpy={(s) => captured.push(s)} />);
+    fireEvent.click(screen.getByTestId('field-arrayobj-add-hosts'));
+
+    const last = captured[captured.length - 1];
+    const parsed = JSON.parse(last.hosts as string) as Array<Record<string, string>>;
+    expect(parsed[0].host).toBe('');
+    expect(parsed[0].port).toBe('');
+  });
+});
+
+// --------------------------------------------------------------------------
 describe('serializeFields array-of-object', () => {
   it('сериализует в массив объектов (не строку)', () => {
     const state: ScenarioFieldsState = {

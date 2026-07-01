@@ -464,4 +464,89 @@ describe('IncarnationNewForm', () => {
     expect(await screen.findByTestId('field-hint-sentinel_port')).toBeInTheDocument();
     expect(screen.queryByTestId('field-hint-port')).not.toBeInTheDocument();
   });
+
+  // Guard: create_from_souls сценарий → показывается хелп-блок с ссылкой на Souls.
+  it('create_from_souls сценарий — отображает хелп-блок с подсказкой онбординга', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create_from_souls',
+              kind: 'lifecycle',
+              path: 'scenario/create_from_souls/main.yml',
+              description: 'create from existing souls',
+              create: true,
+              input_schema: {},
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+
+    // Хелп-блок появляется при create_from_souls сценарии.
+    expect(await screen.findByTestId('create-from-souls-hint')).toBeInTheDocument();
+  });
+
+  // Guard: обычный create сценарий (не from_souls) → хелп-блок НЕ показывается.
+  it('обычный create сценарий — хелп-блок from_souls НЕ показывается', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create',
+              kind: 'lifecycle',
+              path: 'scenario/create/main.yml',
+              create: true,
+              input_schema: { maxmemory: { type: 'string', required: false } },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+
+    await screen.findByTestId('create-scenario-select-wrapper');
+    expect(screen.queryByTestId('create-from-souls-hint')).not.toBeInTheDocument();
+  });
 });
