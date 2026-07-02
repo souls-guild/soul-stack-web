@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import type { IncarnationRerunLastReply } from '../../api/keeper';
 import { unlockSchema, type UnlockFormValues } from './schemas';
 import styles from '../common.module.css';
 
@@ -13,11 +14,14 @@ interface Props {
   open: boolean;
   incarnationName: string;
   onClose: () => void;
-  /** Колбэк при успешном запуске: apply_id принятого прогона. */
-  onAccepted?: (applyId: string) => void;
+  /** Колбэк при успешном запуске: полный reply (apply_id + перезапущенный scenario). */
+  onAccepted?: (reply: IncarnationRerunLastReply) => void;
 }
 
-export function RerunCreateModal({ open, incarnationName, onClose, onAccepted }: Props) {
+// ErrRerunInputUnavailable — отдельный problem type (не TypeIncarnationLocked).
+const TYPE_RERUN_INPUT_UNAVAILABLE = 'https://soul-stack.io/errors/rerun-input-unavailable';
+
+export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -35,16 +39,20 @@ export function RerunCreateModal({ open, incarnationName, onClose, onAccepted }:
 
   const mu = useMutation({
     mutationFn: (values: UnlockFormValues) =>
-      keeperApi.incarnations.rerunCreate(incarnationName, { reason: values.reason }),
+      keeperApi.incarnations.rerunLast(incarnationName, { reason: values.reason }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
       reset();
-      onAccepted?.(data.apply_id);
+      onAccepted?.(data);
       onClose();
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
-        setServerError(t('incarnations:rerunCreate409'));
+        setServerError(
+          err.type === TYPE_RERUN_INPUT_UNAVAILABLE
+            ? t('incarnations:rerunLastInputUnavailable')
+            : t('incarnations:rerunLast409'),
+        );
         setServerDetail(err.detail || null);
       } else {
         setServerError(
@@ -66,7 +74,7 @@ export function RerunCreateModal({ open, incarnationName, onClose, onAccepted }:
   return (
     <Modal
       open={open}
-      title={t('incarnations:rerunCreateTitle', { name: incarnationName })}
+      title={t('incarnations:rerunLastTitle', { name: incarnationName })}
       onClose={close}
       footer={
         <>
@@ -79,20 +87,20 @@ export function RerunCreateModal({ open, incarnationName, onClose, onAccepted }:
             disabled={isSubmitting || mu.isPending}
             onClick={handleSubmit((v) => { setServerError(null); setServerDetail(null); mu.mutate(v); })}
           >
-            {mu.isPending ? t('loading') : t('incarnations:rerunCreateBtn')}
+            {mu.isPending ? t('loading') : t('incarnations:rerunLastBtn')}
           </Button>
         </>
       }
     >
       <form noValidate>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' }}>
-          {t('incarnations:rerunCreateDesc')}
+          {t('incarnations:rerunLastDesc')}
         </p>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13 }}>{t('incarnations:reasonLabel')}</span>
           <textarea
             rows={4}
-            placeholder={t('incarnations:rerunCreateReasonPlaceholder')}
+            placeholder={t('incarnations:rerunLastReasonPlaceholder')}
             spellCheck={false}
             aria-invalid={errors.reason ? 'true' : undefined}
             // maxLength синхронизирован с backend incarnation.ReasonMaxLen=500
@@ -119,7 +127,7 @@ export function RerunCreateModal({ open, incarnationName, onClose, onAccepted }:
             {serverError}
             {serverDetail ? (
               <div style={{ marginTop: 4, fontSize: 11, opacity: 0.75 }}>
-                {t('incarnations:rerunCreate409Detail', { detail: serverDetail })}
+                {t('incarnations:rerunLast409Detail', { detail: serverDetail })}
               </div>
             ) : null}
           </div>

@@ -346,7 +346,7 @@ describe('IncarnationDetail', () => {
     expect(historyTab).toBeDefined();
     await user.click(historyTab);
 
-    // apply_id — apply_run (create/rerun-create/day-2 scenario), НЕ Voyage:
+    // apply_id — apply_run (create/rerun-last/day-2 scenario), НЕ Voyage:
     // ссылка ведёт на run-view инкарнации, не на /voyages/:id.
     await waitFor(() => {
       const link = screen.getByTestId('history-apply-link-hid-1');

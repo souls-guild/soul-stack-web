@@ -688,7 +688,7 @@ export interface paths {
         patch: operations["updateIncarnationHosts"];
         trace?: never;
     };
-    "/v1/incarnations/{name}/rerun-create": {
+    "/v1/incarnations/{name}/rerun-last": {
         parameters: {
             query?: never;
             header?: never;
@@ -698,10 +698,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Перезапустить create из error_locked
-         * @description Снимает error_locked и тем же действием перезапускает scenario create (одна tx FOR UPDATE). Permission incarnation.create-rerun.
+         * Перезапустить последний упавший сценарий из error_locked
+         * @description Снимает error_locked и тем же действием перезапускает последний упавший сценарий инкарнации (bootstrap create/… или day-2 add_user/…) с сохранённым input упавшего прогона (одна tx FOR UPDATE). Permission incarnation.rerun-last.
          */
-        post: operations["rerunCreateIncarnation"];
+        post: operations["rerunLastIncarnation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2745,11 +2745,12 @@ export interface components {
              */
             total: number;
         };
-        IncarnationRerunCreateReply: {
+        IncarnationRerunLastReply: {
             apply_id: string;
             incarnation: string;
+            scenario: string;
         };
-        IncarnationRerunCreateRequest: {
+        IncarnationRerunLastRequest: {
             /** @description свободный текст подтверждения */
             reason: string;
         };
@@ -3082,6 +3083,7 @@ export interface components {
             created_at: string;
             created_by_aid?: string;
             credentials_ref: string;
+            fqdn_suffix?: string;
             name: string;
             region: string;
             type: string;
@@ -3089,6 +3091,8 @@ export interface components {
         ProviderCreateRequest: {
             /** @description vault-ref до credentials (vault:<path>); значение НЕ резолвится */
             credentials_ref: string;
+            /** @description суффикс FQDN VM (self-onboard: keeper предсказывает FQDN=<name>-<index>.<fqdn_suffix>). Опущено → self-onboard недоступен */
+            fqdn_suffix?: string;
             /** @description имя Cloud-Provider-а (kebab) */
             name: string;
             /** @description регион провайдера */
@@ -7058,7 +7062,7 @@ export interface operations {
             };
         };
     };
-    rerunCreateIncarnation: {
+    rerunLastIncarnation: {
         parameters: {
             query?: never;
             header?: never;
@@ -7070,7 +7074,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["IncarnationRerunCreateRequest"];
+                "application/json": components["schemas"]["IncarnationRerunLastRequest"];
             };
         };
         responses: {
@@ -7080,7 +7084,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IncarnationRerunCreateReply"];
+                    "application/json": components["schemas"]["IncarnationRerunLastReply"];
                 };
             };
             /** @description Forbidden */

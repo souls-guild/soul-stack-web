@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
-import { keeperApi, type DriftReport } from '../../api/keeper';
+import { keeperApi, type DriftReport, type IncarnationRerunLastReply } from '../../api/keeper';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { UnlockModal } from './UnlockModal';
-import { RerunCreateModal } from './RerunCreateModal';
+import { RerunLastModal } from './RerunLastModal';
 import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
 import { HostsTab } from './HostsTab';
@@ -46,8 +46,8 @@ export function IncarnationDetail() {
   const [driftError, setDriftError] = useState<string | null>(null);
 
   const [unlockOpen, setUnlockOpen] = useState(false);
-  const [rerunCreateOpen, setRerunCreateOpen] = useState(false);
-  const [rerunAcceptedId, setRerunAcceptedId] = useState<string | null>(null);
+  const [rerunLastOpen, setRerunLastOpen] = useState(false);
+  const [rerunAccepted, setRerunAccepted] = useState<IncarnationRerunLastReply | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [destroyOpen, setDestroyOpen] = useState(false);
   const [traitsOpen, setTraitsOpen] = useState(false);
@@ -181,10 +181,10 @@ export function IncarnationDetail() {
                 {row.status === 'error_locked' ? (
                   <Button
                     variant="secondary"
-                    onClick={() => { setRerunAcceptedId(null); setRerunCreateOpen(true); }}
-                    title={t('incarnations:rerunCreateTooltip')}
+                    onClick={() => { setRerunAccepted(null); setRerunLastOpen(true); }}
+                    title={t('incarnations:rerunLastTooltip')}
                   >
-                    <RefreshCw size={14} /> {t('incarnations:rerunCreateBtn')}
+                    <RefreshCw size={14} /> {t('incarnations:rerunLastBtn')}
                   </Button>
                 ) : null}
               </>
@@ -381,7 +381,7 @@ export function IncarnationDetail() {
                     <td className="mono">{entry.scenario}</td>
                     <td className="mono">
                       {entry.apply_id ? (
-                        // apply_id — это apply_run (create/rerun-create/day-2 scenario),
+                        // apply_id — это apply_run (create/rerun-last/day-2 scenario),
                         // НЕ Voyage (batch-прогон по многим инкарнациям). Ссылаемся на
                         // run-view этой инкарнации.
                         <Link
@@ -442,7 +442,7 @@ export function IncarnationDetail() {
         </section>
       ) : null}
 
-      {rerunAcceptedId ? (
+      {rerunAccepted ? (
         <div
           role="status"
           aria-live="polite"
@@ -453,10 +453,11 @@ export function IncarnationDetail() {
             boxShadow: '0 2px 12px rgba(0,0,0,.25)',
           }}
         >
-          {t('incarnations:rerunCreateAccepted')} <span className="mono">{rerunAcceptedId}</span>
+          {t('incarnations:rerunLastAccepted', { scenario: rerunAccepted.scenario })}{' '}
+          <span className="mono">{rerunAccepted.apply_id}</span>
           <button
             type="button"
-            onClick={() => setRerunAcceptedId(null)}
+            onClick={() => setRerunAccepted(null)}
             aria-label={t('cancel')}
             style={{ marginLeft: 12, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14 }}
           >
@@ -466,11 +467,11 @@ export function IncarnationDetail() {
       ) : null}
       <IncarnationTraitsModal open={traitsOpen} incarnationName={row.name} onClose={() => setTraitsOpen(false)} />
       <UnlockModal open={unlockOpen} incarnationName={row.name} onClose={() => setUnlockOpen(false)} />
-      <RerunCreateModal
-        open={rerunCreateOpen}
+      <RerunLastModal
+        open={rerunLastOpen}
         incarnationName={row.name}
-        onClose={() => setRerunCreateOpen(false)}
-        onAccepted={(id) => setRerunAcceptedId(id)}
+        onClose={() => setRerunLastOpen(false)}
+        onAccepted={(reply) => setRerunAccepted(reply)}
       />
       <UpgradeModal
         open={upgradeOpen}

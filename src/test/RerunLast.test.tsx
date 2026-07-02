@@ -1,10 +1,10 @@
 /**
- * Тесты для lifecycle-rework S5:
+ * Тесты для rerun-last (перезапуск последнего упавшего сценария из error_locked):
  * 1. runnableScenarios фильтрует по полю `runnable` (create виден, destroy нет, converge виден)
- * 2. Кнопка «Перезапустить create» видна только на error_locked
+ * 2. Кнопка «Перезапустить последний упавший» видна только на error_locked
  * 3. Модалка требует reason (пустой = ошибка валидации)
- * 4. Happy-path: вызов с правильным телом → 202 + apply_id → тост
- * 5. Обработка 409: показывает пояснительное сообщение
+ * 4. Happy-path: вызов с правильным телом → 202 (incl. scenario) → тост с именем сценария
+ * 5. Обработка 409: не-error_locked и ErrRerunInputUnavailable — разные сообщения
  */
 import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -107,9 +107,9 @@ describe('runnableScenarios — фильтр по полю runnable', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 2. Кнопка «Перезапустить create» — видимость по статусу
+// 2. Кнопка «Перезапустить последний упавший» — видимость по статусу
 // ────────────────────────────────────────────────────────────
-describe('IncarnationDetail — кнопка rerunCreate', () => {
+describe('IncarnationDetail — кнопка rerunLast', () => {
   function renderDetail(status: string) {
     mockFetch(makeIncarnation(status));
     return renderWithProviders(
@@ -127,7 +127,7 @@ describe('IncarnationDetail — кнопка rerunCreate', () => {
       expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
     });
     expect(
-      screen.getByRole('button', { name: /перезапустить create/i }),
+      screen.getByRole('button', { name: /перезапустить последний упавший/i }),
     ).toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe('IncarnationDetail — кнопка rerunCreate', () => {
       expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
     });
     expect(
-      screen.queryByRole('button', { name: /перезапустить create/i }),
+      screen.queryByRole('button', { name: /перезапустить последний упавший/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -149,7 +149,7 @@ describe('IncarnationDetail — кнопка rerunCreate', () => {
       expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
     });
     expect(
-      screen.queryByRole('button', { name: /перезапустить create/i }),
+      screen.queryByRole('button', { name: /перезапустить последний упавший/i }),
     ).not.toBeInTheDocument();
     // Unlock-кнопка при этом есть (isLocked=true).
     expect(screen.getByRole('button', { name: /unlock/i })).toBeInTheDocument();
@@ -159,14 +159,14 @@ describe('IncarnationDetail — кнопка rerunCreate', () => {
 // ────────────────────────────────────────────────────────────
 // 3. Модалка требует reason
 // ────────────────────────────────────────────────────────────
-describe('RerunCreateModal — валидация reason', () => {
+describe('RerunLastModal — валидация reason', () => {
   it('не отправляет запрос при пустом reason', async () => {
     tokenStore.clear();
     let postCount = 0;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-      if (method === 'POST' && urlStr.includes('rerun-create')) {
+      if (method === 'POST' && urlStr.includes('rerun-last')) {
         postCount++;
       }
       return new Response(JSON.stringify(makeIncarnation('error_locked')), {
@@ -187,7 +187,7 @@ describe('RerunCreateModal — валидация reason', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить create/i }));
+    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
 
     // Модалка открылась — заголовок есть.
     await waitFor(() => {
@@ -196,7 +196,7 @@ describe('RerunCreateModal — валидация reason', () => {
 
     // Кликаем confirm без заполнения reason (кнопка внутри dialog — последняя из совпавших).
     const dialog = screen.getByRole('dialog');
-    const btns = within(dialog).getAllByRole('button', { name: /перезапустить create/i });
+    const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
     await user.click(btns[0]);
 
     // POST не ушёл.
@@ -209,10 +209,10 @@ describe('RerunCreateModal — валидация reason', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 4. Happy-path: POST с reason → 202 + тост с apply_id
+// 4. Happy-path: POST с reason → 202 (incl. scenario) → тост с именем сценария
 // ────────────────────────────────────────────────────────────
-describe('RerunCreateModal — happy-path', () => {
-  it('POST уходит с {reason}, 202 → тост с apply_id', async () => {
+describe('RerunLastModal — happy-path', () => {
+  it('POST уходит с {reason}, 202 → тост с именем сценария и apply_id', async () => {
     tokenStore.clear();
     let capturedBody: unknown = null;
     let postUrl = '';
@@ -221,11 +221,15 @@ describe('RerunCreateModal — happy-path', () => {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
-      if (method === 'POST' && urlStr.includes('rerun-create')) {
+      if (method === 'POST' && urlStr.includes('rerun-last')) {
         capturedBody = init?.body ? JSON.parse(init.body as string) : null;
         postUrl = urlStr;
         return new Response(
-          JSON.stringify({ apply_id: '01HWTEST000000000000000001', incarnation: 'test-inc' }),
+          JSON.stringify({
+            apply_id: '01HWTEST000000000000000001',
+            incarnation: 'test-inc',
+            scenario: 'add_user',
+          }),
           { status: 202, headers: { 'Content-Type': 'application/json' } },
         );
       }
@@ -247,7 +251,7 @@ describe('RerunCreateModal — happy-path', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить create/i }));
+    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -256,35 +260,37 @@ describe('RerunCreateModal — happy-path', () => {
     const textarea = screen.getByRole('textbox');
     await user.type(textarea, 'исправлен конфиг вручную');
 
-    await user.click(screen.getAllByRole('button', { name: /перезапустить create/i }).find(
+    await user.click(screen.getAllByRole('button', { name: /перезапустить последний упавший/i }).find(
       (b) => !b.hasAttribute('title'), // кнопка внутри модалки, без title-тултипа
-    ) ?? screen.getAllByRole('button', { name: /перезапустить create/i })[0]);
+    ) ?? screen.getAllByRole('button', { name: /перезапустить последний упавший/i })[0]);
 
     // POST ушёл по правильному URL.
     await waitFor(() => {
-      expect(postUrl).toMatch(/\/v1\/incarnations\/test-inc\/rerun-create/);
+      expect(postUrl).toMatch(/\/v1\/incarnations\/test-inc\/rerun-last/);
     });
     expect(capturedBody).toEqual({ reason: 'исправлен конфиг вручную' });
 
-    // Тост с apply_id появился.
+    // Тост с именем сценария и apply_id появился.
     await waitFor(() => {
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
-    expect(screen.getByRole('status').textContent).toContain('01HWTEST000000000000000001');
+    const toastText = screen.getByRole('status').textContent ?? '';
+    expect(toastText).toContain('add_user');
+    expect(toastText).toContain('01HWTEST000000000000000001');
   });
 });
 
 // ────────────────────────────────────────────────────────────
 // 4b. reasonMax: >500 символов — клиентская ошибка, POST не уходит
 // ────────────────────────────────────────────────────────────
-describe('RerunCreateModal — reasonMax 500 символов', () => {
+describe('RerunLastModal — reasonMax 500 символов', () => {
   it('reason длиннее 500 символов — показывает ошибку, POST не уходит', async () => {
     tokenStore.clear();
     let postCount = 0;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-      if (method === 'POST' && urlStr.includes('rerun-create')) postCount++;
+      if (method === 'POST' && urlStr.includes('rerun-last')) postCount++;
       return new Response(JSON.stringify(makeIncarnation('error_locked')), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -303,7 +309,7 @@ describe('RerunCreateModal — reasonMax 500 символов', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить create/i }));
+    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -317,7 +323,7 @@ describe('RerunCreateModal — reasonMax 500 символов', () => {
     fireEvent.change(textarea, { target: { value: 'a'.repeat(501) } });
 
     const dialog = screen.getByRole('dialog');
-    const btns = within(dialog).getAllByRole('button', { name: /перезапустить create/i });
+    const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
     await user.click(btns[0]);
 
     // POST не ушёл
@@ -330,19 +336,19 @@ describe('RerunCreateModal — reasonMax 500 символов', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 5. 409 — показывает пояснительный текст
+// 5. 409 — два разных кейса конфликта
 // ────────────────────────────────────────────────────────────
-describe('RerunCreateModal — 409 conflict', () => {
-  it('показывает сообщение о том, что последний прогон не create', async () => {
+describe('RerunLastModal — 409 conflict', () => {
+  async function submit409(type: string, detail: string) {
     tokenStore.clear();
 
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       const method = (init?.method ?? 'GET').toUpperCase();
 
-      if (method === 'POST' && urlStr.includes('rerun-create')) {
+      if (method === 'POST' && urlStr.includes('rerun-last')) {
         return new Response(
-          JSON.stringify({ type: 'about:blank', title: 'Conflict', detail: 'last run is not create' }),
+          JSON.stringify({ type, title: 'Conflict', detail }),
           { status: 409, headers: { 'Content-Type': 'application/json' } },
         );
       }
@@ -364,7 +370,7 @@ describe('RerunCreateModal — 409 conflict', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить create/i }));
+    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -374,14 +380,34 @@ describe('RerunCreateModal — 409 conflict', () => {
     const textarea = within(dialog).getByRole('textbox');
     await user.type(textarea, 'причина тестового 409');
 
-    // Кнопка submit внутри модалки.
-    const btns = within(dialog).getAllByRole('button', { name: /перезапустить create/i });
+    const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
     await user.click(btns[0]);
+  }
 
-    // Сообщение об ошибке 409 появилось.
+  it('type=incarnation-locked (не-error_locked) — показывает generic conflict-сообщение', async () => {
+    await submit409(
+      'https://soul-stack.io/errors/incarnation-locked',
+      'incarnation test-inc is not error_locked — rerun-last requires error_locked',
+    );
+
     await waitFor(() => {
       expect(
-        screen.getByText(/последний упавший прогон не является сценарием create/i),
+        screen.getByText(/инкарнация не в статусе error_locked/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('type=rerun-input-unavailable — показывает сообщение про unlock + ручной запуск', async () => {
+    await submit409(
+      'https://soul-stack.io/errors/rerun-input-unavailable',
+      'incarnation test-inc rerun-last неприменим: input упавшего прогона недоступен ' +
+      '(рецепт вычищен ретеншном либо legacy-прогон без рецепта) — сними блок обычным unlock ' +
+      'и запусти нужный сценарий вручную с явным input',
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/снимите блок обычным unlock и запустите сценарий вручную/i),
       ).toBeInTheDocument();
     });
   });

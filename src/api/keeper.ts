@@ -22,7 +22,7 @@ export type IncarnationListReply = components['schemas']['IncarnationListReply']
 export type StateHistoryEntry = components['schemas']['StateHistoryEntry'];
 export type IncarnationHistoryReply = components['schemas']['IncarnationHistoryReply'];
 // Run-view (GET .../runs + .../runs/{apply_id}) — apply_run НЕ Voyage: свёртка
-// apply_runs по apply_id для одной инкарнации (create/rerun-create/day-2 scenario-прогон).
+// apply_runs по apply_id для одной инкарнации (create/rerun-last/day-2 scenario-прогон).
 export type RunSummaryEntry = components['schemas']['RunSummaryEntry'];
 export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply'];
 export type RunDetailReply = components['schemas']['RunDetailReply'];
@@ -294,9 +294,9 @@ export type StateSchemaMigration = components['schemas']['StateSchemaMigration']
 export type ServiceDependency = components['schemas']['ServiceDependency'];
 export type ServiceDependenciesReply = components['schemas']['ServiceDependenciesReply'];
 
-// Rerun-create — перезапуск scenario create из error_locked (ADR lifecycle-rework S5).
-export type IncarnationRerunCreateRequest = components['schemas']['IncarnationRerunCreateRequest'];
-export type IncarnationRerunCreateReply = components['schemas']['IncarnationRerunCreateReply'];
+// Rerun-last — перезапуск последнего упавшего сценария из error_locked (create или day-2).
+export type IncarnationRerunLastRequest = components['schemas']['IncarnationRerunLastRequest'];
+export type IncarnationRerunLastReply = components['schemas']['IncarnationRerunLastReply'];
 
 // Hosts-editing (PATCH /v1/incarnations/{name}/hosts).
 export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
@@ -570,13 +570,14 @@ export const keeperApi = {
         'DELETE',
         { query: { allow_destroy: allowDestroy } },
       ),
-    // POST /v1/incarnations/{name}/rerun-create — атомарный unlock + перезапуск
-    // scenario create из error_locked. 202 → IncarnationRerunCreateReply.
-    // 404 нет incarnation, 403 нет прав, 409 статус не error_locked или
-    // последний упавший прогон не create, 422 validation.
-    rerunCreate: (name: string, body: IncarnationRerunCreateRequest) =>
-      apiSend<IncarnationRerunCreateReply>(
-        `/v1/incarnations/${encodeURIComponent(name)}/rerun-create`,
+    // POST /v1/incarnations/{name}/rerun-last — атомарный unlock + перезапуск
+    // последнего упавшего сценария (create или day-2) с сохранённым input. 202 →
+    // IncarnationRerunLastReply (incl. scenario). 404 нет incarnation, 403 нет
+    // прав, 409 статус не error_locked ИЛИ input упавшего прогона недоступен
+    // (ErrRerunInputUnavailable — вычищен ретеншном), 422 validation.
+    rerunLast: (name: string, body: IncarnationRerunLastRequest) =>
+      apiSend<IncarnationRerunLastReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/rerun-last`,
         'POST',
         { body },
       ),
