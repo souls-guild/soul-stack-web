@@ -14,6 +14,7 @@ import {
   Zap,
   Play,
   Activity,
+  History as HistoryIcon,
   HelpCircle,
   CalendarClock,
   Bell,
@@ -66,6 +67,7 @@ const ORACLE: NavItem[] = [
 
 const HISTORY: NavItem[] = [
   { to: '/runs', label: 'All runs', icon: Activity, matchPrefix: '/runs' },
+  { to: '/incarnation-runs', label: 'Incarnation runs', icon: HistoryIcon, matchPrefix: '/incarnation-runs' },
   { to: '/cadences', label: 'Cadences', icon: CalendarClock, matchPrefix: '/cadences' },
 ];
 

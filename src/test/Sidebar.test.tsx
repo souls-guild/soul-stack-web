@@ -29,6 +29,11 @@ describe('Sidebar navigation', () => {
     expect(screen.getByRole('link', { name: /All runs/ })).toHaveAttribute('href', '/runs');
   });
 
+  it('Incarnation runs (глобальный список apply_run-ов) присутствует', () => {
+    renderSidebar();
+    expect(screen.getByRole('link', { name: /Incarnation runs/ })).toHaveAttribute('href', '/incarnation-runs');
+  });
+
   it('Provisioning Policy убран из REGISTRY — нет прямой ссылки на /provisioning-policy', () => {
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Provisioning Policy/ })).not.toBeInTheDocument();

@@ -28,6 +28,11 @@ export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply']
 export type RunDetailReply = components['schemas']['RunDetailReply'];
 export type RunHostStatusEntry = components['schemas']['RunHostStatusEntry'];
 export type RunStatus = NonNullable<RunSummaryEntry['status']>;
+// Глобальный run-view (GET /v1/runs + /v1/runs/stats) — те же apply_run-ы, но через ВСЕ инкарнации.
+export type GlobalRunEntry = components['schemas']['GlobalRunEntry'];
+export type RunsListReply = components['schemas']['RunsListReply'];
+export type RunsStatsBucket = components['schemas']['RunsStatsBucket'];
+export type RunsStatsReply = components['schemas']['RunsStatsReply'];
 export type DriftReport = components['schemas']['DriftReport'];
 export type IncarnationCreateRequest = components['schemas']['IncarnationCreateRequest'];
 export type IncarnationCreateReply = components['schemas']['IncarnationCreateReply'];
@@ -599,6 +604,15 @@ export const keeperApi = {
         'PUT',
         { body },
       ),
+  },
+
+  // Глобальный run-view через все инкарнации (apply_run, НЕ Voyage). Permission incarnation.history.
+  runs: {
+    list: (q: { status?: RunStatus; incarnation?: string; offset?: number; limit?: number } = {}) =>
+      apiGet<RunsListReply>('/v1/runs', {
+        query: { status: q.status, incarnation: q.incarnation, offset: q.offset, limit: q.limit },
+      }),
+    stats: () => apiGet<RunsStatsReply>('/v1/runs/stats'),
   },
 
   // Choir/Voice — топология хостов внутри инкарнации (ADR-044).

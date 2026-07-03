@@ -1412,6 +1412,46 @@ export interface paths {
         patch: operations["updateRolePermissions"];
         trace?: never;
     };
+    "/v1/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Глобальный список прогонов (paged)
+         * @description Свёртка apply_runs по apply_id ЧЕРЕЗ ВСЕ инкарнации: статус прогона (applying/success/failed/cancelled), инкарнация-владелец, границы времени, инициатор. Прогон (apply_run) — НЕ Voyage. Видимость scoped по RBAC (ADR-047, fail-closed: пустой scope → пустой список). Permission incarnation.history. Read-only.
+         */
+        get: operations["listRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/runs/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Сводные счётчики прогонов
+         * @description Счётчики прогонов по агрегатному статусу (total/applying/success/failed/cancelled) за всё время и за последние 24 часа, в границах RBAC-scope (fail-closed: пустой scope → нулевой агрегат). Permission incarnation.history. Read-only.
+         */
+        get: operations["getRunsStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/services": {
         parameters: {
             query?: never;
@@ -2557,6 +2597,18 @@ export interface components {
             name: string;
             type: string;
         };
+        GlobalRunEntry: {
+            apply_id: string;
+            /** Format: date-time */
+            finished_at?: string;
+            incarnation: string;
+            scenario: string;
+            /** Format: date-time */
+            started_at: string;
+            started_by_aid?: string;
+            /** @enum {string} */
+            status: "applying" | "success" | "failed" | "cancelled";
+        };
         GrantOperatorRequest: {
             /** @description AID архонта, назначаемого в роль/группу (naming-rules.md) */
             aid: string;
@@ -3320,6 +3372,58 @@ export interface components {
             started_by_aid?: string;
             /** @enum {string} */
             status: "applying" | "success" | "failed" | "cancelled";
+        };
+        RunsListReply: {
+            /** @description страница прогонов через все инкарнации (свёртка apply_runs) */
+            items: components["schemas"]["GlobalRunEntry"][] | null;
+            /**
+             * Format: int32
+             * @description размер страницы
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description сдвиг от начала набора
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description общее число прогонов под фильтрами/scope
+             */
+            total: number;
+        };
+        RunsStatsBucket: {
+            /**
+             * Format: int64
+             * @description прогоны в процессе
+             */
+            applying: number;
+            /**
+             * Format: int64
+             * @description отменённые прогоны
+             */
+            cancelled: number;
+            /**
+             * Format: int64
+             * @description упавшие прогоны (включая orphaned-хосты)
+             */
+            failed: number;
+            /**
+             * Format: int64
+             * @description успешные прогоны
+             */
+            success: number;
+            /**
+             * Format: int64
+             * @description всего прогонов в корзине
+             */
+            total: number;
+        };
+        RunsStatsReply: {
+            /** @description за всё время */
+            all: components["schemas"]["RunsStatsBucket"];
+            /** @description прогоны, стартовавшие за последние 24 часа */
+            last_24h: components["schemas"]["RunsStatsBucket"];
         };
         Scenario: {
             create?: boolean;
@@ -9886,6 +9990,109 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listRuns: {
+        parameters: {
+            query?: {
+                /** @description фильтр по агрегатному статусу прогона (applying/success/failed/cancelled); невалидный → 422 */
+                status?: string;
+                /** @description фильтр по имени инкарнации; невалидное имя → 422 */
+                incarnation?: string;
+                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description размер страницы 1..100 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunsListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getRunsStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunsStatsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
