@@ -59,7 +59,7 @@ export function CovenTraitsFilter({ items, value, onChange }: Props) {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="coven-traits-filter">
       <div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
           {t('incarnations:filterCovenMulti')}
@@ -74,6 +74,7 @@ export function CovenTraitsFilter({ items, value, onChange }: Props) {
                 type="button"
                 aria-pressed={value.covens.includes(c)}
                 onClick={() => toggleCoven(c)}
+                data-testid={`coven-filter-${c}`}
                 style={chipStyle(value.covens.includes(c))}
               >
                 {c}
@@ -97,6 +98,7 @@ export function CovenTraitsFilter({ items, value, onChange }: Props) {
                 type="button"
                 aria-pressed={value.traits.includes(pair)}
                 onClick={() => toggleTrait(pair)}
+                data-testid={`trait-filter-${pair}`}
                 style={chipStyle(value.traits.includes(pair))}
               >
                 {pair}
@@ -110,6 +112,7 @@ export function CovenTraitsFilter({ items, value, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange(EMPTY_COVEN_TRAITS_FILTER)}
+          data-testid="coven-traits-clear"
           style={{
             alignSelf: 'flex-start',
             background: 'none',

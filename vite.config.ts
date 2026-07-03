@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
 import path from 'node:path';
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // Dev-режим: проксируем /v1 и health-endpoints на Keeper Operator API
@@ -34,5 +34,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Playwright-спеки (e2e/*.spec.ts) не должны попадать в vitest-дискавери.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 });

@@ -168,7 +168,7 @@ export function IncarnationDetail() {
                 <Button variant="secondary" onClick={() => setTraitsOpen(true)} title={t('incarnations:editTraitsTitle')}>
                   <Tag size={14} /> {t('incarnations:editTraitsBtn')}
                 </Button>
-                <Button variant="danger" onClick={() => setDestroyOpen(true)} title="Destroy">
+                <Button variant="danger" onClick={() => setDestroyOpen(true)} title="Destroy" data-testid="destroy-trigger">
                   <Trash size={14} /> Destroy
                 </Button>
               </>
@@ -183,6 +183,7 @@ export function IncarnationDetail() {
                     variant="secondary"
                     onClick={() => { setRerunAccepted(null); setRerunLastOpen(true); }}
                     title={t('incarnations:rerunLastTooltip')}
+                    data-testid="rerun-last-trigger"
                   >
                     <RefreshCw size={14} /> {t('incarnations:rerunLastBtn')}
                   </Button>

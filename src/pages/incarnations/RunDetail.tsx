@@ -82,7 +82,7 @@ export function RunDetail() {
               <span className="mono" style={{ fontSize: 18 }}>{applyId}</span>
             </h1>
           </div>
-          <div>
+          <div data-testid="run-status">
             <Badge tone={runStatusTone(run.status)}>{run.status}</Badge>
           </div>
         </div>
@@ -112,7 +112,7 @@ export function RunDetail() {
       </section>
 
       {failedHosts.length > 0 ? (
-        <section className={styles.section} aria-label="Failed task">
+        <section className={styles.section} aria-label="Failed task" data-testid="run-failed-section">
           <h2 className={styles.sectionTitle}>{t('runhistory:runFailedTaskTitle')}</h2>
           {failedHosts.map((h) => (
             <div key={`${h.sid}-${h.passage}`} className={styles.errorBox} style={{ marginBottom: 8 }}>
@@ -134,7 +134,7 @@ export function RunDetail() {
       <section className={styles.section} aria-label="Per-host">
         <h2 className={styles.sectionTitle}>{t('runhistory:runHostsTitle')}</h2>
         {hosts.length > 0 ? (
-          <table className={styles.table}>
+          <table className={styles.table} data-testid="run-hosts-table">
             <thead>
               <tr>
                 <th>SID</th>
@@ -145,7 +145,7 @@ export function RunDetail() {
             </thead>
             <tbody>
               {hosts.map((h) => (
-                <tr key={`${h.sid}-${h.passage}`}>
+                <tr key={`${h.sid}-${h.passage}`} data-testid={`run-host-row-${h.sid}`}>
                   <td className="mono">
                     <HostSidCell sid={h.sid} />
                   </td>

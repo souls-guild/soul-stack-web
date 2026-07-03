@@ -67,7 +67,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
       onClose={close}
       footer={
         <>
-          <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
+          <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending} data-testid="destroy-cancel">
             {t('cancel')}
           </Button>
           <Button
@@ -75,6 +75,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
             variant="danger"
             disabled={isSubmitting || mu.isPending || Boolean(applyId)}
             onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
+            data-testid="destroy-submit"
           >
             {mu.isPending ? t('deleting') : t('destroy')}
           </Button>
@@ -98,6 +99,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
       <Input
         label={t('incarnations:destroyConfirmLabel', { name: incarnationName })}
         mono
+        data-testid="destroy-confirm-input"
         aria-invalid={errors.confirmName ? 'true' : undefined}
         error={errors.confirmName ? t(errors.confirmName.message ?? '', { name: incarnationName }) : undefined}
         {...register('confirmName')}
@@ -107,6 +109,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
         <input
           type="checkbox"
           {...register('allowDestroy')}
+          data-testid="destroy-allow-checkbox"
           style={{ width: 16, height: 16, marginTop: 2, accentColor: 'var(--danger)' }}
         />
         <span>
@@ -117,6 +120,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
 
       {applyId ? (
         <div
+          data-testid="destroy-accepted"
           style={{
             marginTop: 12,
             padding: 12,
@@ -129,7 +133,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
           {t('incarnations:destroyAccepted')} <span className="mono">{applyId}</span>
         </div>
       ) : null}
-      {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}
+      {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }} data-testid="destroy-error">{serverError}</div> : null}
     </Modal>
   );
 }

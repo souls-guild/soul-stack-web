@@ -84,6 +84,7 @@ export function Login() {
             placeholder={t('admin:loginTokenPlaceholder')}
             spellCheck={false}
             autoComplete="off"
+            data-testid="login-token-input"
             aria-invalid={errors.token ? 'true' : undefined}
             {...register('token')}
           />
@@ -93,9 +94,9 @@ export function Login() {
             <span className={styles.hint}>{t('admin:loginHint')}</span>
           )}
         </label>
-        {serverError ? <div className={styles.error}>{serverError}</div> : null}
+        {serverError ? <div className={styles.error} data-testid="login-error">{serverError}</div> : null}
         <div className={styles.actions}>
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
+          <Button type="submit" variant="primary" disabled={isSubmitting} data-testid="login-submit">
             {isSubmitting ? t('loggingIn') : t('login')}
           </Button>
         </div>

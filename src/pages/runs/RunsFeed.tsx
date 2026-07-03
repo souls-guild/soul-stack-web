@@ -269,6 +269,7 @@ export function RunsFeed() {
                   type="button"
                   onClick={() => toggleType(rt)}
                   aria-pressed={active}
+                  data-testid={`runs-type-filter-${rt}`}
                   style={chipStyle(active)}
                 >
                   {typeLabel(rt)}
@@ -323,7 +324,7 @@ export function RunsFeed() {
       ) : null}
 
       {filtered.length > 0 ? (
-        <table className={styles.table}>
+        <table className={styles.table} data-testid="runs-table">
           <thead>
             <tr>
               <th>Type</th>
@@ -336,7 +337,7 @@ export function RunsFeed() {
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={`${r.type}:${r.id}`}>
+              <tr key={`${r.type}:${r.id}`} data-testid={`runs-row-${r.id}`}>
                 <td>
                   <Badge tone="info">{typeLabel(r.type)}</Badge>
                 </td>

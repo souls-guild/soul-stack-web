@@ -380,6 +380,7 @@ export function SoulsList() {
             variant="primary"
             onClick={() => setCreateOpen(true)}
             aria-label={t('souls:registerSoulAria')}
+            data-testid="register-soul-btn"
           >
             <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
             {t('souls:registerSoul')}
@@ -396,6 +397,7 @@ export function SoulsList() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('souls:searchSidPlaceholder')}
             aria-label={t('souls:searchSidAria')}
+            data-testid="souls-search-input"
             style={{
               padding: '8px 10px',
               borderRadius: 'var(--radius)',
@@ -426,6 +428,7 @@ export function SoulsList() {
               onChange={(e) => setSoulprintQuery(e.target.value)}
               placeholder={t('souls:soulprintSearchPlaceholder')}
               aria-label={t('souls:soulprintSearchAria')}
+              data-testid="soulprint-search-input"
               aria-invalid={parsedSoulprint.invalid.length > 0 ? 'true' : undefined}
               style={{
                 padding: '8px 10px 8px 30px',
@@ -452,6 +455,7 @@ export function SoulsList() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as SoulStatus | '')}
+            data-testid="souls-status-filter"
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
           >
             <option value="">{t('souls:allOption')}</option>
@@ -465,6 +469,7 @@ export function SoulsList() {
           <select
             value={transport}
             onChange={(e) => setTransport(e.target.value as SoulTransport | '')}
+            data-testid="souls-transport-filter"
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
           >
             <option value="">{t('souls:allOption')}</option>
@@ -480,6 +485,7 @@ export function SoulsList() {
             value={coven}
             onChange={(e) => setCoven(e.target.value)}
             placeholder={t('souls:covensPlaceholder')}
+            data-testid="souls-coven-filter"
             aria-invalid={parsed.invalid.length > 0 ? 'true' : undefined}
             style={{
               padding: '8px 10px',
@@ -562,7 +568,7 @@ export function SoulsList() {
       ) : null}
 
       {q.data && visible.length > 0 ? (
-        <table className={styles.table}>
+        <table className={styles.table} data-testid="souls-table">
           <thead>
             <tr>
               <th style={{ width: 32 }}>
@@ -608,7 +614,7 @@ export function SoulsList() {
           </thead>
           <tbody>
             {visible.map((row) => (
-              <tr key={row.sid}>
+              <tr key={row.sid} data-testid={`souls-row-${row.sid}`}>
                 <td>
                   <input
                     type="checkbox"

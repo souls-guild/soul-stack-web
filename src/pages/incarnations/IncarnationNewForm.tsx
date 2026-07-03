@@ -203,6 +203,7 @@ export function IncarnationNewForm() {
           label="Name (kebab-case)"
           placeholder="redis-prod"
           mono
+          data-testid="incarnation-name-input"
           aria-invalid={errors.name ? 'true' : undefined}
           error={errors.name ? t(errors.name.message ?? '') : undefined}
           {...register('name')}
@@ -213,6 +214,7 @@ export function IncarnationNewForm() {
           <select
             {...register('service')}
             disabled={services.isLoading}
+            data-testid="incarnation-service-select"
             aria-invalid={errors.service ? 'true' : undefined}
             style={{
               padding: '8px 10px',
@@ -415,9 +417,10 @@ export function IncarnationNewForm() {
           </div>
         ) : null}
 
-        {serverError ? <div className={styles.errorBox}>{serverError}</div> : null}
+        {serverError ? <div className={styles.errorBox} data-testid="incarnation-create-error">{serverError}</div> : null}
         {createdApplyId ? (
           <div
+            data-testid="incarnation-created"
             style={{
               padding: 12,
               background: 'color-mix(in srgb, var(--ok) 8%, var(--surface))',
@@ -435,6 +438,7 @@ export function IncarnationNewForm() {
             type="submit"
             variant="primary"
             disabled={isSubmitting || createMu.isPending || missingRequired.length > 0 || missingScenarioSelection}
+            data-testid="incarnation-submit"
           >
             {createMu.isPending ? t('creating') : t('createIncarnation')}
           </Button>

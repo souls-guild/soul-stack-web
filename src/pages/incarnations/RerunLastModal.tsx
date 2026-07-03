@@ -78,7 +78,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
       onClose={close}
       footer={
         <>
-          <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>
+          <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending} data-testid="rerun-cancel">
             {t('cancel')}
           </Button>
           <Button
@@ -86,6 +86,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
             variant="primary"
             disabled={isSubmitting || mu.isPending}
             onClick={handleSubmit((v) => { setServerError(null); setServerDetail(null); mu.mutate(v); })}
+            data-testid="rerun-submit"
           >
             {mu.isPending ? t('loading') : t('incarnations:rerunLastBtn')}
           </Button>
@@ -102,6 +103,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
             rows={4}
             placeholder={t('incarnations:rerunLastReasonPlaceholder')}
             spellCheck={false}
+            data-testid="rerun-reason-input"
             aria-invalid={errors.reason ? 'true' : undefined}
             // maxLength синхронизирован с backend incarnation.ReasonMaxLen=500
             maxLength={500}
@@ -123,7 +125,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
           ) : null}
         </label>
         {serverError ? (
-          <div className={styles.errorBox} style={{ marginTop: 12 }}>
+          <div className={styles.errorBox} style={{ marginTop: 12 }} data-testid="rerun-error">
             {serverError}
             {serverDetail ? (
               <div style={{ marginTop: 4, fontSize: 11, opacity: 0.75 }}>

@@ -18,3 +18,10 @@ src/api/types.gen.ts
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# playwright ui-smoke (e2e/)
+/e2e/.auth/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

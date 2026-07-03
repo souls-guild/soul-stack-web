@@ -267,6 +267,7 @@ export function IncarnationsList() {
               setStatePredicates([]);
               setStateFieldErrors({});
             }}
+            data-testid="incarnations-service-filter"
             style={{
               padding: '8px 10px',
               borderRadius: 'var(--radius)',
@@ -288,6 +289,7 @@ export function IncarnationsList() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as IncarnationStatus | '')}
+            data-testid="incarnations-status-filter"
             style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
           >
             <option value="">{t('incarnations:filterAnyOption')}</option>
