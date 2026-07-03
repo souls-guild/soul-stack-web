@@ -1,8 +1,6 @@
 // Модал day-2 редактирования incarnation.traits (ADR-060).
-// PUT /v1/incarnations/{name}/traits — полная замена (full-replace).
-// Источник истины — incarnation.traits; проецируется в souls.traits хостов-членов.
-// Примечание: GET /v1/incarnations/{name}/traits отсутствует в API → предзаполнение
-// текущих значений невозможно без добавления поля traits в IncarnationGetReply (needs_backend).
+// PUT /v1/incarnations/{name}/traits — полная замена (full-replace):
+// форма предзаполняется текущими traits, удаление строки удаляет trait.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,15 +14,37 @@ import styles from '../common.module.css';
 interface Props {
   open: boolean;
   incarnationName: string;
+  /** Текущие incarnation.traits (из GET-реплая) для prefill. */
+  currentTraits?: Record<string, unknown> | null;
   onClose: () => void;
 }
 
-export function IncarnationTraitsModal({ open, incarnationName, onClose }: Props) {
+// Scalar-значения редактируются как строки (number/bool сохранятся строками).
+function toTraitsMap(raw: Record<string, unknown> | null | undefined): TraitsMap {
+  const out: TraitsMap = {};
+  for (const [key, val] of Object.entries(raw ?? {})) {
+    out[key] = Array.isArray(val) ? val.map(String) : String(val);
+  }
+  return out;
+}
+
+export function IncarnationTraitsModal({ open, incarnationName, currentTraits, onClose }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [traits, setTraits] = useState<TraitsMap>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // Seed на каждом открытии до маунта TraitsEditor (он читает value один раз).
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setTraits(toTraitsMap(currentTraits));
+      setServerError(null);
+      setSaved(false);
+    }
+  }
 
   const mu = useMutation({
     mutationFn: (body: { traits: Record<string, unknown> }) =>
@@ -43,20 +63,9 @@ export function IncarnationTraitsModal({ open, incarnationName, onClose }: Props
     },
   });
 
-  function resetState() {
-    setServerError(null);
-    setSaved(false);
-    setTraits({});
-  }
-
-  function close() {
-    resetState();
-    onClose();
-  }
-
   function submit() {
     setServerError(null);
-    mu.mutate({ traits: traits as Record<string, unknown> });
+    mu.mutate({ traits });
   }
 
   if (saved) {
@@ -64,9 +73,9 @@ export function IncarnationTraitsModal({ open, incarnationName, onClose }: Props
       <Modal
         open={open}
         title={t('incarnations:editTraitsTitle')}
-        onClose={close}
+        onClose={onClose}
         footer={
-          <Button type="button" variant="primary" onClick={close}>
+          <Button type="button" variant="primary" onClick={onClose}>
             {t('souls:done')}
           </Button>
         }
@@ -91,10 +100,10 @@ export function IncarnationTraitsModal({ open, incarnationName, onClose }: Props
     <Modal
       open={open}
       title={t('incarnations:editTraitsTitle')}
-      onClose={close}
+      onClose={onClose}
       footer={
         <>
-          <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={mu.isPending}>
             {t('cancel')}
           </Button>
           <Button type="button" variant="primary" disabled={mu.isPending} onClick={submit}>
@@ -106,19 +115,6 @@ export function IncarnationTraitsModal({ open, incarnationName, onClose }: Props
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
           {t('incarnations:editTraitsIntro')}
-        </p>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 12,
-            color: 'var(--warning, #b5832a)',
-            padding: '6px 10px',
-            background: 'color-mix(in srgb, var(--warning, #b5832a) 8%, var(--surface))',
-            border: '1px solid color-mix(in srgb, var(--warning, #b5832a) 25%, var(--border))',
-            borderRadius: 'var(--radius)',
-          }}
-        >
-          {t('incarnations:editTraitsNoCurrentNote')}
         </p>
         <TraitsEditor value={traits} onChange={setTraits} />
         {serverError ? (

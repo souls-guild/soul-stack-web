@@ -465,7 +465,12 @@ export function IncarnationDetail() {
           </button>
         </div>
       ) : null}
-      <IncarnationTraitsModal open={traitsOpen} incarnationName={row.name} onClose={() => setTraitsOpen(false)} />
+      <IncarnationTraitsModal
+        open={traitsOpen}
+        incarnationName={row.name}
+        currentTraits={row.traits as Record<string, unknown> | null | undefined}
+        onClose={() => setTraitsOpen(false)}
+      />
       <UnlockModal open={unlockOpen} incarnationName={row.name} onClose={() => setUnlockOpen(false)} />
       <RerunLastModal
         open={rerunLastOpen}
