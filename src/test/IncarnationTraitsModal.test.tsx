@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderWithProviders } from './renderWithProviders';
 import { IncarnationTraitsModal } from '../pages/incarnations/IncarnationTraitsModal';
 import { tokenStore } from '../api/tokenStore';
@@ -104,6 +106,36 @@ describe('IncarnationTraitsModal', () => {
       expect(puts).toHaveLength(1);
     });
     expect(puts[0].body).toEqual({ traits: { tier: 'gold' } });
+  });
+
+  it('save инвалидирует и detail, и список инкарнаций', async () => {
+    installPutMock();
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <IncarnationTraitsModal
+            open
+            incarnationName="redis-prod"
+            currentTraits={{ env: 'prod' }}
+            onClose={noop}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => {
+      expect(screen.getByText('Traits инкарнации обновлены')).toBeInTheDocument();
+    });
+
+    const keys = spy.mock.calls.map(([f]) => f?.queryKey);
+    expect(keys).toContainEqual(['incarnation', 'redis-prod']);
+    expect(keys).toContainEqual(['incarnations']);
   });
 
   it('reopen пересидирует форму свежими currentTraits', () => {

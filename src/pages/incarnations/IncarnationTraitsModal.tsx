@@ -53,6 +53,7 @@ export function IncarnationTraitsModal({ open, incarnationName, currentTraits, o
       setSaved(true);
       setServerError(null);
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
+      qc.invalidateQueries({ queryKey: ['incarnations'] });
     },
     onError: (err) => {
       setServerError(
