@@ -3,8 +3,8 @@
 Файл-конфигурация для Claude Code в **companion-repo Soul Stack UI**
 (React 19 + Vite + TanStack Query + React Hook Form + Zod + lucide-react).
 
-**Core-репо** (где живёт backend): `/Users/cocy/vscode/tools/soul-stack/`.
-**Companion plugins**: `/Users/cocy/vscode/tools/soul-stack-plugins/`.
+**Core-репо** (где живёт backend): `/home/co-cy/vscode/soulstack/soul-stack/`.
+**Companion plugins**: `/home/co-cy/vscode/soulstack/soul-stack-plugins/`.
 
 ## Состояние UI repo
 
@@ -197,7 +197,7 @@ npm run build         # tsc -b && vite build (production)
 ## Обновление openapi-типов
 
 Когда backend меняет API:
-1. Скопировать `cp /Users/cocy/vscode/tools/soul-stack/docs/keeper/openapi.yaml vendor/openapi/keeper.yaml`.
+1. Скопировать `cp /home/co-cy/vscode/soulstack/soul-stack/docs/keeper/openapi.yaml vendor/openapi/keeper.yaml`.
 2. `npm run gen:api` → обновится `src/api/types.gen.ts`.
 3. Заменить локальные типы в `src/api/keeper.ts` на сгенерированные (если они там есть как fallback).
 
@@ -220,7 +220,7 @@ npm run build         # tsc -b && vite build (production)
 
 ## Backlog UI
 
-См. `/Users/cocy/vscode/tools/soul-stack/.pm/handoff/2026-05-27-resume.md` →
+См. `/home/co-cy/vscode/soulstack/soul-stack/.pm/handoff/2026-05-27-resume.md` →
 раздел «Backlog UI».
 
 Главное:
