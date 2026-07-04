@@ -11,6 +11,7 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 import { VoyageTargets } from './VoyageTargets';
@@ -442,12 +443,10 @@ export function VoyageDetail() {
                     {voyage.target.sids.map((sid, i) => (
                       <span key={sid}>
                         {i > 0 ? ', ' : ''}
-                        <Link
-                          to={`/souls/${encodeURIComponent(sid)}`}
+                        <KeeperSidCell
+                          sid={sid}
                           style={{ textDecoration: 'none', color: 'inherit' }}
-                        >
-                          {sid}
-                        </Link>
+                        />
                       </span>
                     ))}
                   </span>

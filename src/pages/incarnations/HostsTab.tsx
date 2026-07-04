@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play, Plus, Server, Trash2 } from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type SoulListEntry } from '../../api/keeper';
 import { soulDot, soulTone } from '../../components/status';
@@ -167,7 +168,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
             {declared.map((h) => (
               <tr key={h.sid}>
                 <td className="mono">
-                  <Link to={`/souls/${encodeURIComponent(h.sid)}`}>{h.sid}</Link>
+                  <KeeperSidCell sid={h.sid} />
                 </td>
                 <td className="mono">{h.role ?? '—'}</td>
                 <td className="mono">{h.coven ?? '—'}</td>
@@ -263,7 +264,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
             {(connected.data.items ?? []).map((s: SoulListEntry) => (
               <tr key={s.sid}>
                 <td className="mono">
-                  <Link to={`/souls/${encodeURIComponent(s.sid)}`}>{s.sid}</Link>
+                  <KeeperSidCell sid={s.sid} />
                 </td>
                 <td>
                   <span className={styles.statusCell}>
@@ -303,7 +304,7 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
             {runtimeHosts.map((h) => (
               <tr key={h.sid}>
                 <td className="mono" style={{ verticalAlign: 'top' }}>
-                  <Link to={`/souls/${encodeURIComponent(h.sid)}`}>{h.sid}</Link>
+                  <KeeperSidCell sid={h.sid} />
                 </td>
                 <td className="mono" style={{ verticalAlign: 'top' }}>{h.role ?? '—'}</td>
                 <td>

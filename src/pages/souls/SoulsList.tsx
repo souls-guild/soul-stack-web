@@ -1,11 +1,12 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Play, Plus, Search, Shield, Tag } from 'lucide-react';
 import i18n from '../../i18n';
 import { keeperApi, SoulprintNotReceivedError, type SoulListEntry, type SoulStatus, type SoulTransport, type SoulprintReadReply } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { CovenAssignModal } from './CovenAssignModal';
@@ -624,7 +625,7 @@ export function SoulsList() {
                   />
                 </td>
                 <td>
-                  <Link to={`/souls/${encodeURIComponent(row.sid)}`}>{row.sid}</Link>
+                  <KeeperSidCell sid={row.sid} />
                 </td>
                 <td>
                   <span className={styles.statusCell}>

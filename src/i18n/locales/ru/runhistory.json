@@ -84,6 +84,8 @@
   "runKeeperSideHint": "Задача исполняется на keeper (on: keeper), это не Soul — страницы soul для неё нет.",
   "runNotFound": "Прогон не найден.",
   "runScenarioLabel": "scenario",
+  "runSentinelBadge": "no host",
+  "runSentinelHint": "Прогон завершён без хостов (аборт до раздачи задач) — синтетический маркер, не Soul.",
   "runStartedByLabel": "started by",
   "runsFeedCrumbs": "сводный feed всех прогонов (Voyage / Push / Errand)",
   "voyageNotFound": "Voyage не найден.",

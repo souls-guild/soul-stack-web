@@ -9,6 +9,7 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Pager } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import styles from '../common.module.css';
 
 const STATUSES: ErrandStatus[] = [
@@ -185,7 +186,7 @@ export function ErrandsList() {
                     </Link>
                   </td>
                   <td className="mono">
-                    <Link to={`/souls/${encodeURIComponent(e.sid)}`}>{e.sid}</Link>
+                    <KeeperSidCell sid={e.sid} />
                   </td>
                   <td className="mono">{e.module}</td>
                   <td>

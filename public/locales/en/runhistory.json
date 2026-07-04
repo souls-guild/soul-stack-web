@@ -84,6 +84,8 @@
   "runKeeperSideHint": "This task runs on keeper (on: keeper), not a Soul — there is no soul page for it.",
   "runNotFound": "Run not found.",
   "runScenarioLabel": "scenario",
+  "runSentinelBadge": "no host",
+  "runSentinelHint": "Run finished with no hosts (aborted before dispatch) — a synthetic marker, not a Soul.",
   "runStartedByLabel": "started by",
   "runsFeedCrumbs": "combined feed of all runs (Voyage / Push / Errand)",
   "voyageNotFound": "Voyage not found.",

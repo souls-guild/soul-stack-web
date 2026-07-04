@@ -11,6 +11,7 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import i18n from '../../i18n';
 import styles from '../common.module.css';
 
@@ -242,7 +243,7 @@ export function ErrandDetail() {
             <span className={styles.metaVal}>{result.module}</span>
             <span className={styles.metaKey}>sid</span>
             <span className={styles.metaVal}>
-              <Link to={`/souls/${encodeURIComponent(result.sid)}`}>{result.sid}</Link>
+              <KeeperSidCell sid={result.sid} />
             </span>
             <span className={styles.metaKey}>started_by</span>
             <span className={styles.metaVal}>{result.started_by_aid}</span>

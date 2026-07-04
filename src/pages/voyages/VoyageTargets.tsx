@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VoyageTargetEntry, type VoyageTargetStatus } from '../../api/keeper';
 import { Badge } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 
@@ -92,13 +93,11 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
                       {entry.target_id}
                     </Link>
                   ) : entry.target_kind === 'soul' ? (
-                    <Link
-                      to={`/souls/${encodeURIComponent(entry.target_id)}`}
+                    <KeeperSidCell
+                      sid={entry.target_id}
                       className="mono"
                       style={{ fontSize: 13 }}
-                    >
-                      {entry.target_id}
-                    </Link>
+                    />
                   ) : (
                     <span className="mono" style={{ fontSize: 13 }}>
                       {entry.target_id}

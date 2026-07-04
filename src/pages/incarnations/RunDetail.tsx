@@ -5,6 +5,7 @@ import { Activity } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 
@@ -17,28 +18,6 @@ import styles from '../common.module.css';
 // error_summary), НЕ полный per-task список: TaskEvent агрегируется на Soul-е
 // без per-task-прогресса, PG хранит только упавшую задачу на host-строке (ADR-012).
 const NON_TERMINAL = new Set(['applying']);
-
-// Keeper-side задача (`on: keeper`, docs/keeper/modules.md) не исполняется на
-// Soul — исполнителем выступает сам keeper-инстанс. Backend отдаёт для неё
-// синтетический apply_runs-row с sid="keeper" (keeper/internal/render/render.go
-// KeeperTargetSID) — это НЕ soul, ссылка на /souls/keeper вела бы на
-// несуществующую/чужую сущность.
-const KEEPER_TARGET_SID = 'keeper';
-
-function HostSidCell({ sid }: { sid: string }) {
-  const { t } = useTranslation();
-  if (sid === KEEPER_TARGET_SID) {
-    return (
-      <>
-        <span className="mono">{sid}</span>{' '}
-        <Badge tone="info" title={t('runhistory:runKeeperSideHint')}>
-          {t('runhistory:runKeeperSideBadge')}
-        </Badge>
-      </>
-    );
-  }
-  return <Link to={`/souls/${encodeURIComponent(sid)}`}>{sid}</Link>;
-}
 
 export function RunDetail() {
   const { t } = useTranslation();
@@ -117,7 +96,7 @@ export function RunDetail() {
           {failedHosts.map((h) => (
             <div key={`${h.sid}-${h.passage}`} className={styles.errorBox} style={{ marginBottom: 8 }}>
               <div className="mono" style={{ fontWeight: 600, marginBottom: 4 }}>
-                <HostSidCell sid={h.sid} />
+                <KeeperSidCell sid={h.sid} />
               </div>
               {h.failed_task_idx != null ? (
                 <div>{t('runhistory:runFailedTaskIdx', { idx: h.failed_task_idx })}</div>
@@ -147,7 +126,7 @@ export function RunDetail() {
               {hosts.map((h) => (
                 <tr key={`${h.sid}-${h.passage}`} data-testid={`run-host-row-${h.sid}`}>
                   <td className="mono">
-                    <HostSidCell sid={h.sid} />
+                    <KeeperSidCell sid={h.sid} />
                   </td>
                   <td>
                     <Badge tone={runStatusTone(h.status)}>

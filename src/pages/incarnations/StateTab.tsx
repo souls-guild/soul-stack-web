@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Activity, Server, Download } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { JsonKeyFilter } from '../../components/JsonKeyFilter';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
 import { Button } from '../../components/primitives';
 import styles from '../common.module.css';
@@ -118,7 +118,7 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
                     return (
                       <tr key={sid}>
                         <td className="mono">
-                          <Link to={`/souls/${encodeURIComponent(sid)}`}>{sid}</Link>
+                          <KeeperSidCell sid={sid} />
                         </td>
                         <td className="mono">{role ?? '—'}</td>
                         <td>

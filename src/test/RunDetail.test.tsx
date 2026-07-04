@@ -136,6 +136,45 @@ describe('RunDetail', () => {
     expect(soulLink).toHaveAttribute('href', '/souls/host-a.local');
   });
 
+  it('sentinel-прогон (sid="__run__") — бейдж без ссылки на /souls (NIM-36)', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: `/v1/incarnations/redis-prod/runs/${APPLY_ID}`,
+        body: {
+          apply_id: APPLY_ID,
+          scenario: 'create',
+          status: 'failed',
+          started_at: '2026-06-30T10:00:00Z',
+          hosts: [
+            {
+              sid: '__run__',
+              status: 'failed',
+              passage: 0,
+              attempt: 1,
+              cancel_requested: false,
+              error_summary: 'no_hosts',
+            },
+          ],
+        },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name/runs/:applyId" element={<RunDetail />} />
+      </Routes>,
+      `/incarnations/redis-prod/runs/${APPLY_ID}`,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('__run__').length).toBeGreaterThan(0);
+    });
+    // sid="__run__" не кликабелен как soul — нет ссылки на /souls/__run__.
+    expect(screen.queryByRole('link', { name: '__run__' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('no host').length).toBeGreaterThan(0);
+  });
+
   it('404 на GET runDetail — graceful error-state, не крашится', async () => {
     installFetchMock([
       {

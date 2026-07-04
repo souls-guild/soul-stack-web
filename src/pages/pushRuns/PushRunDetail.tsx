@@ -9,6 +9,7 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
+import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
 import { pushStatusTone } from './status';
 import styles from '../common.module.css';
@@ -125,7 +126,7 @@ export function PushRunDetail() {
               {hosts.map((h) => (
                 <tr key={h.sid}>
                   <td className="mono">
-                    <Link to={`/souls/${encodeURIComponent(h.sid)}`}>{h.sid}</Link>
+                    <KeeperSidCell sid={h.sid} />
                   </td>
                   <td>
                     <Badge tone={pushStatusTone(h.status)}>{h.status}</Badge>
