@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Input, Modal } from '../../components/primitives';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge, Button, Input, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { useServiceRefs } from '../services/refs';
@@ -32,11 +32,27 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
     handleSubmit,
     reset,
     control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<UpgradeFormValues>({
     resolver: zodResolver(upgradeSchema),
     defaultValues: { to_version: '' },
   });
+
+  // Превью перехода (NIM-34): при выбранной цели тянем upgrade-paths.
+  // Graceful degradation — на любой ошибке (404/501/network) панель скрыта,
+  // модалка работает как раньше; сам apply валидируется на POST upgrade.
+  const toVersion = watch('to_version');
+  const preview = useQuery({
+    queryKey: ['incarnation.upgradePaths', incarnationName, toVersion],
+    queryFn: () => keeperApi.incarnations.upgradePaths(incarnationName, toVersion),
+    enabled: open && Boolean(toVersion),
+    retry: false,
+  });
+  const target = preview.data?.target;
+  const migrations = target?.state_migrations ?? [];
+  // reachable=false приходит валидным 200 (структурно битая цепочка) — блокируем submit.
+  const blocked = Boolean(target) && target!.reachable === false;
 
   const mu = useMutation({
     mutationFn: (values: UpgradeFormValues) =>
@@ -78,7 +94,9 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
             <Button
               type="button"
               variant="primary"
-              disabled={isSubmitting || mu.isPending}
+              data-testid="upgrade-submit"
+              disabled={isSubmitting || mu.isPending || blocked}
+              title={blocked ? t('incarnations:upgradeUnreachableSubmit') : undefined}
               onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
             >
               {mu.isPending ? t('running') : t('upgrade')}
@@ -163,6 +181,75 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
           {...register('to_version')}
         />
       )}
+      {!applyId && toVersion ? (
+        <div data-testid="upgrade-preview" style={{ marginTop: 12 }}>
+          {preview.isLoading ? (
+            <div
+              data-testid="upgrade-preview-loading"
+              style={{ fontSize: 12, color: 'var(--text-muted)' }}
+            >
+              {t('incarnations:upgradePreviewLoading')}
+            </div>
+          ) : preview.error || !target ? null : (
+            <div
+              style={{
+                padding: 12,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {t('incarnations:upgradeDirectionLabel')}:
+                </span>
+                <span data-testid="upgrade-direction" className="mono" style={{ fontSize: 12 }}>
+                  {target.direction}
+                </span>
+                {target.mode ? (
+                  <Badge tone={target.mode === 'found' ? 'ok' : 'muted'}>
+                    <span data-testid="upgrade-mode-badge">{target.mode}</span>
+                  </Badge>
+                ) : null}
+              </div>
+              {target.mode ? (
+                <p style={{ fontSize: 12, color: 'var(--text-faint)', margin: '6px 0 0' }}>
+                  {target.mode === 'found'
+                    ? t('incarnations:upgradeModeFoundHint')
+                    : t('incarnations:upgradeModeLegacyHint')}
+                </p>
+              ) : null}
+              <p
+                data-testid="upgrade-migrations"
+                style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 0' }}
+              >
+                {migrations.length > 0
+                  ? `${t('incarnations:upgradeMigrationsLabel')}: ${migrations
+                      .map((m) => `${m.from}→${m.to}`)
+                      .join(', ')}`
+                  : t('incarnations:upgradeMigrationsNone')}
+              </p>
+              {blocked ? (
+                <div
+                  data-testid="upgrade-unreachable"
+                  style={{
+                    marginTop: 10,
+                    padding: 10,
+                    background: 'color-mix(in srgb, var(--danger) 8%, var(--surface))',
+                    border: '1px solid color-mix(in srgb, var(--danger) 40%, var(--border))',
+                    borderRadius: 'var(--radius)',
+                    fontSize: 12,
+                    color: 'var(--danger)',
+                  }}
+                >
+                  <strong>{t('incarnations:upgradeUnreachableLabel')}:</strong>{' '}
+                  {target.unreachable_reason ?? t('incarnations:upgradeUnreachableSubmit')}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      ) : null}
       {applyId ? (
         <div
           style={{

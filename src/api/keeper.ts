@@ -44,6 +44,12 @@ export type IncarnationUnlockRequest = components['schemas']['IncarnationUnlockR
 export type IncarnationUnlockReply = components['schemas']['IncarnationUnlockReply'];
 export type IncarnationUpgradeRequest = components['schemas']['IncarnationUpgradeRequest'];
 export type IncarnationUpgradeReply = components['schemas']['IncarnationUpgradeReply'];
+// upgrade-paths (NIM-34): предпросмотр перехода версии — found/legacy, direction,
+// reachable, применяемые state-миграции. Read-грань incarnation.upgrade.
+export type IncarnationUpgradePathsReply = components['schemas']['IncarnationUpgradePathsReply'];
+export type UpgradePathRef = components['schemas']['UpgradePathRef'];
+export type UpgradePathTarget = components['schemas']['UpgradePathTarget'];
+// StateSchemaMigration уже реэкспортирован ниже (Schema explorer) — повторно не объявляем.
 export type IncarnationDestroyReply = components['schemas']['IncarnationDestroyReply'];
 export type IncarnationCheckDriftRequest = components['schemas']['IncarnationCheckDriftRequest'];
 
@@ -566,6 +572,13 @@ export const keeperApi = {
         `/v1/incarnations/${encodeURIComponent(name)}/upgrade`,
         'POST',
         { body },
+      ),
+    // GET /v1/incarnations/{name}/upgrade-paths (NIM-34). Без `to` — теги реестра
+    // + is_current; с `to` — анализ одной цели (direction/found-legacy/state-миграции).
+    upgradePaths: (name: string, to?: string) =>
+      apiGet<IncarnationUpgradePathsReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/upgrade-paths`,
+        { query: to ? { to } : undefined },
       ),
     // DELETE /v1/incarnations/{name}?allow_destroy=<bool>. allow_destroy=true →
     // снос без teardown (force), false → штатный через scenario `destroy`.

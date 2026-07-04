@@ -848,6 +848,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{name}/upgrade-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Пути апгрейда инкарнации
+         * @description Дешёвый список тегов реестра сервиса (пометка is_current) без ?to=; on-demand анализ одной цели (direction / found-legacy / state-миграции) с ?to=<ref> (ADR-0068 §6). Permission incarnation.upgrade (read-грань). Read-only, без audit.
+         */
+        get: operations["getIncarnationUpgradePaths"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/permissions": {
         parameters: {
             query?: never;
@@ -2880,8 +2900,16 @@ export interface components {
              */
             mode: "replace" | "append" | "remove";
         };
+        IncarnationUpgradePathsReply: {
+            /** Format: int64 */
+            current_state_schema_version: number;
+            current_version: string;
+            paths?: components["schemas"]["UpgradePathRef"][] | null;
+            target?: components["schemas"]["UpgradePathTarget"];
+        };
         IncarnationUpgradeReply: {
             apply_id: string;
+            run_apply_id?: string;
         };
         IncarnationUpgradeRequest: {
             /** @description echo path-name (игнорируется) */
@@ -3429,6 +3457,7 @@ export interface components {
             create?: boolean;
             description?: string;
             form?: components["schemas"]["ScenarioForm"];
+            from_versions?: string[] | null;
             input_schema?: {
                 [key: string]: unknown;
             };
@@ -3981,6 +4010,25 @@ export interface components {
             projection?: string[];
             /** @description опц. селектор подписки на задачу; отсутствие очищает */
             task?: string;
+        };
+        UpgradePathRef: {
+            commit: string;
+            is_current: boolean;
+            ref: string;
+            type: string;
+        };
+        UpgradePathTarget: {
+            direction: string;
+            downgrade: boolean;
+            mode?: string;
+            reachable: boolean;
+            resolved_commit: string;
+            slug?: string;
+            state_migrations?: components["schemas"]["StateSchemaMigration"][] | null;
+            /** Format: int64 */
+            target_state_schema_version: number;
+            to: string;
+            unreachable_reason?: string;
         };
         VigilCreateRequest: {
             /** @description адрес core-beacon (напр. 'core.beacon.file_changed') */
@@ -7759,6 +7807,77 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getIncarnationUpgradePaths: {
+        parameters: {
+            query?: {
+                /** @description опц. целевой git-ref для on-demand анализа одной цели; пусто → список тегов реестра + is_current */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationUpgradePathsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
