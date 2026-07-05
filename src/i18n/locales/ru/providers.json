@@ -23,5 +23,11 @@
   "secretModeValue": "Значение",
   "secretModeRef": "Путь (Vault)",
   "errorNameTaken": "Провайдер с таким именем уже существует. Выберите другое имя.",
-  "errorForbidden": "Недостаточно прав на эту операцию (нужен provider.create / provider.delete)."
+  "errorForbidden": "Недостаточно прав на эту операцию (нужен provider.create / provider.delete).",
+  "errNameRequired": "Укажите имя",
+  "errNamePattern": "Только строчные буквы, цифры и дефис (до 63)",
+  "errTypeRequired": "Укажите драйвер",
+  "errTypePattern": "Только строчные буквы, цифры и дефис (до 63)",
+  "errRegionRequired": "Укажите регион",
+  "errCredentialsRequired": "Заполните credentials: значение или путь"
 }

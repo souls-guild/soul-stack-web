@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type ProviderCreateRequest } from '../../api/keeper';
 import { Modal, Button, Input } from '../../components/primitives';
 import { SecretModeField } from '../../components/input/SecretModeField';
-import type { SecretMode } from '../../components/input/secretMode';
+import { providerCreateSchema, parseCredentialsKV, type ProviderCreateFormValues } from './schemas';
 import { prettyProviderError } from './errors';
 import styles from '../common.module.css';
 
@@ -13,173 +15,169 @@ interface Props {
   onClose: () => void;
 }
 
-/** Парсит "key: value" построчно в объект credentials. Строки без ':' игнорируются. */
-function parseKV(raw: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const line of raw.split('\n')) {
-    const idx = line.indexOf(':');
-    if (idx === -1) continue;
-    const k = line.slice(0, idx).trim();
-    const v = line.slice(idx + 1).trim();
-    if (k) out[k] = v;
-  }
-  return out;
-}
-
-const NAME_PATTERN = /^[a-z0-9-]{1,63}$/;
+const DEFAULTS: ProviderCreateFormValues = {
+  name: '',
+  type: '',
+  region: '',
+  fqdnSuffix: '',
+  credMode: 'ref',
+  credValue: '',
+  credRef: '',
+};
 
 export function ProviderCreateModal({ open, onClose }: Props) {
   const { t } = useTranslation(['providers', 'common', 'forms']);
   const qc = useQueryClient();
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const [name, setName] = useState('');
-  const [type, setType] = useState('');
-  const [region, setRegion] = useState('');
-  const [fqdnSuffix, setFqdnSuffix] = useState('');
-  // credentials — dual-mode: значение (KV-объект) XOR credentials_ref (vault-путь).
-  const [credMode, setCredMode] = useState<SecretMode>('ref');
-  const [credValue, setCredValue] = useState(''); // KV-текст "key: value"
-  const [credRef, setCredRef] = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    setName('');
-    setType('');
-    setRegion('');
-    setFqdnSuffix('');
-    setCredMode('ref');
-    setCredValue('');
-    setCredRef('');
-  }, [open]);
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isValid, isSubmitting },
+  } = useForm<ProviderCreateFormValues>({
+    resolver: zodResolver(providerCreateSchema),
+    mode: 'onChange',
+    defaultValues: DEFAULTS,
+  });
 
   const createMu = useMutation({
     mutationFn: (body: ProviderCreateRequest) => keeperApi.providers.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['providers.list'] });
+      reset(DEFAULTS);
       onClose();
     },
+    onError: (err) => setServerError(prettyProviderError(err)),
   });
 
-  const credObject = parseKV(credValue);
-  const credProvided = credMode === 'value' ? Object.keys(credObject).length > 0 : credRef.trim() !== '';
-  const canSubmit =
-    NAME_PATTERN.test(name) && NAME_PATTERN.test(type) && region.trim() !== '' && credProvided;
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    // credentials XOR credentials_ref — шлём поле активного режима (ADR-064).
-    const body: ProviderCreateRequest = {
-      name,
-      type,
-      region: region.trim(),
-      fqdn_suffix: fqdnSuffix.trim() || undefined,
-      credentials: credMode === 'value' ? (credObject as ProviderCreateRequest['credentials']) : undefined,
-      credentials_ref: credMode === 'ref' ? credRef.trim() || undefined : undefined,
-    };
-    createMu.mutate(body);
+  function close() {
+    if (createMu.isPending) return;
+    setServerError(null);
+    reset(DEFAULTS);
+    onClose();
   }
 
+  const onValid = (v: ProviderCreateFormValues) => {
+    setServerError(null);
+    // credentials XOR credentials_ref — шлём поле активного режима (ADR-064).
+    const body: ProviderCreateRequest = {
+      name: v.name,
+      type: v.type,
+      region: v.region,
+      fqdn_suffix: v.fqdnSuffix || undefined,
+      credentials: v.credMode === 'value' ? (parseCredentialsKV(v.credValue) as ProviderCreateRequest['credentials']) : undefined,
+      credentials_ref: v.credMode === 'ref' ? v.credRef.trim() || undefined : undefined,
+    };
+    createMu.mutate(body);
+  };
+
+  const credMode = watch('credMode');
+  const credError = errors.credValue?.message ?? errors.credRef?.message;
+
   return (
-    <Modal open={open} title={t('providers:createTitle')} onClose={onClose}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span className={styles.metaKey}>{t('providers:fieldName')} *</span>
-          <Input
-            data-testid="provider-name-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="aws-eu"
-            required
-            pattern="^[a-z0-9-]{1,63}$"
-          />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('providers:fieldNameHint')}</span>
-        </label>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span className={styles.metaKey}>{t('providers:fieldType')} *</span>
-          <Input
-            data-testid="provider-type-input"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            placeholder="community-aws"
-            required
-            pattern="^[a-z0-9-]{1,63}$"
-          />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('providers:fieldTypeHint')}</span>
-        </label>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span className={styles.metaKey}>{t('providers:fieldRegion')} *</span>
-          <Input
-            data-testid="provider-region-input"
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            placeholder="eu-central-1"
-            required
-          />
-        </label>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span className={styles.metaKey}>{t('providers:fieldFqdnSuffix')}</span>
-          <Input
-            data-testid="provider-fqdn-input"
-            value={fqdnSuffix}
-            onChange={(e) => setFqdnSuffix(e.target.value)}
-            placeholder="cloud.example.com"
-          />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('providers:fieldFqdnSuffixHint')}</span>
-        </label>
-
-        <SecretModeField
-          label={t('providers:fieldCredentials')}
-          required
-          mode={credMode}
-          onModeChange={setCredMode}
-          testIdBase="provider-credentials"
-          valueModeLabel={t('providers:secretModeValue')}
-          refModeLabel={t('providers:secretModeRef')}
-          renderValue={({ testId }) => (
-            <>
-              <textarea
-                data-testid={testId}
-                value={credValue}
-                onChange={(e) => setCredValue(e.target.value)}
-                placeholder={'access_key: AKIA…\nsecret_key: …'}
-                rows={3}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  resize: 'vertical',
-                }}
-              />
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('providers:fieldCredentialsValueHint')}</span>
-            </>
-          )}
-          refValue={credRef}
-          onRefChange={setCredRef}
-          refType="text"
-          refPlaceholder="vault:secret/cloud/aws-eu"
-          refHint={t('providers:fieldCredentialsRefHint')}
-        />
-
-        {createMu.isError ? (
-          <div role="alert" className={styles.errorBox} data-testid="provider-form-error">
-            {prettyProviderError(createMu.error)}
-          </div>
-        ) : null}
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-          <Button variant="ghost" type="button" onClick={onClose} disabled={createMu.isPending}>
+    <Modal
+      open={open}
+      title={t('providers:createTitle')}
+      onClose={close}
+      footer={
+        <>
+          <Button variant="ghost" type="button" onClick={close} disabled={isSubmitting || createMu.isPending}>
             {t('common:cancel')}
           </Button>
-          <Button variant="primary" type="submit" disabled={createMu.isPending || !canSubmit}>
+          <Button
+            variant="primary"
+            type="button"
+            disabled={!isValid || isSubmitting || createMu.isPending}
+            onClick={handleSubmit(onValid)}
+          >
             {t('common:create')}
           </Button>
+        </>
+      }
+    >
+      <form noValidate style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Input
+          data-testid="provider-name-input"
+          label={`${t('providers:fieldName')} *`}
+          hint={t('providers:fieldNameHint')}
+          placeholder="aws-eu"
+          error={errors.name?.message ? t(errors.name.message) : undefined}
+          {...register('name')}
+        />
+        <Input
+          data-testid="provider-type-input"
+          label={`${t('providers:fieldType')} *`}
+          hint={t('providers:fieldTypeHint')}
+          placeholder="community-aws"
+          error={errors.type?.message ? t(errors.type.message) : undefined}
+          {...register('type')}
+        />
+        <Input
+          data-testid="provider-region-input"
+          label={`${t('providers:fieldRegion')} *`}
+          placeholder="eu-central-1"
+          error={errors.region?.message ? t(errors.region.message) : undefined}
+          {...register('region')}
+        />
+        <Input
+          data-testid="provider-fqdn-input"
+          label={t('providers:fieldFqdnSuffix')}
+          hint={t('providers:fieldFqdnSuffixHint')}
+          placeholder="cloud.example.com"
+          {...register('fqdnSuffix')}
+        />
+
+        <div>
+          <SecretModeField
+            label={t('providers:fieldCredentials')}
+            required
+            mode={credMode}
+            onModeChange={(m) => setValue('credMode', m, { shouldValidate: true })}
+            testIdBase="provider-credentials"
+            valueModeLabel={t('providers:secretModeValue')}
+            refModeLabel={t('providers:secretModeRef')}
+            renderValue={({ testId }) => (
+              <>
+                <textarea
+                  data-testid={testId}
+                  value={watch('credValue')}
+                  onChange={(e) => setValue('credValue', e.target.value, { shouldValidate: true })}
+                  placeholder={'access_key: AKIA…\nsecret_key: …'}
+                  rows={3}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    resize: 'vertical',
+                  }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('providers:fieldCredentialsValueHint')}</span>
+              </>
+            )}
+            refValue={watch('credRef')}
+            onRefChange={(v) => setValue('credRef', v, { shouldValidate: true })}
+            refType="text"
+            refPlaceholder="vault:secret/cloud/aws-eu"
+            refHint={t('providers:fieldCredentialsRefHint')}
+          />
+          {credError ? (
+            <span data-testid="provider-credentials-error" style={{ fontSize: 12, color: 'var(--danger)' }}>
+              {t(credError)}
+            </span>
+          ) : null}
         </div>
+
+        {serverError ? (
+          <div role="alert" className={styles.errorBox} data-testid="provider-form-error">
+            {serverError}
+          </div>
+        ) : null}
       </form>
     </Modal>
   );

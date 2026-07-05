@@ -23,5 +23,11 @@
   "secretModeValue": "Value",
   "secretModeRef": "Path (Vault)",
   "errorNameTaken": "A provider with this name already exists. Choose another name.",
-  "errorForbidden": "Insufficient permissions for this operation (requires provider.create / provider.delete)."
+  "errorForbidden": "Insufficient permissions for this operation (requires provider.create / provider.delete).",
+  "errNameRequired": "Enter a name",
+  "errNamePattern": "Lowercase letters, digits and hyphens only (max 63)",
+  "errTypeRequired": "Enter a driver",
+  "errTypePattern": "Lowercase letters, digits and hyphens only (max 63)",
+  "errRegionRequired": "Enter a region",
+  "errCredentialsRequired": "Provide credentials: value or path"
 }
