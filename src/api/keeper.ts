@@ -336,7 +336,8 @@ export interface ServiceRefInfo {
   is_default?: boolean;
 }
 export interface ServiceRefListReply {
-  items: ServiceRefInfo[];
+  // ключ `refs` (не `items`) — соответствие backend-схеме ServiceRefsListReply; nullable.
+  refs: ServiceRefInfo[] | null;
 }
 
 // input_schema — flat-map field→property (НЕ JSON-Schema-обёртка `{type:'object',properties}`).

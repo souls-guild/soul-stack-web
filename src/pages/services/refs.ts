@@ -60,7 +60,7 @@ export function useServiceRefs(serviceName: string | undefined, enabled = true):
             : String(q.error),
       };
     }
-    const items = q.data?.items ?? [];
+    const items = q.data?.refs ?? [];
     const tags = items.filter((r) => r.type === 'tag').slice().sort(semverDesc);
     const branches = items.filter((r) => r.type === 'branch').slice().sort(defaultBranchFirst);
     const defaultRef = items.find((r) => r.is_default)?.name ?? null;

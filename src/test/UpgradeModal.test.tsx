@@ -10,7 +10,7 @@ const REFS: FetchRoute = {
   method: 'GET',
   url: '/v1/services/redis/refs',
   body: {
-    items: [
+    refs: [
       { name: 'v1.0.0', type: 'tag', is_default: false },
       { name: 'v2.0.0', type: 'tag', is_default: false },
     ],
