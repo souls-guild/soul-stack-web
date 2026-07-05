@@ -23,6 +23,23 @@ function secretBase(fieldName: string): string {
   return fieldName.replace(/_ref$/, '');
 }
 
+// Типовой пример значения секрет-поля (placeholder, чисто UX — каталог примеров
+// не отдаёт). Пусто → placeholder не показываем.
+function secretValueExample(base: string): string {
+  switch (base) {
+    case 'bot_token':
+      return '123456789:AAE-ExampleTelegramBotToken';
+    case 'webhook_url':
+      return 'https://hooks.example.com/services/T000/B000/xxxx';
+    case 'header_secret':
+      return 'Bearer s3cr3t-token';
+    case 'password':
+      return 'smtp-app-password';
+    default:
+      return '';
+  }
+}
+
 // Начальное состояние секрет-полей типа из существующего config (edit): в config
 // хранится только *_ref (plaintext сервер стирает) → режим ref, value пуст.
 function secretFieldsFromConfig(fields: HeraldTypeFieldSpec[], config: Record<string, unknown> | null | undefined): Record<string, SecretFieldState> {
@@ -667,6 +684,7 @@ function HeraldSecretFieldControl({
       refModeLabel={t('notifications:secretModeRef')}
       value={state.value}
       onValueChange={onValue}
+      valuePlaceholder={secretValueExample(base) || undefined}
       valueHint={t('notifications:heraldSecretConfigValueHint')}
       refValue={state.ref}
       onRefChange={onRef}
