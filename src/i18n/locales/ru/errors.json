@@ -17,6 +17,7 @@
   "roleAlreadyExists": "Роль с таким именем уже существует.",
   "selectHostSid": "Выберите SID хоста.",
   "selfLockout": "Нельзя оставить кластер без `*`-админа (self-lockout-защита). Сначала назначьте другого оператора с cluster-admin / *.",
+  "secretPlaintextDisabled": "Ввод секрета значением отключён на сервере. Переключитесь на «Путь (Vault)» и укажите vault-ref, либо включите приём значения на стороне Keeper (за TLS-фронтом).",
   "svcAlreadyExists": "Service с таким именем уже зарегистрирован. Выберите другое имя.",
   "svcBadRequest": "Ошибка запроса: {{detail}}.",
   "svcCreatorMissing": "AID создателя отсутствует в реестре operators.",

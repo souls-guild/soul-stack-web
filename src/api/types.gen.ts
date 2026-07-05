@@ -2648,7 +2648,7 @@ export interface components {
             updated_at: string;
         };
         HeraldCreateRequest: {
-            /** @description per-type config (форма зависит от type; см. каталог GET /v1/herald-types) */
+            /** @description per-type config (форма зависит от type; см. каталог GET /v1/herald-types). Секрет канала (bot_token/webhook_url/header_secret) — dual-mode: значение (plaintext) ИЛИ *_ref (vault-путь) */
             config: {
                 [key: string]: unknown;
             };
@@ -2656,7 +2656,9 @@ export interface components {
             enabled?: boolean;
             /** @description имя Herald-канала (kebab-case, 1..63), уникальное в кластере */
             name: string;
-            /** @description опц. vault-ref на signing-token (vault:<mount>/<path>); сам секрет не хранится */
+            /** @description опц. plaintext webhook signing-token (dual-mode, ADR-064): keeper пишет его в Vault сам; XOR с secret_ref. Требует TLS-фронта (secret_ingest.accept_plaintext) */
+            secret?: string;
+            /** @description опц. vault-ref на webhook signing-token (vault:<mount>/<path>); XOR с secret */
             secret_ref?: string;
             /**
              * @description тип канала (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email); значение вне enum → 422
@@ -2690,13 +2692,15 @@ export interface components {
             secret: boolean;
         };
         HeraldUpdateRequest: {
-            /** @description per-type config (replace — полностью заменяет существующий) */
+            /** @description per-type config (replace — полностью заменяет существующий). Секрет канала — dual-mode: значение (plaintext) ИЛИ *_ref */
             config: {
                 [key: string]: unknown;
             };
             /** @description канал включён (опущено → true) */
             enabled?: boolean;
-            /** @description опц. vault-ref на signing-token; отсутствие очищает подпись */
+            /** @description опц. plaintext webhook signing-token (dual-mode, ADR-064): keeper перезаписывает его в Vault по тому же пути; XOR с secret_ref */
+            secret?: string;
+            /** @description опц. vault-ref на signing-token; XOR с secret; отсутствие обоих очищает подпись */
             secret_ref?: string;
             /**
              * @description тип канала (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email)
@@ -3169,8 +3173,12 @@ export interface components {
             type: string;
         };
         ProviderCreateRequest: {
-            /** @description vault-ref до credentials (vault:<path>); значение НЕ резолвится */
-            credentials_ref: string;
+            /** @description опц. plaintext cloud-credentials (dual-mode, ADR-064): напр. {access_key, secret_key}; keeper пишет их в Vault сам; XOR с credentials_ref. Требует TLS-фронта (secret_ingest.accept_plaintext) */
+            credentials?: {
+                [key: string]: unknown;
+            };
+            /** @description vault-ref до credentials (vault:<path>); XOR с credentials. Значение НЕ резолвится */
+            credentials_ref?: string;
             /** @description суффикс FQDN VM (self-onboard: keeper предсказывает FQDN=<name>-<index>.<fqdn_suffix>). Опущено → self-onboard недоступен */
             fqdn_suffix?: string;
             /** @description имя Cloud-Provider-а (kebab) */

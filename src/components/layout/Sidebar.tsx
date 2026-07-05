@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Package,
   Puzzle,
+  Cloud,
   ShieldCheck,
   Eye,
   Scroll,
@@ -55,6 +56,7 @@ const REGISTRY: NavItem[] = [
   { to: '/incarnations', label: 'Incarnations', icon: Boxes },
   { to: '/souls', label: 'Souls', icon: Users },
   { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
+  { to: '/providers', label: 'Providers', icon: Cloud, matchPrefix: '/providers' },
   { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
   { to: '/synods', label: 'Synods', icon: Users2, matchPrefix: '/synods' },
 ];

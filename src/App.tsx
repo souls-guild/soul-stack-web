@@ -26,6 +26,7 @@ import { ServiceDetail } from './pages/services/ServiceDetail';
 import { PluginsList } from './pages/plugins/PluginsList';
 import { PluginDetail } from './pages/plugins/PluginDetail';
 import { PluginRegisterForm } from './pages/plugins/PluginRegisterForm';
+import { ProvidersList } from './pages/providers/ProvidersList';
 import { VigilsList } from './pages/beacons/VigilsList';
 import { VigilDetail } from './pages/beacons/VigilDetail';
 import { VigilNewForm } from './pages/beacons/VigilNewForm';
@@ -116,6 +117,7 @@ export function App() {
             <Route path="/plugins" element={<Protected><PluginsList /></Protected>} />
             <Route path="/plugins/register" element={<Protected><PluginRegisterForm /></Protected>} />
             <Route path="/plugins/:namespace/:name/:ref" element={<Protected><PluginDetail /></Protected>} />
+            <Route path="/providers" element={<Protected><ProvidersList /></Protected>} />
             <Route path="/vigils" element={<Protected><VigilsList /></Protected>} />
             <Route path="/vigils/new" element={<Protected><VigilNewForm /></Protected>} />
             <Route path="/vigils/:name" element={<Protected><VigilDetail /></Protected>} />

@@ -4,8 +4,37 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type Herald, type HeraldCreateRequest, type HeraldUpdateRequest, type HeraldTypeFieldSpec } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Modal, Button, Input } from '../../components/primitives';
+import { SecretModeField } from '../../components/input/SecretModeField';
+import { pickSecretField, plaintextDisabledMessage, type SecretMode } from '../../components/input/secretMode';
 import { useHeraldTypeCatalog } from './heraldTypes';
 import styles from '../common.module.css';
+
+// Состояние одного секрет-поля канала (config <base> XOR <base>_ref, ADR-064).
+interface SecretFieldState {
+  mode: SecretMode;
+  value: string; // plaintext (не сохраняется/не возвращается сервером)
+  ref: string; // vault-ref
+}
+
+const EMPTY_SECRET: SecretFieldState = { mode: 'ref', value: '', ref: '' };
+
+// base-имя секрет-поля: bot_token_ref → bot_token (см. herald/secret.go).
+function secretBase(fieldName: string): string {
+  return fieldName.replace(/_ref$/, '');
+}
+
+// Начальное состояние секрет-полей типа из существующего config (edit): в config
+// хранится только *_ref (plaintext сервер стирает) → режим ref, value пуст.
+function secretFieldsFromConfig(fields: HeraldTypeFieldSpec[], config: Record<string, unknown> | null | undefined): Record<string, SecretFieldState> {
+  const cfg = config ?? {};
+  const out: Record<string, SecretFieldState> = {};
+  for (const f of fields) {
+    if (!f.secret) continue;
+    const ref = typeof cfg[f.name] === 'string' ? (cfg[f.name] as string) : '';
+    out[f.name] = { mode: 'ref', value: '', ref };
+  }
+  return out;
+}
 
 interface Props {
   open: boolean;
@@ -137,6 +166,10 @@ export function HeraldModal({ open, onClose, editing }: Props) {
   const [name, setName] = useState('');
   const [type, setType] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
+  const [secretFields, setSecretFields] = useState<Record<string, SecretFieldState>>({});
+  // top-level webhook signing secret (dual-mode secret XOR secret_ref, ADR-064).
+  const [secretMode, setSecretMode] = useState<SecretMode>('ref');
+  const [secretValue, setSecretValue] = useState('');
   const [secretRef, setSecretRef] = useState('');
   const [enabled, setEnabled] = useState(true);
 
@@ -147,6 +180,8 @@ export function HeraldModal({ open, onClose, editing }: Props) {
     if (editing) {
       setName(editing.name);
       setType(editing.type);
+      setSecretMode('ref');
+      setSecretValue('');
       setSecretRef(editing.secret_ref ?? '');
       setEnabled(editing.enabled);
       // config зависит от полей каталога типа editing.type — если каталог ещё
@@ -154,12 +189,16 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       // useEffect ниже перезаполнит значения, когда каталог придёт.
       const typeFields = typeCatalog.fieldsByType[editing.type] ?? [];
       setFieldValues(rawValuesFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
+      setSecretFields(secretFieldsFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
     } else {
       setName('');
       setType('');
+      setSecretMode('ref');
+      setSecretValue('');
       setSecretRef('');
       setEnabled(true);
       setFieldValues({});
+      setSecretFields({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- typeCatalog намеренно не в deps: обрабатывается след. effect-ом на isLoading
   }, [open, editing]);
@@ -172,6 +211,7 @@ export function HeraldModal({ open, onClose, editing }: Props) {
     const typeFields = typeCatalog.fieldsByType[editing.type];
     if (!typeFields || typeFields.length === 0) return;
     setFieldValues(rawValuesFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
+    setSecretFields(secretFieldsFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- typeCatalog.fieldsByType — нестабильная ссылка, триггер только по isLoading
   }, [open, editing, typeCatalog.isLoading]);
 
@@ -180,12 +220,25 @@ export function HeraldModal({ open, onClose, editing }: Props) {
     setType(nextType);
     const nextFields = typeCatalog.fieldsByType[nextType] ?? [];
     const defaults: Record<string, unknown> = {};
-    for (const f of nextFields) defaults[f.name] = defaultRawValue(f.kind);
+    const secretDefaults: Record<string, SecretFieldState> = {};
+    for (const f of nextFields) {
+      if (f.secret) secretDefaults[f.name] = { ...EMPTY_SECRET };
+      else defaults[f.name] = defaultRawValue(f.kind);
+    }
     setFieldValues(defaults);
+    setSecretFields(secretDefaults);
+    // top-level signing secret сбрасывается при смене типа.
+    setSecretMode('ref');
+    setSecretValue('');
+    setSecretRef('');
   }
 
   function setFieldValue(fieldName: string, value: unknown) {
     setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
+  }
+
+  function updateSecretField(fieldName: string, patch: Partial<SecretFieldState>) {
+    setSecretFields((prev) => ({ ...prev, [fieldName]: { ...(prev[fieldName] ?? EMPTY_SECRET), ...patch } }));
   }
 
   const createMu = useMutation({
@@ -211,13 +264,33 @@ export function HeraldModal({ open, onClose, editing }: Props) {
     e.preventDefault();
     // config в OpenAPI-схеме Herald — opaque object (type: object без properties).
     // openapi-typescript генерирует Record<string, unknown>; приводим через as-cast.
-    const cfg = configFromRawValues(fields, fieldValues) as HeraldCreateRequest['config'];
-    const showSecretRef = Boolean(typeCatalog.secretRequiredByType[type]);
+    const cfg = configFromRawValues(fields.filter((f) => !f.secret), fieldValues) as Record<string, unknown>;
+    // Config-секреты канала (dual-mode <base> XOR <base>_ref, ADR-064): шлём поле
+    // активного режима — значение (plaintext) в <base> ИЛИ vault-ref в <base>_ref.
+    for (const f of fields) {
+      if (!f.secret) continue;
+      const st = secretFields[f.name] ?? EMPTY_SECRET;
+      const picked = pickSecretField(st.mode, st.value, st.ref);
+      if (!picked) continue;
+      if (picked.kind === 'value') cfg[secretBase(f.name)] = picked.value;
+      else cfg[f.name] = picked.value;
+    }
+    // top-level webhook signing secret (dual-mode secret XOR secret_ref) — только
+    // для secret_required-типов (webhook); иначе оба поля опущены.
+    let topSecret: string | undefined;
+    let topSecretRef: string | undefined;
+    if (typeCatalog.secretRequiredByType[type]) {
+      const picked = pickSecretField(secretMode, secretValue, secretRef);
+      if (picked?.kind === 'value') topSecret = picked.value;
+      else if (picked?.kind === 'ref') topSecretRef = picked.value;
+    }
+    const configOut = cfg as HeraldCreateRequest['config'];
     if (editing) {
       const body: HeraldUpdateRequest = {
         type: type as HeraldUpdateRequest['type'],
-        config: cfg,
-        secret_ref: showSecretRef ? secretRef || undefined : undefined,
+        config: configOut,
+        secret: topSecret,
+        secret_ref: topSecretRef,
         enabled,
       };
       updateMu.mutate(body);
@@ -225,8 +298,9 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       const body: HeraldCreateRequest = {
         name,
         type: type as HeraldCreateRequest['type'],
-        config: cfg,
-        secret_ref: showSecretRef ? secretRef || undefined : undefined,
+        config: configOut,
+        secret: topSecret,
+        secret_ref: topSecretRef,
         enabled,
       };
       createMu.mutate(body);
@@ -240,6 +314,11 @@ export function HeraldModal({ open, onClose, editing }: Props) {
   // Обязательные поля типа (кроме уже заполненных) не заполнены → submit disabled.
   const missingRequired = fields.some((f) => {
     if (!f.required) return false;
+    if (f.secret) {
+      // dual-mode: заполнено ⟺ активный режим даёт непустое значение (XOR).
+      const st = secretFields[f.name];
+      return !st || pickSecretField(st.mode, st.value, st.ref) === null;
+    }
     const v = fieldValues[f.name];
     if (f.kind === 'bool') return false;
     return String(v ?? '').trim() === '';
@@ -298,28 +377,47 @@ export function HeraldModal({ open, onClose, editing }: Props) {
         {/* Динамические config-поля per-type (ADR-042 no-hardcode: каталог GET /v1/herald-types) */}
         {type && (
           <div data-testid="herald-dynamic-fields" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {fields.map((f) => (
-              <HeraldFieldControl
-                key={f.name}
-                field={f}
-                value={fieldValues[f.name]}
-                onChange={(v) => setFieldValue(f.name, v)}
-              />
-            ))}
+            {fields.map((f) =>
+              f.secret ? (
+                <HeraldSecretFieldControl
+                  key={f.name}
+                  field={f}
+                  state={secretFields[f.name] ?? EMPTY_SECRET}
+                  onMode={(m) => updateSecretField(f.name, { mode: m })}
+                  onValue={(v) => updateSecretField(f.name, { value: v })}
+                  onRef={(v) => updateSecretField(f.name, { ref: v })}
+                />
+              ) : (
+                <HeraldFieldControl
+                  key={f.name}
+                  field={f}
+                  value={fieldValues[f.name]}
+                  onChange={(v) => setFieldValue(f.name, v)}
+                />
+              ),
+            )}
           </div>
         )}
 
         {type && typeCatalog.secretRequiredByType[type] && (
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={styles.metaKey}>{t('notifications:heraldFieldSecretRef')}</span>
-            <Input
-              data-testid="herald-secret-ref-input"
-              value={secretRef}
-              onChange={(e) => setSecretRef(e.target.value)}
-              placeholder="vault:secret/my-webhook-token"
-            />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('notifications:heraldFieldSecretRefHint')}</span>
-          </label>
+          <SecretModeField
+            label={t('notifications:heraldFieldSecret')}
+            mode={secretMode}
+            onModeChange={setSecretMode}
+            testIdBase="herald-secret"
+            valueModeLabel={t('notifications:secretModeValue')}
+            refModeLabel={t('notifications:secretModeRef')}
+            value={secretValue}
+            onValueChange={setSecretValue}
+            valuePlaceholder="s3cr3t-signing-token"
+            valueHint={t('notifications:heraldFieldSecretValueHint')}
+            refValue={secretRef}
+            onRefChange={setSecretRef}
+            refTestId="herald-secret-ref-input"
+            refType="text"
+            refPlaceholder="vault:secret/my-webhook-token"
+            refHint={t('notifications:heraldFieldSecretRefHint')}
+          />
         )}
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
@@ -334,10 +432,11 @@ export function HeraldModal({ open, onClose, editing }: Props) {
         </label>
 
         {error ? (
-          <div role="alert" className={styles.errorBox}>
-            {error instanceof ApiError
-              ? String(error.status) + ': ' + error.message
-              : String(error)}
+          <div role="alert" className={styles.errorBox} data-testid="herald-form-error">
+            {plaintextDisabledMessage(error) ??
+              (error instanceof ApiError
+                ? t('errors:generic', { status: error.status, detail: error.detail || error.message })
+                : String(error))}
           </div>
         ) : null}
 
@@ -534,5 +633,47 @@ function HeraldFieldControl({
         required={field.required}
       />
     </label>
+  );
+}
+
+/**
+ * Секрет-поле канала с dual-mode вводом (ADR-064): значение (plaintext) XOR путь
+ * (vault-ref). base-имя (bot_token_ref → bot_token) — plaintext-вариант в config;
+ * *_ref — vault-путь. ref-инпут сохраняет testid herald-field-<name> (совместимость).
+ */
+function HeraldSecretFieldControl({
+  field,
+  state,
+  onMode,
+  onValue,
+  onRef,
+}: {
+  field: HeraldTypeFieldSpec;
+  state: SecretFieldState;
+  onMode: (m: SecretMode) => void;
+  onValue: (v: string) => void;
+  onRef: (v: string) => void;
+}) {
+  const { t } = useTranslation(['notifications', 'forms']);
+  const base = secretBase(field.name);
+  return (
+    <SecretModeField
+      label={field.label}
+      required={field.required}
+      mode={state.mode}
+      onModeChange={onMode}
+      testIdBase={`herald-secret-${base}`}
+      valueModeLabel={t('notifications:secretModeValue')}
+      refModeLabel={t('notifications:secretModeRef')}
+      value={state.value}
+      onValueChange={onValue}
+      valueHint={t('notifications:heraldSecretConfigValueHint')}
+      refValue={state.ref}
+      onRefChange={onRef}
+      refTestId={`herald-field-${field.name}`}
+      refType="password"
+      refPlaceholder="vault:secret/..."
+      refHint={t('notifications:heraldFieldKindVaultRefHint')}
+    />
   );
 }
