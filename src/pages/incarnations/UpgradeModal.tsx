@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,8 +22,12 @@ interface Props {
 export function UpgradeModal({ open, incarnationName, serviceName, currentRef, onClose }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
   const [applyId, setApplyId] = useState<string | null>(null);
+  // run_apply_id есть ТОЛЬКО у found-перехода (запуск upgrade-сценария на хостах);
+  // при его наличии показываем «Отслеживать процесс» → RunDetail этого host-Run.
+  const [runApplyId, setRunApplyId] = useState<string | null>(null);
 
   // Тянем refs только когда modal открыт — не плодим лишних запросов.
   const refs = useServiceRefs(serviceName, open);
@@ -59,6 +64,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
       keeperApi.incarnations.upgrade(incarnationName, { to_version: values.to_version }),
     onSuccess: (reply) => {
       setApplyId(reply.apply_id);
+      setRunApplyId(reply.run_apply_id ?? null);
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
     },
     onError: (err) => {
@@ -69,6 +75,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
   function close() {
     setServerError(null);
     setApplyId(null);
+    setRunApplyId(null);
     reset();
     onClose();
   }
@@ -83,9 +90,25 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
       onClose={close}
       footer={
         applyId ? (
-          <Button type="button" variant="primary" onClick={close}>
-            {t('close')}
-          </Button>
+          <>
+            {runApplyId ? (
+              <Button
+                type="button"
+                variant="secondary"
+                data-testid="upgrade-track-run"
+                onClick={() => {
+                  const target = `/incarnations/${encodeURIComponent(incarnationName)}/runs/${encodeURIComponent(runApplyId)}`;
+                  close();
+                  navigate(target);
+                }}
+              >
+                {t('incarnations:upgradeTrackRun')}
+              </Button>
+            ) : null}
+            <Button type="button" variant="primary" data-testid="upgrade-close" onClick={close}>
+              {t('close')}
+            </Button>
+          </>
         ) : (
           <>
             <Button type="button" variant="ghost" onClick={close} disabled={isSubmitting || mu.isPending}>

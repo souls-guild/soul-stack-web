@@ -234,6 +234,7 @@
   "upgradeMigrationsNone": "No state-schema migrations.",
   "upgradeUnreachableLabel": "Target unreachable",
   "upgradeUnreachableSubmit": "Target unreachable — upgrade blocked.",
+  "upgradeTrackRun": "Track run",
   "yesShort": "yes",
   "traitsLabel": "Traits (incarnation labels)",
   "traitsHint": "key → scalar value or list of values. Projected into souls.traits of member hosts.",

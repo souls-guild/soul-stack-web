@@ -234,6 +234,7 @@
   "upgradeMigrationsNone": "Миграций схемы нет.",
   "upgradeUnreachableLabel": "Цель недостижима",
   "upgradeUnreachableSubmit": "Цель недостижима — переход заблокирован.",
+  "upgradeTrackRun": "Отслеживать процесс",
   "yesShort": "да",
   "traitsLabel": "Traits (метки инкарнации)",
   "traitsHint": "key → значение (строка) или список значений. Проецируется в souls.traits хостов-членов.",
