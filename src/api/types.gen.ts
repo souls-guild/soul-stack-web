@@ -748,6 +748,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{name}/runs/{apply_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live-ход прогона инкарнации (SSE)
+         * @description text/event-stream: task.executed/apply.completed/failed/cancelled по apply_id. Auth: Authorization: Bearer (fetch-streaming, ADR-068 §A0). Доступ: инициатор ИЛИ incarnation.get/history; чужой/несуществующий apply_id → 403 (anti-enum, parity /mcp/events). Секреты в payload маскируются.
+         */
+        get: operations["streamIncarnationRunEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/runs/{apply_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Задачи прогона инкарнации (план + per-host)
+         * @description План задач одного apply_id (plan_index/name/module/no_log/passage) + per-host статус/output/ошибка из журнала аудита (task.executed) джойном по plan_index. Чужой apply_id / вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         */
+        get: operations["getIncarnationRunTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations/{name}/scenarios/{scenario}": {
         parameters: {
             query?: never;
@@ -1441,7 +1481,7 @@ export interface paths {
         };
         /**
          * Глобальный список прогонов (paged)
-         * @description Свёртка apply_runs по apply_id ЧЕРЕЗ ВСЕ инкарнации: статус прогона (applying/success/failed/cancelled), инкарнация-владелец, границы времени, инициатор. Прогон (apply_run) — НЕ Voyage. Видимость scoped по RBAC (ADR-047, fail-closed: пустой scope → пустой список). Permission incarnation.history. Read-only.
+         * @description Свёртка apply_runs по apply_id ЧЕРЕЗ ВСЕ инкарнации: статус прогона (applying/success/failed/cancelled), инкарнация-владелец, границы времени, инициатор. Прогон (apply_run) — НЕ Voyage. Сортировка колонок — sort/sort_dir (стабильный tie-break apply_id). Видимость scoped по RBAC (ADR-047, fail-closed: пустой scope → пустой список). Permission incarnation.history. Read-only.
          */
         get: operations["listRuns"];
         put?: never;
@@ -2754,6 +2794,7 @@ export interface components {
             };
         };
         IncarnationGetReply: {
+            applying_apply_id?: string;
             covens: string[] | null;
             /** Format: date-time */
             created_at: string;
@@ -3395,6 +3436,7 @@ export interface components {
             failed_task_idx?: number;
             /** Format: int64 */
             passage: number;
+            /** @description FQDN хоста ЛИБО синтетический sid прогона (keeper=on:keeper, __run__=run-sentinel аборта до dispatch), не адресующий Soul (NIM-36) */
             sid: string;
             status: string;
         };
@@ -3408,6 +3450,37 @@ export interface components {
             started_by_aid?: string;
             /** @enum {string} */
             status: "applying" | "success" | "failed" | "cancelled";
+        };
+        RunTaskEntry: {
+            hosts: components["schemas"]["RunTaskHostEntry"][] | null;
+            module: string;
+            name: string;
+            no_log: boolean;
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Format: int64 */
+            passage: number;
+            /** Format: int64 */
+            plan_index: number;
+        };
+        RunTaskErrorEntry: {
+            code: string;
+            message?: string;
+            module: string;
+        };
+        RunTaskHostEntry: {
+            error?: components["schemas"]["RunTaskErrorEntry"];
+            output?: {
+                [key: string]: unknown;
+            };
+            /** @description FQDN хоста ЛИБО синтетический sid прогона (keeper=on:keeper) */
+            sid: string;
+            /** @enum {string} */
+            status: "TASK_STATUS_UNSPECIFIED" | "TASK_STATUS_OK" | "TASK_STATUS_CHANGED" | "TASK_STATUS_SKIPPED" | "TASK_STATUS_FAILED" | "TASK_STATUS_TIMED_OUT" | "TASK_STATUS_CANCELLED";
+        };
+        RunTasksReply: {
+            tasks: components["schemas"]["RunTaskEntry"][] | null;
         };
         RunsListReply: {
             /** @description страница прогонов через все инкарнации (свёртка apply_runs) */
@@ -7437,6 +7510,146 @@ export interface operations {
             };
         };
     };
+    streamIncarnationRunEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description ULID прогона; чужой/несуществующий → 403 (anti-enum) */
+                apply_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SSE-поток apply-событий прогона */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getIncarnationRunTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации */
+                name: string;
+                /** @description ULID прогона; не-ULID → 400 */
+                apply_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunTasksReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     runIncarnationScenario: {
         parameters: {
             query?: never;
@@ -10142,6 +10355,10 @@ export interface operations {
                 status?: string;
                 /** @description фильтр по имени инкарнации; невалидное имя → 422 */
                 incarnation?: string;
+                /** @description поле сортировки (started_at/finished_at/status/incarnation/scenario; дефолт started_at); невалидное → 422 */
+                sort?: string;
+                /** @description направление сортировки (asc/desc; дефолт desc); невалидное → 422 */
+                sort_dir?: string;
                 /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
                 offset?: number;
                 /** @description размер страницы 1..100 (out-of-range → 400) */

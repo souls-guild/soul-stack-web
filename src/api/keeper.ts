@@ -27,6 +27,16 @@ export type RunSummaryEntry = components['schemas']['RunSummaryEntry'];
 export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply'];
 export type RunDetailReply = components['schemas']['RunDetailReply'];
 export type RunHostStatusEntry = components['schemas']['RunHostStatusEntry'];
+
+// GET /runs/{apply_id}/tasks (NIM-37 Схема-2). Сервер джойнит план (name/module/
+// params/no_log/passage) с per-host исходами из audit (task.executed) по plan_index:
+// live И история одним ответом. Схемы ядра: RunTaskEntry/RunTaskHostEntry/
+// RunTaskErrorEntry/RunTasksReply; алиасы держат прежние имена для консьюмеров.
+// output — register_data (структура, НЕ строка); hosts/tasks nullable по контракту.
+export type RunTaskHost = components['schemas']['RunTaskHostEntry'];
+export type RunTaskError = components['schemas']['RunTaskErrorEntry'];
+export type RunTaskView = components['schemas']['RunTaskEntry'];
+export type RunTasksReply = components['schemas']['RunTasksReply'];
 export type RunStatus = NonNullable<RunSummaryEntry['status']>;
 // Глобальный run-view (GET /v1/runs + /v1/runs/stats) — те же apply_run-ы, но через ВСЕ инкарнации.
 export type GlobalRunEntry = components['schemas']['GlobalRunEntry'];
@@ -560,6 +570,14 @@ export const keeperApi = {
     runDetail: (name: string, applyId: string) =>
       apiGet<RunDetailReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(applyId)}`,
+      ),
+    // GET /v1/incarnations/{name}/runs/{apply_id}/tasks (NIM-37) — per-task ход
+    // прогона (Схема-2): сервер джойнит план с per-host исходами. Live И история
+    // одним ответом. 404/501 (backend-слайс не задеплоен) → graceful fallback на
+    // per-host + audit.
+    runTasks: (name: string, applyId: string) =>
+      apiGet<RunTasksReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(applyId)}/tasks`,
       ),
     checkDrift: (name: string, body: IncarnationCheckDriftRequest = {}) =>
       apiSend<DriftReport>(

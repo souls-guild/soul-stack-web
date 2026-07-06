@@ -115,3 +115,17 @@ export function runStatusTone(s: string | undefined): 'ok' | 'warn' | 'danger' |
       return 'muted';
   }
 }
+
+// Per-task status→tone (NIM-37). Wire-значение — proto TaskStatus.String():
+// TASK_STATUS_OK|CHANGED|FAILED|TIMED_OUT|SKIPPED|CANCELLED (SSE `task_status`,
+// audit `status` — одна нормализация). Матч по contains: устойчив к префиксу и
+// к возможному bare-значению.
+export function taskStatusTone(status: string | undefined): 'ok' | 'warn' | 'danger' | 'info' | 'muted' {
+  const s = (status ?? '').toUpperCase();
+  if (s.includes('FAILED') || s.includes('TIMED_OUT')) return 'danger';
+  if (s.includes('CANCELLED') || s.includes('SKIPPED')) return 'muted';
+  // CHANGED — янтарный (Ansible-конвенция: изменение = attention, не neutral-info).
+  if (s.includes('CHANGED')) return 'warn';
+  if (s.includes('OK')) return 'ok';
+  return 'muted';
+}
