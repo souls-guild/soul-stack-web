@@ -38,7 +38,6 @@ import { PushRunsList } from './pages/pushRuns/PushRunsList';
 import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
 import { RunWizard } from './pages/run/RunWizard';
 import { RunsFeed } from './pages/runs/RunsFeed';
-import { IncarnationRunsList } from './pages/runs/IncarnationRunsList';
 import { VoyageDetail } from './pages/voyages/VoyageDetail';
 import { CadencesList } from './pages/cadences/CadencesList';
 import { CadenceDetail } from './pages/cadences/CadenceDetail';
@@ -129,7 +128,8 @@ export function App() {
             <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
             <Route path="/run" element={<Protected><RunWizard /></Protected>} />
             <Route path="/runs" element={<Protected><RunsFeed /></Protected>} />
-            <Route path="/incarnation-runs" element={<Protected><IncarnationRunsList /></Protected>} />
+            {/* Слит в единый /runs (сегмент Scenario); редирект для backward-compat ссылок */}
+            <Route path="/incarnation-runs" element={<Navigate to="/runs" replace />} />
             <Route path="/voyages/:id" element={<Protected><VoyageDetail /></Protected>} />
             <Route path="/cadences" element={<Protected><CadencesList /></Protected>} />
             <Route path="/cadences/:id" element={<Protected><CadenceDetail /></Protected>} />

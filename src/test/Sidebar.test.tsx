@@ -29,9 +29,10 @@ describe('Sidebar navigation', () => {
     expect(screen.getByRole('link', { name: /All runs/ })).toHaveAttribute('href', '/runs');
   });
 
-  it('Incarnation runs (глобальный список apply_run-ов) присутствует', () => {
+  it('Incarnation runs дедуплицирован — свёрнут в единый /runs (NIM-38), отдельного пункта нет', () => {
     renderSidebar();
-    expect(screen.getByRole('link', { name: /Incarnation runs/ })).toHaveAttribute('href', '/incarnation-runs');
+    expect(screen.queryByRole('link', { name: /Incarnation runs/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /incarnation-runs/ })).not.toBeInTheDocument();
   });
 
   it('Provisioning Policy убран из REGISTRY — нет прямой ссылки на /provisioning-policy', () => {
