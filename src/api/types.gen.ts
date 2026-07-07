@@ -2663,6 +2663,7 @@ export interface components {
             finished_at?: string;
             incarnation: string;
             scenario: string;
+            service: string;
             /** Format: date-time */
             started_at: string;
             started_by_aid?: string;
@@ -10355,7 +10356,15 @@ export interface operations {
                 status?: string;
                 /** @description фильтр по имени инкарнации; невалидное имя → 422 */
                 incarnation?: string;
-                /** @description поле сортировки (started_at/finished_at/status/incarnation/scenario; дефолт started_at); невалидное → 422 */
+                /** @description фильтр по сервису инкарнации-владельца (точное совпадение); длиннее 128 символов → 422 */
+                service?: string;
+                /** @description свободный поиск (substring, регистронезависимо) по incarnation/scenario/service/started_by; длиннее 128 символов → 422 */
+                q?: string;
+                /** @description фильтр: время старта прогона ≥ (RFC3339, inclusive); невалидное → 422 */
+                started_after?: string;
+                /** @description фильтр: время старта прогона ≤ (RFC3339, inclusive); невалидное → 422 */
+                started_before?: string;
+                /** @description поле сортировки (started_at/finished_at/status/incarnation/service/scenario; дефолт started_at); невалидное → 422 */
                 sort?: string;
                 /** @description направление сортировки (asc/desc; дефолт desc); невалидное → 422 */
                 sort_dir?: string;

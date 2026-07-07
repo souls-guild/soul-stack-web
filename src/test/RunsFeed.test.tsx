@@ -89,6 +89,7 @@ const RUNS = {
     {
       apply_id: '01RUNAAAAAAAAAAAAAAAAAAAA1',
       incarnation: 'redis-prod',
+      service: 'redis',
       scenario: 'create',
       status: 'success',
       started_by_aid: 'archon-alice',
@@ -98,6 +99,7 @@ const RUNS = {
     {
       apply_id: '01RUNBBBBBBBBBBBBBBBBBBBB2',
       incarnation: 'pg-dev',
+      service: 'postgres',
       scenario: 'restart',
       status: 'failed',
       started_at: '2026-06-30T11:00:00Z',
@@ -110,13 +112,22 @@ const RUNS = {
 
 const EMPTY = { items: [], offset: 0, limit: 50, total: 0 };
 
+// Каталог сервисов (NIM-42 Service-фильтр Scenario) — GET /v1/services.
+const SERVICES = {
+  items: [
+    { name: 'redis', git: 'https://example.test/redis.git', ref: 'main', created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z' },
+    { name: 'postgres', git: 'https://example.test/postgres.git', ref: 'main', created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z' },
+  ],
+};
+
 // Все эндпоинты; /v1/runs/stats ОБЯЗАН идти РАНЬШЕ /v1/runs (fetchMock матчит по префиксу).
-function baseRoutes(over: Partial<{ voyages: unknown; push: unknown; errands: unknown; stats: unknown; runs: unknown }> = {}) {
+function baseRoutes(over: Partial<{ voyages: unknown; push: unknown; errands: unknown; stats: unknown; runs: unknown; services: unknown }> = {}) {
   return [
     { method: 'GET', url: '/v1/voyages', body: over.voyages ?? VOYAGES },
     { method: 'GET', url: '/v1/push-runs', body: over.push ?? PUSH },
     { method: 'GET', url: '/v1/errands', body: over.errands ?? ERRANDS },
     { method: 'GET', url: '/v1/runs/stats', body: over.stats ?? STATS },
+    { method: 'GET', url: '/v1/services', body: over.services ?? SERVICES },
     { method: 'GET', url: '/v1/runs', body: over.runs ?? RUNS },
   ];
 }
@@ -130,6 +141,7 @@ function captureRuns(runsTotal = 2) {
     let body: unknown = EMPTY;
     if (url.includes('/v1/runs/stats')) body = STATS;
     else if (url.startsWith('/v1/runs')) body = { ...RUNS, total: runsTotal };
+    else if (url.startsWith('/v1/services')) body = SERVICES;
     else if (url.startsWith('/v1/voyages')) body = VOYAGES;
     else if (url.startsWith('/v1/push-runs')) body = PUSH;
     else if (url.startsWith('/v1/errands')) body = ERRANDS;
@@ -296,6 +308,38 @@ describe('RunsFeed (unified /runs)', () => {
     await waitFor(() => expect(unionRows()).toHaveLength(4));
   });
 
+  // ── NIM-42 PART B: клиентский поиск по загруженным union-строкам ──────────────
+
+  it('[union-search] фильтрует по подстроке target (case-insensitive), backend НЕ дёргается', async () => {
+    installFetchMock(baseRoutes());
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(unionRows()).toHaveLength(6));
+    const user = userEvent.setup();
+    // target push-строки — destiny_ref "web@v1.2.0"; ищем верхним регистром.
+    await user.type(screen.getByTestId('runs-union-search'), 'WEB@V1.2.0');
+    await waitFor(() => expect(unionRows()).toHaveLength(1));
+    expect(screen.getByTestId('runs-row-01PUSH00000000000000000001')).toBeInTheDocument();
+  });
+
+  it('[union-search] совпадение по id ИЛИ status; пусто = без фильтра', async () => {
+    installFetchMock(baseRoutes());
+    renderWithProviders(<RunsFeed />, '/runs');
+    await waitFor(() => expect(unionRows()).toHaveLength(6));
+    const user = userEvent.setup();
+    const search = screen.getByTestId('runs-union-search');
+    // Подстрока id (errand_id) — один результат.
+    await user.type(search, '01ERR0000000');
+    await waitFor(() => expect(unionRows()).toHaveLength(1));
+    expect(screen.getByTestId('runs-row-01ERR000000000000000000001')).toBeInTheDocument();
+    // Очистка — снова все 6 (фильтр не остался «залипшим»).
+    await user.clear(search);
+    await waitFor(() => expect(unionRows()).toHaveLength(6));
+    // Подстрока status "running" — voyage со статусом running.
+    await user.type(search, 'running');
+    await waitFor(() => expect(unionRows()).toHaveLength(1));
+    expect(screen.getByTestId('runs-row-01VSCY0000000000000000001')).toBeInTheDocument();
+  });
+
   // ── Segment: Scenario (свёрнутый IncarnationRunsList) ─────────────────────────
 
   it('[scenario] рендерит apply_run из /v1/runs + stats + линки RunDetail/incarnation/archon', async () => {
@@ -307,9 +351,9 @@ describe('RunsFeed (unified /runs)', () => {
 
     await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
     expect(scenRows()).toHaveLength(2);
-    // Пер-сегментные контролы: union-чипы и date-range СКРЫТЫ, серверный status-select виден.
+    // Пер-сегментные контролы: union status-ЧИПЫ СКРЫТЫ, серверный status-select виден.
+    // date-range здесь ЕСТЬ (серверный started_after/before, NIM-42), но это иной контрол.
     expect(screen.queryByTestId('status-filter-running')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('date-from')).not.toBeInTheDocument();
     expect(screen.getByTestId('runs-scenario-status-filter')).toBeInTheDocument();
     // stats-шапка.
     expect(screen.getByTestId('runs-stats')).toBeInTheDocument();
@@ -381,6 +425,165 @@ describe('RunsFeed (unified /runs)', () => {
     await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
     await user.type(screen.getByPlaceholderText('redis-prod'), 'redis');
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('incarnation=redis'))).toBe(true));
+  });
+
+  // ── NIM-42 PART A: колонка Service + серверный sort/фильтр service + поиск q ──
+
+  it('[scenario] рендерит колонку Service (r.service) в шапке и ячейках', async () => {
+    installFetchMock(baseRoutes());
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+    // Заголовок-кнопка Service (sortable).
+    expect(screen.getByTestId('runs-scen-sort-service')).toBeInTheDocument();
+    // Ячейки: redis (row 1), postgres (row 2).
+    const row1 = screen.getByTestId('runs-scenario-row-01RUNAAAAAAAAAAAAAAAAAAAA1');
+    expect(within(row1).getByText('redis')).toBeInTheDocument();
+    const row2 = screen.getByTestId('runs-scenario-row-01RUNBBBBBBBBBBBBBBBBBBBB2');
+    expect(within(row2).getByText('postgres')).toBeInTheDocument();
+  });
+
+  it('[scenario] сортировка по Service — server-side sort=service & sort_dir + reset offset', async () => {
+    const captured = captureRuns(120); // total>limit → Pager Next активен
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+
+    // Уходим на 2-ю страницу (offset=50).
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
+
+    await user.click(screen.getByTestId('runs-scen-sort-service'));
+    await waitFor(() =>
+      expect(
+        captured.urls.some(
+          (u) => u.startsWith('/v1/runs?') && u.includes('sort=service') && u.includes('sort_dir=asc') && u.includes('offset=0'),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.getByTestId('runs-scen-sort-service').closest('th')).toHaveAttribute('aria-sort', 'ascending');
+  });
+
+  it('[scenario] Service-фильтр — опции из каталога keeperApi.services.list()', async () => {
+    installFetchMock(baseRoutes());
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+
+    const select = screen.getByTestId('runs-scenario-service-filter');
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'redis' })).toBeInTheDocument());
+    expect(within(select).getByRole('option', { name: 'postgres' })).toBeInTheDocument();
+    // Дефолт-опция «все» присутствует первой.
+    expect((select as HTMLSelectElement).options[0].value).toBe('');
+  });
+
+  it('[scenario] Service-фильтр: каталог недоступен (404) → только дефолт-опция, без краха', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/voyages', body: VOYAGES },
+      { method: 'GET', url: '/v1/push-runs', body: PUSH },
+      { method: 'GET', url: '/v1/errands', body: ERRANDS },
+      { method: 'GET', url: '/v1/runs/stats', body: STATS },
+      { method: 'GET', url: '/v1/services', status: 404, body: { title: 'not found' } },
+      { method: 'GET', url: '/v1/runs', body: RUNS },
+    ]);
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+    const select = screen.getByTestId('runs-scenario-service-filter') as HTMLSelectElement;
+    expect(select.querySelectorAll('option')).toHaveLength(1);
+  });
+
+  it('[scenario] выбор Service уходит в query как ?service= и СБРАСЫВАЕТ offset', async () => {
+    const captured = captureRuns(120); // total>limit → Pager Next активен
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+    // Ждём наполнения дропдауна из каталога.
+    await waitFor(() =>
+      expect(within(screen.getByTestId('runs-scenario-service-filter')).getByRole('option', { name: 'redis' })).toBeInTheDocument(),
+    );
+
+    // Уходим на 2-ю страницу (offset=50).
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
+
+    await user.selectOptions(screen.getByTestId('runs-scenario-service-filter'), 'redis');
+    await waitFor(() =>
+      expect(
+        captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('service=redis') && u.includes('offset=0')),
+      ).toBe(true),
+    );
+  });
+
+  it('[scenario] свободный поиск q уходит в query как ?q= и СБРАСЫВАЕТ offset', async () => {
+    const captured = captureRuns(120);
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+
+    // Уходим на 2-ю страницу (offset=50).
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
+
+    await user.type(screen.getByTestId('runs-scenario-search-filter'), 'redis');
+    await waitFor(() =>
+      expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('q=redis') && u.includes('offset=0'))).toBe(true),
+    );
+  });
+
+  it('[scenario] date-range виден и шлёт started_after/started_before в query + reset offset', async () => {
+    const captured = captureRuns(120); // total>limit → Pager Next активен
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+    // Серверный date-range присутствует в Scenario-сегменте.
+    expect(screen.getByTestId('date-from')).toBeInTheDocument();
+    expect(screen.getByTestId('date-to')).toBeInTheDocument();
+
+    // Уходим на 2-ю страницу (offset=50).
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
+
+    // from → started_after (начало дня, ISO); offset СБРОШЕН в 0.
+    await user.type(screen.getByTestId('date-from'), '2026-06-01');
+    await waitFor(() =>
+      expect(
+        captured.urls.some(
+          (u) => u.startsWith('/v1/runs?') && u.includes('started_after=') && u.includes('offset=0'),
+        ),
+      ).toBe(true),
+    );
+    // to → started_before.
+    await user.type(screen.getByTestId('date-to'), '2026-06-30');
+    await waitFor(() =>
+      expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('started_before='))).toBe(true),
+    );
+  });
+
+  it('[scenario] очистка date-range убирает started_after/started_before из query', async () => {
+    const captured = captureRuns();
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
+
+    await user.type(screen.getByTestId('date-from'), '2026-06-01');
+    await waitFor(() => expect(captured.urls.some((u) => u.includes('started_after='))).toBe(true));
+
+    // Clear → следующий запрос БЕЗ дат-параметров.
+    const before = captured.urls.length;
+    await user.click(screen.getByTestId('date-clear'));
+    await waitFor(() => expect(captured.urls.length).toBeGreaterThan(before));
+    const last = captured.urls[captured.urls.length - 1];
+    expect(last).not.toContain('started_after=');
+    expect(last).not.toContain('started_before=');
   });
 
   // ── Guard #5: /incarnation-runs → редирект на /runs ───────────────────────────

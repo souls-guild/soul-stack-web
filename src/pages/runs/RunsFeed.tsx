@@ -18,7 +18,7 @@ import {
 import { ApiError } from '../../api/client';
 import { Badge, Pager } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
-import { EMPTY_DATE_RANGE, inDateRange, type DateRange } from './dateRange';
+import { EMPTY_DATE_RANGE, inDateRange, hasDateRange, toServerRange, type DateRange } from './dateRange';
 import { DateRangeFilter } from './DateRangeFilter';
 import styles from '../common.module.css';
 
@@ -163,7 +163,7 @@ function compareUnion(a: FeedRow, b: FeedRow, key: UnionSortKey, dir: SortDir): 
 }
 
 // --- Scenario server-sort whitelist (совпадает с backend GET /v1/runs). ---
-type ScenSortKey = 'incarnation' | 'scenario' | 'status' | 'started_at' | 'finished_at';
+type ScenSortKey = 'incarnation' | 'service' | 'scenario' | 'status' | 'started_at' | 'finished_at';
 
 type AriaSort = 'ascending' | 'descending' | 'none';
 function ariaSortOf(active: boolean, dir: SortDir): AriaSort {
@@ -177,6 +177,18 @@ function sortGlyph(active: boolean, dir: SortDir): string {
 
 // Агрегатные статусы прогона (Scenario stats); satisfies ловит drift при расширении enum.
 const SCEN_STATUSES = ['applying', 'success', 'failed', 'cancelled'] as const satisfies readonly RunStatus[];
+
+// Клиентский текстовый поиск по уже загруженным union-строкам (case-insensitive substring
+// по id/target/status). Только клиент — union и так «первые N каждого типа».
+function matchesUnionSearch(row: FeedRow, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    row.id.toLowerCase().includes(needle) ||
+    row.target.toLowerCase().includes(needle) ||
+    row.status.toLowerCase().includes(needle)
+  );
+}
 
 function StatBox({
   label,
@@ -213,6 +225,8 @@ export function RunsFeed() {
   // union client-sort state.
   const [unionSortKey, setUnionSortKey] = useState<UnionSortKey>('started');
   const [unionSortDir, setUnionSortDir] = useState<SortDir>('desc');
+  // Клиентский поиск по уже загруженным union-строкам (NIM-42 PART B).
+  const [unionSearch, setUnionSearch] = useState('');
 
   // scenario server-sort + пагинация + СЕРВЕРНЫЕ фильтры (incarnation + status).
   // status здесь single-select apply_run-статуса (НЕ union-statusSet): server-paginated
@@ -222,6 +236,13 @@ export function RunsFeed() {
   const [offset, setOffset] = useState(0);
   const [incarnation, setIncarnation] = useState('');
   const [scenarioStatus, setScenarioStatus] = useState<RunStatus | ''>('');
+  // NIM-42: серверный Service-фильтр + свободный поиск q (substring по
+  // incarnation/scenario/service/started_by) — оба в query И queryKey.
+  const [scenService, setScenService] = useState('');
+  const [scenQuery, setScenQuery] = useState('');
+  // NIM-42: серверный диапазон started_at (отдельный от union dateRange) —
+  // конвертится в started_after/started_before через toServerRange.
+  const [scenDateRange, setScenDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const wantVoyage = segment === 'all' || segment === 'voyage';
   const wantPush = segment === 'all' || segment === 'push';
@@ -265,12 +286,30 @@ export function RunsFeed() {
 
   // Scenario-режим: серверная сортировка + СЕРВЕРНЫЙ фильтр (status/incarnation) + пагинация.
   // Всё (sort/sort_dir/status/incarnation/offset) в query И в queryKey.
+  const scenServerRange = toServerRange(scenDateRange);
   const scenarioQ = useQuery({
-    queryKey: ['runs.list', { incarnation, status: scenarioStatus, offset, sort: scenSortKey, sort_dir: scenSortDir }],
+    queryKey: [
+      'runs.list',
+      {
+        incarnation,
+        service: scenService,
+        q: scenQuery,
+        status: scenarioStatus,
+        started_after: scenServerRange.started_after,
+        started_before: scenServerRange.started_before,
+        offset,
+        sort: scenSortKey,
+        sort_dir: scenSortDir,
+      },
+    ],
     queryFn: () =>
       keeperApi.runs.list({
         incarnation: incarnation || undefined,
+        service: scenService || undefined,
+        q: scenQuery || undefined,
         status: scenarioStatus || undefined,
+        started_after: scenServerRange.started_after,
+        started_before: scenServerRange.started_before,
         offset,
         limit: LIMIT,
         sort: scenSortKey,
@@ -284,6 +323,14 @@ export function RunsFeed() {
   const statsQ = useQuery({
     queryKey: ['runs.stats'],
     queryFn: () => keeperApi.runs.stats(),
+    enabled: isScenario,
+    retry: false,
+  });
+  // Каталог сервисов для Service-фильтра (ADR-042 — no hardcode). Нет каталога/ошибка
+  // → просто пустой список опций (graceful degradation), без краха фильтр-бара.
+  const servicesQ = useQuery({
+    queryKey: ['services', 'list'],
+    queryFn: () => keeperApi.services.list(),
     enabled: isScenario,
     retry: false,
   });
@@ -365,20 +412,22 @@ export function RunsFeed() {
     return rows;
   }, [wantVoyage, wantPush, wantErrand, wantScenarioUnion, voyagesQ.data, pushQ.data, errandsQ.data, applyUnionQ.data]);
 
-  // Client-фильтр (status-группы + date-range) + client-sort union.
-  function passesClientFilters(status: string, startedAt: string | undefined): boolean {
+  // Client-фильтр (status-группы + date-range + свободный поиск по загруженным строкам)
+  // + client-sort union.
+  function passesClientFilters(row: FeedRow): boolean {
     if (statusSet.size > 0) {
-      const ok = Array.from(statusSet).some((g) => STATUS_GROUP_MATCH[g](status));
+      const ok = Array.from(statusSet).some((g) => STATUS_GROUP_MATCH[g](row.status));
       if (!ok) return false;
     }
-    return inDateRange(startedAt, dateRange);
+    if (!inDateRange(row.startedAt, dateRange)) return false;
+    return matchesUnionSearch(row, unionSearch);
   }
 
   const unionView = useMemo(() => {
-    const filtered = unionRows.filter((r) => passesClientFilters(r.status, r.startedAt));
+    const filtered = unionRows.filter((r) => passesClientFilters(r));
     return [...filtered].sort((a, b) => compareUnion(a, b, unionSortKey, unionSortDir));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unionRows, statusSet, dateRange, unionSortKey, unionSortDir]);
+  }, [unionRows, statusSet, dateRange, unionSearch, unionSortKey, unionSortDir]);
 
   // Scenario фильтруется ТОЛЬКО server-side (status/incarnation в query) — client-фильтр
   // сломал бы Pager/total; отдаём items как есть (сервер уже отфильтровал+отсортировал).
@@ -417,7 +466,12 @@ export function RunsFeed() {
   }
 
   const scenTotal = scenarioQ.data?.total ?? 0;
-  const scenHasFilters = incarnation !== '' || scenarioStatus !== '';
+  const scenHasFilters =
+    incarnation !== '' ||
+    scenarioStatus !== '' ||
+    scenService !== '' ||
+    scenQuery !== '' ||
+    hasDateRange(scenDateRange);
 
   return (
     <div className={styles.page}>
@@ -486,6 +540,47 @@ export function RunsFeed() {
                 ))}
               </select>
             </label>
+            <label>
+              <div className={styles.metaKey}>{t('runhistory:filterServiceLabel')}</div>
+              <select
+                value={scenService}
+                onChange={(e) => {
+                  setScenService(e.target.value);
+                  setOffset(0);
+                }}
+                data-testid="runs-scenario-service-filter"
+                style={selectStyle}
+              >
+                <option value="">{t('runhistory:filterServiceAllOption')}</option>
+                {(servicesQ.data?.items ?? []).map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <div className={styles.metaKey}>{t('search')}</div>
+              <input
+                type="text"
+                value={scenQuery}
+                onChange={(e) => {
+                  setScenQuery(e.target.value);
+                  setOffset(0);
+                }}
+                placeholder={t('runhistory:scenarioSearchPlaceholder')}
+                data-testid="runs-scenario-search-filter"
+                style={inputStyle}
+              />
+            </label>
+            <DateRangeFilter
+              value={scenDateRange}
+              onChange={(r) => {
+                setScenDateRange(r);
+                setOffset(0);
+              }}
+              metaKeyClass={styles.metaKey}
+            />
           </>
         ) : (
           <>
@@ -510,6 +605,17 @@ export function RunsFeed() {
               </div>
             </div>
             <DateRangeFilter value={dateRange} onChange={setDateRange} metaKeyClass={styles.metaKey} />
+            <label>
+              <div className={styles.metaKey}>{t('runhistory:unionSearchLabel')}</div>
+              <input
+                type="text"
+                value={unionSearch}
+                onChange={(e) => setUnionSearch(e.target.value)}
+                placeholder={t('runhistory:unionSearchPlaceholder')}
+                data-testid="runs-union-search"
+                style={inputStyle}
+              />
+            </label>
           </>
         )}
       </div>
@@ -745,6 +851,7 @@ function ScenarioSegment({
               <tr>
                 <th>Apply ID</th>
                 <ScenTh colKey="incarnation" label="Incarnation" />
+                <ScenTh colKey="service" label="Service" />
                 <ScenTh colKey="scenario" label="Scenario" />
                 <ScenTh colKey="status" label="Status" />
                 <th>Started by</th>
@@ -766,6 +873,7 @@ function ScenarioSegment({
                   <td className="mono">
                     <Link to={`/incarnations/${encodeURIComponent(r.incarnation)}`}>{r.incarnation}</Link>
                   </td>
+                  <td className="mono">{r.service}</td>
                   <td className="mono">{r.scenario}</td>
                   <td>
                     <Badge tone={runStatusTone(r.status)}>{r.status}</Badge>

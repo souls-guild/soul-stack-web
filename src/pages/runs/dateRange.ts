@@ -52,3 +52,15 @@ export function inDateRange(ts: string | undefined, r: DateRange): boolean {
   if (hi !== null && t > hi) return false;
   return true;
 }
+
+// СЕРВЕРНЫЙ диапазон started_at: локальные даты from/to → ISO-границы
+// (from → начало дня → started_after; to → конец дня → started_before).
+// Пустая/невалидная граница → поле опущено.
+export function toServerRange(r: DateRange): { started_after?: string; started_before?: string } {
+  const out: { started_after?: string; started_before?: string } = {};
+  const lo = dayStart(r.from);
+  if (lo !== null) out.started_after = new Date(lo).toISOString();
+  const hi = dayEnd(r.to);
+  if (hi !== null) out.started_before = new Date(hi).toISOString();
+  return out;
+}

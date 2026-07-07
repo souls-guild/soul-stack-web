@@ -645,12 +645,16 @@ export const keeperApi = {
 
   // Глобальный run-view через все инкарнации (apply_run, НЕ Voyage). Permission incarnation.history.
   // sort/sort_dir — серверная колоночная сортировка (whitelist
-  // started_at|finished_at|status|incarnation|scenario; дефолт started_at desc; невалид → 422).
+  // started_at|finished_at|status|incarnation|scenario|service; дефолт started_at desc; невалид → 422).
   runs: {
     list: (
       q: {
         status?: RunStatus;
         incarnation?: string;
+        service?: string;
+        q?: string;
+        started_after?: string;
+        started_before?: string;
         offset?: number;
         limit?: number;
         sort?: string;
@@ -661,6 +665,10 @@ export const keeperApi = {
         query: {
           status: q.status,
           incarnation: q.incarnation,
+          service: q.service,
+          q: q.q,
+          started_after: q.started_after,
+          started_before: q.started_before,
           offset: q.offset,
           limit: q.limit,
           sort: q.sort,
