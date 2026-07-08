@@ -475,6 +475,38 @@ describe('SynodDetail', () => {
     });
   });
 
+  // Гард NIM-70: headline-контракт — поиск архонтов СЕРВЕРНЫЙ (GET /v1/operators?q=…),
+  // а не «фетчим всех + .filter на клиенте». Регресс к клиентскому фильтру прошёл бы
+  // все прочие picker-тесты (они не печатают в поиск), но сломался бы на 50+ архонтах.
+  it('[SERVER-Q] AddOperatorModal: ввод в поиск уходит как ?q= в GET /v1/operators', async () => {
+    const { within: w } = await import('@testing-library/react');
+    const calls = recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    await user.click(screen.getByTestId('add-operator-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    // Печатаем подстроку — picker обязан прокинуть её на сервер (debounce внутри SearchMultiSelect).
+    await user.type(w(dialog).getByTestId('add-operator-search'), 'dave');
+
+    await waitFor(
+      () => {
+        const served = calls.find((c) => {
+          if (c.method !== 'GET' || !c.url.startsWith('/v1/operators')) return false;
+          const qs = new URLSearchParams(c.url.split('?')[1] ?? '');
+          return qs.get('q') === 'dave';
+        });
+        expect(
+          served,
+          'picker должен слать ?q= на сервер (серверный поиск), а не фильтровать клиентски',
+        ).toBeDefined();
+      },
+      { timeout: 2000 },
+    );
+  });
+
   it('[GRANT] GrantRoleModal: typeahead-выбор → POST /v1/synods/{name}/roles', async () => {
     const { within: w } = await import('@testing-library/react');
     const calls = recordingFetch({});
