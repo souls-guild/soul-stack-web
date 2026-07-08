@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
-import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock } from 'lucide-react';
+import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock, Info } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { CONSTRAINTS } from '../../api/constraints.gen';
 import type {
@@ -25,6 +25,7 @@ import { Badge, Button } from '../../components/primitives';
 import { useServiceScenarios } from '../incarnations/useServiceScenarios';
 import { runnableScenarios } from '../incarnations/reservedScenarios';
 import { ScenarioInputFields } from '../incarnations/ScenarioInputFields';
+import { splitScenarioNote } from './scenarioNote';
 import {
   computeVisibleFields,
   defaultsFromSchema,
@@ -1238,6 +1239,7 @@ function Step3ScenarioIncarnations({
   onPatternErrorChange?: (fields: string[]) => void;
 }) {
   const { t } = useTranslation();
+  const scenarioNote = splitScenarioNote(selectedScenarioMeta?.description);
 
   // Сидируем defaults при смене supported schema, но НЕ затираем уже введённые/
   // восстановленные из черновика значения (иначе re-mount шага сбрасывал бы input).
@@ -1369,6 +1371,27 @@ function Step3ScenarioIncarnations({
           <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
             {t('run:scenarioInputFieldsLabel', { scenario: value.scenario })}
           </div>
+          {scenarioNote.lead ? (
+            <div
+              data-testid="scenario-note"
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-start',
+                marginBottom: 10,
+                padding: '8px 10px',
+                fontSize: 12.5,
+                lineHeight: 1.45,
+                color: 'var(--text)',
+                background: 'color-mix(in srgb, var(--info) 8%, var(--surface))',
+                border: '1px solid color-mix(in srgb, var(--info) 35%, var(--border))',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              <Info size={14} style={{ flexShrink: 0, marginTop: 2, color: 'var(--info)' }} />
+              <span style={{ whiteSpace: 'pre-line' }}>{scenarioNote.lead}</span>
+            </div>
+          ) : null}
           <ScenarioInputFields
             schema={inputSchema}
             value={value.fields}
@@ -1378,9 +1401,9 @@ function Step3ScenarioIncarnations({
             onPatternErrorChange={onPatternErrorChange}
             form={selectedScenarioMeta?.form}
           />
-          {selectedScenarioMeta?.description ? (
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
-              {selectedScenarioMeta.description}
+          {scenarioNote.rest ? (
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)', whiteSpace: 'pre-line' }}>
+              {scenarioNote.rest}
             </div>
           ) : null}
         </div>

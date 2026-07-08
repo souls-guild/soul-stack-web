@@ -273,6 +273,40 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByText(/укажите regex или \* для всех/)).toBeInTheDocument());
   });
 
+  // NIM-73 A2: ведущий абзац описания сценария → заметный info-callout НАД полями
+  // (оператор видит предусловие до запуска); остаток описания — тускло вне callout.
+  it('Scenario: ведущий абзац описания рендерится заметным callout над полями', async () => {
+    setupFetchStub({
+      scenarios: [
+        {
+          name: 'add_user',
+          kind: 'operational',
+          description:
+            '★ Перед запуском засей пароль юзера в Vault (secret/redis/…/users/<name>#password)\n\nDay-2: добавить ACL-пользователя без рестарта.',
+          input_schema: { username: { type: 'string' } },
+        },
+      ],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    // Step 1 → 2 → выбор сервиса и сценария.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /add_user/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'add_user');
+
+    // Step 2 → 3: рендерятся input-поля сценария + заметка.
+    await user.click(screen.getByRole('button', { name: /Далее/ }));
+
+    const note = await screen.findByTestId('scenario-note');
+    expect(note).toHaveTextContent(/Перед запуском засей пароль юзера в Vault/);
+    // В callout — ТОЛЬКО ведущий абзац; остаток описания рендерится отдельно.
+    expect(note).not.toHaveTextContent(/добавить ACL-пользователя/);
+    expect(screen.getByText(/Day-2: добавить ACL-пользователя без рестарта/)).toBeInTheDocument();
+  });
+
   it('Scenario: regex * → все incarnations → submit', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     renderWizardWithRoutes();
