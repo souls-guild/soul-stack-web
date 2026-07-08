@@ -387,6 +387,20 @@ export interface ScenarioInputSchemaProperty {
   example?: string;
   /** Признак типа map (type=map нормализован): при скалярном items.type → KEY→VALUE-редактор. */
   isMap?: boolean;
+  /**
+   * Под-поля типизированного объекта (NIM-72). Присутствует для одиночного
+   * type=object (AclUser add_user.user) и для items array-of-object.
+   * Примечание: object-level `required` тут — массив имён обязательных под-полей
+   * (JSON-Schema-стиль), а не boolean; читается через каст.
+   */
+  properties?: Record<string, ScenarioInputSchemaProperty>;
+  /**
+   * type=object map (NIM-72): скалярная схема значения ({type:string}) → MapEditor;
+   * false — типизированный объект (не map); true/absent — деградация в JSON-textarea.
+   */
+  additional_properties?: ScenarioInputSchemaProperty | boolean;
+  /** Имя типа под-объекта (AclUser…) — лейбл в UI. */
+  'x-type'?: string;
   [key: string]: unknown;
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
