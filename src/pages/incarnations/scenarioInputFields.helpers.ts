@@ -178,6 +178,60 @@ function celEq(a: CelValue, b: CelValue): boolean {
 export type ScenarioFieldValue = string | number | boolean | undefined;
 export type ScenarioFieldsState = Record<string, ScenarioFieldValue>;
 
+// ---------------------------------------------------------------------------
+// Redis-директивы (NIM-76): inline-валидация + typeahead ключей map-поля.
+//
+// Каталог (серия→имена) прокидывается в MapEditor; валидируются ТОЛЬКО поля с
+// truthy `x-directives`. Версия реактивна (create — выбор оператора; day-2 —
+// state.redis_version). Каталог не на руках → graceful-degrade (не блокируем).
+// ---------------------------------------------------------------------------
+
+// UI-контекст каталога директив. `loaded` — каталог реально доступен (иначе не валидируем).
+export interface DirectiveCatalogContext {
+  directives: Record<string, string[]>;
+  loaded: boolean;
+}
+
+// Метка поля-словаря директив (truthy `x-directives`, напр. "redis"). Имя поля не хардкодим.
+export function directiveFieldTag(prop: ScenarioInputSchemaProperty): string | undefined {
+  const tag = prop['x-directives'];
+  return typeof tag === 'string' && tag !== '' ? tag : undefined;
+}
+
+// Серия Redis из полной версии: первые два компонента ("8.2.2" → "8.2").
+// Зеркалит backend-regex `^([0-9]+:)?<серия>[.]`: снимает whitespace, ведущий "v"
+// ("v8.2.2") и Debian-epoch ("5:7.4.1-1~deb12u7" → "7.4"), иначе epoch-пинованная
+// версия молча выключила бы валидацию, а backend отверг бы директиву уже на рендере.
+export function versionToSeries(version: string | undefined): string | undefined {
+  if (!version) return undefined;
+  const cleaned = version
+    .trim()
+    .replace(/^v/i, '')
+    .replace(/^\d+:/, '');
+  const parts = cleaned.split('.');
+  if (parts.length < 2 || parts[0] === '' || parts[1] === '') return undefined;
+  return `${parts[0]}.${parts[1]}`;
+}
+
+// Имена директив для версии из каталога, либо undefined — валидация неприменима
+// (каталог не загружен / серия неизвестна / серии нет в каталоге). undefined → graceful.
+export function directiveNamesForVersion(
+  catalog: DirectiveCatalogContext | undefined,
+  version: string | undefined,
+): string[] | undefined {
+  if (!catalog?.loaded) return undefined;
+  const series = versionToSeries(version);
+  if (!series) return undefined;
+  const names = catalog.directives[series];
+  return Array.isArray(names) ? names : undefined;
+}
+
+// Есть ли в схеме хоть одно поле-словарь директив (гейт для fetch каталога/версии).
+export function schemaHasDirectiveField(schema: ScenarioInputSchema | undefined | null): boolean {
+  if (!schema || typeof schema !== 'object') return false;
+  return Object.values(schema).some((prop) => Boolean(prop) && directiveFieldTag(prop) !== undefined);
+}
+
 // Вычисляет обязательность поля по текущему input-state.
 // required:true → всегда обязательно.
 // required_when → обязательно, когда CEL-предикат истинен (тот же evalShowWhen-контекст).
