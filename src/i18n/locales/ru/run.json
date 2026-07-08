@@ -137,6 +137,7 @@
   "mapRemovePair": "−",
   "mapDuplicateKeyError": "дубликат ключа",
   "mapIncompleteKeyError": "ключ не заполнен",
+  "mapUnknownDirectiveError": "неизвестная директива в Redis {{version}}",
   "sectionBatchingLabel": "Батчинг",
   "sectionSchedulingLabel": "Планирование",
   "sectionFlagsLabel": "Флаги",

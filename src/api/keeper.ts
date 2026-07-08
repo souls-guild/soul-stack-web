@@ -402,6 +402,12 @@ export interface ScenarioInputSchemaProperty {
   /** Имя типа под-объекта (AclUser…) — лейбл в UI. */
   'x-type'?: string;
   /**
+   * NIM-76: метка поля-словаря директив. Truthy-значение (напр. "redis") включает
+   * inline-валидацию + typeahead ключей против каталога директив сервиса. Валидируем
+   * ТОЛЬКО помеченные поля (имя redis_settings не хардкодим).
+   */
+  'x-directives'?: string;
+  /**
    * NIM-72: field-level обязательность узла-ссылки $type. Для object-$type ключ
    * `required` занят массивом обязательных детей — «само поле обязательно» приходит
    * этой аннотацией, по ней UI ставит `*`.
@@ -445,6 +451,19 @@ export interface ServiceScenarioListReply {
   service?: string;
   ref?: string;
   scenarios: ServiceScenarioInfo[];
+}
+
+// GET /v1/services/{name}/directives[?ref=&version=] — каталог допустимых имён
+// директив (redis.conf) по сериям Redis. directives: серия "major.minor" →
+// отсортированные имена. Ответ immutable по git-ref (ETag + Cache-Control: immutable);
+// кэшируем агрессивно (staleTime: Infinity, ключ service+ref). Сервис без каталога
+// → directives:{} + 200. Endpoint опционален — UI graceful-degraded на 404/501.
+export interface ServiceDirectivesReply {
+  service?: string;
+  ref?: string;
+  sha1?: string;
+  // Серия ("8.2") → отсортированные имена директив; nullable по контракту.
+  directives: Record<string, string[]> | null;
 }
 
 // Oracle: Vigil (Soul-side проверка beacons) + Decree (reactor-правило). ADR-030.
@@ -1011,6 +1030,14 @@ export const keeperApi = {
       apiGet<ServiceScenarioListReply>(
         `/v1/services/${encodeURIComponent(name)}/scenarios`,
         { query: { ref } },
+      ),
+    // GET /v1/services/{name}/directives[?ref=&version=] — каталог имён Redis-директив
+    // по сериям (для inline-валидации/typeahead redis_settings). Кэш immutable по git-ref;
+    // version — advisory (серия выбирается на клиенте). Endpoint опционален — graceful на 404/501.
+    listDirectives: (name: string, opts: { ref?: string; version?: string } = {}) =>
+      apiGet<ServiceDirectivesReply>(
+        `/v1/services/${encodeURIComponent(name)}/directives`,
+        { query: { ref: opts.ref, version: opts.version } },
       ),
     // GET /v1/services/{name}/state-schema[?ref=...] — state_schema-метаданные
     // (текущая state_schema_version + опц. декларация schema + список миграций).

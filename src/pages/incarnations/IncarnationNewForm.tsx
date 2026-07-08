@@ -11,6 +11,7 @@ import { ApiError } from '../../api/client';
 import { ChipsInput } from './ChipsInput';
 import { TraitsEditor, type TraitsMap } from './TraitsEditor';
 import { useServiceScenarios } from './useServiceScenarios';
+import { useServiceDirectives } from './useServiceDirectives';
 import { ScenarioInputFields } from './ScenarioInputFields';
 import {
   computeVisibleFields,
@@ -20,7 +21,9 @@ import {
   isProvisionObjectField,
   readProvisionEnabled,
   missingRequiredFields,
+  schemaHasDirectiveField,
   serializeFields,
+  type DirectiveCatalogContext,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
 import {
@@ -99,6 +102,7 @@ export function IncarnationNewForm() {
       setFields({});
     }
     setShowInputErrors(false);
+    setInvalidMaps([]);
   }, [usePerField, selectedService, createSchema]);
 
   // Пустые required-поля create-input (зеркалит backend 422). Submit блокируется
@@ -116,6 +120,25 @@ export function IncarnationNewForm() {
 
   // Блокируем submit, если сервис имеет create-сценарии, но ни один не выбран.
   const missingScenarioSelection = createScenarios.length > 0 && !selectedCreateScenario;
+
+  // NIM-76: набор map-полей с ошибками (duplicate/incomplete/bad-int/unknown-directive)
+  // — включаем в submit-gate (жёсткий блок наравне с missingRequired).
+  const [invalidMaps, setInvalidMaps] = useState<string[]>([]);
+
+  // NIM-76: каталог Redis-директив — только если в схеме есть поле с x-directives
+  // (не тянем каталог для не-redis сервисов). Версия реактивна из fields.
+  const hasDirectiveField = useMemo(() => schemaHasDirectiveField(createSchema), [createSchema]);
+  const directivesQ = useServiceDirectives(hasDirectiveField ? selectedService || undefined : undefined);
+  const directiveCatalog = useMemo<DirectiveCatalogContext>(
+    () => ({ directives: directivesQ.directives, loaded: !directivesQ.loading && !directivesQ.unavailable }),
+    [directivesQ.directives, directivesQ.loading, directivesQ.unavailable],
+  );
+  // Версия Redis из create-input — управляет набором директив. Контракт: version-поле
+  // create-схемы = top-level `redis_version` (приоритет) либо `version`. Реактивно из fields.
+  const directiveVersion = useMemo(() => {
+    const raw = fields['redis_version'] ?? fields['version'];
+    return raw === undefined || raw === '' ? undefined : String(raw);
+  }, [fields]);
 
   // Pre-submit предупреждение: provision выключен, но сценарий требует хосты.
   // Вычисляем: есть ли provision-поле в схеме, включён ли provision, сколько нужно хостов.
@@ -165,6 +188,11 @@ export function IncarnationNewForm() {
     if (missingRequired.length > 0) {
       setShowInputErrors(true);
       setServerError(t('incarnations:missingRequired', { fields: missingRequired.join(', ') }));
+      return;
+    }
+    // NIM-76: жёсткий блок при невалидных map-полях (в т.ч. unknown-directive).
+    if (invalidMaps.length > 0) {
+      setShowInputErrors(true);
       return;
     }
     const input =
@@ -376,6 +404,9 @@ export function IncarnationNewForm() {
               showErrors={showInputErrors}
               form={selectedCreateScenario?.form}
               incarnationName={watch('name') || undefined}
+              onInvalidMapChange={setInvalidMaps}
+              directiveCatalog={directiveCatalog}
+              directiveVersion={directiveVersion}
             />
             {selectedCreateScenario?.description ? (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
@@ -437,7 +468,7 @@ export function IncarnationNewForm() {
           <Button
             type="submit"
             variant="primary"
-            disabled={isSubmitting || createMu.isPending || missingRequired.length > 0 || missingScenarioSelection}
+            disabled={isSubmitting || createMu.isPending || missingRequired.length > 0 || missingScenarioSelection || invalidMaps.length > 0}
             data-testid="incarnation-submit"
           >
             {createMu.isPending ? t('creating') : t('createIncarnation')}
