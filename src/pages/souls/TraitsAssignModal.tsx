@@ -30,8 +30,8 @@ interface Props {
 // Пара редактора трейт-записей.
 type TraitPair = { key: string; value: string };
 
-// Валидация ключа трейта: kebab-case ([a-z][a-z0-9]*(-[a-z0-9]+)*).
-const TRAIT_KEY_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+// Валидация ключа трейта: kebab/snake-case ([a-z][a-z0-9]*([_-][a-z0-9]+)*) — NIM-67, зеркало soul.TraitKeyPattern.
+const TRAIT_KEY_PATTERN = /^[a-z][a-z0-9]*([_-][a-z0-9]+)*$/;
 
 function validateTraitKey(k: string): string | null {
   if (!TRAIT_KEY_PATTERN.test(k)) return 'souls:traitKeyInvalid';

@@ -118,4 +118,31 @@ describe('TraitsAssignModal', () => {
       expect(partialTexts.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // NIM-67: ключ с underscore (snake_case) — валиден, не блокирует submit.
+  it('принимает snake_case ключ owner_team (NIM-67)', async () => {
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify(SUCCESS_REPLY), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    renderModal(true, { kind: 'single', sid: 'host01.example.com' });
+    const user = userEvent.setup();
+
+    const keyInput = screen.getByTestId('trait-key-0');
+    const valInput = screen.getByTestId('trait-val-0');
+    await user.clear(keyInput);
+    await user.type(keyInput, 'owner_team');
+    await user.clear(valInput);
+    await user.type(valInput, 'dba');
+
+    await user.click(screen.getByRole('button', { name: /Применить/i }));
+
+    // Ключ с `_` НЕ отвергается валидацией — доходит до success-state.
+    await waitFor(() => {
+      expect(screen.getByText('completed')).toBeInTheDocument();
+    });
+  });
 });

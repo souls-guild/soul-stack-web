@@ -333,6 +333,25 @@ export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
 // (ADR-060); проецируется в souls.traits. Полная замена (full-replace семантика).
 export type IncarnationSetTraitsRequest = components['schemas']['IncarnationSetTraitsRequest'];
 
+// NIM-74: локальный тип до регена openapi (backend добавит путь /secrets/revealable|reveal).
+// Discovery: какие state-секреты можно раскрыть (по клику), и по каким ключам.
+export interface RevealableSecretItem {
+  secret_id: string;
+  label: string;
+  state_path: string;
+  keys: string[];
+}
+export interface RevealableSecretsReply {
+  items: RevealableSecretItem[] | null;
+}
+export interface RevealSecretRequest {
+  secret_id: string;
+  key: string;
+}
+export interface RevealSecretReply {
+  value: string;
+}
+
 // Choir + Voice (ADR-044). Топология хостов внутри инкарнации.
 export type Choir = components['schemas']['Choir'];
 export type Voice = components['schemas']['Voice'];
@@ -387,6 +406,32 @@ export interface ScenarioInputSchemaProperty {
   example?: string;
   /** Признак типа map (type=map нормализован): при скалярном items.type → KEY→VALUE-редактор. */
   isMap?: boolean;
+  /**
+   * Под-поля типизированного объекта (NIM-72). Присутствует для одиночного
+   * type=object (AclUser add_user.user) и для items array-of-object.
+   * Примечание: object-level `required` тут — массив имён обязательных под-полей
+   * (JSON-Schema-стиль), а не boolean; читается через каст.
+   */
+  properties?: Record<string, ScenarioInputSchemaProperty>;
+  /**
+   * type=object map (NIM-72): скалярная схема значения ({type:string}) → MapEditor;
+   * false — типизированный объект (не map); true/absent — деградация в JSON-textarea.
+   */
+  additional_properties?: ScenarioInputSchemaProperty | boolean;
+  /** Имя типа под-объекта (AclUser…) — лейбл в UI. */
+  'x-type'?: string;
+  /**
+   * NIM-76: метка поля-словаря директив. Truthy-значение (напр. "redis") включает
+   * inline-валидацию + typeahead ключей против каталога директив сервиса. Валидируем
+   * ТОЛЬКО помеченные поля (имя redis_settings не хардкодим).
+   */
+  'x-directives'?: string;
+  /**
+   * NIM-72: field-level обязательность узла-ссылки $type. Для object-$type ключ
+   * `required` занят массивом обязательных детей — «само поле обязательно» приходит
+   * этой аннотацией, по ней UI ставит `*`.
+   */
+  'x-required'?: boolean;
   [key: string]: unknown;
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
@@ -425,6 +470,19 @@ export interface ServiceScenarioListReply {
   service?: string;
   ref?: string;
   scenarios: ServiceScenarioInfo[];
+}
+
+// GET /v1/services/{name}/directives[?ref=&version=] — каталог допустимых имён
+// директив (redis.conf) по сериям Redis. directives: серия "major.minor" →
+// отсортированные имена. Ответ immutable по git-ref (ETag + Cache-Control: immutable);
+// кэшируем агрессивно (staleTime: Infinity, ключ service+ref). Сервис без каталога
+// → directives:{} + 200. Endpoint опционален — UI graceful-degraded на 404/501.
+export interface ServiceDirectivesReply {
+  service?: string;
+  ref?: string;
+  sha1?: string;
+  // Серия ("8.2") → отсортированные имена директив; nullable по контракту.
+  directives: Record<string, string[]> | null;
 }
 
 // Oracle: Vigil (Soul-side проверка beacons) + Decree (reactor-правило). ADR-030.
@@ -639,6 +697,20 @@ export const keeperApi = {
       apiSend<IncarnationGetReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/traits`,
         'PUT',
+        { body },
+      ),
+    // NIM-74: discovery раскрываемых секретов инкарнации. GET .../secrets/revealable.
+    // items[] пуст, если раскрывать нечего; 404 если инкарнация вне scope — UI graceful.
+    revealableSecrets: (name: string) =>
+      apiGet<RevealableSecretsReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/secrets/revealable`,
+      ),
+    // NIM-74: раскрыть одно значение по клику (lazy, не кэшируется). POST .../secrets/reveal.
+    // 200 → {value}; 403 нет права incarnation.view-secrets; 404 нет ключа/значения.
+    revealSecret: (name: string, body: RevealSecretRequest) =>
+      apiSend<RevealSecretReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/secrets/reveal`,
+        'POST',
         { body },
       ),
   },
@@ -886,14 +958,17 @@ export const keeperApi = {
   },
 
   operators: {
-    // 200 → OperatorListReply (paged + auth_method/revoked фильтры).
-    list: (q: ListOperatorsQuery = {}) =>
+    // 200 → OperatorListReply (paged + auth_method/revoked/q фильтры).
+    // q — full-text по aid/display_name (backend-параметр добавляется параллельно;
+    // до регена gen:api тип расширен локально в ListOperatorsQuery).
+    list: (query: ListOperatorsQuery = {}) =>
       apiGet<OperatorListReply>('/v1/operators', {
         query: {
-          auth_method: q.auth_method,
-          revoked: q.revoked,
-          offset: q.offset,
-          limit: q.limit,
+          auth_method: query.auth_method,
+          revoked: query.revoked,
+          q: query.q,
+          offset: query.offset,
+          limit: query.limit,
         },
       }),
     // 200 → Operator (detail).
@@ -991,6 +1066,14 @@ export const keeperApi = {
       apiGet<ServiceScenarioListReply>(
         `/v1/services/${encodeURIComponent(name)}/scenarios`,
         { query: { ref } },
+      ),
+    // GET /v1/services/{name}/directives[?ref=&version=] — каталог имён Redis-директив
+    // по сериям (для inline-валидации/typeahead redis_settings). Кэш immutable по git-ref;
+    // version — advisory (серия выбирается на клиенте). Endpoint опционален — graceful на 404/501.
+    listDirectives: (name: string, opts: { ref?: string; version?: string } = {}) =>
+      apiGet<ServiceDirectivesReply>(
+        `/v1/services/${encodeURIComponent(name)}/directives`,
+        { query: { ref: opts.ref, version: opts.version } },
       ),
     // GET /v1/services/{name}/state-schema[?ref=...] — state_schema-метаданные
     // (текущая state_schema_version + опц. декларация schema + список миграций).
@@ -1290,6 +1373,9 @@ export interface ListOperatorsQuery {
   auth_method?: OperatorAuthMethod;
   // Default server-side = false (только активные). true — включая revoked.
   revoked?: boolean;
+  // Full-text по aid/display_name (typeahead). Локальное расширение до регена
+  // gen:api; после реген-а совпадёт с нативным q?: string.
+  q?: string;
   offset?: number;
   limit?: number;
 }

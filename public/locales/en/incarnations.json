@@ -259,5 +259,13 @@
   "provisionToggleLabel": "Create VMs automatically (cloud provision)",
   "provisionDisabledHint": "The run will use already-onboarded souls in coven «{{coven}}». Add them via the Hosts tab on the incarnation before running.",
   "provisionHostWarningTitle": "Warning: roster is empty",
-  "provisionHostWarningBody": "This run needs {{n}} host(s). Enable cloud provision (creates VMs automatically) OR onboard the required number of souls to coven «{{coven}}» via Hosts before running."
+  "provisionHostWarningBody": "This run needs {{n}} host(s). Enable cloud provision (creates VMs automatically) OR onboard the required number of souls to coven «{{coven}}» via Hosts before running.",
+  "revealShow": "Show password {{name}}",
+  "revealHide": "Hide password",
+  "revealValueAria": "Password for user {{name}}",
+  "revealCopied": "Copied",
+  "revealForbidden": "Insufficient permissions",
+  "revealNotFound": "Value not found",
+  "revealFailed": "Failed to reveal password: {{detail}}",
+  "revealCopyPrompt": "Copy the password manually:"
 }

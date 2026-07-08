@@ -178,6 +178,60 @@ function celEq(a: CelValue, b: CelValue): boolean {
 export type ScenarioFieldValue = string | number | boolean | undefined;
 export type ScenarioFieldsState = Record<string, ScenarioFieldValue>;
 
+// ---------------------------------------------------------------------------
+// Redis-директивы (NIM-76): inline-валидация + typeahead ключей map-поля.
+//
+// Каталог (серия→имена) прокидывается в MapEditor; валидируются ТОЛЬКО поля с
+// truthy `x-directives`. Версия реактивна (create — выбор оператора; day-2 —
+// state.redis_version). Каталог не на руках → graceful-degrade (не блокируем).
+// ---------------------------------------------------------------------------
+
+// UI-контекст каталога директив. `loaded` — каталог реально доступен (иначе не валидируем).
+export interface DirectiveCatalogContext {
+  directives: Record<string, string[]>;
+  loaded: boolean;
+}
+
+// Метка поля-словаря директив (truthy `x-directives`, напр. "redis"). Имя поля не хардкодим.
+export function directiveFieldTag(prop: ScenarioInputSchemaProperty): string | undefined {
+  const tag = prop['x-directives'];
+  return typeof tag === 'string' && tag !== '' ? tag : undefined;
+}
+
+// Серия Redis из полной версии: первые два компонента ("8.2.2" → "8.2").
+// Зеркалит backend-regex `^([0-9]+:)?<серия>[.]`: снимает whitespace, ведущий "v"
+// ("v8.2.2") и Debian-epoch ("5:7.4.1-1~deb12u7" → "7.4"), иначе epoch-пинованная
+// версия молча выключила бы валидацию, а backend отверг бы директиву уже на рендере.
+export function versionToSeries(version: string | undefined): string | undefined {
+  if (!version) return undefined;
+  const cleaned = version
+    .trim()
+    .replace(/^v/i, '')
+    .replace(/^\d+:/, '');
+  const parts = cleaned.split('.');
+  if (parts.length < 2 || parts[0] === '' || parts[1] === '') return undefined;
+  return `${parts[0]}.${parts[1]}`;
+}
+
+// Имена директив для версии из каталога, либо undefined — валидация неприменима
+// (каталог не загружен / серия неизвестна / серии нет в каталоге). undefined → graceful.
+export function directiveNamesForVersion(
+  catalog: DirectiveCatalogContext | undefined,
+  version: string | undefined,
+): string[] | undefined {
+  if (!catalog?.loaded) return undefined;
+  const series = versionToSeries(version);
+  if (!series) return undefined;
+  const names = catalog.directives[series];
+  return Array.isArray(names) ? names : undefined;
+}
+
+// Есть ли в схеме хоть одно поле-словарь директив (гейт для fetch каталога/версии).
+export function schemaHasDirectiveField(schema: ScenarioInputSchema | undefined | null): boolean {
+  if (!schema || typeof schema !== 'object') return false;
+  return Object.values(schema).some((prop) => Boolean(prop) && directiveFieldTag(prop) !== undefined);
+}
+
 // Вычисляет обязательность поля по текущему input-state.
 // required:true → всегда обязательно.
 // required_when → обязательно, когда CEL-предикат истинен (тот же evalShowWhen-контекст).
@@ -188,6 +242,9 @@ export function isFieldRequired(
 ): boolean {
   if (prop.type === 'boolean') return false;
   if (prop.required === true) return true;
+  // NIM-72: object-$type несёт field-level обязательность в x-required (ключ
+  // required занят массивом обязательных детей). По ней ставим `*` на поле.
+  if (prop['x-required'] === true) return true;
   if (prop.required_when) return evalShowWhen(prop.required_when, inputState);
   return false;
 }
@@ -240,19 +297,82 @@ export function isMapWithScalarItems(prop: ScenarioInputSchemaProperty): boolean
   );
 }
 
+// Тип значения map: из items.type (isMap-путь) ИЛИ additional_properties.type
+// (backend-путь без флага isMap). Дефолт — string.
+export function mapValueType(prop: ScenarioInputSchemaProperty): string {
+  if (prop.items?.type) return prop.items.type;
+  const ap = prop['additional_properties'];
+  if (ap && typeof ap === 'object' && !Array.isArray(ap)) {
+    const t = (ap as Record<string, unknown>)['type'];
+    if (typeof t === 'string') return t;
+  }
+  return 'string';
+}
+
+// Map по additional_properties: type=object + additional_properties — скалярная
+// схема (есть type). Backend шлёт redis_settings/update_config как
+// {type:object, additional_properties:{type:string}} БЕЗ флага isMap → тоже MapEditor.
+export function isMapWithAdditionalProps(prop: ScenarioInputSchemaProperty): boolean {
+  if (prop.type !== 'object') return false;
+  const ap = prop['additional_properties'];
+  if (!ap || typeof ap !== 'object' || Array.isArray(ap)) return false;
+  const apType = (ap as Record<string, unknown>)['type'];
+  return typeof apType === 'string' && SCALAR_TYPES.has(apType);
+}
+
+// Одиночный типизированный объект: type=object + непустой properties, НЕ map
+// (isMap/additional_properties) и НЕ provision. Рендерится рекурсивно под-полями,
+// не JSON-textarea. AclUser (add_user.user): {type:object, properties:{name,perms,state}}.
+export function isObjectWithProperties(prop: ScenarioInputSchemaProperty): boolean {
+  if (prop.type !== 'object') return false;
+  if (isProvisionObjectField(prop)) return false;
+  if (isMapWithScalarItems(prop)) return false;
+  if (isMapWithAdditionalProps(prop)) return false;
+  // additional_properties как схема-объект (есть type) → это map, не типизированный объект.
+  const ap = prop['additional_properties'];
+  if (ap && typeof ap === 'object' && !Array.isArray(ap) && typeof (ap as Record<string, unknown>)['type'] === 'string') {
+    return false;
+  }
+  const props = prop['properties'];
+  return Boolean(props && typeof props === 'object' && !Array.isArray(props) && Object.keys(props as object).length > 0);
+}
+
 // Составной тип (array/object) — рендерится per-field JSON-textarea.
-// Исключения: type=array+items → TypedListField; type=object+isMap+scalarItems → MapEditor;
-// type=array+items.type=object+items.properties → ArrayOfObjectField.
+// Исключения: type=array+items → TypedListField; type=object+map → MapEditor;
+// type=array+items.type=object+items.properties → ArrayOfObjectField;
+// type=object+properties → ObjectField (рекурсивный).
 export function isCompositeType(prop: ScenarioInputSchemaProperty): boolean {
   if (isTypedListField(prop)) return false;
   if (isMapWithScalarItems(prop)) return false;
+  if (isMapWithAdditionalProps(prop)) return false;
   if (isArrayOfObjectField(prop)) return false;
+  if (isObjectWithProperties(prop)) return false;
   return prop.type === 'array' || prop.type === 'object';
 }
+
+// Пресет безопасных ACL-дефолтов для AclUser-объектов. Единый источник для
+// ArrayOfObjectField (per-item add) и одиночного object (defaultsFromSchema).
+export const ACL_USER_PRESET: Record<string, string> = {
+  perms: 'allchannels allkeys +@all -@admin -@dangerous +info',
+  state: 'on',
+};
 
 export function defaultsFromSchema(schema: ScenarioInputSchema): ScenarioFieldsState {
   const out: ScenarioFieldsState = {};
   for (const [key, prop] of Object.entries(schema)) {
+    if (isObjectWithProperties(prop)) {
+      // Рекурсивные дефолты под-полей, сериализованные в JSON-строку объекта
+      // (значение object-with-properties хранится строкой, как composite/map).
+      const sub = defaultsFromSchema(getObjectProperties(prop));
+      // AclUser: preset безопасных ACL-дефолтов (паритет с ArrayOfObjectField).
+      if (prop['x-type'] === 'AclUser') {
+        for (const [k, v] of Object.entries(ACL_USER_PRESET)) {
+          if (sub[k] === undefined || sub[k] === '') sub[k] = v;
+        }
+      }
+      out[key] = JSON.stringify(sub);
+      continue;
+    }
     if (prop.default !== undefined) {
       // Составной default ([] / {}) сериализуем в raw-JSON-строку (state хранит
       // составные значения строкой, как и редактируется per-field textarea).
@@ -305,6 +425,20 @@ export function missingRequiredFields(
   const out: string[] = [];
   const inputState = state as Record<string, unknown>;
   for (const [key, prop] of Object.entries(schema)) {
+    // Одиночный типизированный объект: обязательность задаётся object-level
+    // required:[children] — проверяем непустоту обязательных под-полей.
+    if (isObjectWithProperties(prop)) {
+      if (visibleFields !== undefined && !visibleFields.has(key)) continue;
+      const reqRaw: unknown = prop.required;
+      const requiredKeys = Array.isArray(reqRaw) ? (reqRaw as string[]) : [];
+      if (requiredKeys.length === 0) continue;
+      const subState = parseObjectFieldValue(state[key]);
+      for (const subKey of requiredKeys) {
+        const sv = subState[subKey];
+        if (sv === undefined || (typeof sv === 'string' && sv.trim() === '')) out.push(`${key}.${subKey}`);
+      }
+      continue;
+    }
     if (!isFieldRequired(prop, inputState)) continue;
     // Скрытое поле (show_when=false) — не требуется.
     if (visibleFields !== undefined && !visibleFields.has(key)) continue;
@@ -362,12 +496,12 @@ export function serializeFields(
       }
       continue;
     }
-    // B2: map+scalar items — хранится как JSON-строка объекта {"key":"val",...}.
-    // Конвертируем значения по items.type (int → parseInt).
-    if (isMapWithScalarItems(prop)) {
+    // Map (isMap ИЛИ additional_properties) — JSON-строка объекта {"key":"val",...}.
+    // Конвертируем значения по value-типу (int → parseInt).
+    if (isMapWithScalarItems(prop) || isMapWithAdditionalProps(prop)) {
       const parsed = tryParseJson(String(raw));
       if (parsed.ok && typeof parsed.value === 'object' && parsed.value !== null && !Array.isArray(parsed.value)) {
-        const itemsType = prop.items?.type ?? 'string';
+        const itemsType = mapValueType(prop);
         const obj = parsed.value as Record<string, unknown>;
         if (itemsType === 'integer') {
           const converted: Record<string, unknown> = {};
@@ -387,6 +521,13 @@ export function serializeFields(
           out[key] = obj;
         }
       }
+      continue;
+    }
+    // Одиночный типизированный объект — рекурсивная сериализация под-полей
+    // (subState хранится как ScenarioFieldsState в JSON-строке объекта).
+    if (isObjectWithProperties(prop)) {
+      const subState = parseObjectFieldValue(raw);
+      out[key] = serializeFields(getObjectProperties(prop), subState);
       continue;
     }
     if (isCompositeType(prop)) {
@@ -419,7 +560,7 @@ export function invalidCompositeFields(
   if (!schema || typeof schema !== 'object') return [];
   const out: string[] = [];
   for (const [key, prop] of Object.entries(schema)) {
-    if (!isCompositeType(prop) && !isMapWithScalarItems(prop)) continue;
+    if (!isCompositeType(prop) && !isMapWithScalarItems(prop) && !isMapWithAdditionalProps(prop)) continue;
     const raw = state[key];
     if (raw === undefined || (typeof raw === 'string' && raw.trim() === '')) continue;
     if (!tryParseJson(String(raw)).ok) out.push(key);
@@ -433,6 +574,17 @@ function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false 
   } catch {
     return { ok: false };
   }
+}
+
+// Разбирает сериализованное значение object-with-properties поля в под-state
+// (Record под-поле→ScenarioFieldValue). Пустое/непарсимое → {}.
+export function parseObjectFieldValue(raw: ScenarioFieldValue): ScenarioFieldsState {
+  if (raw === undefined || raw === '') return {};
+  const parsed = tryParseJson(String(raw));
+  if (parsed.ok && parsed.value && typeof parsed.value === 'object' && !Array.isArray(parsed.value)) {
+    return parsed.value as ScenarioFieldsState;
+  }
+  return {};
 }
 
 // ---------------------------------------------------------------------------

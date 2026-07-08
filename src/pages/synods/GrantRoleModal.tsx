@@ -1,26 +1,32 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal } from '../../components/primitives';
-import { keeperApi } from '../../api/keeper';
+import { Button, Modal, SearchMultiSelect } from '../../components/primitives';
+import { keeperApi, type RoleView } from '../../api/keeper';
 import { prettySynodError } from './errors';
 import styles from '../common.module.css';
 
 interface Props {
   open: boolean;
   synodName: string;
-  /** Уже привязанные роли (чтобы отфильтровать в селекте). */
+  /** Уже привязанные роли (исключаются из выбора). */
   currentRoles: string[];
   onClose: () => void;
+}
+
+interface Failure {
+  role: string;
+  msg: string;
 }
 
 export function GrantRoleModal({ open, synodName, currentRoles, onClose }: Props) {
   const { t } = useTranslation(['synods', 'common']);
   const qc = useQueryClient();
-  const [roleName, setRoleName] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [failures, setFailures] = useState<Failure[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Список всех ролей кластера — для селектора.
+  // Каталог ролей кластера — небольшой, фильтруем на клиенте.
   const rolesQ = useQuery({
     queryKey: ['rbac.roles'],
     queryFn: () => keeperApi.roles.list(),
@@ -29,28 +35,47 @@ export function GrantRoleModal({ open, synodName, currentRoles, onClose }: Props
   });
 
   const availableRoles = (rolesQ.data?.items ?? []).filter(
-    (r) => !currentRoles.includes(r.name),
+    (r): r is RoleView => typeof r?.name === 'string' && !currentRoles.includes(r.name),
   );
 
+  // Fan-out: N идемпотентных POST-ов; partial failure не откатывает успешные.
   const mu = useMutation({
-    mutationFn: () => keeperApi.synods.roles.grant(synodName, roleName),
-    onSuccess: () => {
+    mutationFn: async (): Promise<Failure[]> => {
+      const results = await Promise.allSettled(
+        selected.map((role) => keeperApi.synods.roles.grant(synodName, role)),
+      );
+      const failed: Failure[] = [];
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') failed.push({ role: selected[i], msg: prettySynodError(r.reason) });
+      });
+      return failed;
+    },
+    onSuccess: (failed) => {
       qc.invalidateQueries({ queryKey: ['synods'] });
-      setRoleName('');
-      setServerError(null);
-      onClose();
+      if (failed.length === 0) {
+        reset();
+        onClose();
+      } else {
+        setFailures(failed);
+        setSelected(failed.map((f) => f.role));
+      }
     },
     onError: (err) => setServerError(prettySynodError(err)),
   });
 
+  function reset() {
+    setSelected([]);
+    setFailures([]);
+    setServerError(null);
+  }
+
   function close() {
     if (mu.isPending) return;
-    setRoleName('');
-    setServerError(null);
+    reset();
     onClose();
   }
 
-  const canSubmit = roleName.length > 0 && !mu.isPending;
+  const canSubmit = selected.length > 0 && !mu.isPending;
 
   return (
     <Modal
@@ -66,43 +91,41 @@ export function GrantRoleModal({ open, synodName, currentRoles, onClose }: Props
             type="button"
             variant="primary"
             disabled={!canSubmit}
-            onClick={() => { setServerError(null); mu.mutate(); }}
+            onClick={() => { setServerError(null); setFailures([]); mu.mutate(); }}
             data-testid="grant-role-submit"
           >
-            {mu.isPending ? t('common:adding') : t('common:add')}
+            {mu.isPending ? t('common:adding') : t('synods:grantRoleSubmit', { n: selected.length })}
           </Button>
         </>
       }
     >
-      <form noValidate onSubmit={(e) => { e.preventDefault(); if (canSubmit) mu.mutate(); }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 13 }}>{t('synods:grantRoleLabel')}</span>
-          <select
-            value={roleName}
-            onChange={(e) => setRoleName(e.target.value)}
-            aria-label={t('synods:grantRoleLabel')}
-            data-testid="grant-role-select"
-            style={{
-              padding: '8px 10px',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--border)',
-              background: 'var(--surface)',
-              fontSize: 13,
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
-            <option value="">—</option>
-            {availableRoles.map((r) => (
-              <option key={r.name} value={r.name}>{r.name}</option>
+      <SearchMultiSelect<RoleView>
+        items={availableRoles}
+        loading={rolesQ.isLoading}
+        selected={selected}
+        onChange={setSelected}
+        getKey={(r) => r.name}
+        getLabel={(r) => r.name}
+        getSublabel={(r) => r.description}
+        placeholder={t('synods:grantRoleSearchPlaceholder')}
+        emptyText={t('synods:grantRoleNoResults')}
+        testidPrefix="grant-role"
+      />
+      {failures.length > 0 ? (
+        <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert" data-testid="grant-role-partial">
+          <div>{t('synods:grantRolePartialFail', { list: failures.map((f) => f.role).join(', ') })}</div>
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+            {failures.map((f) => (
+              <li key={f.role}><span className="mono">{f.role}</span>: {f.msg}</li>
             ))}
-          </select>
-        </label>
-        {serverError ? (
-          <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert">
-            {serverError}
-          </div>
-        ) : null}
-      </form>
+          </ul>
+        </div>
+      ) : null}
+      {serverError ? (
+        <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert">
+          {serverError}
+        </div>
+      ) : null}
     </Modal>
   );
 }

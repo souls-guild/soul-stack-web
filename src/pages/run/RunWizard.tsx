@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
-import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock } from 'lucide-react';
+import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock, Info } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { CONSTRAINTS } from '../../api/constraints.gen';
 import type {
@@ -23,15 +23,19 @@ import type {
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { useServiceScenarios } from '../incarnations/useServiceScenarios';
+import { useServiceDirectives } from '../incarnations/useServiceDirectives';
 import { runnableScenarios } from '../incarnations/reservedScenarios';
 import { ScenarioInputFields } from '../incarnations/ScenarioInputFields';
+import { splitScenarioNote } from './scenarioNote';
 import {
   computeVisibleFields,
   defaultsFromSchema,
   invalidCompositeFields,
   isSupportedInputSchema,
   missingRequiredFields,
+  schemaHasDirectiveField,
   serializeFields,
+  type DirectiveCatalogContext,
   type ScenarioFieldsState,
 } from '../incarnations/scenarioInputFields.helpers';
 import {
@@ -423,6 +427,31 @@ export function RunWizard() {
   );
   const inputSchema: ScenarioInputSchema | undefined = selectedScenarioMeta?.input_schema;
   const usePerField = isSupportedInputSchema(inputSchema);
+
+  // NIM-76: day-2 update_config — версия Redis не задаётся в форме, берём её из
+  // state.redis_version инкарнации (первая из resolved-множества). Гейтим на наличие
+  // поля с x-directives в схеме (не тянем incarnation/каталог для не-redis сценариев).
+  const hasDirectiveField = useMemo(() => schemaHasDirectiveField(inputSchema), [inputSchema]);
+  // Directive-валидация (hard-block, 3A) применима ТОЛЬКО к одиночному таргету: при
+  // fan-out на >1 инкарнацию их redis_version могут различаться → одна версия жёстко
+  // блокировала бы валидные на других. >1 → graceful (не валидируем; backend 422 финален).
+  const dayTwoSingle = workload === 'scenario' && scenarioState.incarnations.length === 1;
+  const dayTwoIncarnation = dayTwoSingle ? scenarioState.incarnations[0] : '';
+  const incarnationDetailQ = useQuery({
+    queryKey: ['incarnation', dayTwoIncarnation],
+    queryFn: () => keeperApi.incarnations.get(dayTwoIncarnation),
+    enabled: Boolean(dayTwoIncarnation) && hasDirectiveField,
+  });
+  const directiveVersion = useMemo(() => {
+    const st = incarnationDetailQ.data?.state as Record<string, unknown> | undefined;
+    const v = st?.['redis_version'];
+    return typeof v === 'string' && v !== '' ? v : v != null ? String(v) : undefined;
+  }, [incarnationDetailQ.data]);
+  const directivesQ = useServiceDirectives(hasDirectiveField ? scenarioState.service || undefined : undefined);
+  const directiveCatalog = useMemo<DirectiveCatalogContext>(
+    () => ({ directives: directivesQ.directives, loaded: !directivesQ.loading && !directivesQ.unavailable }),
+    [directivesQ.directives, directivesQ.loading, directivesQ.unavailable],
+  );
 
   // --- Резолв хостов для Command (live preview + submit). ---
   // Всегда грузим soul-список (для preview); фильтрация — client-side.
@@ -932,6 +961,8 @@ export function RunWizard() {
             invalidComposite={scenarioInvalidComposite}
             onInvalidMapChange={setScenarioInvalidMaps}
             onPatternErrorChange={setScenarioPatternErrors}
+            directiveCatalog={directiveCatalog}
+            directiveVersion={directiveVersion}
           />
         ) : null}
         {step === 3 && workload === 'command' ? (
@@ -1220,6 +1251,8 @@ function Step3ScenarioIncarnations({
   invalidComposite,
   onInvalidMapChange,
   onPatternErrorChange,
+  directiveCatalog,
+  directiveVersion,
 }: {
   value: ScenarioStateValues;
   // Dispatch (а не plain-callback): два derived-эффекта ниже (defaults-seed и
@@ -1236,8 +1269,11 @@ function Step3ScenarioIncarnations({
   invalidComposite: string[];
   onInvalidMapChange?: (fields: string[]) => void;
   onPatternErrorChange?: (fields: string[]) => void;
+  directiveCatalog?: DirectiveCatalogContext;
+  directiveVersion?: string;
 }) {
   const { t } = useTranslation();
+  const scenarioNote = splitScenarioNote(selectedScenarioMeta?.description);
 
   // Сидируем defaults при смене supported schema, но НЕ затираем уже введённые/
   // восстановленные из черновика значения (иначе re-mount шага сбрасывал бы input).
@@ -1369,6 +1405,27 @@ function Step3ScenarioIncarnations({
           <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
             {t('run:scenarioInputFieldsLabel', { scenario: value.scenario })}
           </div>
+          {scenarioNote.lead ? (
+            <div
+              data-testid="scenario-note"
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-start',
+                marginBottom: 10,
+                padding: '8px 10px',
+                fontSize: 12.5,
+                lineHeight: 1.45,
+                color: 'var(--text)',
+                background: 'color-mix(in srgb, var(--info) 8%, var(--surface))',
+                border: '1px solid color-mix(in srgb, var(--info) 35%, var(--border))',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              <Info size={14} style={{ flexShrink: 0, marginTop: 2, color: 'var(--info)' }} />
+              <span style={{ whiteSpace: 'pre-line' }}>{scenarioNote.lead}</span>
+            </div>
+          ) : null}
           <ScenarioInputFields
             schema={inputSchema}
             value={value.fields}
@@ -1377,10 +1434,12 @@ function Step3ScenarioIncarnations({
             onInvalidMapChange={onInvalidMapChange}
             onPatternErrorChange={onPatternErrorChange}
             form={selectedScenarioMeta?.form}
+            directiveCatalog={directiveCatalog}
+            directiveVersion={directiveVersion}
           />
-          {selectedScenarioMeta?.description ? (
-            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)' }}>
-              {selectedScenarioMeta.description}
+          {scenarioNote.rest ? (
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-faint)', whiteSpace: 'pre-line' }}>
+              {scenarioNote.rest}
             </div>
           ) : null}
         </div>

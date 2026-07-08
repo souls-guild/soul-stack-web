@@ -1,19 +1,28 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ScenarioInputSchema, ScenarioInputSchemaProperty, ScenarioForm } from '../../api/keeper';
 import {
   isCompositeType,
   isMapWithScalarItems,
+  isMapWithAdditionalProps,
+  isObjectWithProperties,
+  mapValueType,
+  parseObjectFieldValue,
   isTypedListField,
   isArrayOfObjectField,
   isProvisionObjectField,
   getObjectProperties,
+  ACL_USER_PRESET,
   readProvisionEnabled,
   setProvisionEnabled,
   setProvisionSubField,
   readProvisionSubField,
   evalShowWhen,
   isFieldRequired,
+  directiveFieldTag,
+  directiveNamesForVersion,
+  versionToSeries,
+  type DirectiveCatalogContext,
   type ScenarioFieldValue,
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
@@ -40,6 +49,10 @@ interface Props {
   form?: ScenarioForm;
   // Имя создаваемой инкарнации (для подсказки existing-souls в ProvisionField).
   incarnationName?: string;
+  // NIM-76: каталог Redis-директив (серия→имена) для полей с x-directives.
+  directiveCatalog?: DirectiveCatalogContext;
+  // NIM-76: полная версия Redis ("8.2.2") — серия выбирается на клиенте. Реактивна.
+  directiveVersion?: string;
 }
 
 // Агрегатор ошибок по имени поля. Хранит карту name→hasError и оповещает
@@ -68,6 +81,8 @@ export function ScenarioInputFields({
   onPatternErrorChange,
   form,
   incarnationName,
+  directiveCatalog,
+  directiveVersion,
 }: Props) {
   const { t } = useTranslation();
   const notifyMapError = useFieldErrorAggregator(onInvalidMapChange);
@@ -120,6 +135,9 @@ export function ScenarioInputFields({
         labelOverride={labelOverride}
         placeholderOverride={placeholderOverride}
         hintOverride={hintOverride}
+        showErrors={showErrors}
+        directiveCatalog={directiveCatalog}
+        directiveVersion={directiveVersion}
       />
     );
   }
@@ -181,8 +199,11 @@ export function ScenarioInputFields({
 
   // Плоский рендер (нет form или нет секций): обратная совместимость.
   // isFieldRequired учитывает required_when реактивно по текущему value.
-  const requiredEntries = entries.filter(([, prop]) => isFieldRequired(prop, value as Record<string, unknown>));
-  const optionalEntries = entries.filter(([, prop]) => !isFieldRequired(prop, value as Record<string, unknown>));
+  // NIM-72: одиночный object-with-properties держим в верхней группе (не в advanced-
+  // collapse) — иначе add_user.user (required=[children], isFieldRequired=false) хоронит
+  // всю форму в свёрнутый <details>. Layout-only, без ложного required-маркера.
+  const requiredEntries = entries.filter(([, prop]) => isFieldRequired(prop, value as Record<string, unknown>) || isObjectWithProperties(prop));
+  const optionalEntries = entries.filter(([, prop]) => !isFieldRequired(prop, value as Record<string, unknown>) && !isObjectWithProperties(prop));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -307,9 +328,14 @@ interface OneProps {
   // Из ScenarioFormField: placeholder и hint (оба опциональны).
   placeholderOverride?: string;
   hintOverride?: string;
+  // Показывать inline-ошибки required у под-полей объекта (NIM-72, рекурсивный ObjectField).
+  showErrors?: boolean;
+  // NIM-76: каталог Redis-директив + версия (для MapEditor полей с x-directives).
+  directiveCatalog?: DirectiveCatalogContext;
+  directiveVersion?: string;
 }
 
-function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
+function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride, showErrors, directiveCatalog, directiveVersion }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
   const { t } = useTranslation();
   // Текст label без маркера (маркер рендерится отдельным span).
   const labelBaseText = labelOverride ?? name;
@@ -435,8 +461,9 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // ADR-045 B2: type=object + isMap=true + scalar items → KEY→VALUE-редактор.
-  if (isMapWithScalarItems(prop)) {
+  // ADR-045 B2 + NIM-72: type=object + map (isMap+scalar items ИЛИ
+  // additional_properties-скаляр) → KEY→VALUE-редактор.
+  if (isMapWithScalarItems(prop) || isMapWithAdditionalProps(prop)) {
     return (
       <MapEditor
         name={name}
@@ -449,6 +476,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
         baseStyle={baseStyle}
         onErrorChange={onMapError}
         hintOverride={resolvedHint}
+        directiveCatalog={directiveCatalog}
+        directiveVersion={directiveVersion}
       />
     );
   }
@@ -467,6 +496,31 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
         missing={missing}
         baseStyle={baseStyle}
         hintOverride={resolvedHint}
+      />
+    );
+  }
+
+  // NIM-72: одиночный типизированный объект (type=object + properties) →
+  // рекурсивный рендер под-полей через тот же движок (enum→select, вложенный
+  // map/object/boolean — «бесплатно»). Раньше падал в JSON-textarea.
+  if (isObjectWithProperties(prop)) {
+    return (
+      <ObjectField
+        name={name}
+        labelText={labelText}
+        required={required}
+        prop={prop}
+        value={value}
+        onChange={onChange}
+        missing={missing}
+        hintOverride={resolvedHint}
+        showErrors={showErrors}
+        incarnationContext={incarnationContext}
+        moduleName={moduleName}
+        onMapError={onMapError}
+        onPatternError={onPatternError}
+        directiveCatalog={directiveCatalog}
+        directiveVersion={directiveVersion}
       />
     );
   }
@@ -855,13 +909,6 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
     commit(next);
   }
 
-  // Пресеты значений по умолчанию для известных x-type.
-  // Цель: быстрый старт оператора без ручного ввода безопасных дефолтов.
-  const ACL_USER_PRESET: Record<string, string> = {
-    perms: 'allchannels allkeys +@all -@admin -@dangerous +info',
-    state: 'on',
-  };
-
   function handleAdd() {
     // Создаём новый элемент с пустыми значениями для всех под-полей.
     // Для типа AclUser применяем preset безопасных дефолтов.
@@ -1010,6 +1057,98 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
       ) : null}
       {missing ? (
         <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
+      ) : null}
+    </div>
+  );
+}
+
+// NIM-72: одиночный типизированный объект (AclUser add_user.user). Рекурсивно
+// рендерит под-поля через ScenarioInputOneField (тот же движок). Значение —
+// JSON-строка объекта под-полей (subState = ScenarioFieldsState), сериализуется
+// рекурсивно в serializeFields. object-level required:[children] → маркеры/gate.
+interface ObjectFieldProps {
+  name: string;
+  labelText: string;
+  required: boolean;
+  prop: ScenarioInputSchemaProperty;
+  value: ScenarioFieldValue;
+  onChange: (v: ScenarioFieldValue) => void;
+  missing: boolean;
+  hintOverride?: string;
+  showErrors?: boolean;
+  incarnationContext?: string;
+  moduleName?: string;
+  onMapError?: (name: string, hasError: boolean) => void;
+  onPatternError?: (name: string, hasError: boolean) => void;
+  directiveCatalog?: DirectiveCatalogContext;
+  directiveVersion?: string;
+}
+
+function ObjectField({ name, labelText, required, prop, value, onChange, missing, hintOverride, showErrors, incarnationContext, moduleName, onMapError, onPatternError, directiveCatalog, directiveVersion }: ObjectFieldProps) {
+  const { t } = useTranslation();
+
+  const subProps = getObjectProperties(prop);
+  const reqRaw: unknown = prop.required;
+  const requiredKeys: string[] = Array.isArray(reqRaw) ? (reqRaw as string[]) : [];
+  const xType = prop['x-type'] as string | undefined;
+
+  // subState парсится из value на каждый рендер (single source of truth — внешний value).
+  const subState = parseObjectFieldValue(value);
+
+  function handleSubChange(subKey: string, subVal: ScenarioFieldValue) {
+    const next: ScenarioFieldsState = { ...subState, [subKey]: subVal };
+    onChange(JSON.stringify(next));
+  }
+
+  const requiredMarkerEl = required ? (
+    <span
+      data-testid={`field-required-marker-${name}`}
+      style={{ color: 'var(--danger)', marginLeft: 2 }}
+      aria-label="обязательное поле"
+    >
+      *
+    </span>
+  ) : null;
+
+  return (
+    <div data-testid={`field-object-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+        {labelText}{requiredMarkerEl}
+        {xType ? <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>[{xType}]</span> : null}
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 12, borderLeft: '2px solid var(--border)' }}>
+        {Object.entries(subProps).map(([subKey, subProp]) => {
+          const isSubRequired = requiredKeys.includes(subKey);
+          const subVal = subState[subKey];
+          const subEmpty = subVal === undefined || (typeof subVal === 'string' && subVal.trim() === '');
+          const subMissing = Boolean(showErrors) && isSubRequired && subEmpty;
+          return (
+            <ScenarioInputOneField
+              key={subKey}
+              name={`${name}.${subKey}`}
+              required={isSubRequired}
+              missing={subMissing}
+              prop={subProp}
+              value={subVal}
+              inputState={subState as Record<string, unknown>}
+              onChange={(nv) => handleSubChange(subKey, nv)}
+              incarnationContext={incarnationContext}
+              moduleName={moduleName}
+              onMapError={onMapError}
+              onPatternError={onPatternError}
+              showErrors={showErrors}
+              labelOverride={subKey}
+              directiveCatalog={directiveCatalog}
+              directiveVersion={directiveVersion}
+            />
+          );
+        })}
+      </div>
+      {hintOverride ? (
+        <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{hintOverride}</span>
+      ) : null}
+      {missing ? (
+        <span data-testid={`field-required-${name}`} style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
       ) : null}
     </div>
   );
@@ -1190,14 +1329,23 @@ interface MapEditorProps {
   // Callback: поднимает ошибку/её снятие к ScenarioInputFields для gate-а submit-а.
   onErrorChange?: (name: string, hasError: boolean) => void;
   hintOverride?: string;
+  // NIM-76: каталог Redis-директив (серия→имена) + текущая версия. Валидируем ключи
+  // ТОЛЬКО при truthy prop['x-directives'] И загруженном каталоге (иначе graceful).
+  directiveCatalog?: DirectiveCatalogContext;
+  directiveVersion?: string;
 }
 
+type PairError = 'duplicate' | 'incomplete' | 'unknown-directive' | null;
+
 // Вычисляет ошибки пар map-редактора — единый источник правды для рендера и commitPairs.
+// knownDirectives (NIM-76): непустой Set → ключ вне каталога = 'unknown-directive';
+// null/undefined → директивы не проверяем (каталог не на руках → graceful-degrade).
 function computePairErrors(
   pairs: Array<[string, string]>,
   isInt: boolean,
+  knownDirectives?: Set<string> | null,
 ): {
-  pairErrors: Array<'duplicate' | 'incomplete' | null>;
+  pairErrors: PairError[];
   valErrors: boolean[];
   hasError: boolean;
 } {
@@ -1205,9 +1353,10 @@ function computePairErrors(
   for (const [k] of pairs) {
     if (k.trim() !== '') keyCount[k] = (keyCount[k] ?? 0) + 1;
   }
-  const pairErrors: Array<'duplicate' | 'incomplete' | null> = pairs.map(([k, v]) => {
+  const pairErrors: PairError[] = pairs.map(([k, v]) => {
     if (k.trim() === '' && v.trim() !== '') return 'incomplete';
     if (k.trim() !== '' && (keyCount[k] ?? 0) > 1) return 'duplicate';
+    if (k.trim() !== '' && knownDirectives && !knownDirectives.has(k)) return 'unknown-directive';
     return null;
   });
   const valErrors: boolean[] = isInt
@@ -1230,23 +1379,54 @@ function parseJsonPairs(raw: ScenarioFieldValue): Array<[string, string]> {
   return [];
 }
 
-function MapEditor({ name, labelText, required, prop, value, onChange, missing, baseStyle, onErrorChange, hintOverride }: MapEditorProps) {
+function MapEditor({ name, labelText, required, prop, value, onChange, missing, baseStyle, onErrorChange, hintOverride, directiveCatalog, directiveVersion }: MapEditorProps) {
   const { t } = useTranslation();
-  const itemsType = prop.items?.type ?? 'string';
+  const itemsType = mapValueType(prop);
   const isInt = itemsType === 'integer';
 
   // Локальный state пар (включает черновые с пустым ключом).
   // Инициализируется из внешнего value при первом рендере.
   const [pairs, setPairs] = useState<Array<[string, string]>>(() => parseJsonPairs(value));
 
+  // NIM-76: имена директив для валидации/typeahead — только для помеченного поля
+  // (x-directives) и при загруженном каталоге + известной серии. Иначе null → не валидируем.
+  const directiveTag = directiveFieldTag(prop);
+  const directiveNames = useMemo(
+    () => (directiveTag ? directiveNamesForVersion(directiveCatalog, directiveVersion) : undefined),
+    [directiveTag, directiveCatalog, directiveVersion],
+  );
+  const knownDirectives = useMemo(
+    () => (directiveNames ? new Set(directiveNames) : null),
+    [directiveNames],
+  );
+  const directivesDatalistId = directiveNames
+    ? `directives-${name}-${versionToSeries(directiveVersion)}`
+    : undefined;
+
   // Ошибки текущих пар — через единую функцию (источник правды).
-  const { pairErrors, valErrors } = computePairErrors(pairs, isInt);
+  const { pairErrors, valErrors } = computePairErrors(pairs, isInt, knownDirectives);
+
+  // Реактивная перепроверка при смене версии/каталога (commitPairs покрывает правки
+  // пар; этот эффект — смену серии директив и начальную валидацию pre-filled value).
+  useEffect(() => {
+    const { hasError } = computePairErrors(pairs, isInt, knownDirectives);
+    onErrorChange?.(name, hasError);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [knownDirectives]);
+
+  // Снимаем ошибку при размонтировании поля (скрытие show_when-секции или смена
+  // сценария): иначе агрегатор держит stale-ключ и submit-gate залипает без видимого
+  // на экране поля. Refs агрегатора стабильны → колбэк первого рендера корректен.
+  useEffect(() => {
+    return () => onErrorChange?.(name, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function commitPairs(next: Array<[string, string]>) {
     setPairs(next);
 
     // Пересчитываем ошибки для нового набора пар через ту же функцию.
-    const { hasError: nextHasError } = computePairErrors(next, isInt);
+    const { hasError: nextHasError } = computePairErrors(next, isInt, knownDirectives);
 
     // Внешний state — ВСЕГДА валидный JSON: только пары с непустым ключом,
     // дубли — last-wins (черновик переживает re-mount без потери введённого).
@@ -1307,6 +1487,8 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
               value={k}
               onChange={(e) => handleKeyChange(idx, e.target.value)}
               placeholder="key"
+              list={directivesDatalistId}
+              aria-invalid={pairErrors[idx] ? 'true' : undefined}
               style={{
                 ...baseStyle,
                 flex: '0 0 140px',
@@ -1323,7 +1505,8 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
               style={{
                 ...baseStyle,
                 flex: 1,
-                border: `1px solid ${valErrors[idx] || pairErrors[idx] ? 'var(--danger)' : 'var(--border)'}`,
+                // unknown-directive — проблема ключа, значение не подсвечиваем.
+                border: `1px solid ${valErrors[idx] || (pairErrors[idx] && pairErrors[idx] !== 'unknown-directive') ? 'var(--danger)' : 'var(--border)'}`,
               }}
             />
             <button
@@ -1357,6 +1540,13 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
             >
               {t('run:mapIncompleteKeyError')}
             </span>
+          ) : pairErrors[idx] === 'unknown-directive' ? (
+            <span
+              data-testid={`field-map-error-${name}`}
+              style={{ color: 'var(--danger)', fontSize: 12, paddingLeft: 2 }}
+            >
+              {t('run:mapUnknownDirectiveError', { version: directiveVersion })}
+            </span>
           ) : valErrors[idx] ? (
             <span
               data-testid={`field-map-error-${name}`}
@@ -1367,6 +1557,14 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
           ) : null}
         </div>
       ))}
+      {/* NIM-76: один общий datalist на редактор — typeahead имён директив серии. */}
+      {directiveNames && directivesDatalistId ? (
+        <datalist id={directivesDatalistId} data-testid={`field-map-directives-${name}`}>
+          {directiveNames.map((d) => (
+            <option key={d} value={d} />
+          ))}
+        </datalist>
+      ) : null}
       <button
         type="button"
         data-testid={`field-map-add-${name}`}
