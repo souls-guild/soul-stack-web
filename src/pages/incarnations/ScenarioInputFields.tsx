@@ -4,10 +4,15 @@ import type { ScenarioInputSchema, ScenarioInputSchemaProperty, ScenarioForm } f
 import {
   isCompositeType,
   isMapWithScalarItems,
+  isMapWithAdditionalProps,
+  isObjectWithProperties,
+  mapValueType,
+  parseObjectFieldValue,
   isTypedListField,
   isArrayOfObjectField,
   isProvisionObjectField,
   getObjectProperties,
+  ACL_USER_PRESET,
   readProvisionEnabled,
   setProvisionEnabled,
   setProvisionSubField,
@@ -120,6 +125,7 @@ export function ScenarioInputFields({
         labelOverride={labelOverride}
         placeholderOverride={placeholderOverride}
         hintOverride={hintOverride}
+        showErrors={showErrors}
       />
     );
   }
@@ -181,8 +187,11 @@ export function ScenarioInputFields({
 
   // Плоский рендер (нет form или нет секций): обратная совместимость.
   // isFieldRequired учитывает required_when реактивно по текущему value.
-  const requiredEntries = entries.filter(([, prop]) => isFieldRequired(prop, value as Record<string, unknown>));
-  const optionalEntries = entries.filter(([, prop]) => !isFieldRequired(prop, value as Record<string, unknown>));
+  // NIM-72: одиночный object-with-properties держим в верхней группе (не в advanced-
+  // collapse) — иначе add_user.user (required=[children], isFieldRequired=false) хоронит
+  // всю форму в свёрнутый <details>. Layout-only, без ложного required-маркера.
+  const requiredEntries = entries.filter(([, prop]) => isFieldRequired(prop, value as Record<string, unknown>) || isObjectWithProperties(prop));
+  const optionalEntries = entries.filter(([, prop]) => !isFieldRequired(prop, value as Record<string, unknown>) && !isObjectWithProperties(prop));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -307,9 +316,11 @@ interface OneProps {
   // Из ScenarioFormField: placeholder и hint (оба опциональны).
   placeholderOverride?: string;
   hintOverride?: string;
+  // Показывать inline-ошибки required у под-полей объекта (NIM-72, рекурсивный ObjectField).
+  showErrors?: boolean;
 }
 
-function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
+function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride, showErrors }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
   const { t } = useTranslation();
   // Текст label без маркера (маркер рендерится отдельным span).
   const labelBaseText = labelOverride ?? name;
@@ -435,8 +446,9 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // ADR-045 B2: type=object + isMap=true + scalar items → KEY→VALUE-редактор.
-  if (isMapWithScalarItems(prop)) {
+  // ADR-045 B2 + NIM-72: type=object + map (isMap+scalar items ИЛИ
+  // additional_properties-скаляр) → KEY→VALUE-редактор.
+  if (isMapWithScalarItems(prop) || isMapWithAdditionalProps(prop)) {
     return (
       <MapEditor
         name={name}
@@ -467,6 +479,29 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
         missing={missing}
         baseStyle={baseStyle}
         hintOverride={resolvedHint}
+      />
+    );
+  }
+
+  // NIM-72: одиночный типизированный объект (type=object + properties) →
+  // рекурсивный рендер под-полей через тот же движок (enum→select, вложенный
+  // map/object/boolean — «бесплатно»). Раньше падал в JSON-textarea.
+  if (isObjectWithProperties(prop)) {
+    return (
+      <ObjectField
+        name={name}
+        labelText={labelText}
+        required={required}
+        prop={prop}
+        value={value}
+        onChange={onChange}
+        missing={missing}
+        hintOverride={resolvedHint}
+        showErrors={showErrors}
+        incarnationContext={incarnationContext}
+        moduleName={moduleName}
+        onMapError={onMapError}
+        onPatternError={onPatternError}
       />
     );
   }
@@ -855,13 +890,6 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
     commit(next);
   }
 
-  // Пресеты значений по умолчанию для известных x-type.
-  // Цель: быстрый старт оператора без ручного ввода безопасных дефолтов.
-  const ACL_USER_PRESET: Record<string, string> = {
-    perms: 'allchannels allkeys +@all -@admin -@dangerous +info',
-    state: 'on',
-  };
-
   function handleAdd() {
     // Создаём новый элемент с пустыми значениями для всех под-полей.
     // Для типа AclUser применяем preset безопасных дефолтов.
@@ -1010,6 +1038,94 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
       ) : null}
       {missing ? (
         <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
+      ) : null}
+    </div>
+  );
+}
+
+// NIM-72: одиночный типизированный объект (AclUser add_user.user). Рекурсивно
+// рендерит под-поля через ScenarioInputOneField (тот же движок). Значение —
+// JSON-строка объекта под-полей (subState = ScenarioFieldsState), сериализуется
+// рекурсивно в serializeFields. object-level required:[children] → маркеры/gate.
+interface ObjectFieldProps {
+  name: string;
+  labelText: string;
+  required: boolean;
+  prop: ScenarioInputSchemaProperty;
+  value: ScenarioFieldValue;
+  onChange: (v: ScenarioFieldValue) => void;
+  missing: boolean;
+  hintOverride?: string;
+  showErrors?: boolean;
+  incarnationContext?: string;
+  moduleName?: string;
+  onMapError?: (name: string, hasError: boolean) => void;
+  onPatternError?: (name: string, hasError: boolean) => void;
+}
+
+function ObjectField({ name, labelText, required, prop, value, onChange, missing, hintOverride, showErrors, incarnationContext, moduleName, onMapError, onPatternError }: ObjectFieldProps) {
+  const { t } = useTranslation();
+
+  const subProps = getObjectProperties(prop);
+  const reqRaw: unknown = prop.required;
+  const requiredKeys: string[] = Array.isArray(reqRaw) ? (reqRaw as string[]) : [];
+  const xType = prop['x-type'] as string | undefined;
+
+  // subState парсится из value на каждый рендер (single source of truth — внешний value).
+  const subState = parseObjectFieldValue(value);
+
+  function handleSubChange(subKey: string, subVal: ScenarioFieldValue) {
+    const next: ScenarioFieldsState = { ...subState, [subKey]: subVal };
+    onChange(JSON.stringify(next));
+  }
+
+  const requiredMarkerEl = required ? (
+    <span
+      data-testid={`field-required-marker-${name}`}
+      style={{ color: 'var(--danger)', marginLeft: 2 }}
+      aria-label="обязательное поле"
+    >
+      *
+    </span>
+  ) : null;
+
+  return (
+    <div data-testid={`field-object-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="mono" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+        {labelText}{requiredMarkerEl}
+        {xType ? <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>[{xType}]</span> : null}
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 12, borderLeft: '2px solid var(--border)' }}>
+        {Object.entries(subProps).map(([subKey, subProp]) => {
+          const isSubRequired = requiredKeys.includes(subKey);
+          const subVal = subState[subKey];
+          const subEmpty = subVal === undefined || (typeof subVal === 'string' && subVal.trim() === '');
+          const subMissing = Boolean(showErrors) && isSubRequired && subEmpty;
+          return (
+            <ScenarioInputOneField
+              key={subKey}
+              name={`${name}.${subKey}`}
+              required={isSubRequired}
+              missing={subMissing}
+              prop={subProp}
+              value={subVal}
+              inputState={subState as Record<string, unknown>}
+              onChange={(nv) => handleSubChange(subKey, nv)}
+              incarnationContext={incarnationContext}
+              moduleName={moduleName}
+              onMapError={onMapError}
+              onPatternError={onPatternError}
+              showErrors={showErrors}
+              labelOverride={subKey}
+            />
+          );
+        })}
+      </div>
+      {hintOverride ? (
+        <span data-testid={`field-hint-${name}`} style={{ color: 'var(--text-faint)', fontSize: 12 }}>{hintOverride}</span>
+      ) : null}
+      {missing ? (
+        <span data-testid={`field-required-${name}`} style={{ color: 'var(--danger)', fontSize: 12 }}>{t('forms:required')}</span>
       ) : null}
     </div>
   );
@@ -1232,7 +1348,7 @@ function parseJsonPairs(raw: ScenarioFieldValue): Array<[string, string]> {
 
 function MapEditor({ name, labelText, required, prop, value, onChange, missing, baseStyle, onErrorChange, hintOverride }: MapEditorProps) {
   const { t } = useTranslation();
-  const itemsType = prop.items?.type ?? 'string';
+  const itemsType = mapValueType(prop);
   const isInt = itemsType === 'integer';
 
   // Локальный state пар (включает черновые с пустым ключом).
