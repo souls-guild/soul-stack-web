@@ -1,0 +1,128 @@
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chipRemove {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  display: inline-flex;
+}
+
+.chipRemove:disabled {
+  cursor: not-allowed;
+  color: var(--text-faint);
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.control:focus-within {
+  border-color: var(--accent);
+}
+
+.searchIcon {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.searchInput::placeholder {
+  color: var(--text-faint);
+}
+
+.dropdown {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.option:hover,
+.optionActive {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.optCheck {
+  width: 14px;
+  display: inline-flex;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.optLabel {
+  font-family: var(--font-mono);
+}
+
+.optSub {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.msg {
+  padding: 12px 10px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}

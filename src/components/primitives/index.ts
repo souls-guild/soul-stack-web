@@ -9,3 +9,5 @@ export { Modal } from './Modal';
 export { Pager } from './Pager';
 export { Donut } from './Donut';
 export type { DonutSlice, DonutTone } from './Donut';
+export { SearchMultiSelect } from './SearchMultiSelect';
+export type { SearchMultiSelectProps } from './SearchMultiSelect';

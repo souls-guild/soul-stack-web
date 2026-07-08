@@ -997,7 +997,7 @@ export interface paths {
         };
         /**
          * Список Архонтов (paged + фильтры)
-         * @description Реестр операторов с фильтрами (auth_method enum, revoked) и пагинацией. Permission operator.list. Read-only, без audit.
+         * @description Реестр операторов с фильтрами (auth_method enum, revoked, q — substring-поиск по display_name/aid, регистронезависимо) и пагинацией. Permission operator.list. Read-only, без audit.
          */
         get: operations["listOperators"];
         put?: never;
@@ -8317,6 +8317,8 @@ export interface operations {
                 auth_method?: "jwt" | "mtls" | "combined" | "ldap" | "oidc";
                 /** @description включать ревокнутых (false — только активные); bad-value → 400 */
                 revoked?: boolean;
+                /** @description свободный поиск по display_name/aid (substring, регистронезависимо); пусто → без фильтра */
+                q?: string;
                 /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
                 /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */

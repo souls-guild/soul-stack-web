@@ -886,14 +886,17 @@ export const keeperApi = {
   },
 
   operators: {
-    // 200 → OperatorListReply (paged + auth_method/revoked фильтры).
-    list: (q: ListOperatorsQuery = {}) =>
+    // 200 → OperatorListReply (paged + auth_method/revoked/q фильтры).
+    // q — full-text по aid/display_name (backend-параметр добавляется параллельно;
+    // до регена gen:api тип расширен локально в ListOperatorsQuery).
+    list: (query: ListOperatorsQuery = {}) =>
       apiGet<OperatorListReply>('/v1/operators', {
         query: {
-          auth_method: q.auth_method,
-          revoked: q.revoked,
-          offset: q.offset,
-          limit: q.limit,
+          auth_method: query.auth_method,
+          revoked: query.revoked,
+          q: query.q,
+          offset: query.offset,
+          limit: query.limit,
         },
       }),
     // 200 → Operator (detail).
@@ -1290,6 +1293,9 @@ export interface ListOperatorsQuery {
   auth_method?: OperatorAuthMethod;
   // Default server-side = false (только активные). true — включая revoked.
   revoked?: boolean;
+  // Full-text по aid/display_name (typeahead). Локальное расширение до регена
+  // gen:api; после реген-а совпадёт с нативным q?: string.
+  q?: string;
   offset?: number;
   limit?: number;
 }
