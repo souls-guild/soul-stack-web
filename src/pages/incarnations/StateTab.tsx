@@ -1,9 +1,13 @@
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { Activity, Server, Download } from 'lucide-react';
 import { JsonKeyFilter } from '../../components/JsonKeyFilter';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
 import { Button } from '../../components/primitives';
+import { keeperApi } from '../../api/keeper';
+import { RedisUsersTable } from './RedisUsersTable';
+import { normalizeRedisUsers } from './redisUsers.helpers';
 import styles from '../common.module.css';
 
 interface Props {
@@ -51,9 +55,28 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
     }
   }
 
-  // Остаток state без hosts — чтобы не дублировать.
+  // NIM-74: state.redis_users — таблица ACL-юзеров с reveal-глазом. Discovery грузим
+  // лениво (только если ключ есть в state); при 404/ошибке — graceful, редис-юзеры
+  // отрисуются обычным JSON-фильтром ниже.
+  const redisUsersRaw = state && typeof state === 'object'
+    ? (state as Record<string, unknown>).redis_users
+    : undefined;
+  const hasRedisUsers = redisUsersRaw !== undefined && redisUsersRaw !== null;
+  const revealable = useQuery({
+    queryKey: ['incarnation-secrets-revealable', incarnationName],
+    queryFn: () => keeperApi.incarnations.revealableSecrets(incarnationName),
+    enabled: Boolean(incarnationName) && hasRedisUsers,
+    retry: false,
+  });
+  const revealableItem = (revealable.data?.items ?? []).find((it) => it.state_path === 'redis_users');
+  const showRedisUsersTable = hasRedisUsers && Boolean(revealableItem);
+  const redisUsers = showRedisUsersTable ? normalizeRedisUsers(redisUsersRaw) : [];
+
+  // Остаток state без hosts (и без redis_users, когда он вынесен в таблицу) — чтобы не дублировать.
+  const hiddenKeys = new Set<string>(['hosts']);
+  if (showRedisUsersTable) hiddenKeys.add('redis_users');
   const stateWithoutHosts = state && typeof state === 'object'
-    ? Object.fromEntries(Object.entries(state as Record<string, unknown>).filter(([k]) => k !== 'hosts'))
+    ? Object.fromEntries(Object.entries(state as Record<string, unknown>).filter(([k]) => !hiddenKeys.has(k)))
     : null;
   const restEmpty = !stateWithoutHosts || Object.keys(stateWithoutHosts).length === 0;
 
@@ -94,6 +117,15 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
             </>
           ) : null}
 
+          {showRedisUsersTable && revealableItem ? (
+            <RedisUsersTable
+              incarnationName={incarnationName}
+              secretId={revealableItem.secret_id}
+              users={redisUsers}
+              revealableKeys={revealableItem.keys ?? []}
+            />
+          ) : null}
+
           {perHost.length > 0 ? (
             <>
               <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 8 }}>
@@ -132,7 +164,7 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
             </>
           ) : null}
 
-          {restEmpty && perHost.length === 0 ? (
+          {restEmpty && perHost.length === 0 && !showRedisUsersTable ? (
             <div className={styles.empty}>
               {t('incarnations:stateContainsEmpty')}
             </div>

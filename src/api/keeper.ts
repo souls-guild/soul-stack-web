@@ -333,6 +333,25 @@ export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
 // (ADR-060); проецируется в souls.traits. Полная замена (full-replace семантика).
 export type IncarnationSetTraitsRequest = components['schemas']['IncarnationSetTraitsRequest'];
 
+// NIM-74: локальный тип до регена openapi (backend добавит путь /secrets/revealable|reveal).
+// Discovery: какие state-секреты можно раскрыть (по клику), и по каким ключам.
+export interface RevealableSecretItem {
+  secret_id: string;
+  label: string;
+  state_path: string;
+  keys: string[];
+}
+export interface RevealableSecretsReply {
+  items: RevealableSecretItem[] | null;
+}
+export interface RevealSecretRequest {
+  secret_id: string;
+  key: string;
+}
+export interface RevealSecretReply {
+  value: string;
+}
+
 // Choir + Voice (ADR-044). Топология хостов внутри инкарнации.
 export type Choir = components['schemas']['Choir'];
 export type Voice = components['schemas']['Voice'];
@@ -659,6 +678,20 @@ export const keeperApi = {
       apiSend<IncarnationGetReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/traits`,
         'PUT',
+        { body },
+      ),
+    // NIM-74: discovery раскрываемых секретов инкарнации. GET .../secrets/revealable.
+    // items[] пуст, если раскрывать нечего; 404 если инкарнация вне scope — UI graceful.
+    revealableSecrets: (name: string) =>
+      apiGet<RevealableSecretsReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/secrets/revealable`,
+      ),
+    // NIM-74: раскрыть одно значение по клику (lazy, не кэшируется). POST .../secrets/reveal.
+    // 200 → {value}; 403 нет права incarnation.view-secrets; 404 нет ключа/значения.
+    revealSecret: (name: string, body: RevealSecretRequest) =>
+      apiSend<RevealSecretReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/secrets/reveal`,
+        'POST',
         { body },
       ),
   },
