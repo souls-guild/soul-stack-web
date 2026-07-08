@@ -259,5 +259,13 @@
   "provisionToggleLabel": "Создать VM автоматически (cloud provision)",
   "provisionDisabledHint": "Прогон запустится на уже онбордженных souls в coven «{{coven}}». Добавьте их через вкладку Hosts у инкарнации до запуска.",
   "provisionHostWarningTitle": "Внимание: нет хостов в roster",
-  "provisionHostWarningBody": "Этому прогону нужно {{n}} хост(ов). Включите cloud provision (создаст VM автоматически) ИЛИ онбордите нужное количество souls в coven «{{coven}}» через Hosts перед запуском."
+  "provisionHostWarningBody": "Этому прогону нужно {{n}} хост(ов). Включите cloud provision (создаст VM автоматически) ИЛИ онбордите нужное количество souls в coven «{{coven}}» через Hosts перед запуском.",
+  "revealShow": "Показать пароль {{name}}",
+  "revealHide": "Скрыть пароль",
+  "revealValueAria": "Пароль пользователя {{name}}",
+  "revealCopied": "Скопировано",
+  "revealForbidden": "Недостаточно прав",
+  "revealNotFound": "Значение не найдено",
+  "revealFailed": "Не удалось раскрыть пароль: {{detail}}",
+  "revealCopyPrompt": "Скопируйте пароль вручную:"
 }
