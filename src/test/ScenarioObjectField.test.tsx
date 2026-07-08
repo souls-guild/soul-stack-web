@@ -13,6 +13,7 @@ import {
   isObjectWithProperties,
   isMapWithAdditionalProps,
   isCompositeType,
+  isFieldRequired,
   mapValueType,
   serializeFields,
   defaultsFromSchema,
@@ -220,6 +221,38 @@ describe('object-with-properties не уходит в advanced-collapse', () => 
     expect(objectField.closest('[data-testid="advanced-collapse"]')).toBeNull();
     // optional note — внутри collapse (контроль: партиция вообще работает).
     expect(collapse.contains(screen.getByTestId('field-text-note'))).toBe(true);
+  });
+});
+
+// ─── x-required: `*` на самом object-поле (NIM-72) ────────────────────────
+// add_user.user несёт field-level required:true, backend проецирует его как
+// x-required (ключ required занят массивом детей). UI ставит `*` на поле.
+const aclUserRequiredSchema: ScenarioInputSchema = {
+  user: {
+    ...(aclUserSchema.user as object),
+    'x-required': true,
+  } as unknown as ScenarioInputSchemaProperty,
+};
+
+describe('x-required → `*` на object-поле', () => {
+  it('isFieldRequired: true при x-required, несмотря на required=массив детей', () => {
+    expect(isFieldRequired(aclUserRequiredSchema.user, {})).toBe(true);
+  });
+
+  it('isFieldRequired: false без x-required (required=массив не делает поле обязательным)', () => {
+    expect(isFieldRequired(aclUserSchema.user, {})).toBe(false);
+  });
+
+  it('рендер: маркер field-required-marker-user есть при x-required', () => {
+    render(<StatefulFields schema={aclUserRequiredSchema} />);
+    expect(screen.getByTestId('field-required-marker-user')).toBeTruthy();
+  });
+
+  it('рендер: без x-required маркера на контейнере нет (под-поля свои маркеры сохраняют)', () => {
+    render(<StatefulFields schema={aclUserSchema} />);
+    expect(screen.queryByTestId('field-required-marker-user')).toBeNull();
+    // Контроль: под-поля required остаются размеченными.
+    expect(screen.getByTestId('field-required-marker-user.name')).toBeTruthy();
   });
 });
 

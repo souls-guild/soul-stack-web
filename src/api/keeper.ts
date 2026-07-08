@@ -401,6 +401,12 @@ export interface ScenarioInputSchemaProperty {
   additional_properties?: ScenarioInputSchemaProperty | boolean;
   /** Имя типа под-объекта (AclUser…) — лейбл в UI. */
   'x-type'?: string;
+  /**
+   * NIM-72: field-level обязательность узла-ссылки $type. Для object-$type ключ
+   * `required` занят массивом обязательных детей — «само поле обязательно» приходит
+   * этой аннотацией, по ней UI ставит `*`.
+   */
+  'x-required'?: boolean;
   [key: string]: unknown;
 }
 export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;

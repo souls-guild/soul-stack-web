@@ -188,6 +188,9 @@ export function isFieldRequired(
 ): boolean {
   if (prop.type === 'boolean') return false;
   if (prop.required === true) return true;
+  // NIM-72: object-$type несёт field-level обязательность в x-required (ключ
+  // required занят массивом обязательных детей). По ней ставим `*` на поле.
+  if (prop['x-required'] === true) return true;
   if (prop.required_when) return evalShowWhen(prop.required_when, inputState);
   return false;
 }
