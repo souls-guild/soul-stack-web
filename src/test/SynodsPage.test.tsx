@@ -348,7 +348,7 @@ describe('SynodsList', () => {
     expect(alert).toHaveTextContent(/lock-?out|администратора/i);
   });
 
-  it('Add-operator: POST /v1/synods/{name}/operators с {aid} (выбор из селекта)', async () => {
+  it('Add-operator: POST /v1/synods/{name}/operators с {aid} (typeahead-выбор)', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -358,7 +358,8 @@ describe('SynodsList', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
     // archon-dave есть в OPERATORS_SAMPLE и не в ops-team.operators.
-    await user.selectOptions(within(dialog).getByTestId('add-operator-select'), 'archon-dave');
+    await user.click(within(dialog).getByTestId('add-operator-search'));
+    await user.click(await within(dialog).findByTestId('add-operator-option-archon-dave'));
     await user.click(within(dialog).getByTestId('add-operator-submit'));
 
     await waitFor(() => {
@@ -370,7 +371,94 @@ describe('SynodsList', () => {
     });
   });
 
-  it('[ФИЛЬТР] AddOperatorModal: текущие члены группы не появляются в селекте', async () => {
+  it('[MULTI] AddOperatorModal: несколько выбранных → N POST-ов (fan-out)', async () => {
+    const calls = recordingFetch({});
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('add-operator-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    await user.click(within(dialog).getByTestId('add-operator-search'));
+    await user.click(await within(dialog).findByTestId('add-operator-option-archon-charlie'));
+    await user.click(within(dialog).getByTestId('add-operator-option-archon-dave'));
+    // Оба выбраны — чипы отрисованы.
+    expect(within(dialog).getByTestId('add-operator-chip-archon-charlie')).toBeInTheDocument();
+    expect(within(dialog).getByTestId('add-operator-chip-archon-dave')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByTestId('add-operator-submit'));
+
+    await waitFor(() => {
+      const posts = calls.filter(
+        (c) => c.url === '/v1/synods/ops-team/operators' && c.method === 'POST',
+      );
+      expect(posts.length).toBe(2);
+      const bodies = posts.map((p) => p.body ?? '').join('|');
+      expect(bodies).toContain('archon-charlie');
+      expect(bodies).toContain('archon-dave');
+    });
+  });
+
+  it('[PARTIAL] AddOperatorModal: частичный провал — модалка открыта, показан упавший aid', async () => {
+    const calls: Call[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : null;
+      calls.push({ url, method, body });
+      if (url.startsWith('/v1/me/permissions')) {
+        return new Response(JSON.stringify(MY_PERMS_WILDCARD), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/v1/synods') && method === 'GET') {
+        return new Response(JSON.stringify(SYNODS_SAMPLE), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/v1/operators') && method === 'GET') {
+        return new Response(JSON.stringify(OPERATORS_SAMPLE), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (/^\/v1\/synods\/[^/]+\/operators$/.test(url) && method === 'POST') {
+        // archon-dave падает 409, archon-charlie — успех.
+        if (body && body.includes('archon-dave')) {
+          return new Response(
+            JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'nope' }),
+            { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+          );
+        }
+        return new Response('', { status: 201 });
+      }
+      return new Response('{}', { status: 599 });
+    });
+
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('add-operator-ops-team'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    await user.click(within(dialog).getByTestId('add-operator-search'));
+    await user.click(await within(dialog).findByTestId('add-operator-option-archon-charlie'));
+    await user.click(within(dialog).getByTestId('add-operator-option-archon-dave'));
+    await user.click(within(dialog).getByTestId('add-operator-submit'));
+
+    const partial = await within(dialog).findByTestId('add-operator-partial');
+    expect(partial).toHaveTextContent('archon-dave');
+    // Модалка не закрылась после частичного провала.
+    expect(
+      screen.getByRole('dialog', { name: /Добавить архонта в ops-team/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('[ФИЛЬТР] AddOperatorModal: текущие члены группы не появляются в опциях', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -380,19 +468,22 @@ describe('SynodsList', () => {
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
     const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
-    const select = await within(dialog).findByTestId('add-operator-select');
+    await user.click(within(dialog).getByTestId('add-operator-search'));
 
-    // archon-charlie и archon-dave (не в группе) — должны быть в опциях.
-    expect(within(select).getByRole('option', { name: 'archon-charlie' })).toBeInTheDocument();
-    expect(within(select).getByRole('option', { name: 'archon-dave' })).toBeInTheDocument();
-    // archon-alice, archon-bob (уже в группе) — не должны быть.
-    expect(within(select).queryByRole('option', { name: 'archon-alice' })).not.toBeInTheDocument();
-    expect(within(select).queryByRole('option', { name: 'archon-bob' })).not.toBeInTheDocument();
-    // archon-revoked — не должен быть (revoked_at заполнен).
-    expect(within(select).queryByRole('option', { name: 'archon-revoked' })).not.toBeInTheDocument();
+    // archon-charlie и archon-dave (не в группе) — в опциях.
+    expect(
+      await within(dialog).findByTestId('add-operator-option-archon-charlie'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByTestId('add-operator-option-archon-dave')).toBeInTheDocument();
+    // archon-alice, archon-bob (уже в группе) и archon-revoked (revoked) — отфильтрованы.
+    expect(within(dialog).queryByTestId('add-operator-option-archon-alice')).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId('add-operator-option-archon-bob')).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByTestId('add-operator-option-archon-revoked'),
+    ).not.toBeInTheDocument();
   });
 
-  it('[EMPTY-STATE] AddOperatorModal: empty-state и кнопка disabled если все уже в группе', async () => {
+  it('[EMPTY-STATE] AddOperatorModal: empty-state и submit disabled если все уже в группе', async () => {
     // ops-team members: archon-alice, archon-bob.
     // Дадим операторов только alice и bob — оба уже в группе.
     const twoOperators = {
@@ -409,12 +500,13 @@ describe('SynodsList', () => {
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
     const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
-    // empty-state сообщение отображается, селекта нет.
+    await user.click(within(dialog).getByTestId('add-operator-search'));
+    // Оба оператора уже в группе → опций нет, показан empty-state.
     await waitFor(() =>
       expect(within(dialog).getByTestId('add-operator-empty')).toBeInTheDocument(),
     );
-    expect(within(dialog).queryByTestId('add-operator-select')).not.toBeInTheDocument();
-    // Кнопка submit задизейблена.
+    expect(within(dialog).queryByTestId('add-operator-option-archon-alice')).not.toBeInTheDocument();
+    // Кнопка submit задизейблена (ничего не выбрано).
     expect(within(dialog).getByTestId('add-operator-submit')).toBeDisabled();
   });
 
@@ -444,7 +536,8 @@ describe('SynodsList', () => {
     await user.click(screen.getByTestId('grant-role-ops-team'));
 
     const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
-    await user.selectOptions(within(dialog).getByTestId('grant-role-select'), 'soul-operator');
+    await user.click(within(dialog).getByTestId('grant-role-search'));
+    await user.click(await within(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(within(dialog).getByTestId('grant-role-submit'));
 
     await waitFor(() => {
@@ -531,12 +624,14 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('grant-role-ops-team'));
     const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
-    await user.selectOptions(within(dialog).getByTestId('grant-role-select'), 'soul-operator');
+    await user.click(within(dialog).getByTestId('grant-role-search'));
+    await user.click(await within(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(within(dialog).getByTestId('grant-role-submit'));
 
-    // Ошибка отображается в строке — модалка показывает alert.
-    const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/subset|эскалац|права/i);
+    // Все привязки упали → partial-fail блок с pretty-error (subset).
+    const partial = await within(dialog).findByTestId('grant-role-partial');
+    expect(partial).toHaveTextContent('soul-operator');
+    expect(partial).toHaveTextContent(/subset|эскалац|права/i);
   });
 
   // --- #6 Ужесточение контракта grant-role ---
@@ -550,7 +645,8 @@ describe('SynodsList', () => {
     await user.click(screen.getByTestId('grant-role-ops-team'));
 
     const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
-    await user.selectOptions(within(dialog).getByTestId('grant-role-select'), 'soul-operator');
+    await user.click(within(dialog).getByTestId('grant-role-search'));
+    await user.click(await within(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(within(dialog).getByTestId('grant-role-submit'));
 
     await waitFor(() => {
@@ -566,7 +662,7 @@ describe('SynodsList', () => {
 
   // --- #3 GrantRoleModal availableRoles-фильтр ---
 
-  it('[ФИЛЬТР] GrantRoleModal: уже привязанная роль cluster-admin не появляется в select', async () => {
+  it('[ФИЛЬТР] GrantRoleModal: уже привязанная роль cluster-admin не появляется в опциях', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -576,12 +672,12 @@ describe('SynodsList', () => {
     await user.click(screen.getByTestId('grant-role-ops-team'));
 
     const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
-    const select = within(dialog).getByTestId('grant-role-select');
+    await user.click(within(dialog).getByTestId('grant-role-search'));
 
     // soul-operator (не привязан) — есть в опциях.
-    expect(within(select).getByRole('option', { name: 'soul-operator' })).toBeInTheDocument();
+    expect(await within(dialog).findByTestId('grant-role-option-soul-operator')).toBeInTheDocument();
     // cluster-admin (уже привязан) — отсутствует.
-    expect(within(select).queryByRole('option', { name: 'cluster-admin' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId('grant-role-option-cluster-admin')).not.toBeInTheDocument();
   });
 
   // --- #4 Inline row-error для remove-operator / revoke-role ---

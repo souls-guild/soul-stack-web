@@ -34,6 +34,16 @@ const ROLES_SAMPLE = {
   ],
 };
 
+// Все архонты кластера для AddOperatorModal (server-side typeahead).
+const OPERATORS_SAMPLE = {
+  items: [
+    { aid: 'archon-alice', display_name: 'Alice', auth_method: 'jwt', revoked_at: null },
+    { aid: 'archon-bob', display_name: 'Bob', auth_method: 'jwt', revoked_at: null },
+    { aid: 'archon-charlie', display_name: 'Charlie', auth_method: 'jwt', revoked_at: null },
+    { aid: 'archon-dave', display_name: 'Dave', auth_method: 'jwt', revoked_at: null },
+  ],
+};
+
 const MY_PERMS_WILDCARD = { permissions: [{ wildcard: true }] };
 const MY_PERMS_READONLY = {
   permissions: [{ wildcard: false, resource: 'soul', action: 'list' }],
@@ -58,6 +68,7 @@ function recordingFetch(opts: {
   synods?: typeof SYNODS_SAMPLE | { items: [] };
   myPerms?: typeof MY_PERMS_WILDCARD;
   roles?: typeof ROLES_SAMPLE;
+  operators?: typeof OPERATORS_SAMPLE;
   synodsStatus?: number;
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
@@ -109,6 +120,12 @@ function recordingFetch(opts: {
     }
     if (url.startsWith('/v1/roles') && method === 'GET') {
       return new Response(JSON.stringify(opts.roles ?? ROLES_SAMPLE), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.startsWith('/v1/operators') && method === 'GET') {
+      return new Response(JSON.stringify(opts.operators ?? OPERATORS_SAMPLE), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -430,5 +447,55 @@ describe('SynodDetail', () => {
 
     // Нет ссылок на архонтов и роли в пустой группе.
     expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
+  });
+
+  // ── Picker-тесты (typeahead multi-select) ─────────────────────────────────
+
+  it('[ADD] AddOperatorModal: typeahead-выбор → POST /v1/synods/{name}/operators', async () => {
+    const { within: w } = await import('@testing-library/react');
+    const calls = recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    await user.click(screen.getByTestId('add-operator-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    await user.click(w(dialog).getByTestId('add-operator-search'));
+    // archon-dave не состоит в ops-team → доступен в опциях.
+    await user.click(await w(dialog).findByTestId('add-operator-option-archon-dave'));
+    await user.click(w(dialog).getByTestId('add-operator-submit'));
+
+    await waitFor(() => {
+      const post = calls.find(
+        (c) => c.url === '/v1/synods/ops-team/operators' && c.method === 'POST',
+      );
+      expect(post).toBeDefined();
+      expect(post!.body).toContain('archon-dave');
+    });
+  });
+
+  it('[GRANT] GrantRoleModal: typeahead-выбор → POST /v1/synods/{name}/roles', async () => {
+    const { within: w } = await import('@testing-library/react');
+    const calls = recordingFetch({});
+    renderWithProviders(withRoute(), '/synods/ops-team');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
+    await user.click(screen.getByTestId('grant-role-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
+    await user.click(w(dialog).getByTestId('grant-role-search'));
+    // soul-operator не привязан к ops-team → доступен в опциях.
+    await user.click(await w(dialog).findByTestId('grant-role-option-soul-operator'));
+    await user.click(w(dialog).getByTestId('grant-role-submit'));
+
+    await waitFor(() => {
+      const post = calls.find(
+        (c) => c.url === '/v1/synods/ops-team/roles' && c.method === 'POST',
+      );
+      expect(post).toBeDefined();
+      expect(post!.body).toContain('soul-operator');
+    });
   });
 });
