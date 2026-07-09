@@ -428,7 +428,7 @@ export function RunWizard() {
   const inputSchema: ScenarioInputSchema | undefined = selectedScenarioMeta?.input_schema;
   const usePerField = isSupportedInputSchema(inputSchema);
 
-  // NIM-76: day-2 update_config — версия Redis не задаётся в форме, берём её из
+  // NIM-76: операционный update_config — версия Redis не задаётся в форме, берём её из
   // state.redis_version инкарнации (первая из resolved-множества). Гейтим на наличие
   // поля с x-directives в схеме (не тянем incarnation/каталог для не-redis сценариев).
   const hasDirectiveField = useMemo(() => schemaHasDirectiveField(inputSchema), [inputSchema]);

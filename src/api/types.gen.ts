@@ -699,7 +699,7 @@ export interface paths {
         put?: never;
         /**
          * Перезапустить последний упавший сценарий из error_locked
-         * @description Снимает error_locked и тем же действием перезапускает последний упавший сценарий инкарнации (bootstrap create/… или day-2 add_user/…) с сохранённым input упавшего прогона (одна tx FOR UPDATE). Permission incarnation.rerun-last.
+         * @description Снимает error_locked и тем же действием перезапускает последний упавший сценарий инкарнации (bootstrap create/… или операционный add_user/…) с сохранённым input упавшего прогона (одна tx FOR UPDATE). Permission incarnation.rerun-last.
          */
         post: operations["rerunLastIncarnation"];
         delete?: never;
@@ -818,7 +818,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Pre-fill day-2-формы сценария из incarnation.state
+         * Pre-fill формы операционного сценария из incarnation.state
          * @description Текущие значения state под поля схемы сценария с prefill_from_state (docs/input.md). Path-whitelist (клиент путь не задаёт), secret-поля исключены. Вне RBAC-scope → 404. Permission incarnation.get. Read-only, без audit.
          */
         post: operations["incarnationFormPrefill"];

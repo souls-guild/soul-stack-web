@@ -1,4 +1,4 @@
-// Модал day-2 редактирования incarnation.traits (ADR-060).
+// Модал операционного редактирования incarnation.traits (ADR-060).
 // PUT /v1/incarnations/{name}/traits — полная замена (full-replace):
 // форма предзаполняется текущими traits, удаление строки удаляет trait.
 

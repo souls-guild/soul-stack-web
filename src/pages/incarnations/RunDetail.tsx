@@ -14,7 +14,7 @@ import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
 import styles from '../common.module.css';
 
-// Run-view: детали одного apply_run инкарнации (create/rerun-last/day-2
+// Run-view: детали одного apply_run инкарнации (create/rerun-last/операционный
 // scenario-прогон). НЕ Voyage (batch-прогон по многим инкарнациям) — apply_run
 // адресует ровно одну инкарнацию, поэтому отдельный route/страница.
 //

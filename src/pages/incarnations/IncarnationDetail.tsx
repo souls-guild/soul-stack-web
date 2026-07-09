@@ -382,7 +382,7 @@ export function IncarnationDetail() {
                     <td className="mono">{entry.scenario}</td>
                     <td className="mono">
                       {entry.apply_id ? (
-                        // apply_id — это apply_run (create/rerun-last/day-2 scenario),
+                        // apply_id — это apply_run (create/rerun-last/операционный сценарий),
                         // НЕ Voyage (batch-прогон по многим инкарнациям). Ссылаемся на
                         // run-view этой инкарнации.
                         <Link

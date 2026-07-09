@@ -4,7 +4,7 @@
 // поле валидируется против каталога серии версии; unknown-directive блокирует submit
 // через тот же канал onInvalidMapChange; каталог не на руках → graceful (не блокируем);
 // поле без x-directives не валидируется; datalist несёт имена серии; версия реактивна;
-// day-2 берёт версию из incarnation.state.redis_version.
+// операционный сценарий берёт версию из incarnation.state.redis_version.
 
 import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
@@ -95,7 +95,7 @@ describe('NIM-76 хелперы версии/каталога', () => {
   });
 
   it('versionToSeries: снимает "v"-префикс и Debian-epoch (зеркалит backend)', () => {
-    // epoch — реальный кейс day-2 state.redis_version (Debian-сборка Redis).
+    // epoch — реальный операционный кейс state.redis_version (Debian-сборка Redis).
     expect(versionToSeries('5:7.4.1-1~deb12u7')).toBe('7.4');
     expect(versionToSeries('6:8.2.2')).toBe('8.2');
     // не сломать обычные и v-префикс.
@@ -292,8 +292,8 @@ describe('NIM-76 BUG-1 epoch-версия ведёт себя как обычн�
   });
 });
 
-// ─── #7 day-2: версия из incarnation.state.redis_version ──────────────────────
-describe('NIM-76 #7 day-2 update_config берёт версию из state.redis_version', () => {
+// ─── #7 операционный сценарий: версия из incarnation.state.redis_version ──────────────────────
+describe('NIM-76 #7 операционный update_config берёт версию из state.redis_version', () => {
   function stubFetch() {
     const scenarios = [
       {
@@ -380,8 +380,8 @@ describe('NIM-76 FIX-1 unmount снимает ошибку map-поля', () => 
   });
 });
 
-// ─── FIX-2: day-2 mixed-target (>1 инкарнация) → директивы не блокируют ───────
-describe('NIM-76 FIX-2 day-2 fan-out на >1 инкарнацию → graceful', () => {
+// ─── FIX-2: операционный mixed-target (>1 инкарнация) → директивы не блокируют ───────
+describe('NIM-76 FIX-2 операционный fan-out на >1 инкарнацию → graceful', () => {
   function stubFetchMulti() {
     const scenarios = [
       {

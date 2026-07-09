@@ -182,7 +182,7 @@ export type ScenarioFieldsState = Record<string, ScenarioFieldValue>;
 // Redis-директивы (NIM-76): inline-валидация + typeahead ключей map-поля.
 //
 // Каталог (серия→имена) прокидывается в MapEditor; валидируются ТОЛЬКО поля с
-// truthy `x-directives`. Версия реактивна (create — выбор оператора; day-2 —
+// truthy `x-directives`. Версия реактивна (create — выбор оператора; операционный сценарий —
 // state.redis_version). Каталог не на руках → graceful-degrade (не блокируем).
 // ---------------------------------------------------------------------------
 

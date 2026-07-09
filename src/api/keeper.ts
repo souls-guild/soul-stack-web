@@ -22,7 +22,7 @@ export type IncarnationListReply = components['schemas']['IncarnationListReply']
 export type StateHistoryEntry = components['schemas']['StateHistoryEntry'];
 export type IncarnationHistoryReply = components['schemas']['IncarnationHistoryReply'];
 // Run-view (GET .../runs + .../runs/{apply_id}) — apply_run НЕ Voyage: свёртка
-// apply_runs по apply_id для одной инкарнации (create/rerun-last/day-2 scenario-прогон).
+// apply_runs по apply_id для одной инкарнации (create/rerun-last/операционный сценарий-прогон).
 export type RunSummaryEntry = components['schemas']['RunSummaryEntry'];
 export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply'];
 export type RunDetailReply = components['schemas']['RunDetailReply'];
@@ -320,7 +320,7 @@ export type StateSchemaMigration = components['schemas']['StateSchemaMigration']
 export type ServiceDependency = components['schemas']['ServiceDependency'];
 export type ServiceDependenciesReply = components['schemas']['ServiceDependenciesReply'];
 
-// Rerun-last — перезапуск последнего упавшего сценария из error_locked (create или day-2).
+// Rerun-last — перезапуск последнего упавшего сценария из error_locked (create или операционный).
 export type IncarnationRerunLastRequest = components['schemas']['IncarnationRerunLastRequest'];
 export type IncarnationRerunLastReply = components['schemas']['IncarnationRerunLastReply'];
 
@@ -671,7 +671,7 @@ export const keeperApi = {
         { query: { allow_destroy: allowDestroy } },
       ),
     // POST /v1/incarnations/{name}/rerun-last — атомарный unlock + перезапуск
-    // последнего упавшего сценария (create или day-2) с сохранённым input. 202 →
+    // последнего упавшего сценария (create или операционный) с сохранённым input. 202 →
     // IncarnationRerunLastReply (incl. scenario). 404 нет incarnation, 403 нет
     // прав, 409 статус не error_locked ИЛИ input упавшего прогона недоступен
     // (ErrRerunInputUnavailable — вычищен ретеншном), 422 validation.
