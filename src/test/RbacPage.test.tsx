@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
 import { RbacPage } from '../pages/rbac/RbacPage';
 import { installFetchMock } from './fetchMock';
@@ -188,73 +189,23 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Create role: открытие модалки → POST /v1/roles с name + permissions', async () => {
-    const calls = recordingFetch({ rolesList: SAMPLE });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
-    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    const nameInput = within(dialog).getByPlaceholderText('soul-operator');
-    await user.type(nameInput, 'log-reader');
-    // Каталог permissions подгружается из GET /v1/permissions — отмечаем audit.read.
-    const auditRead = await within(dialog).findByRole('checkbox', { name: 'audit.read' });
-    await user.click(auditRead);
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
-
-    await waitFor(() => {
-      const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
-      expect(post).toBeDefined();
-      expect(post!.body).toContain('"name":"log-reader"');
-      expect(post!.body).toContain('"audit.read"');
-    });
-  });
-
-  it('Create role: 201 с пустым телом не падает на .json() и закрывает модалку', async () => {
-    // Регрессия: role.create отдаёт 201 без тела (контракт backend).
-    // Клиент не должен звать .json() на пустом потоке («Unexpected end of
-    // JSON input»). Успех = mutation отрабатывает onSuccess → модалка закрыта.
+  it('«Создать роль» ведёт на dedicated route /rbac/roles/new (NIM-80), не модалка', async () => {
+    // Создание роли вынесено на отдельную страницу (CreateRolePage.test.tsx
+    // покрывает саму форму). RbacPage лишь навигирует.
     recordingFetch({ rolesList: SAMPLE });
-    renderWithProviders(<RbacPage />, '/rbac');
+    renderWithProviders(
+      <Routes>
+        <Route path="/rbac" element={<RbacPage />} />
+        <Route path="/rbac/roles/new" element={<div>CREATE-ROLE-PAGE</div>} />
+      </Routes>,
+      '/rbac',
+    );
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: /Создать роль/i }));
-    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'log-reader');
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
-
-    // onSuccess закрывает модалку; ошибки парсинга тела нет.
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /Создать роль/i })).not.toBeInTheDocument();
-    });
-  });
-
-  it('Create role 409 already-exists → human-readable error', async () => {
-    recordingFetch({
-      rolesList: SAMPLE,
-      conflict: {
-        path: /^\/v1\/roles$/,
-        method: 'POST',
-        status: 409,
-        type: 'https://soul-stack.io/errors/role-already-exists',
-        detail: 'role log-reader already exists',
-      },
-    });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
-    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'log-reader');
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
-
-    const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/уже существует|already exists/i);
-    // Модалка остаётся открытой — оператор видит ошибку.
-    expect(screen.getByRole('dialog', { name: /Создать роль/i })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('CREATE-ROLE-PAGE')).toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: /Создать роль/i })).not.toBeInTheDocument();
   });
 
   it('Edit permissions: PATCH /v1/roles/{name}/permissions с новым набором', async () => {
@@ -409,23 +360,6 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Permissions-picker: рендерит каталог из GET /v1/permissions сгруппированно', async () => {
-    recordingFetch({ rolesList: SAMPLE });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
-    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    // Чекбоксы из каталога: resource.action как полное право.
-    expect(await within(dialog).findByRole('checkbox', { name: 'soul.list' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'soul.read' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'incarnation.run' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'audit.read' })).toBeInTheDocument();
-    // resource-группы видны как legend.
-    expect(within(dialog).getByText('incarnation')).toBeInTheDocument();
-  });
-
   it('Permissions-picker: каталог недоступен (404) → graceful, права роли сохраняются', async () => {
     // /v1/permissions отдаёт 599 (нет хэндлера) — recordingFetch с пустым каталогом.
     const calls = recordingFetch({ rolesList: SAMPLE, permissions: { items: [] } });
@@ -445,65 +379,6 @@ describe('RbacPage', () => {
       const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
       expect(patch).toBeDefined();
       expect(patch!.body).toContain('soul.exec');
-    });
-  });
-
-  it('Scope-builder: отмечает incarnation.run без scope → голый "incarnation.run"', async () => {
-    // incarnation.run имеет selector_keys: [] → scope-пикер не показывается.
-    const calls = recordingFetch({
-      rolesList: { items: [{ name: 'test-role', description: '', builtin: false, permissions: [], operators: [] }] },
-    });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('test-role')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
-    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'scope-test');
-
-    const cb = await within(dialog).findByRole('checkbox', { name: 'incarnation.run' });
-    await user.click(cb);
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
-
-    await waitFor(() => {
-      const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
-      expect(post).toBeDefined();
-      // Должен быть голый пермишн без " on ..."
-      expect(post!.body).toContain('"incarnation.run"');
-      expect(post!.body).not.toContain(' on ');
-    });
-  });
-
-  it('Scope-builder: soul.list + scope coven=ops → "soul.list on coven=ops"', async () => {
-    // soul.list имеет selector_keys: ['coven', 'sid'] → scope-пикер появляется.
-    const calls = recordingFetch({
-      rolesList: { items: [{ name: 'scoped-role', description: '', builtin: false, permissions: [], operators: [] }] },
-    });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('scoped-role')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
-    const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'scoped-role-x');
-
-    const cb = await within(dialog).findByRole('checkbox', { name: 'soul.list' });
-    await user.click(cb);
-
-    // Выбрать scope-ключ = coven (scope-пикер появляется после checked)
-    const keySelect = await within(dialog).findByRole('combobox', { name: /ключ селектора scope/i });
-    await user.selectOptions(keySelect, 'coven');
-
-    // Ввести значение (input появляется после выбора ключа)
-    const valueInput = await within(dialog).findByRole('textbox', { name: /значение coven/i });
-    await user.type(valueInput, 'ops');
-
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
-
-    await waitFor(() => {
-      const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
-      expect(post).toBeDefined();
-      expect(post!.body).toContain('soul.list on coven=ops');
     });
   });
 
