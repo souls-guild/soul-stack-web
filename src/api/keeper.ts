@@ -90,6 +90,15 @@ export type SoulprintKernelFacts = components['schemas']['SoulprintKernelFacts']
 export type SoulprintOsFacts = components['schemas']['SoulprintOsFacts'];
 export type SoulprintFacts = components['schemas']['SoulprintFacts'];
 
+// Host-vitals (NIM-86/NIM-88): утилизация хоста из Redis — latest + window
+// (спарклайны, newest-first) + freshness. Агрегат по инкарнации без окна.
+export type SoulTelemetryReply = components['schemas']['SoulTelemetryReply'];
+export type IncarnationTelemetryReply = components['schemas']['IncarnationTelemetryReply'];
+export type HostTelemetry = components['schemas']['HostTelemetry'];
+export type UtilizationLatest = components['schemas']['UtilizationLatest'];
+export type UtilizationWindowPoint = components['schemas']['UtilizationWindowPoint'];
+export type TelemetryDisk = components['schemas']['TelemetryDisk'];
+
 // Расширение OperatorCreateRequest: опциональное `roles[]` — список имён ролей,
 // в которые сразу зачислить нового Архонта. Поле появилось в backend slice
 // «create-with-roles»; до его доезда сервер игнорирует поле (200), либо отвечает
@@ -593,6 +602,12 @@ export const keeperApi = {
     },
     get: (name: string) =>
       apiGet<IncarnationGetReply>(`/v1/incarnations/${encodeURIComponent(name)}`),
+    // GET /v1/incarnations/{name}/telemetry — агрегат host-vitals по хостам ковена
+    // (latest+stale на хост, без окна). NIM-86. Пустой флот/вне scope → hosts:[].
+    telemetry: (name: string) =>
+      apiGet<IncarnationTelemetryReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/telemetry`,
+      ),
     create: (body: IncarnationCreateRequest) =>
       apiSend<IncarnationCreateReply>('/v1/incarnations', 'POST', { body }),
     // Поведение API: при наличии `wave` в request возвращается IncarnationRunTideReply,
@@ -809,6 +824,10 @@ export const keeperApi = {
         },
       }),
     get: (sid: string) => apiGet<SoulListEntry>(`/v1/souls/${encodeURIComponent(sid)}`),
+    // GET /v1/souls/{sid}/telemetry — host-vitals: latest + window (спарклайны,
+    // newest-first) + freshness (collected_at/received_at, stale). NIM-86.
+    telemetry: (sid: string) =>
+      apiGet<SoulTelemetryReply>(`/v1/souls/${encodeURIComponent(sid)}/telemetry`),
     // GET /v1/souls/stats — сводка by_status/by_transport/by_coven + total +
     // stale_count для Souls Overview. Scoped-видимость (ADR-047). Read-only.
     stats: () => apiGet<SoulStatsReply>('/v1/souls/stats'),
