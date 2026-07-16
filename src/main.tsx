@@ -6,7 +6,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/fonts.css';
 
-// Apply theme до React-mount, чтобы избежать FOUC.
+// Apply theme before React-mount, to avoid FOUC.
 (function applyStoredTheme() {
   try {
     const stored = window.localStorage.getItem('theme');
@@ -19,7 +19,7 @@ import './styles/fonts.css';
   }
 })();
 
-// Apply font до React-mount, чтобы избежать FOUC (симметрично теме выше).
+// Apply font before React-mount, to avoid FOUC (symmetric to theme above).
 (function applyStoredFont() {
   try {
     const stored = window.localStorage.getItem('app-font');

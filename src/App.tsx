@@ -66,16 +66,16 @@ function Protected({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Default landing — `/overview` (дашборд), с возможностью запомнить иной маршрут
-// в localStorage('landing'). Валидируем сохранённое значение (только known-маршрут),
-// иначе fallback на /overview.
+// Default landing — `/overview` (dashboard), with the option to remember a different
+// route in localStorage('landing'). We validate the saved value (known route only),
+// otherwise fallback to /overview.
 const KNOWN_LANDINGS = new Set(['/overview', '/runs', '/incarnations', '/run', '/souls']);
 function landingTarget(): string {
   try {
     const saved = localStorage.getItem('landing');
     if (saved && KNOWN_LANDINGS.has(saved)) return saved;
   } catch {
-    // localStorage недоступен — дефолт.
+    // localStorage unavailable — default.
   }
   return '/overview';
 }
@@ -100,7 +100,7 @@ export function App() {
             <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
             <Route path="/archons" element={<Protected><ArchonsList /></Protected>} />
             <Route path="/archons/:aid" element={<Protected><ArchonDetail /></Protected>} />
-            {/* Редирект для совместимости со старыми ссылками */}
+            {/* Redirect for backward-compat with old links */}
             <Route path="/provisioning-policy" element={<Navigate to="/settings/provisioning-policy" replace />} />
             <Route path="/settings/*" element={<Protected><SettingsPage /></Protected>} />
             <Route path="/push" element={<Protected><PushApply /></Protected>} />
@@ -128,7 +128,7 @@ export function App() {
             <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
             <Route path="/run" element={<Protected><RunWizard /></Protected>} />
             <Route path="/runs" element={<Protected><RunsFeed /></Protected>} />
-            {/* Слит в единый /runs (сегмент Scenario); редирект для backward-compat ссылок */}
+            {/* Merged into unified /runs (Scenario segment); redirect for backward-compat links */}
             <Route path="/incarnation-runs" element={<Navigate to="/runs" replace />} />
             <Route path="/voyages/:id" element={<Protected><VoyageDetail /></Protected>} />
             <Route path="/cadences" element={<Protected><CadencesList /></Protected>} />
