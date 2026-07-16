@@ -2,15 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../api/keeper';
 
 /**
- * Хук для получения эффективных прав текущего Архонта (GET /v1/me/permissions).
+ * Hook for getting the effective permissions of the current Archon (GET /v1/me/permissions).
  *
- * wildcard=true (cluster-admin) → hasPermission() возвращает true для любого права.
- * Иначе проверяем наличие совпадения resource+action (без scope-сравнения — UI
- * использует hasPermission только для show/hide кнопок, не для авторизации).
+ * wildcard=true (cluster-admin) → hasPermission() returns true for any permission.
+ * Otherwise we check for a resource+action match (without scope comparison — the UI
+ * uses hasPermission only to show/hide buttons, not for authorization).
  *
- * Пока данные грузятся — hasPermission возвращает true (optimistic), чтобы кнопки
- * не мигали при инициализации. Если fetch упал (403/500) — аналогично возвращаем
- * true (graceful; backend даст 403 при фактическом вызове).
+ * While data is loading — hasPermission returns true (optimistic), so buttons
+ * don't flicker on init. If the fetch failed (403/500) — same, we return
+ * true (graceful; the backend will give 403 on the actual call).
  */
 export function useMyPermissions() {
   const q = useQuery({
@@ -21,14 +21,14 @@ export function useMyPermissions() {
   });
 
   function hasPermission(permission: string): boolean {
-    // Пока грузим или ошибка — показываем кнопки (optimistic).
+    // While loading or on error — show buttons (optimistic).
     if (!q.data) return true;
 
     const perms = q.data.permissions ?? [];
-    // Cluster-admin: wildcard=true → всё разрешено.
+    // Cluster-admin: wildcard=true → everything allowed.
     if (perms.some((p) => p.wildcard)) return true;
 
-    // Парсим "resource.action" (формат из permission-каталога: synod.create и т.п.)
+    // Parse "resource.action" (format from the permission catalog: synod.create etc.)
     const dot = permission.indexOf('.');
     if (dot === -1) return false;
     const resource = permission.slice(0, dot);

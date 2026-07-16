@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 
-// localStorage `sidebar.collapsed` = 'true' | 'false'. На mobile (<768px)
-// default = collapsed, на desktop — expanded. Сохранённое значение оператора
-// перекрывает default.
+// localStorage `sidebar.collapsed` = 'true' | 'false'. On mobile (<768px)
+// default = collapsed, on desktop — expanded. The operator's saved value
+// overrides the default.
 
 const STORAGE_KEY = 'sidebar.collapsed';
 const MOBILE_BREAKPOINT = 768;
@@ -22,7 +22,7 @@ function readDefault(): boolean {
 export function useSidebar() {
   const [collapsed, setCollapsedState] = useState<boolean>(() => readDefault());
 
-  // Сохраняем явный выбор оператора.
+  // Save the operator's explicit choice.
   const setCollapsed = useCallback((next: boolean) => {
     try {
       window.localStorage.setItem(STORAGE_KEY, String(next));
@@ -34,9 +34,9 @@ export function useSidebar() {
 
   const toggle = useCallback(() => setCollapsed(!collapsed), [collapsed, setCollapsed]);
 
-  // Если оператор НЕ выбирал явно — реагируем на resize (mobile↔desktop).
-  // Если localStorage уже содержит явное значение — оператор управляет вручную,
-  // resize не перетирает.
+  // If the operator has NOT chosen explicitly — react to resize (mobile↔desktop).
+  // If localStorage already has an explicit value — the operator controls it manually,
+  // resize does not override it.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let stored: string | null = null;

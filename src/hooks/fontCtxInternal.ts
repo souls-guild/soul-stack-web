@@ -1,6 +1,6 @@
-// Внутренний createContext — вынесен из FontContext.tsx чтобы не было
-// lint-warning react-refresh/only-export-components (файл с провайдером
-// должен экспортировать только компоненты). См. themeCtxInternal.ts (симметрия).
+// Internal createContext - extracted from FontContext.tsx to avoid the
+// react-refresh/only-export-components lint-warning (a file with a provider
+// must export only components). See themeCtxInternal.ts (symmetry).
 import { createContext } from 'react';
 import type { FontMode } from './fontConstants';
 

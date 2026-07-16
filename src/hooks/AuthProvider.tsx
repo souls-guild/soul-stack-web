@@ -8,8 +8,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<OperatorIdentity | null>(() => tokenStore.identity());
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-  // На старте, если есть токен — пробуем легковесный запрос как verify.
-  // Если 401 — токен уже почищен интерсептором, обновляем UI-state.
+  // On startup, if a token exists - try a lightweight request as verify.
+  // If 401 - the token has already been cleared by the interceptor, update UI-state.
   useEffect(() => {
     if (!identity) return;
     let cancelled = false;
@@ -27,8 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-    // identity сравнивается по ссылке — но мы перезапускаем verify только
-    // когда сам факт «есть identity» изменился (после login/logout).
+    // identity is compared by reference - but we only re-run verify
+    // when the fact "identity exists" itself has changed (after login/logout).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity?.aid]);
 

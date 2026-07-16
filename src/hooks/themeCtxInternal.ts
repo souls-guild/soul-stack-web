@@ -1,6 +1,6 @@
-// Внутренний createContext — вынесен из ThemeContext.tsx чтобы не было
-// lint-warning react-refresh/only-export-components (файл с провайдером
-// должен экспортировать только компоненты).
+// Internal createContext - extracted from ThemeContext.tsx to avoid the
+// react-refresh/only-export-components lint-warning (a file with a provider
+// must export only components).
 import { createContext } from 'react';
 import type { ThemeMode } from './themeConstants';
 

@@ -1,9 +1,9 @@
-// Шрифт интерфейса — независимый селектор (симметрично theme), см. themeConstants.ts.
-// Все режимы кроме system — self-hosted @font-face (src/styles/fonts.css),
-// файлы в public/fonts/ — не Google Fonts CDN, чтобы работать под keeper /ui
-// embed offline-контуром. comic-neue и quicksand не имеют cyrillic-субсета
-// в апстриме (латинские декоративные шрифты) — кириллица в этих режимах
-// откатывается на var(--font-sans) через fallback в стеке ниже.
+// Interface font - an independent selector (symmetric with theme), see themeConstants.ts.
+// All modes except system are self-hosted @font-face (src/styles/fonts.css),
+// files in public/fonts/ - not Google Fonts CDN, to work under keeper /ui
+// embed offline. comic-neue and quicksand don't have a cyrillic subset
+// upstream (latin decorative fonts) - cyrillic in these modes
+// falls back to var(--font-sans) via the fallback in the stack below.
 export const FONT_MODES = [
   'system',
   'mono',

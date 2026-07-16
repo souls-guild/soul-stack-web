@@ -1,5 +1,5 @@
-// useFont — хук доступа к шрифту интерфейса. Бросает, если FontProvider не обёрнут выше.
-// Этот файл содержит только не-компонентные экспорты — react-refresh ok.
+// useFont — hook for accessing the interface font. Throws if FontProvider is not wrapped above.
+// This file contains only non-component exports — react-refresh ok.
 import { useContext } from 'react';
 import { FontCtx } from './fontCtxInternal';
 import type { FontContextValue } from './fontCtxInternal';

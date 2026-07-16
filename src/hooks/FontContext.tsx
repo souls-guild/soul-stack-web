@@ -1,7 +1,7 @@
-// FontProvider — провайдер шрифта интерфейса. Независим от темы (ADR: свой
-// селектор, не привязан к theme mode — см. ThemeContext.tsx для паттерна).
-// Этот файл экспортирует только компонент (React-refresh ok).
-// Хук useFont и контекстный объект — в useFont.ts / fontCtxInternal.ts.
+// FontProvider - the interface font provider. Independent of theme (ADR: its own
+// selector, not tied to theme mode - see ThemeContext.tsx for the pattern).
+// This file exports only the component (React-refresh ok).
+// The useFont hook and context object are in useFont.ts / fontCtxInternal.ts.
 
 import {
   useCallback,

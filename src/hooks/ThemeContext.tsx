@@ -1,6 +1,6 @@
-// ThemeProvider — провайдер темы.
-// Этот файл экспортирует только компонент (React-refresh ok).
-// Хук useTheme и контекстный объект — в useTheme.ts / themeCtxInternal.ts.
+// ThemeProvider - the theme provider.
+// This file exports only the component (React-refresh ok).
+// The useTheme hook and context object are in useTheme.ts / themeCtxInternal.ts.
 
 import {
   useCallback,

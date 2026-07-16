@@ -1,5 +1,5 @@
-// useTheme — хук доступа к теме. Бросает, если ThemeProvider не обёрнут выше.
-// Этот файл содержит только не-компонентные экспорты — react-refresh ok.
+// useTheme — hook for accessing the theme. Throws if ThemeProvider is not wrapped above.
+// This file contains only non-component exports — react-refresh ok.
 import { useContext } from 'react';
 import { ThemeCtx } from './themeCtxInternal';
 import type { ThemeContextValue } from './themeCtxInternal';
