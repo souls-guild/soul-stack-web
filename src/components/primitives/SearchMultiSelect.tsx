@@ -4,19 +4,19 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Check, Search, X } from 'lucide-react';
 import styles from './SearchMultiSelect.module.css';
 
-// Универсальный typeahead multi-select с чипами. Два режима источника данных:
-//  • items    — статический каталог, фильтруется на клиенте (roles).
-//  • search   — async-функция, дебаунс + react-query внутри (archons, server-side).
-// Выбор отдаётся как список ключей (getKey); лейблы кэшируются, чтобы чип
-// корректно рисовался, даже когда элемент выпал из текущей серверной выдачи.
+// Generic typeahead multi-select with chips. Two data-source modes:
+//  - items    - static catalog, filtered client-side (roles).
+//  - search   - async function, debounce + react-query inside (archons, server-side).
+// Selection is emitted as a list of keys (getKey); labels are cached so a chip
+// still renders correctly even when the item drops out of the current server result.
 export interface SearchMultiSelectProps<T> {
-  /** Статический каталог (client-filter). Взаимоисключимо с search. */
+  /** Static catalog (client-filter). Mutually exclusive with search. */
   items?: T[];
-  /** Async серверный поиск (debounce внутри). Взаимоисключимо с items. */
+  /** Async server search (debounce inside). Mutually exclusive with items. */
   search?: (q: string) => Promise<T[]>;
-  /** База кэш-ключа react-query для search-режима: итог = [...queryKey, debouncedQ]. */
+  /** Base react-query cache key for search mode: final = [...queryKey, debouncedQ]. */
   queryKey?: readonly unknown[];
-  /** Гейт запроса в search-режиме (напр. открытость модалки). */
+  /** Query gate in search mode (e.g. whether the modal is open). */
   enabled?: boolean;
   selected: string[];
   onChange: (next: string[]) => void;
@@ -24,9 +24,9 @@ export interface SearchMultiSelectProps<T> {
   getLabel: (item: T) => string;
   getSublabel?: (item: T) => string | undefined;
   placeholder?: string;
-  /** Порог длины строки до запроса/фильтра (default 0). */
+  /** Minimum string length before request/filter (default 0). */
   minChars?: number;
-  /** Внешний loading для items-режима. */
+  /** External loading flag for items-mode. */
   loading?: boolean;
   emptyText: string;
   disabled?: boolean;
@@ -83,13 +83,13 @@ export function SearchMultiSelect<T>({
       const sub = (getSublabel?.(it) ?? '').toLowerCase();
       return label.includes(needle) || sub.includes(needle);
     });
-    // getKey исключён намеренно — не влияет на фильтрацию.
+    // getKey deliberately excluded - it doesn't affect filtering.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, serverQ.data, items, debounced, meetsMin]);
 
   const isLoading = search ? serverQ.isFetching && meetsMin : Boolean(loading);
 
-  // Кэш ключ→лейбл: чип должен рисоваться, даже если элемент выпал из выдачи.
+  // Key->label cache: a chip must still render even if the item drops out of the result.
   const labelCache = useRef(new Map<string, string>());
   for (const it of options) labelCache.current.set(getKey(it), getLabel(it));
   const chipLabel = (key: string) => labelCache.current.get(key) ?? key;
@@ -124,7 +124,7 @@ export function SearchMultiSelect<T>({
       e.preventDefault();
       setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
-      // preventDefault: не даём submit-нуть родительскую форму по Enter.
+      // preventDefault: don't let Enter submit the parent form.
       e.preventDefault();
       if (open && options[active]) toggle(options[active]);
     } else if (e.key === 'Escape') {

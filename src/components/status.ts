@@ -67,22 +67,22 @@ export function soulTone(status: SoulStatus): 'ok' | 'warn' | 'danger' | 'info' 
   }
 }
 
-// Единый status→tone-маппинг для ВСЕХ run-типов (Tide / Push / Errand-run /
-// Errand). Run-типы используют разный словарь терминальных статусов: tide отдаёт
-// `succeeded`, push/errand-run/errand — `success`; этот хелпер уравнивает оба
-// (а также `completed` из push.cleanup-shape) в один зелёный tone, чтобы бейдж
-// был консистентным в сводной ленте /runs и на per-type-страницах.
+// Unified status->tone mapping for ALL run types (Tide / Push / Errand-run /
+// Errand). Run types use a different vocabulary of terminal statuses: tide returns
+// `succeeded`, push/errand-run/errand return `success`; this helper equalizes both
+// (as well as `completed` from push.cleanup-shape) into one green tone, so the badge
+// is consistent in the combined /runs feed and on per-type pages.
 //
-// Группы (значения собраны из openapi-enum-ов всех list-эндпоинтов):
-//   ok    — терминально-успешные: success / succeeded / completed / no_match
-//           (no_match — benign-терминал apply_run: сценарий не адресовал хост)
-//   warn  — частичный успех: partial / partial_failed
-//   danger— неуспешные терминалы: failed / error / error_locked / aborted /
-//           timed_out / module_not_allowed / orphaned (apply_run: хост-строка
-//           осиротела без финального RunResult)
-//   info  — в процессе: running / pending / claimed / planned / applying /
-//           dispatched (apply_run: задача отправлена Soul-у, ответ не пришёл)
-//   muted — отменён / неизвестный: cancelled / прочее
+// Groups (values collected from the openapi enums of all list-endpoints):
+//   ok    - terminally successful: success / succeeded / completed / no_match
+//           (no_match - benign terminal of apply_run: the scenario didn't address a host)
+//   warn  - partial success: partial / partial_failed
+//   danger- unsuccessful terminals: failed / error / error_locked / aborted /
+//           timed_out / module_not_allowed / orphaned (apply_run: the host-row
+//           was orphaned without a final RunResult)
+//   info  - in progress: running / pending / claimed / planned / applying /
+//           dispatched (apply_run: task sent to the Soul, no response yet)
+//   muted - cancelled / unknown: cancelled / other
 export function runStatusTone(s: string | undefined): 'ok' | 'warn' | 'danger' | 'info' | 'muted' {
   switch (s) {
     case 'success':
@@ -116,15 +116,15 @@ export function runStatusTone(s: string | undefined): 'ok' | 'warn' | 'danger' |
   }
 }
 
-// Per-task status→tone (NIM-37). Wire-значение — proto TaskStatus.String():
+// Per-task status->tone (NIM-37). Wire value is proto TaskStatus.String():
 // TASK_STATUS_OK|CHANGED|FAILED|TIMED_OUT|SKIPPED|CANCELLED (SSE `task_status`,
-// audit `status` — одна нормализация). Матч по contains: устойчив к префиксу и
-// к возможному bare-значению.
+// audit `status` - one normalization). Match by contains: resilient to a prefix and
+// to a possible bare value.
 export function taskStatusTone(status: string | undefined): 'ok' | 'warn' | 'danger' | 'info' | 'muted' {
   const s = (status ?? '').toUpperCase();
   if (s.includes('FAILED') || s.includes('TIMED_OUT')) return 'danger';
   if (s.includes('CANCELLED') || s.includes('SKIPPED')) return 'muted';
-  // CHANGED — янтарный (Ansible-конвенция: изменение = attention, не neutral-info).
+  // CHANGED - amber (Ansible convention: a change = attention, not neutral-info).
   if (s.includes('CHANGED')) return 'warn';
   if (s.includes('OK')) return 'ok';
   return 'muted';

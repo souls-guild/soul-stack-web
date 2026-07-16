@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import { Badge } from './primitives';
 import { RUN_SENTINEL_SID, isKeeperSid } from './keeperSid';
 
-// KeeperSidCell — единая sid-ячейка рендереров прогона: реальный Soul → ссылка
-// /souls, синтетический → бейдж без ссылки (NIM-36). className/style пробрасываются
-// в <Link> для сохранения исходной вёрстки конкретного рендерера.
+// KeeperSidCell — a shared sid cell for run renderers: a real Soul → link to
+// /souls, a synthetic one → badge without a link (NIM-36). className/style are passed
+// through to <Link> to preserve the specific renderer's original layout.
 export function KeeperSidCell({
   sid,
   className,

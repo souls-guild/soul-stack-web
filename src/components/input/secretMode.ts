@@ -1,6 +1,6 @@
-// Dual-mode приём секрета (ADR-064): оператор задаёт секрет ЗНАЧЕНИЕМ (plaintext)
-// XOR ПУТЁМ (vault-ref). UI-инвариант — ровно один из двух активен, поэтому
-// отправляем только поле активного режима.
+// Dual-mode secret intake (ADR-064): the operator sets the secret as a VALUE (plaintext)
+// XOR as a PATH (vault-ref). UI invariant — exactly one of the two is active, so
+// only the active mode's field is sent.
 
 import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
@@ -13,9 +13,9 @@ export interface PickedSecret {
 }
 
 /**
- * Возвращает единственное поле для отправки по активному режиму. XOR by
- * construction: mode=value → plaintext-значение; mode=ref → vault-ref. Пустой
- * (после trim) активный ввод → null (поле не отправляется). Никогда не вернёт оба.
+ * Returns the single field to send for the active mode. XOR by
+ * construction: mode=value → plaintext value; mode=ref → vault-ref. An empty
+ * (after trim) active input → null (field not sent). Never returns both.
  */
 export function pickSecretField(mode: SecretMode, value: string, ref: string): PickedSecret | null {
   const raw = mode === 'value' ? value : ref;
@@ -25,9 +25,9 @@ export function pickSecretField(mode: SecretMode, value: string, ref: string): P
 }
 
 /**
- * Распознаёт 422 «приём plaintext выключен» (ADR-064 митигация a: keeper за
- * TLS-фронтом + secret_ingest.accept_plaintext). Возвращает дружелюбную подсказку
- * или null — тогда вызывающий использует свой generic-маппинг ошибки.
+ * Recognizes 422 "plaintext intake disabled" (ADR-064 mitigation a: keeper behind
+ * a TLS front + secret_ingest.accept_plaintext). Returns a friendly hint
+ * or null — in which case the caller uses its generic error mapping.
  */
 export function plaintextDisabledMessage(err: unknown): string | null {
   if (err instanceof ApiError && err.status === 422) {

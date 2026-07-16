@@ -15,11 +15,11 @@ import styles from './DynamicInputBuilder.module.css';
 
 interface Props {
   value: Record<string, unknown>;
-  // onChange вызывается только когда состояние формы валидно (все ключи
-  // непустые, без дубликатов, типы коэрсятся). При невалидности — onChange
-  // не вызывается, ошибки рисуются inline.
+  // onChange is called only when the form state is valid (all keys
+  // non-empty, no duplicates, types coerce). When invalid — onChange
+  // is not called, errors are rendered inline.
   onChange: (next: Record<string, unknown>) => void;
-  // Опционально показывать toggle «Edit as raw JSON». Default — true.
+  // Optionally show the "Edit as raw JSON" toggle. Default — true.
   allowRawJsonToggle?: boolean;
   ariaLabel?: string;
 }
@@ -39,19 +39,19 @@ export function DynamicInputBuilder({
   ariaLabel,
 }: Props) {
   const { t } = useTranslation();
-  // Локальный state-of-truth — массив FieldRow + флаг raw-режима.
-  // Внешний `value` синхронизируется через onChange при валидных изменениях.
+  // Local state-of-truth — an array of FieldRow + a raw-mode flag.
+  // The external `value` syncs via onChange on valid changes.
   const [rows, setRows] = useState<FieldRow[]>(() => parseRawJsonToFields(value ?? {}));
   const [rawMode, setRawMode] = useState(false);
   const [rawText, setRawText] = useState<string>(() => JSON.stringify(value ?? {}, null, 2));
   const [rawError, setRawError] = useState<string | null>(null);
 
-  // Защита от echo: каждый onChange отметим в lastEmittedRef, чтобы внешний
-  // re-render с тем же value не сбрасывал локальный rows-state.
+  // Echo protection: mark each onChange in lastEmittedRef so an external
+  // re-render with the same value doesn't reset local rows-state.
   const lastEmittedRef = useRef<string>(JSON.stringify(value ?? {}));
 
-  // Внешний reset (например, смена scenario сбросила input): если приходящий
-  // value отличается от последнего emit-а — пересоздаём rows.
+  // External reset (e.g. changing scenario reset the input): if the incoming
+  // value differs from the last emit — recreate rows.
   useEffect(() => {
     const incoming = JSON.stringify(value ?? {});
     if (incoming !== lastEmittedRef.current) {
@@ -98,14 +98,14 @@ export function DynamicInputBuilder({
   // raw-mode handlers.
   function toggleRawMode() {
     if (!rawMode) {
-      // Form → raw: используем lossy-сериализацию, чтобы не терять draft.
+      // Form → raw: use lossy serialization so the draft isn't lost.
       const draft = fieldsToObjectLossy(rows);
       setRawText(JSON.stringify(draft, null, 2));
       setRawError(null);
       setRawMode(true);
       return;
     }
-    // Raw → form: парсим текущий rawText.
+    // Raw → form: parse the current rawText.
     const parsed = tryParseRawObject(rawText);
     if (parsed.error !== null) {
       setRawError(parsed.error);
@@ -328,8 +328,8 @@ function ValueInput({
     );
   }
   const inputType = row.type === 'number' || row.type === 'integer' ? 'text' : 'text';
-  // type='text' даже для number — чтобы можно было редактировать '-' и '12.';
-  // финальный coerce — в helpers.
+  // type='text' even for number — so '-' and '12.' remain editable;
+  // final coercion happens in helpers.
   return (
     <input
       type={inputType}
@@ -343,8 +343,8 @@ function ValueInput({
 }
 
 function Preview({ rows }: { rows: FieldRow[] }) {
-  // Lossy preview всегда: показываем «как получится», даже если есть невалидные
-  // строки (они окажутся string).
+  // Lossy preview always: show "best effort", even if there are invalid
+  // rows (they'll come out as string).
   const obj = useMemo(() => fieldsToObjectLossy(rows), [rows]);
   const text = useMemo(() => JSON.stringify(obj, null, 2), [obj]);
   if (Object.keys(obj).length === 0) return null;

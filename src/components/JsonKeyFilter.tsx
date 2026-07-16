@@ -5,8 +5,8 @@ import styles from './JsonKeyFilter.module.css';
 interface Props {
   value: unknown;
   emptyLabel?: string;
-  // Если top-level — объект, рендерим как разворачиваемый list ключей с фильтром.
-  // Иначе (массив, скаляр, null) — фолбэк на pretty-JSON одним блоком.
+  // If top-level is an object, render as an expandable key list with a filter.
+  // Otherwise (array, scalar, null) — fall back to a single pretty-JSON block.
 }
 
 interface Entry {
@@ -87,7 +87,7 @@ export function JsonKeyFilter({ value, emptyLabel }: Props) {
     return <div className={styles.empty}>{resolvedEmpty}</div>;
   }
   if (!isPlainObject) {
-    // Массив или скаляр — рендерим как обычный JSON-блок.
+    // Array or scalar — render as a plain JSON block.
     return (
       <div className={styles.entry}>
         <pre>{stringify(value)}</pre>

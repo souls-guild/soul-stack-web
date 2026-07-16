@@ -1,13 +1,13 @@
-// Helpers DynamicInputBuilder: row-types, обратимая конвертация в JSON и обратно.
+// Helpers for DynamicInputBuilder: row types, reversible conversion to JSON and back.
 //
-// Снаружи компонент общается через `Record<string, unknown>`. Внутри держим
-// массив FieldRow с локальным rowId — стабильным для React-key (это нужно,
-// чтобы редактирование одного row не дёргало input-focus у соседнего, когда
-// key === field.key и пользователь как раз правит key).
+// Externally the component communicates via `Record<string, unknown>`. Internally we
+// hold an array of FieldRow with a local rowId — stable for the React key (needed
+// so editing one row doesn't yank input focus off a neighboring row when
+// key === field.key and the user is right in the middle of editing key).
 
 import i18n from '../../i18n';
 
-// Pure-функции (вне React-дерева) используют глобальный i18n-инстанс.
+// Pure functions (outside the React tree) use the global i18n instance.
 const t = i18n.t.bind(i18n);
 
 export type FieldType = 'string' | 'number' | 'integer' | 'boolean' | 'json';
@@ -16,12 +16,12 @@ export interface FieldRow {
   id: string;
   key: string;
   type: FieldType;
-  // value хранится как «исходник для UI»:
+  // value is stored as the "UI source":
   //   string  → string
-  //   number  → string (чтобы '12.' и '-' оставались редактируемыми)
+  //   number  → string (so '12.' and '-' stay editable)
   //   integer → string
   //   boolean → boolean
-  //   json    → string (валидируется в момент сериализации)
+  //   json    → string (validated at serialization time)
   raw: string | boolean;
 }
 
@@ -35,9 +35,9 @@ export function newEmptyRow(): FieldRow {
   return { id: nextRowId(), key: '', type: 'string', raw: '' };
 }
 
-// Конвертация Record<string, unknown> → FieldRow[]. Используется при инициализации
-// и при возврате из raw-JSON-режима. Тип определяется по typeof value;
-// object/array → 'json' с сериализованным значением.
+// Converts Record<string, unknown> → FieldRow[]. Used on initialization
+// and when returning from raw-JSON mode. Type is determined by typeof value;
+// object/array → 'json' with a serialized value.
 export function parseRawJsonToFields(obj: Record<string, unknown>): FieldRow[] {
   const out: FieldRow[] = [];
   for (const [key, value] of Object.entries(obj)) {
@@ -57,23 +57,23 @@ function valueToRow(key: string, value: unknown): FieldRow {
   if (typeof value === 'string') {
     return { id: nextRowId(), key, type: 'string', raw: value };
   }
-  // object / array / null → JSON-режим.
+  // object / array / null → JSON mode.
   return { id: nextRowId(), key, type: 'json', raw: JSON.stringify(value, null, 2) };
 }
 
 export interface FieldsValidation {
-  // По индексам rows: причина невалидности или null.
+  // By row index: reason for invalidity or null.
   rowErrors: Array<string | null>;
-  // Общий объект, если все строки валидны и ключи уникальны.
+  // The combined object, if all rows are valid and keys are unique.
   result: Record<string, unknown> | null;
   duplicateKeys: string[];
 }
 
-// Сериализует строки в JSON-объект и параллельно собирает ошибки. Если есть
-// хоть одна ошибка — `result === null`, иначе — полный Record.
+// Serializes rows into a JSON object while collecting errors. If there is
+// even one error — `result === null`, otherwise — the full Record.
 //
-// Пустые строки (key === '') пропускаются (это «черновик», в который оператор
-// ещё не вписал имя), не валидируются и не попадают в результат.
+// Empty rows (key === '') are skipped (this is a "draft" the operator
+// hasn't named yet); they are not validated and don't end up in the result.
 export function fieldsToObject(rows: FieldRow[]): FieldsValidation {
   const rowErrors: Array<string | null> = rows.map(() => null);
   const seenKeys = new Map<string, number>(); // key → first row index
@@ -150,28 +150,28 @@ function coerceRowValue(row: FieldRow): CoerceResult {
   }
 }
 
-// При переключении типа стараемся сохранить значение по смыслу.
+// When switching type, we try to preserve the value's meaning.
 export function changeRowType(row: FieldRow, next: FieldType): FieldRow {
   if (row.type === next) return row;
-  // Из bool → string('true'|'false') или number(1|0).
+  // From bool → string('true'|'false') or number(1|0).
   if (row.type === 'boolean') {
     const b = Boolean(row.raw);
     if (next === 'string') return { ...row, type: next, raw: b ? 'true' : 'false' };
     if (next === 'integer' || next === 'number') return { ...row, type: next, raw: b ? '1' : '0' };
     if (next === 'json') return { ...row, type: next, raw: b ? 'true' : 'false' };
   }
-  // В bool: 'true'/'1' → true.
+  // To bool: 'true'/'1' → true.
   if (next === 'boolean') {
     const s = typeof row.raw === 'string' ? row.raw.trim().toLowerCase() : '';
     return { ...row, type: next, raw: s === 'true' || s === '1' };
   }
-  // string ↔ number/integer/json — переносим как строку.
+  // string ↔ number/integer/json — carried over as a string.
   const raw = typeof row.raw === 'string' ? row.raw : String(row.raw);
   return { ...row, type: next, raw };
 }
 
-// Сериализация для raw-JSON-режима (если result === null, всё равно отдаём
-// то, что есть, но включая невалидные строки как plain string).
+// Serialization for raw-JSON mode (if result === null, we still return
+// whatever there is, but including invalid rows as plain strings).
 export function fieldsToObjectLossy(rows: FieldRow[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const row of rows) {

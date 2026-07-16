@@ -1,5 +1,5 @@
-// Корпоративная двупанельная иконка (WB-стиль IconLayoutSidebar).
-// Зеркалируется в collapsed-режиме, чтобы визуально передать «панель закрыта».
+// Corporate two-panel icon (WB-style IconLayoutSidebar).
+// Mirrored in collapsed mode to visually convey "panel closed".
 
 interface Props {
   size?: number;

@@ -3,18 +3,18 @@ import { Input } from '../primitives';
 import type { SecretMode } from './secretMode';
 import styles from '../../pages/common.module.css';
 
-// Контрол секрет-поля с dual-mode вводом (ADR-064): переключатель «значение | путь»
-// + активный инпут. «значение» → plaintext (keeper сам кладёт в Vault); «путь» →
-// vault-ref (как раньше). Ровно один режим активен → XOR структурно гарантирован.
-// value-редактор по умолчанию — password-инпут; для нестрокового значения
-// (credentials-объект) передаётся через renderValue.
+// A secret-field control with dual-mode input (ADR-064): a "value | path" toggle
+// + the active input. "value" → plaintext (keeper puts it into Vault itself); "path" →
+// vault-ref (as before). Exactly one mode is active → XOR is structurally guaranteed.
+// The value editor defaults to a password input; for a non-string value
+// (a credentials object) it's passed through renderValue.
 
 interface Props {
   label: string;
   required?: boolean;
   mode: SecretMode;
   onModeChange: (m: SecretMode) => void;
-  /** Префикс data-testid: `${testIdBase}-mode-value` / `-mode-ref` / `-value` / `-ref`. */
+  /** data-testid prefix: `${testIdBase}-mode-value` / `-mode-ref` / `-value` / `-ref`. */
   testIdBase: string;
   valueModeLabel: string;
   refModeLabel: string;
@@ -24,7 +24,7 @@ interface Props {
   onValueChange?: (v: string) => void;
   valuePlaceholder?: string;
   valueHint?: string;
-  /** Кастомный редактор значения (напр. key/value для credentials). Перекрывает дефолтный инпут. */
+  /** Custom value editor (e.g. key/value for credentials). Overrides the default input. */
   renderValue?: (args: { testId: string }) => ReactNode;
 
   // ref (vault) side
@@ -32,7 +32,7 @@ interface Props {
   onRefChange: (v: string) => void;
   refPlaceholder?: string;
   refHint?: string;
-  /** Переопределение testid ref-инпута (backward-compat с существующими тестами). */
+  /** Override for the ref-input testid (backward-compat with existing tests). */
   refTestId?: string;
   refType?: 'text' | 'password';
 }

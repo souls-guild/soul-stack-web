@@ -4,14 +4,14 @@ interface Props {
   offset: number;
   limit: number;
   total: number;
-  // Сколько элементов реально отрисовано на текущей странице (items.length).
+  // How many items are actually rendered on the current page (items.length).
   shown: number;
   onChange: (offset: number) => void;
 }
 
-// Общий пагинатор offset/limit. Раньше этот блок копировался инлайном в каждом
-// списке (Archons / Errands / ErrandRuns / Tides / PushRuns); вынесен сюда,
-// чтобы перевод prev/next/range жил в одном месте.
+// Shared offset/limit pager. This block used to be copy-pasted inline into every
+// list (Archons / Errands / ErrandRuns / Tides / PushRuns); extracted here
+// so the prev/next/range translation lives in one place.
 export function Pager({ offset, limit, total, shown, onChange }: Props) {
   const { t } = useTranslation();
   const atStart = offset === 0;

@@ -26,21 +26,21 @@ import styles from './Sidebar.module.css';
 
 // Sidebar — primary navigation.
 //
-// UX-pattern: один entry-point для запуска работы (/run Wizard),
-// остальные pages — read-only views (registry / history / audit).
+// UX-pattern: one entry-point for launching work (/run Wizard),
+// the rest of the pages are read-only views (registry / history / audit).
 //
 // Routes /errands/new + /push + /push-runs (+ /push-runs/:applyId)
-// сохранены как hidden для backward-compat-ссылок (deprecated,
-// см. PM-decision 2026-05-27). Push deferred — нет use-case, pull
-// покрывает всё; эндпоинт /v1/push-runs в dev-конфиге не
-// регистрируется (404), поэтому пункт убран из навигации.
+// are kept hidden for backward-compat links (deprecated,
+// see PM-decision 2026-05-27). Push deferred - no use-case, pull
+// covers everything; the /v1/push-runs endpoint isn't registered
+// in the dev-config (404), so the item was removed from navigation.
 
 interface NavItem {
   to: string;
   label: string;
   icon: typeof Boxes;
   disabled?: boolean;
-  // Если задан — link активен и при префиксе (для вложенных подвкладок).
+  // If set - the link is active on prefix match too (for nested sub-tabs).
   matchPrefix?: string;
 }
 
@@ -103,7 +103,7 @@ function Item({ item, collapsed }: ItemProps) {
     <NavLink
       to={item.to}
       title={titleAttr}
-      // end=false когда задан matchPrefix — ссылка активна на всех вложенных маршрутах.
+      // end=false when matchPrefix is set - the link is active on all nested routes.
       end={!item.matchPrefix}
       className={({ isActive }) => (isActive ? `${styles.link} ${styles.linkActive}` : styles.link)}
     >

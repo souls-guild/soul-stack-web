@@ -27,10 +27,10 @@ const toneClass: Record<DonutTone, string> = {
   accent: styles.accent,
 };
 
-// Donut-диаграмма на чистом SVG (без chart-библиотеки — единственный
-// потребитель сейчас Souls Overview, тянуть recharts ради одной страницы
-// не оправдано). Каждый slice — свой <circle> со stroke-dasharray,
-// накопленный offset двигает сегменты по кругу без пересечений.
+// Donut chart in plain SVG (no chart library - the only
+// consumer right now is Souls Overview, pulling in recharts for one page
+// isn't justified). Each slice is its own <circle> with stroke-dasharray,
+// an accumulated offset moves the segments around the circle without overlap.
 export function Donut({
   slices,
   size = 160,

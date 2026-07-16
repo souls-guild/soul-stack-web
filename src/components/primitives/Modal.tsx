@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
-  // Шире обычного 640px — для форм с textarea/JSON.
+  // Wider than the usual 640px - for forms with textarea/JSON.
   wide?: boolean;
 }
 

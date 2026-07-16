@@ -9,9 +9,9 @@ interface Props {
   onClose: () => void;
 }
 
-// Endpoint-адреса берём в первую очередь из vite-env (VITE_KEEPER_API / VITE_KEEPER_MCP);
-// если не заданы — собираем относительно текущего window.location: keeper и MCP по
-// умолчанию слушают 8080 / 8081 (см. ADR-004, keeper.yml `listen.openapi.addr` / `listen.mcp.addr`).
+// Endpoint addresses come first from vite-env (VITE_KEEPER_API / VITE_KEEPER_MCP);
+// if not set - derive from the current window.location: keeper and MCP
+// listen on 8080 / 8081 by default (see ADR-004, keeper.yml `listen.openapi.addr` / `listen.mcp.addr`).
 function getKeeperBase(): string {
   const fromEnv = import.meta.env.VITE_KEEPER_API as string | undefined;
   if (fromEnv) return fromEnv.replace(/\/$/, '');
@@ -39,8 +39,8 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // clipboard может быть недоступен (http-context) — fallback в select-and-copy:
-      // показываем prompt с готовым значением, чтобы оператор не упёрся в тупик.
+      // clipboard may be unavailable (http-context) - fallback to select-and-copy:
+      // show a prompt with the ready value so the operator isn't stuck.
       window.prompt(t('admin:helpCopyPrompt'), value);
     }
   }

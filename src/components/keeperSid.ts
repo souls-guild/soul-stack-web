@@ -1,11 +1,11 @@
-// Синтетические apply_runs.sid, не адресующие Soul (NIM-36): keeper-side задача
-// (on: keeper, backend KeeperTargetSID) и run-sentinel аборта до dispatch
-// (RunSentinelSID). Ссылка /souls/<sid> для них ведёт на несуществующий soul.
+// Synthetic apply_runs.sid values that don't address a Soul (NIM-36): a keeper-side task
+// (on: keeper, backend KeeperTargetSID) and a run-sentinel abort before dispatch
+// (RunSentinelSID). The /souls/<sid> link for these leads to a nonexistent soul.
 export const KEEPER_TARGET_SID = 'keeper';
 export const RUN_SENTINEL_SID = '__run__';
 
-// isKeeperSid — sid синтетический, а не реальный Soul. Матч ТОЧНЫЙ: реальный soul
-// может зваться soul-keeper-1 / keeper.example.com — их НЕ трогаем.
+// isKeeperSid — the sid is synthetic, not a real Soul. Match is EXACT: a real soul
+// could be named soul-keeper-1 / keeper.example.com — those are NOT touched.
 export function isKeeperSid(sid: string): boolean {
   return sid === KEEPER_TARGET_SID || sid === RUN_SENTINEL_SID;
 }

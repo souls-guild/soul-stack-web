@@ -11,8 +11,8 @@ const LABELS: Record<Lang, string> = {
 export function LangToggle() {
   const { i18n } = useTranslation();
   const current = (i18n.resolvedLanguage ?? i18n.language) as Lang;
-  // Non-default языки грузятся по HTTP async — блокируем кнопки на время загрузки,
-  // чтобы не словить двойной клик / гонку переключений.
+  // Non-default languages load over HTTP async - disable buttons while loading
+  // to avoid a double click / a race between switches.
   const [loading, setLoading] = useState(false);
 
   const onSwitch = (lng: Lang) => {
