@@ -372,7 +372,7 @@ describe('RunsFeed (unified /runs)', () => {
   // -- Guard #2: Scenario sends sort/sort_dir + RESETS offset on sort change ---
 
   it('[scenario] сортировка колонки уходит в query как sort/sort_dir и СБРАСЫВАЕТ offset', async () => {
-    const captured = captureRuns(120); // total>limit → Pager Next активен
+    const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
     await user.click(screen.getByTestId('runs-segment-scenario'));
@@ -398,7 +398,7 @@ describe('RunsFeed (unified /runs)', () => {
   // -- Guard #3: Scenario status — server-side (query + offset reset), NOT client-side --
 
   it('[scenario] статус-фильтр server-side: уходит в /v1/runs как ?status= и СБРАСЫВАЕТ offset', async () => {
-    const captured = captureRuns(120); // total>limit → Pager Next активен
+    const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
     await user.click(screen.getByTestId('runs-segment-scenario'));
@@ -445,7 +445,7 @@ describe('RunsFeed (unified /runs)', () => {
   });
 
   it('[scenario] сортировка по Service — server-side sort=service & sort_dir + reset offset', async () => {
-    const captured = captureRuns(120); // total>limit → Pager Next активен
+    const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
     await user.click(screen.getByTestId('runs-segment-scenario'));
@@ -498,7 +498,7 @@ describe('RunsFeed (unified /runs)', () => {
   });
 
   it('[scenario] выбор Service уходит в query как ?service= и СБРАСЫВАЕТ offset', async () => {
-    const captured = captureRuns(120); // total>limit → Pager Next активен
+    const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
     await user.click(screen.getByTestId('runs-segment-scenario'));
@@ -538,7 +538,7 @@ describe('RunsFeed (unified /runs)', () => {
   });
 
   it('[scenario] date-range виден и шлёт started_after/started_before в query + reset offset', async () => {
-    const captured = captureRuns(120); // total>limit → Pager Next активен
+    const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
     await user.click(screen.getByTestId('runs-segment-scenario'));

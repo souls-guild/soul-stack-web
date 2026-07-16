@@ -204,13 +204,13 @@ describe('ArchonsList', () => {
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
-      // Hide revoked default ON → 2 видимых строки (bootstrap, alice).
+      // Hide revoked default ON -> 2 visible rows (bootstrap, alice).
       expect(screen.getByTestId('revoke-archon-alice')).toBeInTheDocument();
     });
     const user = userEvent.setup();
     await user.click(screen.getByTestId('revoke-archon-alice'));
     await user.click(await screen.findByTestId('revoke-submit'));
-    // Pretty-error виден в Modal; Modal не закрывается.
+    // Pretty-error visible in Modal; Modal does not close.
     expect(await screen.findByRole('alert')).toHaveTextContent(/last-?cluster-?admin|self-lockout|последнего/i);
     expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
   });
@@ -253,7 +253,7 @@ describe('ArchonsList', () => {
     ]);
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    // Невалидный AID: uppercase — нарушает ^[a-z0-9]...
+    // Invalid AID: uppercase - violates ^[a-z0-9]...
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'Alice!');
     expect(screen.getAllByText(/формат:/i).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
@@ -265,10 +265,10 @@ describe('ArchonsList', () => {
     ]);
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    // Валидный AID, но display_name пуст → submit disabled.
+    // Valid AID, but display_name empty -> submit disabled.
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
-    // Заполнили display_name → submit разблокирован.
+    // Filled display_name -> submit unlocked.
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
     expect(screen.getByRole('button', { name: /Создать/i })).not.toBeDisabled();
   });
@@ -285,7 +285,7 @@ describe('ArchonsList', () => {
     expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
   });
 
-  // --- Multi-select ролей (extended payload {aid, display_name, roles[]}) ---
+  // --- Multi-select roles (extended payload {aid, display_name, roles[]}) ---
 
   const SAMPLE_ROLES = {
     items: [
@@ -335,7 +335,7 @@ describe('ArchonsList', () => {
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
 
-    // Ждём, пока select наполнится опциями.
+    // Wait for select to fill with options.
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
     });
@@ -343,7 +343,7 @@ describe('ArchonsList', () => {
     await user.selectOptions(rolesSelect, 'ops-viewer');
     await user.selectOptions(rolesSelect, 'release-engineer');
 
-    // Chips появились.
+    // Chips appeared.
     expect(screen.getByText('ops-viewer')).toBeInTheDocument();
     expect(screen.getByText('release-engineer')).toBeInTheDocument();
 
@@ -402,7 +402,7 @@ describe('ArchonsList', () => {
       const post = calls.find((c) => c.url === '/v1/operators' && c.method === 'POST');
       expect(post).toBeDefined();
       const parsed = JSON.parse(post!.body ?? '{}') as { roles?: string[] };
-      // Без выбора — поле либо отсутствует, либо пустой массив (мы не отправляем roles, если пусто).
+      // Without selection - field is either absent or an empty array (we don't send roles if empty).
       expect(parsed.roles === undefined || parsed.roles.length === 0).toBe(true);
     });
   });
@@ -475,7 +475,7 @@ describe('ArchonsList', () => {
       if (url === '/v1/operators' && method === 'POST') {
         postCount += 1;
         postBodies.push(body ?? '');
-        // Первый POST — с roles[] — backend ещё не поддерживает: 404.
+        // First POST - with roles[] - backend doesn't support it yet: 404.
         if (postCount === 1) {
           return new Response(
             JSON.stringify({
@@ -487,7 +487,7 @@ describe('ArchonsList', () => {
             { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
           );
         }
-        // Второй POST — fallback без roles[] — 201.
+        // Second POST - fallback without roles[] - 201.
         return new Response(
           JSON.stringify({
             aid: 'archon-alice',
@@ -512,19 +512,19 @@ describe('ArchonsList', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: /добавить роль/i }), 'ops-viewer');
     await user.click(screen.getByRole('button', { name: /Создать/i }));
 
-    // JWT отрисован — Архонт всё-таки создан.
+    // JWT rendered - Archon was created after all.
     await waitFor(() => {
       expect(screen.getByText(/JWT выпущен/i)).toBeInTheDocument();
     });
-    // Было два POST: с roles и без.
+    // There were two POSTs: with roles and without.
     expect(postCount).toBe(2);
     expect(JSON.parse(postBodies[0])).toHaveProperty('roles');
     expect(JSON.parse(postBodies[1]).roles).toBeUndefined();
-    // Подсказка пользователю про unsupported.
+    // Hint to the user about unsupported.
     expect(screen.getByRole('status')).toHaveTextContent(/backend не поддерживает/i);
   });
 
-  // --- Колонка created_via ---
+  // --- created_via column ---
 
   it('created_via отображается как Badge в таблице', async () => {
     installFetchMock([
@@ -534,11 +534,11 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    // archon-alice (hide-revoked ON → archon-old скрыт):
-    // bootstrap → badge для archon-bootstrap, user → badge для archon-alice
+    // archon-alice (hide-revoked ON -> archon-old hidden):
+    // bootstrap -> badge for archon-bootstrap, user -> badge for archon-alice
     expect(screen.getByTestId('created-via-archon-bootstrap')).toHaveTextContent('bootstrap');
     expect(screen.getByTestId('created-via-archon-alice')).toHaveTextContent('user');
-    // archon-old скрыт (hide-revoked по умолчанию ON)
+    // archon-old hidden (hide-revoked ON by default)
     expect(screen.queryByTestId('created-via-archon-old')).not.toBeInTheDocument();
   });
 
@@ -551,7 +551,7 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    // Снимаем hide-revoked → archon-old виден
+    // Turn off hide-revoked -> archon-old visible
     await user.click(screen.getByLabelText(/Скрыть отозванных/i));
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
@@ -559,19 +559,19 @@ describe('ArchonsList', () => {
     expect(screen.getByTestId('created-via-archon-old')).toHaveTextContent('ldap');
   });
 
-  // --- AID-паттерн: новый формат ADR-014 amendment ---
+  // --- AID pattern: new format ADR-014 amendment ---
 
   it.each([
     ['alice@corp.com', true],
     ['ops-bob', true],
-    ['archon-alice', true],  // старый формат тоже валиден
-    ['a1', true],             // минимальная длина 2
+    ['archon-alice', true],  // old format is also valid
+    ['a1', true],             // minimum length 2
     ['user.name_42@example.org', true],
-    ['BOB', false],           // uppercase — запрещено
-    ['-x', false],            // leading dash — запрещено
-    ['', false],              // пустой — не проходит regex (length < 2)
-    ['a', false],             // длина 1 — меньше минимума
-    ['Alice!', false],        // uppercase + спецсимвол
+    ['BOB', false],           // uppercase - forbidden
+    ['-x', false],            // leading dash - forbidden
+    ['', false],              // empty - doesn't pass regex (length < 2)
+    ['a', false],             // length 1 - below minimum
+    ['Alice!', false],        // uppercase + special char
   ])('AID "%s" → valid=%s', async (aid, expectedValid) => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
@@ -585,10 +585,10 @@ describe('ArchonsList', () => {
     const errorShown = screen.queryAllByText(/формат:/i).length > 0;
     const btnDisabled = screen.getByRole('button', { name: /Создать/i }).hasAttribute('disabled');
     if (expectedValid) {
-      // Валидный AID: нет ошибки-подсказки; кнопка может быть disabled из-за display_name
+      // Valid AID: no error hint; button may be disabled due to display_name
       expect(errorShown).toBe(false);
     } else {
-      // Невалидный AID при непустом вводе: ошибка + кнопка disabled
+      // Invalid AID with non-empty input: error + button disabled
       if (aid.length > 0) {
         expect(errorShown).toBe(true);
       }
@@ -596,7 +596,7 @@ describe('ArchonsList', () => {
     }
   });
 
-  // --- Поиск в списке Архонтов ---
+  // --- Search in Archons list ---
 
   it('search по AID — фильтрует client-side по aid', async () => {
     installFetchMock([
@@ -609,10 +609,10 @@ describe('ArchonsList', () => {
     });
     const searchInput = screen.getByPlaceholderText(/AID или имя/i);
     await user.type(searchInput, 'alice');
-    // Только alice видна, bootstrap скрыт.
+    // Only alice visible, bootstrap hidden.
     expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'archon-bootstrap' })).not.toBeInTheDocument();
-    // Счётчик обновился: "Найдено 1 из 2"
+    // Counter updated: "Найдено 1 из 2"
     expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/1/);
   });
 

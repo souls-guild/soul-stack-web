@@ -166,18 +166,18 @@ describe('CreateSoulModal', () => {
     const sidInput = screen.getByLabelText('SID нового хоста');
     await user.type(sidInput, 'host-chips.example.com');
 
-    // Вводим первый coven-чип: "prod" + Enter
+    // Enter the first coven chip: "prod" + Enter
     const chipsBox = screen.getByLabelText('coven-метки');
     const chipsInput = chipsBox.querySelector('input') as HTMLInputElement;
     await user.click(chipsInput);
     await user.type(chipsInput, 'prod');
     await user.keyboard('{Enter}');
 
-    // Вводим второй coven-чип: "blue" + Enter
+    // Enter the second coven chip: "blue" + Enter
     await user.type(chipsInput, 'blue');
     await user.keyboard('{Enter}');
 
-    // Оба чипа отображаются
+    // Both chips are displayed
     expect(screen.getByText('prod')).toBeInTheDocument();
     expect(screen.getByText('blue')).toBeInTheDocument();
 

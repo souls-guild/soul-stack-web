@@ -248,12 +248,12 @@ describe('computeVisibleFields интеграция', () => {
     const missing = missingRequiredFields(schema, state, visible);
     expect(missing).not.toContain('host');
     // mode empty -> should be in missing
-    expect(missing).not.toContain('mode'); // mode = 'standalone' — не пустое
+    expect(missing).not.toContain('mode'); // mode = 'standalone' -- not empty
 
     const state2: ScenarioFieldsState = {};
     const visible2 = computeVisibleFields(form, state2);
     const missing2 = missingRequiredFields(schema, state2, visible2);
     expect(missing2).toContain('mode');
-    expect(missing2).not.toContain('host'); // скрыт
+    expect(missing2).not.toContain('host'); // hidden
   });
 });

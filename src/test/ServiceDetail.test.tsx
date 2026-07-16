@@ -53,7 +53,7 @@ const INCS_WITH_STATE = {
       state: {
         redis_version: '7.2.4',
         node_exporter_version: '1.7.0',
-        redis_users: ['default', 'admin'],  // составное — array
+        redis_users: ['default', 'admin'],  // composite -- array
       },
     },
     {

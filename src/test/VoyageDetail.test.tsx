@@ -49,7 +49,7 @@ const SAMPLE_VOYAGE_COMMAND = {
   target: { sids: ['host-a.example.com', 'host-b.example.com'] },
 };
 
-/** barrier: 10 батчей, выполнено 3 (running) */
+/** barrier: 10 batches, 3 completed (running) */
 const VOYAGE_BARRIER_PARTIAL = {
   ...SAMPLE_VOYAGE_SCENARIO,
   status: 'running',
@@ -68,7 +68,7 @@ const VOYAGE_BARRIER_TERMINAL = {
   summary: { total: 10, succeeded: 10, failed: 0, cancelled: 0 },
 };
 
-/** window: batch_mode=window, total_batches=1, current_batch_index=0 всегда */
+/** window: batch_mode=window, total_batches=1, current_batch_index=0 always */
 const VOYAGE_WINDOW = {
   ...SAMPLE_VOYAGE_SCENARIO,
   batch_mode: 'window',
@@ -807,7 +807,7 @@ describe('VoyageDetail', () => {
     await user.click(screen.getByTestId('voyage-repeat-btn'));
     // Dialog must appear
     expect(screen.getByTestId('voyage-repeat-confirm-dialog')).toBeInTheDocument();
-    // Cancel -> dialog closes ("Закрыть" button -- ru locale is default in tests)
+    // Cancel -> dialog closes ("Close" button -- ru locale is default in tests)
     await user.click(screen.getByRole('button', { name: /Закрыть/i }));
     expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
     sessionStorage.clear();

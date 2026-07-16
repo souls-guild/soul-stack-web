@@ -191,7 +191,7 @@ describe('ArrayOfObjectField рендер', () => {
       target: { value: 'on' },
     });
 
-    // последнее значение — JSON-строка массива объектов
+    // last value - JSON string of array of objects
     const last = captured[captured.length - 1];
     expect(typeof last.users).toBe('string');
     const parsed = JSON.parse(last.users as string);
@@ -207,7 +207,7 @@ describe('ArrayOfObjectField AclUser preset', () => {
     render(<StatefulFields schema={aclUserSchema} onChangeSpy={(s) => captured.push(s)} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
 
-    // Проверяем preset через onChange (captured state содержит JSON-строку)
+    // Check preset via onChange (captured state contains JSON string)
     const last = captured[captured.length - 1];
     expect(typeof last.users).toBe('string');
     const parsed = JSON.parse(last.users as string) as Array<Record<string, string>>;

@@ -195,7 +195,7 @@ describe('CadencesList', () => {
       expect(screen.queryByText('Выключить расписание?')).not.toBeInTheDocument(),
     );
 
-    // disable-запрос так и не был отправлен
+    // disable request was never sent
     const calls = vi.mocked(globalThis.fetch).mock.calls;
     const disableCall = calls.find(([input, init]) => {
       const url = typeof input === 'string' ? input : (input as Request).url;
@@ -216,18 +216,18 @@ describe('CadencesList', () => {
 
     await waitFor(() => expect(screen.getByText('db-backup')).toBeInTheDocument());
 
-    // db-backup enabled=false — кнопка-тоггл для enable
+    // db-backup enabled=false - toggle button for enable
     const enableBtn = screen.getByRole('button', { name: /Включить/i });
     await user.click(enableBtn);
 
-    // Модалка открылась с правильным текстом
+    // Modal opened with correct text
     await waitFor(() =>
       expect(screen.getByText('Включить расписание?')).toBeInTheDocument(),
     );
     expect(screen.getByText(/начнёт спавнить прогоны/)).toBeInTheDocument();
     expect(screen.getAllByText(/db-backup/).length).toBeGreaterThan(0);
 
-    // enable-запрос ещё не был отправлен
+    // enable request was not sent yet
     const callsBefore = vi.mocked(globalThis.fetch).mock.calls;
     const enableCallBefore = callsBefore.find(([input, init]) => {
       const url = typeof input === 'string' ? input : (input as Request).url;
@@ -260,18 +260,18 @@ describe('CadencesList', () => {
 
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
-    // Кликаем кнопку delete первой строки
+    // Click delete button of the first row
     const deleteBtns = screen.getAllByRole('button', { name: /Удалить/i });
     await user.click(deleteBtns[0]);
 
-    // Модалка открылась с заголовком
+    // Modal opened with a title
     await waitFor(() =>
       expect(screen.getByText('Удалить Cadence?')).toBeInTheDocument(),
     );
-    // Имя Cadence фигурирует в подтверждении
+    // Cadence name appears in the confirmation
     expect(screen.getAllByText(/redis-hourly/).length).toBeGreaterThan(0);
 
-    // Кнопка Отмена закрывает модалку
+    // Cancel button closes the modal
     await user.click(screen.getByRole('button', { name: /Отменить|Отмена/i }));
     await waitFor(() =>
       expect(screen.queryByText('Удалить Cadence?')).not.toBeInTheDocument(),
@@ -292,9 +292,9 @@ describe('CadenceDetail', () => {
     );
 
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
-    // Метаданные
+    // Metadata
     expect(screen.getByText('every 1h')).toBeInTheDocument();
-    // Дочерние Voyage
+    // Child Voyages
     await waitFor(() => expect(screen.getByText('voy-01')).toBeInTheDocument());
     expect(screen.getByText('succeeded')).toBeInTheDocument();
   });
@@ -313,7 +313,7 @@ describe('CadenceDetail', () => {
     await waitFor(() => expect(screen.getByText(/Прогонов ещё нет/)).toBeInTheDocument());
   });
 
-  // ── Guard-тесты: кликабельные ссылки ─────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------
 
   it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
     setupMocks();

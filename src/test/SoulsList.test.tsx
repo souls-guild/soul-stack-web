@@ -524,7 +524,7 @@ describe('SoulsList — keyset pagination', () => {
 
     // Wait for loading to finish.
     // With items=[] the component shows an empty-state with a "Connect Soul" button
-    // (souls:registerSoul = "Подключить Soul" from the ru bundle).
+    // (souls:registerSoul = "Connect Soul" from the ru bundle).
     await screen.findByRole('button', { name: /Подключить Soul/i });
 
     // "Load more" button must not be present (no next_cursor).
@@ -579,7 +579,7 @@ describe('SoulsList — keyset pagination', () => {
     // Badge must switch to count-filtered with visible.length=1.
     const filteredBadge = screen.getByTestId('count-filtered');
     expect(filteredBadge).toBeInTheDocument();
-    // Text = "Найдено: 1", does NOT contain ≈ and does NOT contain "42".
+    // Text = "Found: 1", does NOT contain ≈ and does NOT contain "42".
     expect(filteredBadge.textContent).toContain('1');
     expect(filteredBadge.textContent).not.toContain('≈');
     expect(filteredBadge.textContent).not.toContain('42');

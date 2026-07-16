@@ -421,13 +421,13 @@ describe('ChoirsTab', () => {
     await user.click(screen.getByTestId('add-voice-submit'));
 
     await waitFor(() => {
-      // Новый текст: coven=<incarnationName>, ссылка на реестр Souls.
+      // New text: coven=<incarnationName>, link to Souls registry.
       expect(screen.getByText(/coven=redis-prod/i)).toBeInTheDocument();
       expect(screen.getByText(/Souls/i)).toBeInTheDocument();
     });
   });
 
-  // --- удаление Voice ---
+  // --- deleting a Voice ---
 
   it('Remove Voice — кнопка Trash2 отправляет DELETE', async () => {
     let deleteVoiceCount = 0;
@@ -472,12 +472,12 @@ describe('ChoirsTab', () => {
     await waitFor(() => screen.getByTestId('choir-toggle-primaries'));
     await user.click(screen.getByTestId('choir-toggle-primaries'));
 
-    // Ждём появления Voice-ов в таблице.
+    // Wait for Voices to appear in the table.
     await waitFor(() => {
       expect(screen.getByText('host-a.local')).toBeInTheDocument();
     });
 
-    // Кликаем Trash2 для удаления Voice.
+    // Click Trash2 to delete Voice.
     await user.click(screen.getByTestId('remove-voice-host-a.local'));
 
     await waitFor(() => {
@@ -485,7 +485,7 @@ describe('ChoirsTab', () => {
     });
   });
 
-  // --- прямой рендер ChoirsTab (graceful empty-state) ---
+  // --- direct render of ChoirsTab (graceful empty-state) ---
 
   it('ChoirsTab — graceful empty-state без краша при пустых данных', async () => {
     installFetchMock([
@@ -499,7 +499,7 @@ describe('ChoirsTab', () => {
     });
   });
 
-  // --- Choir list с описанием и min/max ---
+  // --- Choir list with description and min/max ---
 
   it('Choir с description/min_size/max_size рендерится без краша', async () => {
     installFetchMock([
@@ -511,11 +511,11 @@ describe('ChoirsTab', () => {
       expect(screen.getByText('primaries')).toBeInTheDocument();
     });
     expect(screen.getByText('Primary nodes')).toBeInTheDocument();
-    // min/max отображается.
+    // min/max is displayed.
     expect(screen.getByText(/1…3/)).toBeInTheDocument();
   });
 
-  // --- graceful-404: choir-подсистема недоступна ---
+  // --- graceful-404: choir subsystem unavailable ---
 
   it('choirs.list 404 → graceful-плейсхолдер, не error-box', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
@@ -537,11 +537,11 @@ describe('ChoirsTab', () => {
     await waitFor(() => {
       expect(screen.getByTestId('choirs-degraded')).toBeInTheDocument();
     });
-    // Не должно быть красного error-box с choirsLoadFailed.
+    // There should be no red error-box with choirsLoadFailed.
     expect(screen.queryByText(/Не удалось загрузить Choir/i)).not.toBeInTheDocument();
   });
 
-  // --- confirm-модалка DeleteChoir ---
+  // --- DeleteChoir confirm modal ---
 
   it('DeleteChoirModal: кнопка Delete заблокирована без подтверждения чекбокса', async () => {
     installFetchMock([
@@ -556,7 +556,7 @@ describe('ChoirsTab', () => {
     const confirmBtn = screen.getByTestId('delete-choir-confirm');
     expect(confirmBtn).toBeDisabled();
 
-    // После чекбокса — enabled.
+    // After the checkbox - enabled.
     await user.click(screen.getByTestId('delete-choir-checkbox'));
     expect(confirmBtn).not.toBeDisabled();
   });

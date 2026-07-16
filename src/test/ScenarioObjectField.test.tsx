@@ -354,7 +354,7 @@ describe('missingRequiredFields object-level required:[children]', () => {
   });
 
   it('скрытое поле (show_when=false) не гейтит', () => {
-    const visible = new Set<string>(); // user не виден
+    const visible = new Set<string>(); // user is not visible
     const missing = missingRequiredFields(aclUserSchema, { user: '' }, visible);
     expect(missing).toEqual([]);
   });
