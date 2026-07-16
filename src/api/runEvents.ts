@@ -1,11 +1,11 @@
-// Fetch-streaming SSE-транспорт apply-событий прогона (NIM-37, ADR-069 A0).
+// Fetch-streaming SSE transport for run apply-events (NIM-37, ADR-069 A0).
 //
-// EventSource НЕ используется: он не умеет слать Authorization-header, а
-// events-роут аутентифицируется Bearer-ом (tokenStore). Поэтому — ручной
-// fetch + ReadableStream.getReader() + TextDecoder + собственный SSE-парсер.
+// EventSource is NOT used: it cannot send an Authorization header, and
+// the events route authenticates via Bearer (tokenStore). Hence a manual
+// fetch + ReadableStream.getReader() + TextDecoder + custom SSE parser.
 //
-// Graceful: любой fetch-fail / non-200 / отсутствие body → onError, вызывающий
-// компонент деградирует на polling (авторитет статуса — GET runDetail).
+// Graceful: any fetch failure / non-200 / missing body → onError, and the
+// calling component degrades to polling (GET runDetail remains the status authority).
 
 import { tokenStore } from './tokenStore';
 
@@ -15,10 +15,10 @@ export interface SseFrame {
   data: string;
 }
 
-// parseSseFrames — чистый инкрементальный парсер SSE-кадров. Возвращает
-// завершённые кадры и `rest` (незавершённый хвост для следующего чанка).
-// Кадры разделены `\n\n`. Строка на `:` — комментарий (heartbeat `:ok`/
-// `:keepalive`) → кадр без data не эмитим. CRLF/CR нормализуются в LF.
+// parseSseFrames — a pure incremental SSE frame parser. Returns
+// completed frames and `rest` (the unfinished tail for the next chunk).
+// Frames are separated by `\n\n`. A line starting with `:` is a comment (heartbeat
+// `:ok`/`:keepalive`) → a frame with no data is not emitted. CRLF/CR are normalized to LF.
 export function parseSseFrames(buffer: string): { frames: SseFrame[]; rest: string } {
   const normalized = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const parts = normalized.split('\n\n');
@@ -30,11 +30,11 @@ export function parseSseFrames(buffer: string): { frames: SseFrame[]; rest: stri
     let data: string | undefined;
     for (const line of block.split('\n')) {
       if (line === '') continue;
-      if (line.startsWith(':')) continue; // комментарий/heartbeat
+      if (line.startsWith(':')) continue; // comment/heartbeat
       const colon = line.indexOf(':');
       const field = colon === -1 ? line : line.slice(0, colon);
       let value = colon === -1 ? '' : line.slice(colon + 1);
-      if (value.startsWith(' ')) value = value.slice(1); // SSE: один ведущий пробел
+      if (value.startsWith(' ')) value = value.slice(1); // SSE: one leading space
       if (field === 'event') event = value;
       else if (field === 'id') id = value;
       else if (field === 'data') data = data === undefined ? value : `${data}\n${value}`;
@@ -49,12 +49,12 @@ export interface SubscribeRunEventsOptions {
   onError?: (err: unknown) => void;
   onOpen?: () => void;
   signal?: AbortSignal;
-  // Инъекция fetch для тестов; по умолчанию — глобальный fetch.
+  // fetch injection for tests; defaults to the global fetch.
   fetchImpl?: typeof fetch;
 }
 
-// subscribeRunEvents открывает SSE-стрим прогона и вызывает onEvent на каждый
-// распарсенный кадр. Резолвится, когда стрим закрыт (терминал / abort / ошибка).
+// subscribeRunEvents opens the run's SSE stream and calls onEvent for each
+// parsed frame. Resolves once the stream closes (terminal / abort / error).
 export async function subscribeRunEvents(
   name: string,
   applyId: string,

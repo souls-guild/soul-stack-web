@@ -1,13 +1,13 @@
-// HTTP-клиент Keeper Operator API.
+// HTTP client for the Keeper Operator API.
 //
-// Auth-модель Soul Stack:
+// Soul Stack auth model:
 //   - Authorization: Bearer <JWT> (ADR-013/014).
-//   - Токен выдаётся bootstrap-ом (`keeper init --archon=...`) или через
-//     POST /v1/operators/{aid}/issue-token (требует уже-аутентифицированный
-//     запрос). В UI оператор вставляет JWT-строку в форму /login.
-//   - 401 → token-store clears + redirect на /login (см. AuthProvider).
+//   - The token is issued by bootstrap (`keeper init --archon=...`) or via
+//     POST /v1/operators/{aid}/issue-token (requires an already-authenticated
+//     request). In the UI the operator pastes the JWT string into the /login form.
+//   - 401 → token-store clears + redirect to /login (see AuthProvider).
 //
-// Error-envelope сервера — application/problem+json (RFC 7807).
+// Server error envelope — application/problem+json (RFC 7807).
 
 import { tokenStore } from './tokenStore';
 
@@ -99,10 +99,10 @@ async function throwIfNotOk(res: Response): Promise<void> {
   try {
     problem = (await res.json()) as ProblemJson;
   } catch {
-    // Empty body or non-JSON — оставим defaults.
+    // Empty body or non-JSON — keep defaults.
   }
   if (res.status === 401) {
-    // Глобальный 401-handler: чистим токен. Redirect делает AuthProvider/router.
+    // Global 401 handler: clear the token. Redirect is handled by AuthProvider/router.
     tokenStore.clear();
   }
   throw new ApiError(
@@ -126,10 +126,10 @@ export async function apiSend<T>(
 ): Promise<T> {
   const res = await rawRequest(path, { ...opts, method });
   await throwIfNotOk(res);
-  // Пустое тело — успех без полезной нагрузки (204 No Content, но также
-  // 201 Created без сериализованного объекта — контракт role.create).
-  // Прямой res.json() упал бы на пустом потоке («Unexpected end of JSON
-  // input»), поэтому сперва читаем текст и парсим только непустой.
+  // Empty body — success without a payload (204 No Content, but also
+  // 201 Created without a serialized object — the role.create contract).
+  // A direct res.json() would fail on an empty stream ("Unexpected end of JSON
+  // input"), so we read the text first and only parse it if non-empty.
   const text = await res.text();
   if (text === '') return undefined as T;
   return JSON.parse(text) as T;

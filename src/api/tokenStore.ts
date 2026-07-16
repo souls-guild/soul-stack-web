@@ -1,15 +1,15 @@
-// Хранилище JWT-токена Архонта.
+// Archon JWT token storage.
 //
-// localStorage выбрано осознанно: Keeper Operator API монтируется на
-// отдельном listener-е и потребляется только из доверенного browser-окружения
-// оператора (внутренняя сеть). XSS-mitigation — на стороне CSP keeper-а
-// (post-MVP) и через минимальное доверие к стороннему коду в UI (lock-deps,
-// review зависимостей). cookie-based session отвергнута: openapi.yaml
-// требует Bearer-auth, переход на cookies — отдельный backend-слайс.
+// localStorage is chosen deliberately: the Keeper Operator API is mounted on
+// a separate listener and consumed only from the operator's trusted browser
+// environment (internal network). XSS mitigation is handled on the keeper's
+// CSP side (post-MVP) and via minimal trust in third-party UI code (lock-deps,
+// dependency review). A cookie-based session was rejected: openapi.yaml
+// requires Bearer-auth; moving to cookies is a separate backend slice.
 //
-// TTL-просмотр выполняется парсингом JWT.exp (без подписи). Это НЕ
-// валидация — это auto-clear, чтобы UI не слал заведомо протухший токен.
-// Серверная проверка остаётся за Keeper-ом.
+// TTL is checked by parsing JWT.exp (without verifying the signature). This is NOT
+// validation — it is an auto-clear so the UI doesn't send a token that's obviously
+// expired. Server-side verification remains the Keeper's responsibility.
 
 const KEY = 'soul-stack.jwt';
 
@@ -32,7 +32,7 @@ function decodePayload(token: string): JwtPayload | null {
 
 function isExpired(token: string): boolean {
   const payload = decodePayload(token);
-  if (!payload?.exp) return false; // нет exp — доверяем серверу
+  if (!payload?.exp) return false; // no exp — trust the server
   const nowSec = Math.floor(Date.now() / 1000);
   return payload.exp <= nowSec;
 }
