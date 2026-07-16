@@ -13,13 +13,13 @@ interface Props {
   stateSchemaVersion: number;
 }
 
-// Tab «Schema» — state_schema-метаданные сервиса incarnation: текущая
-// state_schema_version, опциональная декларация структуры state (service.yml::
-// state_schema:) и список миграций (migrations/<NNN>_to_<MMM>.yml).
+// Tab "Schema" — state_schema metadata for the incarnation's service: current
+// state_schema_version, an optional declaration of the state structure (service.yml::
+// state_schema:), and a list of migrations (migrations/<NNN>_to_<MMM>.yml).
 //
-// Источник — GET /v1/services/{name}/state-schema?ref=<serviceVersion>. Endpoint
-// опционален: на 404/501 (старый Keeper или service-loader не нашёл репо) —
-// graceful-деградация к инструктивному placeholder-у.
+// Source — GET /v1/services/{name}/state-schema?ref=<serviceVersion>. The endpoint
+// is optional: on 404/501 (old Keeper or service-loader didn't find the repo) —
+// graceful degradation to an instructive placeholder.
 
 export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: Props) {
   const { t } = useTranslation();
@@ -64,7 +64,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
         </div>
       ) : null}
 
-      {/* Структура state — если backend отдал декларацию. */}
+      {/* State structure — if the backend returned a declaration. */}
       {q.data && fields && fields.length > 0 ? (
         <>
           <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
@@ -97,7 +97,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
         </div>
       ) : null}
 
-      {/* Миграции — если backend отдал список. */}
+      {/* Migrations — if the backend returned a list. */}
       {q.data ? (
         <>
           <h3 className={styles.sectionTitle} style={{ fontSize: 14, marginTop: 16 }}>
@@ -133,7 +133,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
         </>
       ) : null}
 
-      {/* Graceful degradation: endpoint недоступен — инструктивный placeholder. */}
+      {/* Graceful degradation: endpoint unavailable — instructive placeholder. */}
       {isSchemaDegraded(q.error) ? (
         <div
           style={{

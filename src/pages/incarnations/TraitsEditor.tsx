@@ -2,13 +2,13 @@ import { useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, X } from 'lucide-react';
 
-/** Trait-значение: строка или список строк (ADR-060: scalar | list of scalars). */
+/** Trait value: a string or a list of strings (ADR-060: scalar | list of scalars). */
 export type TraitValue = string | string[];
 
-/** Внутреннее состояние одной строки редактора. */
+/** Internal state of one editor row. */
 interface TraitRow {
   key: string;
-  /** Режим: 'string' — одна строка, 'list' — chips. */
+  /** Mode: 'string' - a single string, 'list' - chips. */
   mode: 'string' | 'list';
   strVal: string;
   listVal: string[];
@@ -43,12 +43,12 @@ function newRow(): TraitRow {
   return { key: '', mode: 'string', strVal: '', listVal: [] };
 }
 
-/** Редактор trait-меток инкарнации. key → scalar или list (mode-switch). */
+/** Incarnation trait-label editor. key -> scalar or list (mode-switch). */
 export function TraitsEditor({ value, onChange }: Props) {
   const { t } = useTranslation();
 
-  // Внутреннее состояние строк (не синхронизируем наружу на каждый keystroke key-поля,
-  // только при blur или при изменении значения — так ниже).
+  // Internal row state (not synced outward on every keystroke in the key field,
+  // only on blur or when the value changes - see below).
   const [rows, setRows] = useState<TraitRow[]>(() => {
     const initial = rowsFromMap(value);
     return initial.length > 0 ? initial : [];
@@ -70,7 +70,7 @@ export function TraitsEditor({ value, onChange }: Props) {
   function setKey(idx: number, key: string) {
     const next = rows.map((r, i) => (i === idx ? { ...r, key } : r));
     setRows(next);
-    // Публикуем наружу сразу (нужно чтобы map обновлялся).
+    // Publish outward immediately (needed so the map stays up to date).
     onChange(rowsToMap(next));
   }
 
@@ -84,10 +84,10 @@ export function TraitsEditor({ value, onChange }: Props) {
     const next = rows.map((r, i) => {
       if (i !== idx) return r;
       if (r.mode === 'string') {
-        // string → list: кладём strVal как первый элемент если не пустой
+        // string -> list: put strVal as the first element if not empty
         return { ...r, mode: 'list' as const, listVal: r.strVal ? [r.strVal] : [], strVal: '' };
       } else {
-        // list → string: берём первый элемент или пустую строку
+        // list -> string: take the first element or an empty string
         return { ...r, mode: 'string' as const, strVal: r.listVal[0] ?? '', listVal: [] };
       }
     });
@@ -152,7 +152,7 @@ export function TraitsEditor({ value, onChange }: Props) {
   );
 }
 
-// ─── внутренний компонент одной строки ───────────────────────────────────────
+// ─── internal single-row component ───────────────────────────────────────
 
 interface RowProps {
   row: TraitRow;

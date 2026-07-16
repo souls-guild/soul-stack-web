@@ -1,8 +1,8 @@
-// Страница «Настройки» — keeper-side конфигурация.
-// Sub-nav строится из массива SECTIONS: добавить новый раздел = одна запись.
-// Текущие разделы:
-//   provisioning-policy — методы создания операторов (ADR-058)
-// Будущие: TLS-политики, Redis-топология, LDAP/OIDC-конфиги и т.п.
+// "Settings" page — keeper-side configuration.
+// Sub-nav is built from the SECTIONS array: add a new section = one entry.
+// Current sections:
+//   provisioning-policy — operator creation methods (ADR-058)
+// Future: TLS policies, Redis topology, LDAP/OIDC configs, etc.
 
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -12,9 +12,9 @@ import styles from './SettingsPage.module.css';
 import commonStyles from '../common.module.css';
 
 interface Section {
-  /** slug-путь относительно /settings/ */
+  /** slug path relative to /settings/ */
   path: string;
-  /** i18n-ключ для заголовка вкладки */
+  /** i18n key for the tab title */
   labelKey: string;
   element: React.ReactNode;
 }
@@ -30,14 +30,14 @@ const SECTIONS: Section[] = [
     labelKey: 'admin:settingsTabProvPolicy',
     element: <ProvisioningPolicy />,
   },
-  // Следующий раздел: { path: 'auth', labelKey: 'admin:settingsTabAuth', element: <AuthSettings /> },
+  // Next section: { path: 'auth', labelKey: 'admin:settingsTabAuth', element: <AuthSettings /> },
 ];
 
 export function SettingsPage() {
   const { t } = useTranslation();
   const location = useLocation();
 
-  // Определяем активную вкладку по текущему пути.
+  // Determine the active tab from the current path.
   const activePath = location.pathname.replace(/^\/settings\/?/, '').split('/')[0];
 
   return (
@@ -68,7 +68,7 @@ export function SettingsPage() {
           {SECTIONS.map((s) => (
             <Route key={s.path} path={s.path} element={s.element} />
           ))}
-          {/* Дефолтный redirect на первый раздел */}
+          {/* Default redirect to the first section */}
           <Route path="*" element={<Navigate to={`/settings/${SECTIONS[0].path}`} replace />} />
         </Routes>
       </div>

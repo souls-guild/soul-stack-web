@@ -1,25 +1,25 @@
-// Нормализованная per-task модель fallback-таймлайна прогона (NIM-37).
+// Normalized per-task model for the run's fallback timeline (NIM-37).
 //
-// Primary-путь (Схема-2 master-detail) берёт готовый join из /runs/{apply_id}/tasks
-// (RunTaskView) и в этой модели НЕ нуждается. Эти хелперы обслуживают ТОЛЬКО
-// graceful fallback (backend /tasks ещё не задеплоен): audit task.executed →
-// TaskRow → TaskTimeline. SSE-кадры больше не нормализуются в строки — SSE стал
-// nudge-ом (инвалидирует query), см. RunDetail.
+// The primary path (Schema-2 master-detail) takes a ready-made join from /runs/{apply_id}/tasks
+// (RunTaskView) and doesn't need this model. These helpers serve ONLY the
+// graceful fallback (backend /tasks not yet deployed): audit task.executed ->
+// TaskRow -> TaskTimeline. SSE frames are no longer normalized into rows - SSE became
+// a nudge (invalidates the query), see RunDetail.
 export interface TaskRow {
   sid: string;
   taskIdx: number;
   passage: number;
   status: string; // TASK_STATUS_* (audit status)
-  planIndex?: number; // глобальный сквозной индекс
+  planIndex?: number; // global cross-cutting index
   errorCode?: string;
   errorModule?: string;
-  // error.message НЕ храним намеренно: audit-message может нести секрет — на экран
-  // не выводим (секрет-гигиена, NIM-37 review).
+  // error.message intentionally NOT stored: an audit message may carry a secret - we
+  // don't render it on screen (secret hygiene, NIM-37 review).
   suppressed?: string;
 }
 
-// Ключ дедупликации/строки: task_idx локален внутри Passage, поэтому сам по себе
-// не уникален — комбинируем с sid и passage.
+// Dedup/row key: task_idx is local within a Passage, so on its own it's
+// not unique - combine with sid and passage.
 export function taskRowKey(r: Pick<TaskRow, 'sid' | 'passage' | 'taskIdx'>): string {
   return `${r.sid}|${r.passage}|${r.taskIdx}`;
 }
@@ -32,8 +32,8 @@ function asString(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
-// normalizeAuditTaskPayload — из audit-payload task.executed (`status`, есть
-// plan_index и error.message) в TaskRow.
+// normalizeAuditTaskPayload - from an audit-payload task.executed (`status`,
+// has plan_index and error.message) into a TaskRow.
 export function normalizeAuditTaskPayload(payload: unknown): TaskRow | null {
   if (!payload || typeof payload !== 'object') return null;
   const p = payload as Record<string, unknown>;
@@ -52,7 +52,7 @@ export function normalizeAuditTaskPayload(payload: unknown): TaskRow | null {
     const e = err as Record<string, unknown>;
     row.errorCode = asString(e.code);
     row.errorModule = asString(e.module);
-    // error.message осознанно НЕ переносим (секрет-гигиена — не рендерится).
+    // error.message deliberately NOT carried over (secret hygiene - not rendered).
   }
   return row;
 }

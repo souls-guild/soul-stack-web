@@ -16,11 +16,11 @@ import { applyFilter, parseSoulprintFilter } from './soulprintFilter';
 import { filtersToCEL } from '../run/targetTranslator';
 import styles from '../common.module.css';
 
-// satisfies гарантирует, что списки ⊆ SoulStatus/SoulTransport; tsc упадёт при расширении enum в backend
+// satisfies ensures the lists are a subset of SoulStatus/SoulTransport; tsc will fail if the backend enum is extended
 const SOUL_STATUSES = ['pending', 'connected', 'disconnected', 'expired'] as const satisfies readonly SoulStatus[];
 const SOUL_TRANSPORTS = ['agent', 'ssh'] as const satisfies readonly SoulTransport[];
 
-// Конвенция coven-метки (openapi.yaml): lowercase, цифры, дефис-разделитель.
+// Coven-label convention (openapi.yaml): lowercase, digits, hyphen-separated.
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 const PAGE_LIMIT = 100;
@@ -40,9 +40,9 @@ function formatTimeAgo(iso: string | null | undefined): string {
   return t('souls:timeAgoDays', { n: Math.floor(deltaSec / 86_400) });
 }
 
-// Парсит CSV-строку coven-меток ("prod, redis-prod, stage") в массив
-// валидных меток + список невалидных (для inline-warning). openapi.yaml
-// поддерживает `?coven=X&coven=Y` (style: form, explode: true) — multi-OR.
+// Parses a CSV string of coven labels ("prod, redis-prod, stage") into an
+// array of valid labels + a list of invalid ones (for inline-warning). openapi.yaml
+// supports `?coven=X&coven=Y` (style: form, explode: true) -- multi-OR.
 function parseCovens(input: string): { valid: string[]; invalid: string[] } {
   const tokens = input
     .split(',')
@@ -57,7 +57,7 @@ function parseCovens(input: string): { valid: string[]; invalid: string[] } {
   return { valid, invalid };
 }
 
-// Сортировка по двум ключам с явной обработкой undefined у last_seen_at.
+// Sorting by two keys with explicit handling of undefined for last_seen_at.
 function sortItems(items: SoulListEntry[], key: SortKey, dir: SortDir): SoulListEntry[] {
   const arr = [...items];
   arr.sort((a, b) => {
@@ -67,7 +67,7 @@ function sortItems(items: SoulListEntry[], key: SortKey, dir: SortDir): SoulList
     } else if (key === 'status') {
       cmp = a.status.localeCompare(b.status);
     } else {
-      // last_seen_at: undefined → бесконечность давно (sort to bottom для desc).
+      // last_seen_at: undefined -> infinitely long ago (sort to bottom for desc).
       const ta = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
       const tb = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
       cmp = ta - tb;
@@ -92,26 +92,26 @@ export function SoulsList() {
   const [bulkTraitOpen, setBulkTraitOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // accumulated — аккумулятор всех загруженных элементов.
+  // accumulated -- accumulator of all loaded items.
   const [accumulated, setAccumulated] = useState<SoulListEntry[]>([]);
-  // Флаги из последнего ответа: есть ли ещё страницы и приблизителен ли total.
+  // Flags from the last response: whether there are more pages and whether total is approximate.
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [totalApproximate, setTotalApproximate] = useState<boolean>(false);
   const [serverTotal, setServerTotal] = useState<number>(0);
-  // loadMorePending: true пока загружается дополнительная страница (не первый запрос).
+  // loadMorePending: true while an additional page is loading (not the first request).
   const [loadMorePending, setLoadMorePending] = useState(false);
-  // loadMoreError: ошибка при догрузке страницы (не первой).
+  // loadMoreError: error while loading an additional page (not the first).
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const parsed = useMemo(() => parseCovens(coven), [coven]);
   const covenFilter = parsed.valid.length > 0 ? parsed.valid : undefined;
 
-  // При смене серверных фильтров сбрасываем аккумулятор и курсор.
+  // Reset the accumulator and cursor when server filters change.
   const serverFilterKey = JSON.stringify({ status, transport, coven: covenFilter });
 
-  // Первая страница — через useQuery без cursor.
-  // queryKey содержит serverFilterKey, чтобы при смене фильтров сбрасывался кеш.
-  // queryFn — чистая функция (только возвращает данные, без setState).
+  // First page -- via useQuery without a cursor.
+  // queryKey contains serverFilterKey so the cache resets when filters change.
+  // queryFn -- a pure function (only returns data, no setState).
   const q = useQuery({
     queryKey: ['souls-page0', serverFilterKey],
     queryFn: async () => {
@@ -124,19 +124,19 @@ export function SoulsList() {
     },
   });
 
-  // filterKeyRef — синхронная ссылка на текущий serverFilterKey.
-  // Обновляется до setState в useEffect, поэтому после любого await в loadMore
-  // ref.current гарантированно содержит актуальный ключ (не stale-замыкание).
+  // filterKeyRef -- a synchronous reference to the current serverFilterKey.
+  // Updated before setState in useEffect, so after any await in loadMore
+  // ref.current is guaranteed to contain the current key (no stale closure).
   const filterKeyRef = useRef<string>('');
 
-  // Синхронизация аккумулятора с первой страницей через useEffect.
-  // Сбрасывает аккумулятор только при смене serverFilterKey (новый набор),
-  // но не при refetch того же ключа (reconnect не затирает накопленное).
+  // Sync the accumulator with the first page via useEffect.
+  // Resets the accumulator only when serverFilterKey changes (new set),
+  // not on refetch of the same key (reconnect does not clear accumulated data).
   useEffect(() => {
     if (!q.data) return;
     if (filterKeyRef.current !== serverFilterKey) {
-      // Сначала обновляем ref — до setState, чтобы loadMore увидел новый ключ
-      // немедленно, даже если рендер ещё не случился.
+      // Update the ref first -- before setState, so loadMore sees the new key
+      // immediately, even if the render has not happened yet.
       filterKeyRef.current = serverFilterKey;
       setAccumulated(q.data.items ?? []);
       setNextCursor(q.data.next_cursor ?? undefined);
@@ -146,12 +146,12 @@ export function SoulsList() {
     }
   }, [q.data, serverFilterKey]);
 
-  // «Загрузить ещё» — явный callback, не useQuery, т.к. это императивная догрузка.
+  // "Load more" -- an explicit callback, not useQuery, since this is an imperative fetch.
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadMorePending) return;
-    // Захватываем актуальный ключ фильтра ДО await.
-    // После await сверяем с filterKeyRef.current — если фильтр сменился,
-    // отбрасываем результат (не подмешиваем старые souls в новый набор).
+    // Capture the current filter key BEFORE the await.
+    // After the await, compare against filterKeyRef.current -- if the filter changed,
+    // discard the result (do not mix stale souls into the new set).
     const requestedKey = filterKeyRef.current;
     setLoadMorePending(true);
     setLoadMoreError(null);
@@ -163,13 +163,13 @@ export function SoulsList() {
         limit: PAGE_LIMIT,
         cursor: nextCursor,
       });
-      // Проверка после await: фильтр мог смениться пока шёл запрос.
+      // Check after the await: the filter may have changed while the request was in flight.
       if (filterKeyRef.current !== requestedKey) {
-        // Фильтр устарел — отбрасываем результат целиком.
+        // Filter is stale -- discard the whole result.
         return;
       }
       setAccumulated((prev) => {
-        // Дедупликация по sid на случай двойного клика.
+        // Dedup by sid in case of a double click.
         const existingSids = new Set(prev.map((it) => it.sid));
         const fresh = (result.items ?? []).filter((it) => !existingSids.has(it.sid));
         return [...prev, ...fresh];
@@ -178,8 +178,8 @@ export function SoulsList() {
       setTotalApproximate(result.total_approximate ?? false);
       setServerTotal(result.total);
     } catch (err) {
-      // Показываем ошибку только если фильтр не сменился — иначе она
-      // относится к старому набору и вводит оператора в заблуждение.
+      // Show the error only if the filter has not changed -- otherwise it
+      // refers to the old set and misleads the operator.
       if (filterKeyRef.current === requestedKey) {
         setLoadMoreError(
           err instanceof ApiError
@@ -192,13 +192,13 @@ export function SoulsList() {
     }
   }, [nextCursor, loadMorePending, status, transport, covenFilter, t]);
 
-  // Парсинг DSL soulprint-фильтра. Невалидные токены показываем inline-warn,
-  // в фильтрацию идут только валидные правила.
+  // Parsing the soulprint DSL filter. Invalid tokens are shown inline-warn,
+  // only valid rules go into filtering.
   const parsedSoulprint = useMemo(() => parseSoulprintFilter(soulprintQuery), [soulprintQuery]);
   const soulprintRules = parsedSoulprint.rules;
   const soulprintFilterActive = soulprintRules.length > 0;
 
-  // Stage 1: server-side фильтры уже применены в accumulated. Client-side SID-search + sort.
+  // Stage 1: server-side filters are already applied in accumulated. Client-side SID-search + sort.
   const prefiltered = useMemo<SoulListEntry[]>(() => {
     if (q.isLoading && accumulated.length === 0) return [];
     const needle = search.trim().toLowerCase();
@@ -208,9 +208,9 @@ export function SoulsList() {
     return sortItems(filtered, sortKey, sortDir);
   }, [accumulated, q.isLoading, search, sortKey, sortDir]);
 
-  // Stage 2: lazy fetch soulprint для каждого SID, только если soulprint-фильтр активен.
-  // 410 (soulprint не получен) → null, ошибка → null, чтобы хост был исключён,
-  // а не падал весь стейт. Cache 60s — соответствует ТЗ.
+  // Stage 2: lazy fetch soulprint for each SID, only if the soulprint filter is active.
+  // 410 (soulprint not received) -> null, error -> null, so the host is excluded
+  // instead of failing the whole state. Cache 60s -- matches spec.
   const soulprintQueries = useQueries({
     queries: prefiltered.map((row) => ({
       queryKey: ['soulprint', row.sid] as const,
@@ -231,7 +231,7 @@ export function SoulsList() {
   const soulprintLoading =
     soulprintFilterActive && soulprintQueries.some((res) => res.isLoading);
 
-  // Stage 3: применение soulprint-правил. Если правил нет — отдаём prefiltered as-is.
+  // Stage 3: applying soulprint rules. If there are no rules -- return prefiltered as-is.
   const visible = useMemo<SoulListEntry[]>(() => {
     if (!soulprintFilterActive) return prefiltered;
     const out: SoulListEntry[] = [];
@@ -245,7 +245,7 @@ export function SoulsList() {
     return out;
   }, [prefiltered, soulprintFilterActive, soulprintQueries, soulprintRules]);
 
-  // selected чистим от исчезнувших SID-ов после смены фильтра (UX-аккуратность).
+  // Clean up selected from vanished SIDs after a filter change (UX tidiness).
   const visibleSidSet = useMemo(() => new Set(visible.map((it) => it.sid)), [visible]);
   const effectiveSelected = useMemo(() => {
     const out = new Set<string>();
@@ -286,9 +286,9 @@ export function SoulsList() {
   const allChecked = visible.length > 0 && effectiveSelected.size === visible.length;
   const someChecked = effectiveSelected.size > 0 && !allChecked;
 
-  // Сборка CEL-фрагмента из активных фильтров для «Run on filtered» action-кнопки.
-  // Если ни один фильтр не активен — кнопка disabled (запуск «на весь флот»
-  // считаем явным risk-action и не предлагаем одним кликом).
+  // Building a CEL fragment from active filters for the "Run on filtered" action button.
+  // If no filter is active -- the button is disabled (running "on the whole fleet"
+  // is treated as an explicit risk-action, not offered with one click).
   const filteredWhereCEL = useMemo(() => {
     return filtersToCEL({
       status: status || undefined,
@@ -309,15 +309,15 @@ export function SoulsList() {
     navigate(`/run?workload=command&target_where=${encodeURIComponent(filteredWhereCEL)}`);
   }
 
-  // Счётчик загруженного набора с учётом приблизительности total.
-  // Показывается только когда данные есть и фильтр не активен (иначе matched-строка перекрывает).
-  // Логика:
-  //   - keyset-режим (totalApproximate=true): "Показано N, всего ≈M" пока есть nextCursor,
-  //     или "≈M soul(s)" когда всё загружено.
-  //   - offset-режим (totalApproximate=false): не показываем отдельный счётчик (UI не менялся).
+  // Counter of the loaded set accounting for total approximation.
+  // Shown only when data exists and the filter is inactive (otherwise the matched-line overlaps).
+  // Logic:
+  //   - keyset mode (totalApproximate=true): "Shown N, total ~M" while nextCursor exists,
+  //     or "~M soul(s)" when everything is loaded.
+  //   - offset mode (totalApproximate=false): no separate counter shown (UI unchanged).
   function renderTotalBadge() {
     if (!q.data || soulprintFilterActive) return null;
-    // При активном клиентском поиске: показываем только видимые строки, без серверного total.
+    // When client-side search is active: show only visible rows, without server total.
     if (search.trim()) {
       return (
         <div className={styles.metaKey} aria-live="polite" data-testid="count-filtered">
@@ -325,7 +325,7 @@ export function SoulsList() {
         </div>
       );
     }
-    if (!totalApproximate) return null; // offset-режим: счётчик не нужен
+    if (!totalApproximate) return null; // offset mode: no counter needed
     if (nextCursor) {
       return (
         <div className={styles.metaKey} aria-live="polite" data-testid="count-approximate">
@@ -333,7 +333,7 @@ export function SoulsList() {
         </div>
       );
     }
-    // Всё загружено, показываем итог с маркером.
+    // Everything loaded, show the total with a marker.
     return (
       <div className={styles.metaKey} aria-live="polite" data-testid="count-approximate">
         {t('souls:countApproximate', { count: accumulated.length })}
@@ -643,7 +643,7 @@ export function SoulsList() {
         </table>
       ) : null}
 
-      {/* «Загрузить ещё» — показывается только в keyset-режиме, пока есть nextCursor */}
+      {/* "Load more" -- shown only in keyset mode, while nextCursor exists */}
       {loadMoreError ? (
         <div className={styles.errorBox} data-testid="load-more-error">
           {loadMoreError}

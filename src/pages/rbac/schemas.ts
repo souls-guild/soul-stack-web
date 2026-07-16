@@ -1,19 +1,19 @@
-// Zod-схемы для RBAC CRUD-форм. Регэкспы синхронизированы с openapi.yaml
+// Zod schemas for RBAC CRUD forms. Regexes synced with openapi.yaml
 // (RoleCreateRequest.name kebab-case, RolePermissionsUpdateRequest, permission
-// rbac.ParsePermission на сервере; здесь — мягкий клиентский фильтр, серверная
-// валидация остаётся источником правды — 422 покажем как server-error).
+// rbac.ParsePermission on the server; here — a soft client-side filter, server
+// validation remains the source of truth — 422 is shown as a server-error).
 
 import { z } from 'zod';
 
 const ROLE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-// permission-строка: "*", "namespace.*", "namespace.verb",
+// permission string: "*", "namespace.*", "namespace.verb",
 // "namespace.verb on key=value", "namespace.verb on key=v1,v2".
-// Минимальный фильтр — пустую строку и пробелы не пускаем. Битый permission
-// поймает сервер (422 validation-failed), мы его покажем как-есть.
+// Minimal filter — empty string and whitespace are rejected. A malformed permission
+// will be caught by the server (422 validation-failed), we show it as-is.
 const PERMISSION = /^[A-Za-z0-9._*-]+( on [a-z]+=\S+)?$/;
 
-// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
+// Messages — i18n keys in namespace `admin`; rendered via t(fieldError.message).
 export const roleCreateSchema = z.object({
   name: z
     .string()

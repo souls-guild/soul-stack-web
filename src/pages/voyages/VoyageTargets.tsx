@@ -8,7 +8,7 @@ import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 
-// satisfies: enum ⊆ VoyageTargetStatus; при расширении backend tsc потребует пересмотра.
+// satisfies: enum is a subset of VoyageTargetStatus; extending the backend will require tsc to be revisited.
 const _ALL_TARGET_STATUSES = [
   'awaiting',
   'running',
@@ -21,9 +21,9 @@ void _ALL_TARGET_STATUSES; // lint: used for type-check only
 
 interface Props {
   voyageId: string;
-  /** Рефетч-интервал: передаётся из VoyageDetail (пока voyage running — 3000, иначе false). */
+  /** Refetch interval: passed from VoyageDetail (3000 while voyage is running, otherwise false). */
   refetchInterval: number | false;
-  /** Активный фильтр по статусу. null = все. */
+  /** Active status filter. null = all. */
   statusFilter?: string | null;
 }
 
@@ -54,7 +54,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
     return <div className={styles.empty}>{t('voyageTargetsNoneForStatus', { status: statusFilter })}</div>;
   }
 
-  // Группировка по batch_index (сортируем индексы для предсказуемого порядка).
+  // Group by batch_index (sort indices for predictable order).
   const grouped = groupByBatchIndex(targets);
   const sortedIndices = [...grouped.keys()].sort((a, b) => a - b);
 
@@ -83,7 +83,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
             {(grouped.get(batchIdx) ?? []).map((entry) => (
               <tr key={`${entry.target_kind}:${entry.target_id}`}>
                 <td style={tdStyle}>
-                  {/* incarnation-target → ссылка на detail; soul-target → ссылка на soul */}
+                  {/* incarnation-target -> link to detail; soul-target -> link to soul */}
                   {entry.target_kind === 'incarnation' ? (
                     <Link
                       to={`/incarnations/${encodeURIComponent(entry.target_id)}`}
@@ -111,7 +111,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
                   {entry.finished_at ?? '—'}
                 </td>
                 <td style={tdStyle}>
-                  {/* apply_id = voyage_id данного шага. Ссылаемся на /voyages/:id */}
+                  {/* apply_id = voyage_id of this step. Links to /voyages/:id */}
                   {entry.apply_id ? (
                     <Link
                       to={`/voyages/${encodeURIComponent(entry.apply_id)}`}

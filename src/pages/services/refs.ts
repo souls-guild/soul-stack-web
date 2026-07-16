@@ -4,8 +4,8 @@ import { ApiError } from '../../api/client';
 import { keeperApi, type ServiceRefInfo } from '../../api/keeper';
 import i18n from '../../i18n';
 
-// Хук-обёртка: тянет /v1/services/{name}/refs. Endpoint может отсутствовать —
-// возвращаем `unavailable: true`, caller рисует text input fallback.
+// Wrapper hook: fetches /v1/services/{name}/refs. The endpoint may be absent —
+// we return `unavailable: true`, caller renders a text input fallback.
 export interface RefsQueryResult {
   loading: boolean;
   unavailable: boolean;
@@ -68,7 +68,7 @@ export function useServiceRefs(serviceName: string | undefined, enabled = true):
   }, [serviceName, q.isLoading, q.error, q.data]);
 }
 
-// Стабильная sort-логика: semver desc, не-semver падает в конец.
+// Stable sort logic: semver desc, non-semver falls to the end.
 function semverDesc(a: ServiceRefInfo, b: ServiceRefInfo): number {
   const av = parseSemver(a.name);
   const bv = parseSemver(b.name);

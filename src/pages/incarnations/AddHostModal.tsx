@@ -7,19 +7,19 @@ import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 import styles from '../common.module.css';
 
-// Add host в declared spec.hosts[] incarnation (PATCH .../hosts, mode=append).
-// SID выбирается из реестра souls (а не свободный ввод — backend всё равно
-// валидирует существование, но select убирает класс опечаток). role —
-// опциональный kebab-case-текст.
+// Add host to the declared spec.hosts[] of the incarnation (PATCH .../hosts, mode=append).
+// SID is chosen from the souls registry (not free text — the backend still
+// validates existence, but a select removes a class of typos). role —
+// optional kebab-case text.
 //
-// 422 unknown-SID / 409 destroying / 404 — pretty-error в модалке.
+// 422 unknown-SID / 409 destroying / 404 — pretty error in the modal.
 
 const ROLE_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 interface Props {
   open: boolean;
   incarnationName: string;
-  // SID-ы, уже присутствующие в declared spec.hosts[] — исключаем из select.
+  // SIDs already present in declared spec.hosts[] — excluded from the select.
   existingSids: string[];
   onClose: () => void;
 }
@@ -44,7 +44,7 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
   const [formError, setFormError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Список souls для select. Подгружаем только при открытой модалке.
+  // List of souls for the select. Fetched only while the modal is open.
   const souls = useQuery({
     queryKey: ['souls-for-add-host'],
     queryFn: () => keeperApi.souls.list({ limit: 500 }),
@@ -89,8 +89,8 @@ export function AddHostModal({ open, incarnationName, existingSids, onClose }: P
       setFormError(t('incarnations:roleKebab'));
       return;
     }
-    // Принудительное добавление в обход add-сценария согласования — требует
-    // явного подтверждения опасной операции.
+    // Forced addition bypassing the add-scenario reconciliation — requires
+    // explicit confirmation of the dangerous operation.
     if (!confirmed) {
       setFormError(t('incarnations:forceAddNotConfirmed'));
       return;

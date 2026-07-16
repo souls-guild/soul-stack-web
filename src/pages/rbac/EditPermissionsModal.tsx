@@ -17,9 +17,9 @@ interface Props {
   catalog: readonly PermissionResource[];
 }
 
-// Replace-семантика permissions роли — PATCH /v1/roles/{name}/permissions
-// принимает полный набор. Сервер вернёт 409 role-builtin для builtin-ролей,
-// 409 would-lock-out-cluster при снятии последнего `*`.
+// Replace semantics for role permissions — PATCH /v1/roles/{name}/permissions
+// takes the full set. Server returns 409 role-builtin for builtin roles,
+// 409 would-lock-out-cluster when removing the last `*`.
 export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();

@@ -25,8 +25,8 @@ const HISTORY_TYPES: readonly SoulHistoryType[] = ['scenario', 'errand'];
 
 type Tab = 'overview' | 'soulprint' | 'history';
 
-// Skew между collected_at (Soul-side) и received_at (Keeper-side). По ADR-018
-// — warn если разница > 10 минут (рассинхрон NTP или долгий path до Keeper-а).
+// Skew between collected_at (Soul-side) and received_at (Keeper-side). Per ADR-018
+// -- warn if the difference is > 10 minutes (NTP drift or a long path to Keeper).
 const SKEW_WARN_MS = 10 * 60 * 1000;
 
 function skewWarning(collectedAt?: string, receivedAt?: string): string | null {
@@ -207,8 +207,8 @@ export function SoulDetail() {
 }
 
 // Per-host timeline (scenario apply_runs + ad-hoc errands), merge started_at DESC.
-// Фильтр по источнику (chip scenario/errand) + offset/limit-пейджинг. Polling 5s,
-// пока в текущей странице есть нетерминальная запись (running/pending).
+// Filter by source (chip scenario/errand) + offset/limit paging. Polling 5s,
+// while the current page has a non-terminal record (running/pending).
 function SoulHistoryTab({ sid }: { sid: string }) {
   const { t } = useTranslation();
   const [types, setTypes] = useState<Set<SoulHistoryType>>(new Set());
@@ -311,24 +311,24 @@ function SoulHistoryTab({ sid }: { sid: string }) {
   );
 }
 
-// Ссылка по записи timeline:
-//   voyage_id присутствует → /voyages/:voyage_id (приоритет, для обоих типов).
-//   scenario без voyage_id → /incarnations/:incarnation (standalone apply_run).
-//   errand без voyage_id → не кликабельно (standalone errand, роут /errands/:id удалён).
+// Link for a timeline record:
+//   voyage_id present -> /voyages/:voyage_id (priority, for both types).
+//   scenario without voyage_id -> /incarnations/:incarnation (standalone apply_run).
+//   errand without voyage_id -> not clickable (standalone errand, /errands/:id route removed).
 function historyLink(item: SoulHistoryItem): string | null {
   if (item.voyage_id) return `/voyages/${encodeURIComponent(item.voyage_id)}`;
   if (item.type === 'scenario') {
     if (item.incarnation) return `/incarnations/${encodeURIComponent(item.incarnation)}`;
     return null;
   }
-  // Standalone errand без voyage_id — не кликабельно.
+  // Standalone errand without voyage_id -- not clickable.
   return null;
 }
 
 function SoulHistoryRow({ item }: { item: SoulHistoryItem }) {
   const to = historyLink(item);
   const idLabel = item.id ?? '—';
-  // Вторая колонка: scenario → incarnation/scenario, errand → fully-qualified module.
+  // Second column: scenario -> incarnation/scenario, errand -> fully-qualified module.
   const context =
     item.type === 'scenario'
       ? [item.incarnation, item.scenario].filter(Boolean).join(' / ') || '—'

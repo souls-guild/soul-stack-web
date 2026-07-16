@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// Remove host из declared spec.hosts[] incarnation (PATCH .../hosts, mode=remove).
-// Зеркальна AddHostModal: warning-box + чекбокс-подтверждение + danger-кнопка,
-// disabled пока чекбокс не отмечен. Мутация (removeMu) живёт в HostsTab — модалка
-// только UI подтверждения: дёргает onConfirm, получает pending/error пробросом.
+// Remove host from the declared spec.hosts[] of an incarnation (PATCH .../hosts, mode=remove).
+// Mirrors AddHostModal: warning-box + checkbox confirmation + danger button,
+// disabled until the checkbox is checked. The mutation (removeMu) lives in HostsTab — the modal
+// is only a confirmation UI: fires onConfirm, receives pending/error via props.
 
 interface Props {
-  // sid = null → модалка закрыта (ничего не выбрано к удалению).
+  // sid = null → modal closed (nothing selected for removal).
   sid: string | null;
   incarnationName: string;
   pending: boolean;

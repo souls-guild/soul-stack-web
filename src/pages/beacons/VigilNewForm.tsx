@@ -20,8 +20,8 @@ import {
 } from './schemas';
 import styles from '../common.module.css';
 
-// Динамическая форма params per beacon-kind. Для known check-ов — typed-поля,
-// иначе fallback на raw-JSON textarea.
+// Dynamic params form per beacon-kind. For known checks — typed fields,
+// otherwise fallback to a raw-JSON textarea.
 function ParamsTypedFields({
   check,
   value,
@@ -146,11 +146,11 @@ export function VigilNewForm() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
-  // typed-params живут отдельно — превращаются в params_json на submit.
+  // typed-params live separately — turned into params_json on submit.
   const [typedParams, setTypedParams] = useState<Record<string, unknown>>({ recursive: false });
-  // covenInput — line/comma-separated; разбиваем в массив на submit.
+  // covenInput — line/comma-separated; split into an array on submit.
   const [covenInput, setCovenInput] = useState('');
-  // useRawParams = true → редактируем params вручную JSON-ом (для unknown check).
+  // useRawParams = true → edit params manually as JSON (for unknown check).
   const [useRawParams, setUseRawParams] = useState(false);
 
   const {
@@ -211,7 +211,7 @@ export function VigilNewForm() {
         return {};
       }
     }
-    // Typed-режим — собираем по check.
+    // Typed mode — assemble by check.
     switch (values.check) {
       case 'core.beacon.file_changed':
         return fileChangedToParams({
@@ -261,7 +261,7 @@ export function VigilNewForm() {
     create.mutate(body);
   }
 
-  // При переключении check сбрасываем typedParams к разумным дефолтам.
+  // When switching check, reset typedParams to sensible defaults.
   function onCheckChange(next: string) {
     setValue('check', next, { shouldValidate: true });
     if (next === 'core.beacon.file_changed') setTypedParams({ recursive: false });
@@ -270,8 +270,8 @@ export function VigilNewForm() {
     else setTypedParams({});
   }
 
-  // Sync coven из текстового поля в форму, чтобы validator увидел.
-  // (не валидируем coven отдельно — берём через useMemo при submit).
+  // Sync coven from the text field into the form, so the validator sees it.
+  // (we don't validate coven separately — we take it via useMemo on submit).
   function syncCovenToForm() {
     setValue('coven', coven, { shouldValidate: false });
   }

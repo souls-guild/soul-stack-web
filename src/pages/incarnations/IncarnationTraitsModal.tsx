@@ -1,6 +1,6 @@
-// Модал day-2 редактирования incarnation.traits (ADR-060).
-// PUT /v1/incarnations/{name}/traits — полная замена (full-replace):
-// форма предзаполняется текущими traits, удаление строки удаляет trait.
+// Modal for editing incarnation.traits post-provisioning (ADR-060).
+// PUT /v1/incarnations/{name}/traits — full replace:
+// the form is prefilled with current traits, removing a row deletes the trait.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,12 +14,12 @@ import styles from '../common.module.css';
 interface Props {
   open: boolean;
   incarnationName: string;
-  /** Текущие incarnation.traits (из GET-реплая) для prefill. */
+  /** Current incarnation.traits (from the GET reply) for prefill. */
   currentTraits?: Record<string, unknown> | null;
   onClose: () => void;
 }
 
-// Scalar-значения редактируются как строки (number/bool сохранятся строками).
+// Scalar values are edited as strings (number/bool will be saved as strings).
 function toTraitsMap(raw: Record<string, unknown> | null | undefined): TraitsMap {
   const out: TraitsMap = {};
   for (const [key, val] of Object.entries(raw ?? {})) {
@@ -35,7 +35,7 @@ export function IncarnationTraitsModal({ open, incarnationName, currentTraits, o
   const [serverError, setServerError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Seed на каждом открытии до маунта TraitsEditor (он читает value один раз).
+  // Seed on every open before TraitsEditor mounts (it reads value once).
   const [prevOpen, setPrevOpen] = useState(false);
   if (open !== prevOpen) {
     setPrevOpen(open);

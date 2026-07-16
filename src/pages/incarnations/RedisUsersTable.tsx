@@ -7,15 +7,15 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import type { RedisUser } from './redisUsers.helpers';
 import styles from '../common.module.css';
 
-// Раскрытый пароль сам скрывается через 30с (значение живёт только в локальном стейте).
+// A revealed password auto-hides after 30s (value lives only in local state).
 const AUTO_HIDE_MS = 30_000;
 
 interface Props {
   incarnationName: string;
-  // secret_id из discovery (напр. "user_password") — что раскрываем.
+  // secret_id from discovery (e.g. "user_password") — what we're revealing.
   secretId: string;
   users: RedisUser[];
-  // Имена юзеров, для которых backend разрешает reveal (discovery keys).
+  // Usernames the backend allows revealing (discovery keys).
   revealableKeys: string[];
 }
 
@@ -42,8 +42,8 @@ const TOAST_BG: Record<ToastKind, string> = {
   danger: 'var(--danger, #b3261e)',
 };
 
-// Таблица ACL-юзеров Redis из state.redis_users. Глаз (UX-гейт incarnation.view-secrets)
-// раскрывает пароль инлайн по клику — значение фетчится лениво и в react-query-кэш не кладётся.
+// Table of Redis ACL users from state.redis_users. The eye icon (UX gate incarnation.view-secrets)
+// reveals the password inline on click — value is fetched lazily and not cached in react-query.
 export function RedisUsersTable({ incarnationName, secretId, users, revealableKeys }: Props) {
   const { t } = useTranslation();
   const { hasPermission } = useMyPermissions();
@@ -55,7 +55,7 @@ export function RedisUsersTable({ incarnationName, secretId, users, revealableKe
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
 
-  // Авто-скрытие: сброс таймера при новом reveal и очистка значения при размонтировании.
+  // Auto-hide: reset the timer on a new reveal and clear the value on unmount.
   useEffect(() => {
     if (!revealed) return;
     const id = setTimeout(() => {

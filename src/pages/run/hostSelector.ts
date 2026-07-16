@@ -1,18 +1,18 @@
-// Rich host-selector для Command-workload Run Wizard.
+// Rich host-selector for the Command-workload Run Wizard.
 //
-// Оператор комбинирует несколько критериев; между РАЗНЫМИ критериями — AND,
-// внутри списочного критерия (incarnations / covens) — OR. UI резолвит критерии
-// в конкретный список SID client-side (через GET /v1/souls + soulprint-fetch) и
-// шлёт явный `target: { sids: [...] }` в POST /v1/errand-runs — так обходим
-// незавершённую backend target-алгебру.
+// The operator combines several criteria; between DIFFERENT criteria — AND,
+// within a list criterion (incarnations / covens) — OR. The UI resolves criteria
+// into a concrete SID list client-side (via GET /v1/souls + soulprint-fetch) and
+// sends an explicit `target: { sids: [...] }` in POST /v1/errand-runs — this works
+// around the incomplete backend target algebra.
 //
-// Критерии:
-//   incarnations — список incarnation-имён; soul принадлежит incarnation, если
-//                  имя incarnation есть в его coven[] (incarnation.name — корневой
-//                  Coven-label, ADR-008).
-//   covens       — список Coven-меток; OR внутри.
-//   sidRegex     — RE2-паттерн на SID, full-match (anchored `^(?:…)$`, как `grep -x`).
-//   soulprint    — DSL-строка (soulprintFilter.ts), AND внутри.
+// Criteria:
+//   incarnations — list of incarnation names; a soul belongs to an incarnation if
+//                  the incarnation name is in its coven[] (incarnation.name is the root
+//                  Coven label, ADR-008).
+//   covens       — list of Coven labels; OR within.
+//   sidRegex     — RE2 pattern over SID, full-match (anchored `^(?:...)$`, like `grep -x`).
+//   soulprint    — DSL string (soulprintFilter.ts), AND within.
 
 import type { SoulListEntry, SoulprintFacts } from '../../api/keeper';
 import { parseSoulprintFilter, applyFilter, type FilterRule } from '../souls/soulprintFilter';
@@ -31,7 +31,7 @@ export const EMPTY_HOST_CRITERIA: HostCriteria = {
   soulprint: '',
 };
 
-// Распознанные правила soulprint-DSL + невалидные токены (для inline-warn).
+// Recognized soulprint-DSL rules + invalid tokens (for inline-warn).
 export interface ParsedSoulprint {
   rules: FilterRule[];
   invalid: string[];
@@ -42,17 +42,17 @@ export function parseCriteriaSoulprint(c: HostCriteria): ParsedSoulprint {
   return parseSoulprintFilter(c.soulprint);
 }
 
-// Нужен ли soulprint-fetch для резолва (дорогой per-SID запрос).
+// Whether a soulprint-fetch is needed for resolution (expensive per-SID request).
 export function needsSoulprint(c: HostCriteria): boolean {
   return c.soulprint.trim().length > 0;
 }
 
-// Скомпилированный SID-regex или null (при пустом / невалидном паттерне).
+// Compiled SID regex or null (for an empty / invalid pattern).
 //
-// Паттерн — full-match по SID (anchored `^(?:…)$`, семантика `grep -x`): иначе
-// unanchored `x*` ("ноль-или-более x") совпадает с пустой подстрокой в КАЖДОМ
-// SID и таргетит весь флот. Якоримся через non-capturing group, чтобы не
-// сломать чередование верхнего уровня (`a|b` → `^(?:a|b)$`, не `^a|b$`).
+// The pattern is a full-match over SID (anchored `^(?:...)$`, `grep -x` semantics): otherwise
+// an unanchored `x*` ("zero-or-more x") matches the empty substring in EVERY
+// SID and targets all souls. Anchored via a non-capturing group so it doesn't
+// break top-level alternation (`a|b` -> `^(?:a|b)$`, not `^a|b$`).
 export function compileSidRegex(raw: string): { re: RegExp | null; error: string | null } {
   const r = raw.trim();
   if (!r) return { re: null, error: null };
@@ -63,8 +63,8 @@ export function compileSidRegex(raw: string): { re: RegExp | null; error: string
   }
 }
 
-// Соответствует ли soul «стабильным» критериям (incarnations / covens / sidRegex).
-// soulprint в этой стадии НЕ проверяется — он требует отдельного fetch.
+// Whether the soul matches the "stable" criteria (incarnations / covens / sidRegex).
+// soulprint is NOT checked at this stage — it requires a separate fetch.
 export function matchStableCriteria(
   soul: SoulListEntry,
   c: HostCriteria,
@@ -72,7 +72,7 @@ export function matchStableCriteria(
 ): boolean {
   const covens = soul.covens ?? [];
   if (c.incarnations.length > 0) {
-    // incarnation.name — корневой coven-label.
+    // incarnation.name is the root coven label.
     if (!c.incarnations.some((inc) => covens.includes(inc))) return false;
   }
   if (c.covens.length > 0) {
@@ -84,14 +84,14 @@ export function matchStableCriteria(
   return true;
 }
 
-// Финальная проверка soulprint-правил (требует уже загруженных typed_facts).
+// Final check of soulprint rules (requires typed_facts already loaded).
 export function matchSoulprint(facts: SoulprintFacts | undefined, rules: FilterRule[]): boolean {
   if (rules.length === 0) return true;
   if (!facts) return false;
   return applyFilter(facts, rules);
 }
 
-// Активен ли хоть один критерий (для блокировки submit при пустом scope).
+// Whether any criterion is active (to block submit on empty scope).
 export function hasAnyCriteria(c: HostCriteria): boolean {
   return (
     c.incarnations.length > 0 ||

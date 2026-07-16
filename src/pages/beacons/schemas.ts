@@ -1,28 +1,28 @@
-// Zod-схемы для форм Vigil/Decree (ADR-030).
+// Zod schemas for Vigil/Decree forms (ADR-030).
 //
-// Vigil — Soul-side проверка beacons; форма параметров (params) зависит от check
-// (адрес core-beacon). Делаем discriminated union по check, fallback — JSON-textarea.
-// Submit-payload — `VigilCreateRequest` из openapi (см. ../../api/keeper.ts).
+// Vigil — Soul-side beacon check; params form depends on check
+// (core-beacon address). Discriminated union by check, fallback — JSON textarea.
+// Submit payload — `VigilCreateRequest` from openapi (see ../../api/keeper.ts).
 
 import { z } from 'zod';
 
-// Сообщения валидации хранятся как i18n-ключи (ns beacons); компонент рендерит
-// их через t(fieldError.message). См. правило i18n в CLAUDE.md.
+// Validation messages are stored as i18n keys (ns beacons); the component renders
+// them via t(fieldError.message). See the i18n rule in CLAUDE.md.
 
-// kebab-case 1..63 — симметрично openapi pattern.
+// kebab-case 1..63 — mirrors the openapi pattern.
 const nameSchema = z
   .string()
   .min(1, 'beacons:errNameRequired')
   .max(63, 'beacons:errNameMax')
   .regex(/^[a-z0-9-]{1,63}$/, 'beacons:errNameKebab');
 
-// duration-конвенция Go: 30s / 1m / 1h. Минимально-валидируем — суффикс h/m/s/ms.
+// Go duration convention: 30s / 1m / 1h. Minimal validation — suffix h/m/s/ms.
 const durationSchema = z
   .string()
   .min(1, 'beacons:errDurationRequired')
   .regex(/^\d+(ms|s|m|h)$/, 'beacons:errDurationFormat');
 
-// SID — XOR с coven (проверяем в форме, не в схеме).
+// SID — XOR with coven (checked in the form, not the schema).
 const sidSchema = z
   .string()
   .max(253, 'beacons:errSidMax')
@@ -34,9 +34,9 @@ const covenItemSchema = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/, 'beacons:errCovenKebab');
 
-// --- Vigil: формы per check ---
+// --- Vigil: per-check forms ---
 
-// core.beacon.file_changed — наблюдение за файлом/директорией.
+// core.beacon.file_changed — watches a file/directory.
 export const fileChangedSchema = z.object({
   check: z.literal('core.beacon.file_changed'),
   path: z.string().min(1, 'beacons:errPathRequired'),
@@ -45,14 +45,14 @@ export const fileChangedSchema = z.object({
 });
 export type FileChangedInput = z.infer<typeof fileChangedSchema>;
 
-// core.beacon.service_down — heartbeat init-системы.
+// core.beacon.service_down — init-system heartbeat.
 export const serviceDownSchema = z.object({
   check: z.literal('core.beacon.service_down'),
   service: z.string().min(1, 'beacons:errServiceRequired'),
 });
 export type ServiceDownInput = z.infer<typeof serviceDownSchema>;
 
-// core.beacon.port_closed — TCP-probe.
+// core.beacon.port_closed — TCP probe.
 export const portClosedSchema = z.object({
   check: z.literal('core.beacon.port_closed'),
   host: z.string().default('127.0.0.1'),
@@ -60,14 +60,14 @@ export const portClosedSchema = z.object({
 });
 export type PortClosedInput = z.infer<typeof portClosedSchema>;
 
-// core.beacon.process_absent — отсутствует процесс по имени.
+// core.beacon.process_absent — process missing by name.
 export const processAbsentSchema = z.object({
   check: z.literal('core.beacon.process_absent'),
   process: z.string().min(1, 'beacons:errProcessRequired'),
 });
 export type ProcessAbsentInput = z.infer<typeof processAbsentSchema>;
 
-// core.beacon.http_unhealthy — HTTP-probe.
+// core.beacon.http_unhealthy — HTTP probe.
 export const httpUnhealthySchema = z.object({
   check: z.literal('core.beacon.http_unhealthy'),
   url: z.string().url('beacons:errUrl'),
@@ -76,7 +76,7 @@ export const httpUnhealthySchema = z.object({
 });
 export type HttpUnhealthyInput = z.infer<typeof httpUnhealthySchema>;
 
-// Discriminated union известных check-ов. Fallback — JSON-textarea (см. ниже).
+// Discriminated union of known checks. Fallback — JSON textarea (see below).
 export const beaconConfigSchema = z.discriminatedUnion('check', [
   fileChangedSchema,
   serviceDownSchema,
@@ -86,7 +86,7 @@ export const beaconConfigSchema = z.discriminatedUnion('check', [
 ]);
 export type BeaconConfigInput = z.infer<typeof beaconConfigSchema>;
 
-// Каталог известных beacons (для select-а).
+// Catalog of known beacons (for the select).
 export const KNOWN_BEACONS = [
   'core.beacon.file_changed',
   'core.beacon.service_down',
@@ -100,7 +100,7 @@ export function isKnownBeacon(c: string): c is KnownBeacon {
   return (KNOWN_BEACONS as readonly string[]).includes(c);
 }
 
-// Top-level Vigil-схема: общие поля + params (либо discriminated, либо raw JSON).
+// Top-level Vigil schema: common fields + params (either discriminated or raw JSON).
 export const vigilFormSchema = z
   .object({
     name: nameSchema,
@@ -109,7 +109,7 @@ export const vigilFormSchema = z
     sid: sidSchema,
     coven: z.array(covenItemSchema),
     enabled: z.boolean(),
-    // params — динамика per check; валидируется отдельно поверх kind-схемы.
+    // params — per-check dynamics; validated separately on top of the kind schema.
     params_json: z.string(),
   })
   .superRefine((v, ctx) => {
@@ -123,7 +123,7 @@ export const vigilFormSchema = z
         message: 'beacons:errSidCovenXor',
       });
     }
-    // params_json должен быть JSON-object.
+    // params_json must be a JSON object.
     try {
       const parsed = JSON.parse(v.params_json || '{}');
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -144,7 +144,7 @@ export const vigilFormSchema = z
 
 export type VigilFormInput = z.infer<typeof vigilFormSchema>;
 
-// Маппинги: typed-форма → params Record.
+// Mappings: typed form -> params Record.
 export function fileChangedToParams(v: FileChangedInput): Record<string, unknown> {
   const out: Record<string, unknown> = { path: v.path, recursive: v.recursive };
   if (v.throttle) out.throttle = v.throttle;
@@ -165,12 +165,12 @@ export function httpUnhealthyToParams(v: HttpUnhealthyInput): Record<string, unk
   return out;
 }
 
-// --- Decree-форма ---
+// --- Decree form ---
 
 export const decreeFormSchema = z
   .object({
     name: nameSchema,
-    on_beacon: nameSchema, // имя Vigil-а — тот же kebab-case pattern.
+    on_beacon: nameSchema, // Vigil name — same kebab-case pattern.
     where: z.string().optional().or(z.literal('')),
     sid: sidSchema,
     coven: z.array(covenItemSchema),
@@ -184,7 +184,7 @@ export const decreeFormSchema = z
       .regex(/^[a-z][a-z0-9_]*$/, 'beacons:errActionScenarioSnake'),
     action_input_json: z.string(),
     cooldown: durationSchema.optional().or(z.literal('')),
-    enabled: z.boolean(), // default-deny: opt-in для safety; default задаётся в defaultValues.
+    enabled: z.boolean(), // default-deny: opt-in for safety; default set in defaultValues.
   })
   .superRefine((v, ctx) => {
     const hasSid = !!(v.sid && v.sid.length > 0);

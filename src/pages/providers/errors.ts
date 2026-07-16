@@ -2,11 +2,11 @@ import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 import { plaintextDisabledMessage } from '../../components/input/secretMode';
 
-// Расшифровка problem+json для Provider-формы (create). Локализация — глобальный
-// i18n-инстанс (helper — pure-функция, не hook).
+// Decodes problem+json for the Provider form (create). Localization — global
+// i18n instance (helper — pure function, not a hook).
 export function prettyProviderError(err: unknown): string {
   const t = i18n.t.bind(i18n);
-  // Специальный случай dual-mode: приём значения секрета выключен на сервере.
+  // Special dual-mode case: accepting a plaintext secret value is disabled on the server.
   const plaintext = plaintextDisabledMessage(err);
   if (plaintext) return plaintext;
   if (err instanceof ApiError) {

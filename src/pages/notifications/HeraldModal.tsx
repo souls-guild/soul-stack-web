@@ -9,22 +9,22 @@ import { pickSecretField, plaintextDisabledMessage, type SecretMode } from '../.
 import { useHeraldTypeCatalog } from './heraldTypes';
 import styles from '../common.module.css';
 
-// Состояние одного секрет-поля канала (config <base> XOR <base>_ref, ADR-064).
+// State of one channel secret field (config <base> XOR <base>_ref, ADR-064).
 interface SecretFieldState {
   mode: SecretMode;
-  value: string; // plaintext (не сохраняется/не возвращается сервером)
+  value: string; // plaintext (not saved/not returned by the server)
   ref: string; // vault-ref
 }
 
 const EMPTY_SECRET: SecretFieldState = { mode: 'ref', value: '', ref: '' };
 
-// base-имя секрет-поля: bot_token_ref → bot_token (см. herald/secret.go).
+// secret field base name: bot_token_ref -> bot_token (see herald/secret.go).
 function secretBase(fieldName: string): string {
   return fieldName.replace(/_ref$/, '');
 }
 
-// Типовой пример значения секрет-поля (placeholder, чисто UX — каталог примеров
-// не отдаёт). Пусто → placeholder не показываем.
+// Typical example of a secret field value (placeholder, purely UX - the catalog
+// doesn't return examples). Empty -> don't show a placeholder.
 function secretValueExample(base: string): string {
   switch (base) {
     case 'bot_token':
@@ -40,8 +40,8 @@ function secretValueExample(base: string): string {
   }
 }
 
-// Начальное состояние секрет-полей типа из существующего config (edit): в config
-// хранится только *_ref (plaintext сервер стирает) → режим ref, value пуст.
+// Initial state of type secret fields from the existing config (edit): config
+// only stores *_ref (server strips plaintext) -> ref mode, value empty.
 function secretFieldsFromConfig(fields: HeraldTypeFieldSpec[], config: Record<string, unknown> | null | undefined): Record<string, SecretFieldState> {
   const cfg = config ?? {};
   const out: Record<string, SecretFieldState> = {};
@@ -56,13 +56,13 @@ function secretFieldsFromConfig(fields: HeraldTypeFieldSpec[], config: Record<st
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Если передан — режим редактирования, иначе создание. */
+  /** If passed - edit mode, otherwise create. */
   editing?: Herald;
 }
 
 /**
- * Парсит строку "Key: Value\nKey2: Value2" в объект. Строки без ':' игнорируются.
- * Общий формат для kind=map (headers и т.п.).
+ * Parses a "Key: Value\nKey2: Value2" string into an object. Lines without ':' are ignored.
+ * Common format for kind=map (headers etc.).
  */
 function parseKV(raw: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -83,7 +83,7 @@ function serialiseKV(v: unknown): string {
     .join('\n');
 }
 
-/** Парсит построчный список (kind=list/list_string). Пустые строки отбрасываются. */
+/** Parses a line-per-item list (kind=list/list_string). Empty lines are dropped. */
 function parseLines(raw: string): string[] {
   return raw
     .split('\n')
@@ -96,7 +96,7 @@ function serialiseLines(v: unknown): string {
   return v.map(String).join('\n');
 }
 
-/** Дефолтное raw-значение конфиг-поля по его Kind (для controlled-инпутов). */
+/** Default raw value of a config field by its Kind (for controlled inputs). */
 function defaultRawValue(kind: string): unknown {
   switch (kind) {
     case 'bool':
@@ -110,7 +110,7 @@ function defaultRawValue(kind: string): unknown {
   }
 }
 
-/** Строит начальные raw-значения формы из существующего config (режим редактирования). */
+/** Builds initial form raw values from the existing config (edit mode). */
 function rawValuesFromConfig(fields: HeraldTypeFieldSpec[], config: Record<string, unknown> | null | undefined): Record<string, unknown> {
   const cfg = config ?? {};
   const out: Record<string, unknown> = {};
@@ -137,7 +137,7 @@ function rawValuesFromConfig(fields: HeraldTypeFieldSpec[], config: Record<strin
   return out;
 }
 
-/** Собирает config-объект для отправки backend-у из raw form-значений по каталогу полей. */
+/** Builds a config object to send to the backend from raw form values per the field catalog. */
 function configFromRawValues(fields: HeraldTypeFieldSpec[], raw: Record<string, unknown>): Record<string, unknown> {
   const cfg: Record<string, unknown> = {};
   for (const f of fields) {
@@ -201,9 +201,9 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       setSecretValue('');
       setSecretRef(editing.secret_ref ?? '');
       setEnabled(editing.enabled);
-      // config зависит от полей каталога типа editing.type — если каталог ещё
-      // не загрузился (isLoading), rawValuesFromConfig([]) даёт {} и второй
-      // useEffect ниже перезаполнит значения, когда каталог придёт.
+      // config depends on the catalog fields for type editing.type - if the catalog
+      // hasn't loaded yet (isLoading), rawValuesFromConfig([]) yields {} and the
+      // second useEffect below will refill the values once the catalog arrives.
       const typeFields = typeCatalog.fieldsByType[editing.type] ?? [];
       setFieldValues(rawValuesFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
       setSecretFields(secretFieldsFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
@@ -217,22 +217,22 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       setFieldValues({});
       setSecretFields({});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- typeCatalog намеренно не в deps: обрабатывается след. effect-ом на isLoading
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- typeCatalog intentionally not in deps: handled by the next effect on isLoading
   }, [open, editing]);
 
-  // Каталог мог подгрузиться ПОСЛЕ открытия модалки в editing-режиме (форма
-  // уже смонтирована с пустыми fields) — как только isLoading перешёл в false,
-  // перезаполняем values по актуальному дескриптору полей editing.type.
+  // The catalog might have loaded AFTER the modal was opened in editing mode (the
+  // form is already mounted with empty fields) - as soon as isLoading turns false,
+  // refill values from the up-to-date field descriptor for editing.type.
   useEffect(() => {
     if (!open || !editing || typeCatalog.isLoading) return;
     const typeFields = typeCatalog.fieldsByType[editing.type];
     if (!typeFields || typeFields.length === 0) return;
     setFieldValues(rawValuesFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
     setSecretFields(secretFieldsFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- typeCatalog.fieldsByType — нестабильная ссылка, триггер только по isLoading
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- typeCatalog.fieldsByType is an unstable reference, trigger only on isLoading
   }, [open, editing, typeCatalog.isLoading]);
 
-  // Смена типа (не editing-инициализация) — сбрасывает значения полей на дефолт нового типа.
+  // Type change (not editing-initialization) - resets field values to the new type's defaults.
   function handleTypeChange(nextType: string) {
     setType(nextType);
     const nextFields = typeCatalog.fieldsByType[nextType] ?? [];
@@ -244,7 +244,7 @@ export function HeraldModal({ open, onClose, editing }: Props) {
     }
     setFieldValues(defaults);
     setSecretFields(secretDefaults);
-    // top-level signing secret сбрасывается при смене типа.
+    // top-level signing secret resets on type change.
     setSecretMode('ref');
     setSecretValue('');
     setSecretRef('');
@@ -279,11 +279,11 @@ export function HeraldModal({ open, onClose, editing }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // config в OpenAPI-схеме Herald — opaque object (type: object без properties).
-    // openapi-typescript генерирует Record<string, unknown>; приводим через as-cast.
+    // config in the Herald OpenAPI schema is an opaque object (type: object without properties).
+    // openapi-typescript generates Record<string, unknown>; we cast via as-cast.
     const cfg = configFromRawValues(fields.filter((f) => !f.secret), fieldValues) as Record<string, unknown>;
-    // Config-секреты канала (dual-mode <base> XOR <base>_ref, ADR-064): шлём поле
-    // активного режима — значение (plaintext) в <base> ИЛИ vault-ref в <base>_ref.
+    // Channel config secrets (dual-mode <base> XOR <base>_ref, ADR-064): send the field
+    // for the active mode - value (plaintext) in <base> OR vault-ref in <base>_ref.
     for (const f of fields) {
       if (!f.secret) continue;
       const st = secretFields[f.name] ?? EMPTY_SECRET;
@@ -292,8 +292,8 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       if (picked.kind === 'value') cfg[secretBase(f.name)] = picked.value;
       else cfg[f.name] = picked.value;
     }
-    // top-level webhook signing secret (dual-mode secret XOR secret_ref) — только
-    // для secret_required-типов (webhook); иначе оба поля опущены.
+    // top-level webhook signing secret (dual-mode secret XOR secret_ref) - only
+    // for secret_required types (webhook); otherwise both fields are omitted.
     let topSecret: string | undefined;
     let topSecretRef: string | undefined;
     if (typeCatalog.secretRequiredByType[type]) {
@@ -328,11 +328,11 @@ export function HeraldModal({ open, onClose, editing }: Props) {
   const error = mu.error;
   const title = editing ? t('notifications:heraldEditTitle') : t('notifications:heraldCreateTitle');
 
-  // Обязательные поля типа (кроме уже заполненных) не заполнены → submit disabled.
+  // Required fields of the type (besides already filled ones) not filled -> submit disabled.
   const missingRequired = fields.some((f) => {
     if (!f.required) return false;
     if (f.secret) {
-      // dual-mode: заполнено ⟺ активный режим даёт непустое значение (XOR).
+      // dual-mode: filled iff the active mode gives a non-empty value (XOR).
       const st = secretFields[f.name];
       return !st || pickSecretField(st.mode, st.value, st.ref) === null;
     }
@@ -391,7 +391,7 @@ export function HeraldModal({ open, onClose, editing }: Props) {
           )}
         </label>
 
-        {/* Динамические config-поля per-type (ADR-042 no-hardcode: каталог GET /v1/herald-types) */}
+        {/* Dynamic per-type config fields (ADR-042 no-hardcode: catalog GET /v1/herald-types) */}
         {type && (
           <div data-testid="herald-dynamic-fields" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {fields.map((f) =>
@@ -489,10 +489,10 @@ function HeraldFieldControl({
   const labelSuffix = field.required ? ' *' : ` (${t('forms:optional')})`;
 
   if (field.kind === 'bool') {
-    // http_allowed/allow_private — SSRF-opt-out-флаги (herald.channel.go
-    // httpDelivery), заводятся по имени поля (не по каталогу — каталог не
-    // несёт признака "security-sensitive"): показываем предупреждение при
-    // включении, как в прежней webhook-only форме.
+    // http_allowed/allow_private - SSRF opt-out flags (herald.channel.go
+    // httpDelivery), keyed by field name (not by catalog - the catalog doesn't
+    // carry a "security-sensitive" marker): show a warning when
+    // enabling, same as in the former webhook-only form.
     const isSsrfOptOut = field.name === 'http_allowed' || field.name === 'allow_private';
     return (
       <div>
@@ -594,11 +594,11 @@ function HeraldFieldControl({
   }
 
   if (field.kind === 'enum') {
-    // Каталог отдаёт EnumValues per-field (backend HeraldFieldSpec.EnumValues,
-    // ADR-042 no-hardcode) — рендерим select. Пустая строка "" в enumValues —
-    // явная "не задано"/дефолт-опция типа (напр. parse_mode="" = plain text).
-    // Если каталог для этого поля EnumValues не отдал (пусто/absent) — fallback
-    // на текстовый ввод, чтобы select без вариантов не блокировал форму.
+    // The catalog returns EnumValues per-field (backend HeraldFieldSpec.EnumValues,
+    // ADR-042 no-hardcode) - we render a select. An empty string "" in enumValues is
+    // an explicit "not set"/default option of the type (e.g. parse_mode="" = plain text).
+    // If the catalog didn't return EnumValues for this field (empty/absent) - fall back
+    // to text input, so a select with no options doesn't block the form.
     const enumValues = field.enum_values ?? [];
     if (enumValues.length === 0) {
       return (

@@ -113,9 +113,9 @@ function ProjectionEditor({ paths, onChange }: { paths: string[]; onChange: (nex
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Если передан — режим редактирования. */
+  /** If provided — edit mode. */
   editing?: Tiding;
-  /** Предзаполнить cadence при создании (используется при переходе из CadenceDetail). */
+  /** Preset cadence on create (used when navigating from CadenceDetail). */
   initialCadence?: string;
 }
 
@@ -209,8 +209,8 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Если в поле кастомного типа есть непустой текст, не добавленный кнопкой — добавить его.
-    // addCustomType сдвигает состояние через setter, поэтому собираем итоговый массив вручную.
+    // If the custom-type field has non-empty text not yet added via the button — add it.
+    // addCustomType shifts state through the setter, so we build the final array manually.
     const finalTypes =
       customType.trim() && !selectedTypes.includes(customType.trim())
         ? [...selectedTypes, customType.trim()]
@@ -303,7 +303,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
             {t('notifications:tidingFieldEventTypesHint')}
           </span>
-          {/* Каталог event-types с backend — чипы-переключатели (ADR-042) */}
+          {/* Event-types catalog from backend — toggle chips (ADR-042) */}
           <div
             data-testid="tiding-event-types-chips"
             style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}
@@ -337,7 +337,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
                 </button>
               );
             })}
-            {/* Пользовательские типы (не из каталога) — чипы с кнопкой удалить */}
+            {/* Custom types (not from the catalog) — chips with a remove button */}
             {selectedTypes
               .filter((et) => !eventTypeCatalog.allTypes.includes(et))
               .map((et) => (
@@ -375,7 +375,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
                 </span>
               ))}
           </div>
-          {/* Свободный ввод */}
+          {/* Free-form input */}
           <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
             <Input
               data-testid="tiding-custom-event-type-input"
@@ -462,7 +462,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           </span>
         </label>
 
-        {/* Annotations — статические поля в тело webhook */}
+        {/* Annotations — static fields added to the webhook body */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className={styles.metaKey}>{t('notifications:tidingFieldAnnotations')}</span>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -471,7 +471,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           <KVEditor pairs={annotationPairs} onChange={setAnnotationPairs} />
         </div>
 
-        {/* Projection — allow-list путей payload */}
+        {/* Projection — allow-list of payload paths */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className={styles.metaKey}>{t('notifications:tidingFieldProjection')}</span>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>

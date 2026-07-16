@@ -25,11 +25,11 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
   const [applyId, setApplyId] = useState<string | null>(null);
-  // run_apply_id есть ТОЛЬКО у found-перехода (запуск upgrade-сценария на хостах);
-  // при его наличии показываем «Отслеживать процесс» → RunDetail этого host-Run.
+  // run_apply_id is present ONLY for a found transition (running the upgrade
+  // scenario on hosts); when present, show "Track progress" -> RunDetail of this host-Run.
   const [runApplyId, setRunApplyId] = useState<string | null>(null);
 
-  // Тянем refs только когда modal открыт — не плодим лишних запросов.
+  // Fetch refs only when the modal is open - avoid spawning extra requests.
   const refs = useServiceRefs(serviceName, open);
 
   const {
@@ -44,9 +44,9 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
     defaultValues: { to_version: '' },
   });
 
-  // Превью перехода (NIM-34): при выбранной цели тянем upgrade-paths.
-  // Graceful degradation — на любой ошибке (404/501/network) панель скрыта,
-  // модалка работает как раньше; сам apply валидируется на POST upgrade.
+  // Transition preview (NIM-34): once a target is selected, fetch upgrade-paths.
+  // Graceful degradation - on any error (404/501/network) the panel is hidden,
+  // the modal works as before; the apply itself is validated on POST upgrade.
   const toVersion = watch('to_version');
   const preview = useQuery({
     queryKey: ['incarnation.upgradePaths', incarnationName, toVersion],
@@ -56,7 +56,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
   });
   const target = preview.data?.target;
   const migrations = target?.state_migrations ?? [];
-  // reachable=false приходит валидным 200 (структурно битая цепочка) — блокируем submit.
+  // reachable=false arrives as a valid 200 (structurally broken chain) - block submit.
   const blocked = Boolean(target) && target!.reachable === false;
 
   const mu = useMutation({

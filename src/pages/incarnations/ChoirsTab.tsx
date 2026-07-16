@@ -8,13 +8,13 @@ import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 import styles from '../common.module.css';
 
-// ChoirsTab — управление топологией (Choir/Voice) инкарнации (ADR-044).
+// ChoirsTab — manages the incarnation topology (Choir/Voice) (ADR-044).
 //
-// Choir — именованная партия хостов внутри инкарнации.
-// Voice — членство SID в Choir-е (PK: incarnation_name + choir_name + sid).
+// Choir — a named group of hosts within the incarnation.
+// Voice — SID membership in a Choir (PK: incarnation_name + choir_name + sid).
 
-// 404/501 — choir-подсистема недоступна (старый Keeper или ChoirDB не примонтирован).
-// Прочие ошибки — настоящий hard error.
+// 404/501 — the choir subsystem is unavailable (old Keeper or ChoirDB not mounted).
+// Other errors are a real hard error.
 function isChoirsDegraded(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 501);
 }
@@ -296,7 +296,7 @@ function AddVoiceModal({ open, incarnationName, choirName, existingVoiceSids, on
   const [position, setPosition] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Хосты инкарнации — список souls с coven=incarnationName (аналогично HostsTab).
+  // Incarnation hosts — list of souls with coven=incarnationName (same as HostsTab).
   const souls = useQuery({
     queryKey: ['incarnation-souls', incarnationName],
     queryFn: () => keeperApi.souls.list({ coven: [incarnationName], limit: 200 }),

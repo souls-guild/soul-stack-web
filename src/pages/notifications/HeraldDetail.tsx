@@ -11,7 +11,7 @@ import { HeraldModal } from './HeraldModal';
 import { useHeraldTypeCatalog } from './heraldTypes';
 import styles from '../common.module.css';
 
-/** Форматирует значение config-поля для read-only отображения по его Kind. */
+/** Formats a config field value for read-only display by its Kind. */
 function formatConfigValue(kind: string, raw: unknown): string {
   if (raw === undefined || raw === null) return '—';
   switch (kind) {
@@ -99,8 +99,8 @@ export function HeraldDetail() {
 
   const cfg = (h.config ?? {}) as Record<string, unknown>;
   const heraldTidings = (tidingsQ.data?.items ?? []).filter((td) => td.herald === name);
-  // Дескриптор config-полей ИМЕННО этого типа канала (ADR-042 no-hardcode) —
-  // рендерим read-only список per-type, а не жёстко webhook-специфичные ключи.
+  // Descriptor of the config fields for THIS specific channel type (ADR-042 no-hardcode) -
+  // we render a per-type read-only list rather than hardcoded webhook-specific keys.
   const typeFields = typeCatalog.fieldsByType[h.type] ?? [];
 
   return (
@@ -169,7 +169,7 @@ export function HeraldDetail() {
             {h.secret_ref ?? '—'}
           </dd>
 
-          {/* Config-поля ИМЕННО этого типа канала (каталог GET /v1/herald-types, ADR-042 no-hardcode) */}
+          {/* Config fields for THIS specific channel type (catalog GET /v1/herald-types, ADR-042 no-hardcode) */}
           {typeFields.map((f) => (
             <FieldRow key={f.name} label={f.label} kind={f.kind} value={cfg[f.name]} />
           ))}
@@ -298,7 +298,7 @@ export function HeraldDetail() {
                 })}
               </tbody>
             </table>
-            {/* Пагинация */}
+            {/* Pagination */}
             {(deliveriesQ.data?.total ?? 0) > DELIVERIES_LIMIT ? (
               <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
                 <Button
@@ -332,7 +332,7 @@ export function HeraldDetail() {
   );
 }
 
-/** Одна read-only строка config-поля в мета-блоке (dt/dd — часть родительского dl). */
+/** A single read-only config field row in the meta block (dt/dd - part of the parent dl). */
 function FieldRow({ label, kind, value }: { label: string; kind: string; value: unknown }) {
   return (
     <>

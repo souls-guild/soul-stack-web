@@ -14,13 +14,13 @@ interface Props {
   ariaLabel?: string;
 }
 
-// Состояние scope-пикера для одного action.
+// State of the scope picker for a single action.
 interface ScopeState {
   key: string;
   value: string;
 }
 
-// Автокомплит-значения по scope-ключу (берём из существующих API).
+// Autocomplete values by scope key (sourced from existing APIs).
 function useAutocompleteOptions(scopeKey: string): string[] {
   const incQ = useQuery({
     queryKey: ['rbac.scope-ac.incarnations'],
@@ -40,7 +40,7 @@ function useAutocompleteOptions(scopeKey: string): string[] {
     enabled: scopeKey === 'host',
     staleTime: 60_000,
   });
-  // coven — нет прямого endpoint-а; собираем уникальные ковены из /v1/souls.
+  // coven — no direct endpoint; collect unique covens from /v1/souls.
   const covenSoulsQ = useQuery({
     queryKey: ['rbac.scope-ac.covens'],
     queryFn: () => keeperApi.souls.list({ limit: 500 }),
@@ -68,7 +68,7 @@ function useAutocompleteOptions(scopeKey: string): string[] {
   return [];
 }
 
-// Scope-picker для одного action. Рендерится под чекбоксом когда checked + есть selector_keys.
+// Scope picker for a single action. Rendered under the checkbox when checked + selector_keys exist.
 function ScopePicker({
   selectorKeys,
   scope,
@@ -83,7 +83,7 @@ function ScopePicker({
   const options = useAutocompleteOptions(currentKey);
   const datalistId = useId();
 
-  // Если ключ не выбран — показываем выбор ключа.
+  // If no key is selected — show the key selector.
   const handleKeyChange = (k: string) => {
     if (!k) { onChange(null); return; }
     onChange({ key: k, value: scope?.value ?? '' });
@@ -168,7 +168,7 @@ function ScopePicker({
   );
 }
 
-// Бейдж scope для отображения в списке preserved-прав и в catalog-picker.
+// Scope badge for display in the preserved-permissions list and in the catalog picker.
 function ScopeBadge({ scopeKey, scopeValues }: { scopeKey: string; scopeValues: string[] }) {
   const { t } = useTranslation();
   return (
@@ -192,18 +192,18 @@ function ScopeBadge({ scopeKey, scopeValues }: { scopeKey: string; scopeValues: 
   );
 }
 
-// Grouped permission-picker по реальному каталогу GET /v1/permissions (ADR-042):
-// resource → actions, оператор отмечает чекбоксы. При наличии selector_keys для
-// action — появляется опциональный scope-пикер (dropdown ключа + input значения).
-// Полное право = `resource.action` или `resource.action on key=value`.
-// Права из value, которых нет в каталоге (wildcard `*`, `incarnation.*`, legacy,
-// scoped-права сохранённые ранее), сохраняются read-only чипами.
+// Grouped permission picker backed by the real catalog GET /v1/permissions (ADR-042):
+// resource → actions, the operator checks boxes. If an action has selector_keys —
+// an optional scope picker appears (key dropdown + value input).
+// Full permission = `resource.action` or `resource.action on key=value`.
+// Permissions from value not covered by the catalog (wildcard `*`, `incarnation.*`, legacy,
+// previously saved scoped rights) are preserved as read-only chips.
 export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props) {
   const { t } = useTranslation();
   const groupId = useId();
 
-  // scopeStates: Map base-права → текущее состояние scope-пикера.
-  // Инициализируем из value: если право уже scoped — распарсить и показать.
+  // scopeStates: Map base permission → current scope picker state.
+  // Initialized from value: if a permission is already scoped — parse and show it.
   const [scopeStates, setScopeStates] = useState<Map<string, ScopeState | null>>(() => {
     const m = new Map<string, ScopeState | null>();
     for (const perm of value) {
@@ -215,7 +215,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     return m;
   });
 
-  // selected: Set base-прав (без scope-части) — для чекбоксов.
+  // selected: Set of base permissions (without the scope part) — for checkboxes.
   const selected = new Set<string>();
   for (const perm of value) {
     const { base } = parsePermission(perm);
@@ -227,13 +227,13 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     for (const act of (res.actions ?? [])) catalogBases.add(`${res.resource}.${act.action}`);
   }
 
-  // Права, которые каталог не покрывает (включая wildcard, scoped-rights) — не теряем при save.
+  // Permissions not covered by the catalog (including wildcard, scoped rights) — not lost on save.
   const preserved = value.filter((p) => {
     const { base } = parsePermission(p);
     return !catalogBases.has(base);
   });
 
-  // Сборка текущего value из selected + scopeStates.
+  // Build the current value from selected + scopeStates.
   function buildValue(
     bases: Set<string>,
     scopes: Map<string, ScopeState | null>,

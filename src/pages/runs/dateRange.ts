@@ -1,17 +1,17 @@
-// КЛИЕНТСКИЙ фильтр по диапазону дат для списков прогонов (НЕ серверный).
+// CLIENT-SIDE date-range filter for run lists (NOT server-side).
 //
-// Backend на момент написания не отдаёт единого диапазона started_at для всех
-// run-эндпоинтов: errands/errand-runs принимают только `started_after` (нижняя
-// граница, без верхней), а tides/push-runs — вообще без дат-параметров. Поэтому
-// диапазон применяется на клиенте поверх УЖЕ ЗАГРУЖЕННОЙ страницы (LIMIT-выборки),
-// а не транслируется в query. Для полноценного серверного диапазона нужен
-// backend-параметр `started_after`/`started_before` на всех list-эндпоинтах —
-// заведено отдельной задачей на core.
+// At the time of writing, the backend does not return a unified started_at
+// range for all run endpoints: errands/errand-runs accept only `started_after`
+// (lower bound, no upper), while tides/push-runs have no date params at all. So
+// the range is applied client-side over the ALREADY LOADED page (LIMIT-sized
+// selection), not translated into the query. A proper server-side range needs
+// a backend `started_after`/`started_before` param on all list endpoints —
+// filed as a separate task against core.
 //
-// Контракт инпутов — `<input type="date">` (значение `YYYY-MM-DD` в локальной
-// зоне, либо ''). `from` включает с начала дня, `to` — по конец дня (обе границы
-// включающие). Невалидный/пустой ts строки в выборку при заданном диапазоне НЕ
-// попадает (нечего сравнивать).
+// Input contract — `<input type="date">` (value `YYYY-MM-DD` in local
+// timezone, or ''). `from` includes from start of day, `to` — through end of
+// day (both bounds inclusive). An invalid/empty row ts does NOT fall into the
+// selection when a range is set (nothing to compare).
 
 export interface DateRange {
   from: string; // 'YYYY-MM-DD' | ''
@@ -24,8 +24,8 @@ export function hasDateRange(r: DateRange): boolean {
   return r.from !== '' || r.to !== '';
 }
 
-// from → начало дня (00:00:00.000), to → конец дня (23:59:59.999), локальная
-// зона. Невалидная дата → null (граница игнорируется).
+// from -> start of day (00:00:00.000), to -> end of day (23:59:59.999), local
+// timezone. Invalid date -> null (bound ignored).
 function dayStart(date: string): number | null {
   if (!date) return null;
   const d = new Date(`${date}T00:00:00`);
@@ -40,7 +40,7 @@ function dayEnd(date: string): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-// Предикат «ts попадает в диапазон». Пустой диапазон → всегда true.
+// Predicate "ts falls within range". Empty range -> always true.
 export function inDateRange(ts: string | undefined, r: DateRange): boolean {
   if (!hasDateRange(r)) return true;
   if (!ts) return false;
@@ -53,9 +53,9 @@ export function inDateRange(ts: string | undefined, r: DateRange): boolean {
   return true;
 }
 
-// СЕРВЕРНЫЙ диапазон started_at: локальные даты from/to → ISO-границы
-// (from → начало дня → started_after; to → конец дня → started_before).
-// Пустая/невалидная граница → поле опущено.
+// SERVER-SIDE started_at range: local dates from/to -> ISO bounds
+// (from -> start of day -> started_after; to -> end of day -> started_before).
+// Empty/invalid bound -> field omitted.
 export function toServerRange(r: DateRange): { started_after?: string; started_before?: string } {
   const out: { started_after?: string; started_before?: string } = {};
   const lo = dayStart(r.from);

@@ -1,9 +1,9 @@
 import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 
-// Расшифровка серверной 409 «would-lock-out-cluster» / «role-builtin»
-// в человеческое сообщение. Бэкенд возвращает problem+json (ADR-014).
-// Локализация через глобальный i18n-инстанс (helper — pure-функция, не hook).
+// Decodes the server's 409 "would-lock-out-cluster" / "role-builtin"
+// into a human-readable message. Backend returns problem+json (ADR-014).
+// Localized via the global i18n instance (helper is a pure function, not a hook).
 export function prettyRbacError(err: unknown): string {
   const t = i18n.t.bind(i18n);
   if (err instanceof ApiError) {

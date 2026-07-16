@@ -25,7 +25,7 @@ export function CadenceDetail() {
     queryKey: ['cadence.runs', id],
     queryFn: () => keeperApi.cadences.runs(id, { limit: 50 }),
     enabled: Boolean(id),
-    // Рефетч пока есть running дочерние Voyage.
+    // Refetch while there are running child Voyages.
     refetchInterval: (query) => {
       const items = (query.state.data as { items?: Voyage[] } | undefined)?.items ?? [];
       const hasRunning = items.some((v) => NON_TERMINAL_VOYAGE.has(v.status as VoyageStatus));

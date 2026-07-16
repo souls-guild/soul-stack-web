@@ -14,11 +14,11 @@ interface Props {
   open: boolean;
   incarnationName: string;
   onClose: () => void;
-  /** Колбэк при успешном запуске: полный reply (apply_id + перезапущенный scenario). */
+  /** Callback on successful launch: full reply (apply_id + rerun scenario). */
   onAccepted?: (reply: IncarnationRerunLastReply) => void;
 }
 
-// ErrRerunInputUnavailable — отдельный problem type (не TypeIncarnationLocked).
+// ErrRerunInputUnavailable — a separate problem type (not TypeIncarnationLocked).
 const TYPE_RERUN_INPUT_UNAVAILABLE = 'https://soul-stack.io/errors/rerun-input-unavailable';
 
 export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: Props) {
@@ -105,7 +105,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
             spellCheck={false}
             data-testid="rerun-reason-input"
             aria-invalid={errors.reason ? 'true' : undefined}
-            // maxLength синхронизирован с backend incarnation.ReasonMaxLen=500
+            // maxLength synced with backend incarnation.ReasonMaxLen=500
             maxLength={500}
             {...register('reason')}
             style={{

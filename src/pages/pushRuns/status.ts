@@ -1,6 +1,6 @@
-// Status-tone маппинги для Push-runs страниц. Вынесено из PushRunsList.tsx из-за
-// react-refresh правила (только-компоненты в файле страницы). Делегирует единому
-// runStatusTone (общий словарь всех run-типов).
+// Status-tone mappings for Push-runs pages. Extracted from PushRunsList.tsx due to
+// the react-refresh rule (only components in a page file). Delegates to the shared
+// runStatusTone (common dictionary for all run types).
 
 import { runStatusTone } from '../../components/status';
 

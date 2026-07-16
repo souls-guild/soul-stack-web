@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import styles from '../common.module.css';
 
-// Placeholder. ТЗ упоминает /v1/oracle/fires, но в openapi spec endpoint
-// отсутствует — экран остаётся пустым до его появления (ADR-030 / Oracle).
-// Эквивалент сейчас — фильтр audit-log по type=decree.fired.
+// Placeholder. The spec mentions /v1/oracle/fires, but the endpoint is
+// absent from the openapi spec — the screen stays empty until it appears (ADR-030 / Oracle).
+// The current equivalent is filtering audit-log by type=decree.fired.
 export function OracleFiresList() {
   const { t } = useTranslation();
 

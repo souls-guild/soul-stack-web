@@ -2,8 +2,8 @@ import { useTranslation } from 'react-i18next';
 import type { ScenariosQueryResult } from './useServiceScenarios';
 import { runnableScenarios } from './reservedScenarios';
 
-// Поле выбора сценария: select при доступных scenarios, иначе text input.
-// register-обработчики react-hook-form подаются полями onChange/onBlur/value/name.
+// Scenario picker field: select when scenarios are available, otherwise a text input.
+// react-hook-form register handlers are passed via the onChange/onBlur/value/name fields.
 interface Props {
   scenarios: ScenariosQueryResult;
   value: string;

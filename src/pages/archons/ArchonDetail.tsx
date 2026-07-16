@@ -60,9 +60,9 @@ export function ArchonDetail() {
     enabled: Boolean(aid),
   });
 
-  // Каталог ролей кластера — для секции «Roles» в info-табе. Membership
-  // выводится из role.operators.includes(aid), та же логика, что в
-  // RbacPage::MembersTab — RBAC остаётся источником правды.
+  // Cluster role catalog — for the "Roles" section in the info tab. Membership
+  // is derived from role.operators.includes(aid), the same logic as in
+  // RbacPage::MembersTab — RBAC remains the source of truth.
   const rolesQ = useQuery({
     queryKey: ['rbac.roles'],
     queryFn: () => keeperApi.roles.list(),
@@ -71,7 +71,7 @@ export function ArchonDetail() {
   });
   const memberRoles = (rolesQ.data?.items ?? []).filter((r) => (r.operators ?? []).includes(aid));
 
-  // Каталог Synod-групп — для секции «Синоды» в info-табе.
+  // Synod group catalog — for the "Synods" section in the info tab.
   const synodsQ = useQuery({
     queryKey: ['synods'],
     queryFn: () => keeperApi.synods.list(),
@@ -223,7 +223,7 @@ export function ArchonDetail() {
                       fontSize: 12,
                     }}
                   >
-                    {/* Имя роли — ссылка на /rbac (страницы отдельной роли нет) */}
+                    {/* Role name — link to /rbac (no dedicated single-role page) */}
                     <Link to="/rbac" style={{ textDecoration: 'none', color: 'inherit' }}>
                       {r.name}
                     </Link>

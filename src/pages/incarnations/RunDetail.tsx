@@ -14,15 +14,15 @@ import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
 import styles from '../common.module.css';
 
-// Run-view: детали одного apply_run инкарнации (create/rerun-last/day-2
-// scenario-прогон). НЕ Voyage (batch-прогон по многим инкарнациям) — apply_run
-// адресует ровно одну инкарнацию, поэтому отдельный route/страница.
+// Run view: details of a single incarnation apply_run (create/rerun-last/operational
+// scenario run). NOT Voyage (batch run across many incarnations) — apply_run
+// addresses exactly one incarnation, so it gets a separate route/page.
 //
-// Ход задач (NIM-37, Схема-2 master-detail): primary — GET /runs/{apply_id}/tasks
-// (сервер джойнит план с per-host исходами, live И история одним ответом). SSE
-// task.executed — nudge: инвалидирует ['run-tasks'] для мгновенного refetch.
-// Graceful fallback: пока backend /tasks не задеплоен (404/501) — деградация к
-// per-host итогу + audit-таймлайну (текущий вид).
+// Task progress (NIM-37, Scheme-2 master-detail): primary — GET /runs/{apply_id}/tasks
+// (server joins the plan with per-host outcomes, live AND history in one response). SSE
+// task.executed is a nudge: invalidates ['run-tasks'] for an instant refetch.
+// Graceful fallback: while backend /tasks isn't deployed (404/501) — degrade to
+// the per-host summary + audit timeline (previous view).
 const NON_TERMINAL = new Set(['applying']);
 
 export function RunDetail() {
@@ -40,8 +40,8 @@ export function RunDetail() {
   const status = q.data?.status;
   const isApplying = status === 'applying';
 
-  // Primary: per-task ход из /tasks (сервер джойнит). retry:false → быстрый
-  // graceful fallback на ошибке. Авторитет статуса/поллинга — runDetail (isApplying).
+  // Primary: per-task progress from /tasks (server joins). retry:false → fast
+  // graceful fallback on error. Status/polling authority is runDetail (isApplying).
   const tasksQ = useQuery({
     queryKey: ['run-tasks', name, applyId],
     queryFn: () => keeperApi.incarnations.runTasks(name, applyId),
@@ -49,15 +49,15 @@ export function RunDetail() {
     retry: false,
     refetchInterval: isApplying ? 3000 : false,
   });
-  // Primary готов только если ответ той формы (есть tasks[]). Fallback, если /tasks
-  // недоступен: сетевая ошибка / 404 / 501 ЛИБО тело не того контракта — деградируем
-  // к per-host + audit, не крашимся.
+  // Primary is ready only if the response has that shape (tasks[] present). Fallback if
+  // /tasks is unavailable: network error / 404 / 501 OR the body doesn't match the contract —
+  // we degrade to per-host + audit instead of crashing.
   const tasksReady = Array.isArray(tasksQ.data?.tasks);
   const tasksUnavailable = tasksQ.isError || (tasksQ.data != null && !tasksReady);
 
-  // Fallback-путь: audit = история задач (task.executed по correlation_id=applyId).
-  // Грузим ТОЛЬКО когда /tasks недоступен — иначе лишний запрос. 403 → мягкая
-  // деградация (плашка), per-host итог остаётся.
+  // Fallback path: audit = task history (task.executed by correlation_id=applyId).
+  // Loaded ONLY when /tasks is unavailable — otherwise an extra request. 403 → soft
+  // degradation (banner), the per-host summary remains.
   const auditQ = useQuery({
     queryKey: ['run-audit-tasks', name, applyId],
     queryFn: () =>
@@ -71,19 +71,19 @@ export function RunDetail() {
   const terminalHandledRef = useRef(false);
   const sawApplyingRef = useRef(false);
 
-  // Роут не пересоздаётся при смене :applyId (нет key) — сбрасываем one-shot-гарды,
-  // иначе терминал одного прогона «прилипнет» к соседнему.
+  // The route isn't recreated on :applyId change (no key) — reset one-shot guards,
+  // otherwise the terminal state of one run would "stick" to the next.
   useEffect(() => {
     terminalHandledRef.current = false;
     sawApplyingRef.current = false;
   }, [applyId]);
 
-  // SSE live-nudge: подписка только пока прогон applying. На каждый task.executed
-  // сервер уже записал исход (audit/join) — инвалидируем оба пути (primary /tasks +
-  // fallback audit) → мгновенный refetch, живой feel. Кадр НЕ рендерим напрямую
-  // (авторитет данных — сервер). AbortController закрывает стрим на unmount и на
-  // переходе в терминал (эффект перезапускается при смене status). Ошибки глушим —
-  // авторитет статуса у polling-а runDetail.
+  // SSE live-nudge: subscribed only while the run is applying. On each task.executed
+  // the server has already recorded the outcome (audit/join) — we invalidate both paths
+  // (primary /tasks + fallback audit) → instant refetch, live feel. We do NOT render the
+  // frame directly (data authority is the server). AbortController closes the stream on
+  // unmount and on transition to terminal (effect restarts on status change). Errors are
+  // swallowed — status authority is runDetail's polling.
   useEffect(() => {
     if (!name || !applyId || status !== 'applying') return;
     const ctrl = new AbortController();
@@ -95,16 +95,16 @@ export function RunDetail() {
         qc.invalidateQueries({ queryKey: ['run-audit-tasks', name, applyId] });
       },
       onError: () => {
-        /* graceful: polling остаётся источником авторитетного статуса */
+        /* graceful: polling remains the source of authoritative status */
       },
     });
     return () => ctrl.abort();
   }, [name, applyId, status, qc]);
 
-  // Терминал прогона (авторитет = polled runDetail.status): ОДИН раз финально
-  // рефетчим ход задач + per-host срез + родительскую инкарнацию (status/
-  // applying_apply_id). Только на ПЕРЕХОДЕ applying→терминал (sawApplyingRef),
-  // чтобы не рефетчить при открытии уже-завершённого прогона.
+  // Run terminal state (authority = polled runDetail.status): refetch task progress +
+  // per-host slice + the parent incarnation (status/applying_apply_id) ONE final time.
+  // Only on the applying→terminal TRANSITION (sawApplyingRef), so we don't refetch
+  // when opening an already-finished run.
   useEffect(() => {
     if (status === 'applying') {
       sawApplyingRef.current = true;

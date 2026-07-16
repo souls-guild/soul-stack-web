@@ -64,8 +64,8 @@ export function IncarnationDetail() {
     enabled: Boolean(name) && tab === 'history',
   });
 
-  // Connected souls для Overview-карточки «Hosts» — тот же источник, что HostsTab.
-  // Грузим всегда (не только на tab=hosts), чтобы Overview показывал реальный count.
+  // Connected souls for the Overview "Hosts" card — the same source as HostsTab.
+  // Always loaded (not only on tab=hosts) so Overview shows the real count.
   const connectedSouls = useQuery({
     queryKey: ['incarnation-souls', name],
     queryFn: () => keeperApi.souls.list({ coven: [name], limit: 200 }),
@@ -84,8 +84,8 @@ export function IncarnationDetail() {
     },
   });
 
-  // Summary-агрегат для Overview: считаем поля spec/state, declared/runtime hosts.
-  // Зовём useMemo безусловно (хук не должен сидеть под if), значения берём через `?.`.
+  // Summary aggregate for Overview: count spec/state fields, declared/runtime hosts.
+  // Call useMemo unconditionally (a hook must not sit under an if), values accessed via `?.`.
   const summary = useMemo(() => {
     const row = detail.data;
     const spec = (row?.spec ?? null) as Record<string, unknown> | null;
@@ -96,8 +96,8 @@ export function IncarnationDetail() {
     if (spec && Array.isArray((spec as Record<string, unknown>).hosts)) {
       declaredHosts = ((spec as Record<string, unknown>).hosts as unknown[]).length;
     }
-    // onlineHosts — реальные connected souls (coven=incarnation.name), тот же
-    // источник что HostsTab. Показываем «N online» (+«M declared» если spec.hosts непустой).
+    // onlineHosts — actual connected souls (coven=incarnation.name), the same
+    // source as HostsTab. Shows "N online" (+"M declared" if spec.hosts is non-empty).
     const onlineHosts = connectedSouls.data?.items?.length ?? null;
     return { specKeys, stateKeys, declaredHosts, onlineHosts };
   }, [detail.data, connectedSouls.data]);
@@ -382,9 +382,9 @@ export function IncarnationDetail() {
                     <td className="mono">{entry.scenario}</td>
                     <td className="mono">
                       {entry.apply_id ? (
-                        // apply_id — это apply_run (create/rerun-last/day-2 scenario),
-                        // НЕ Voyage (batch-прогон по многим инкарнациям). Ссылаемся на
-                        // run-view этой инкарнации.
+                        // apply_id is the apply_run (create/rerun-last/operational scenario),
+                        // NOT a Voyage (batch run across many incarnations). Reference the
+                        // run view of this incarnation.
                         <Link
                           to={`/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(entry.apply_id)}`}
                           title={t('incarnations:historyApplyIdLink')}

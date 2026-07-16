@@ -1,12 +1,12 @@
-// Zod-схемы для форм Incarnation. Регэкспы синхронизированы с openapi.yaml
+// Zod schemas for Incarnation forms. Regexes synced with openapi.yaml
 // (IncarnationCreateRequest / coven pattern).
 
 import { z } from 'zod';
 
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-// JSON-инпут как строка → парсится через .transform; пустая строка = `{}`.
-// При невалидном JSON отдаём поле как невалидное и понятный message.
+// JSON input as a string -> parsed via .transform; empty string = `{}`.
+// On invalid JSON, mark the field as invalid with a clear message.
 const jsonObjectFromString = z
   .string()
   .trim()
@@ -39,7 +39,7 @@ export const incarnationCreateSchema = z.object({
     .array(z.string().regex(KEBAB, 'incarnations:kebabEach'))
     .default([]),
   inputJson: jsonObjectFromString,
-  // traits: key → scalar|list (ADR-060); хранится снаружи как TraitsMap, в схеме как passthrough.
+  // traits: key -> scalar|list (ADR-060); stored outside as TraitsMap, in the schema as passthrough.
   traits: z.record(z.union([z.string(), z.array(z.string())])).default({}),
 });
 

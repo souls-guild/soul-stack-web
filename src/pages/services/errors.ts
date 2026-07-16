@@ -1,9 +1,9 @@
 import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 
-// Расшифровка серверных problem+json в человеческое сообщение для Service-форм
+// Decodes server problem+json into a human-readable message for Service forms
 // (register / update / deregister). Backend — keeper openapi /v1/services.
-// Локализация через глобальный i18n-инстанс (helper — pure-функция, не hook).
+// Localization via the global i18n instance (helper is a pure function, not a hook).
 export function prettyServiceError(err: unknown): string {
   const t = i18n.t.bind(i18n);
   if (err instanceof ApiError) {

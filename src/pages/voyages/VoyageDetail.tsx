@@ -16,7 +16,7 @@ import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 import { VoyageTargets } from './VoyageTargets';
 
-// --- Type-guard для changed_tasks в payload incarnation.run_completed ---
+// --- Type-guard for changed_tasks in the incarnation.run_completed payload ---
 
 interface ChangedTask {
   name?: string;
@@ -131,7 +131,7 @@ function VoyageNotifications({ events, isLoading, error }: VoyageNotificationsPr
   );
 }
 
-// --- Секция «Что изменилось» ---
+// --- "What changed" section ---
 
 interface VoyageChangedTasksProps {
   events: AuditEvent[];
@@ -228,7 +228,7 @@ function VoyageChangedTasks({ events, isLoading, error }: VoyageChangedTasksProp
   );
 }
 
-// satisfies: перечисление ⊆ VoyageStatus; при добавлении статуса в backend tsc потребует пересмотра.
+// satisfies: enumeration is a subset of VoyageStatus; adding a status in the backend will require tsc to be revisited.
 const NON_TERMINAL_STATUSES = ['pending', 'scheduled', 'running'] as const satisfies readonly VoyageStatus[];
 const NON_TERMINAL: ReadonlySet<string> = new Set(NON_TERMINAL_STATUSES);
 
@@ -243,21 +243,21 @@ function progressPct(v: Voyage): number {
   return Math.round((done / v.total_batches) * 100);
 }
 
-/** Число завершённых targets для window-режима: succeeded+failed+cancelled из summary */
+/** Number of completed targets for window mode: succeeded+failed+cancelled from summary */
 function windowDone(v: Voyage): number {
   if (!v.summary) return 0;
   return (v.summary.succeeded ?? 0) + (v.summary.failed ?? 0) + (v.summary.cancelled ?? 0);
 }
 
-/** Tone бейджа summary-счётчика по статусу и числу. */
+/** Tone of the summary-counter badge by status and count. */
 function summaryTone(s: 'succeeded' | 'failed' | 'cancelled', n: number): 'ok' | 'danger' | 'warn' | 'muted' {
   if (s === 'succeeded') return 'ok';
   if (s === 'failed') return n > 0 ? 'danger' : 'muted';
   return n > 0 ? 'warn' : 'muted';
 }
 
-// Строит URL для /run с параметрами из Voyage (scenario-режим).
-// input данных нет в Voyage-ответе — оператор вводит вручную.
+// Builds a /run URL with parameters from Voyage (scenario mode).
+// There is no input data in the Voyage response -- the operator enters it manually.
 function buildRepeatUrl(voyage: Voyage): string | null {
   if (voyage.kind !== 'scenario') return null;
   const params = new URLSearchParams({ workload: 'scenario' });
@@ -267,7 +267,7 @@ function buildRepeatUrl(voyage: Voyage): string | null {
   if (incarnations.length === 1) {
     params.set('incarnation', incarnations[0]);
   } else if (incarnations.length > 1) {
-    // Множество инкарнаций → regex-OR (паттерн из IncarnationsList).
+    // Multiple incarnations -> regex-OR (pattern from IncarnationsList).
     const escaped = incarnations.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     params.set('incarnation_regex', `^(${escaped.join('|')})$`);
   }
@@ -353,7 +353,7 @@ export function VoyageDetail() {
 
   function handleRepeat() {
     if (!repeatUrl) return;
-    // Проверяем наличие черновика в sessionStorage — если есть, предупреждаем.
+    // Check for a draft in sessionStorage -- if present, warn.
     const hasDraft = (() => {
       try {
         return Boolean(sessionStorage.getItem('run-wizard-draft'));

@@ -1,13 +1,13 @@
-// Хелперы state_schema-таба: вытаскивание плоского списка полей из MVP-подмножества
-// JSON Schema + классификация degraded-ошибки endpoint-а. Вынесено из SchemaTab.tsx
-// (react-refresh: в файле-компоненте — только компоненты), переиспользуется
-// SchemaTab (incarnation) и ServiceSchemaTab (service).
+// Helpers for the state_schema tab: extracting a flat field list from the MVP
+// JSON Schema subset + classifying endpoint degraded-errors. Extracted from SchemaTab.tsx
+// (react-refresh: only components in a component file), reused by
+// SchemaTab (incarnation) and ServiceSchemaTab (service).
 
 import { ApiError } from '../../api/client';
 
-// MVP-подмножество JSON Schema: плоский список top-level-полей (имя + type +
-// required). Вложенные object/array показываются типом как есть; глубокий
-// рекурсивный рендер не делаем.
+// MVP subset of JSON Schema: a flat list of top-level fields (name + type +
+// required). Nested object/array are shown by type as-is; a deep
+// recursive render is not done.
 export interface SchemaField {
   name: string;
   type: string;
@@ -35,8 +35,8 @@ export function extractFields(schema: Record<string, unknown> | undefined): Sche
   return out;
 }
 
-// 404 (endpoint/service нет), 501 (не реализован), 502 (loader не достал репо) —
-// деградируем к placeholder-у. Прочие ошибки показываем как errorBox.
+// 404 (endpoint/service missing), 501 (not implemented), 502 (loader failed to fetch repo) -
+// degrade to a placeholder. Other errors are shown as errorBox.
 export function isSchemaDegraded(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 501 || err.status === 502);
 }

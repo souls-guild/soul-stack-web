@@ -9,19 +9,19 @@ import { Badge } from '../../components/primitives';
 import styles from './ModulePicker.module.css';
 import wizard from './WizardSteps.module.css';
 
-// Searchable combobox над каталогом модулей (GET /v1/modules). Заменяет
-// free-text «custom module» в Run→Command. Фильтр по name + description.
-// На выбор отдаёт полную запись каталога — caller сам разруливает state-суффикс
-// и params-форму. На 404/501 (старый Keeper без endpoint-а) — graceful fallback:
-// поле деградирует к free-text (callback onUnavailable).
+// Searchable combobox over the module catalog (GET /v1/modules). Replaces
+// free-text "custom module" in Run->Command. Filters by name + description.
+// On select, returns the full catalog record — the caller handles the state suffix
+// and params form. On 404/501 (old Keeper without the endpoint) — graceful fallback:
+// the field degrades to free-text (onUnavailable callback).
 
 interface Props {
-  // Текущее выбранное имя модуля (без state-суффикса), напр. `core.cmd`.
+  // Currently selected module name (without the state suffix), e.g. `core.cmd`.
   value: string;
   onSelect: (item: ModuleCatalogItem) => void;
-  // Фильтр каталога: только errand-safe модули (Run→Command whitelist).
+  // Catalog filter: errand-safe modules only (Run->Command whitelist).
   errandSafe?: boolean;
-  // Вызывается, когда endpoint недоступен (404/501) — caller включает free-text.
+  // Called when the endpoint is unavailable (404/501) — caller switches to free-text.
   onUnavailable?: () => void;
 }
 
@@ -59,7 +59,7 @@ export function ModulePicker({ value, onSelect, errandSafe, onUnavailable }: Pro
     );
   }, [items, query]);
 
-  // Закрытие dropdown по клику вне.
+  // Close dropdown on outside click.
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {

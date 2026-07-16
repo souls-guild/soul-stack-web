@@ -44,8 +44,8 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<RunScenarioFormInput, unknown, RunScenarioFormOutput>({
-    // zodResolver (@hookform/resolvers v3) не пробрасывает output-тип transform-схемы
-    // в Resolver<Input, _, Output>; каст согласует типы без смены рантайма.
+    // zodResolver (@hookform/resolvers v3) doesn't propagate the output type of a transform
+    // schema into Resolver<Input, _, Output>; the cast aligns types without changing runtime behavior.
     resolver: zodResolver(runScenarioSchema) as Resolver<
       RunScenarioFormInput,
       unknown,
@@ -62,7 +62,7 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
   const supportedSchema = selectedScenario?.input_schema;
   const usePerField = isSupportedInputSchema(supportedSchema);
 
-  // Per-field state живёт отдельно от RHF (динамическая схема).
+  // Per-field state lives separately from RHF (dynamic schema).
   const [fields, setFields] = useState<ScenarioFieldsState>({});
   useEffect(() => {
     if (usePerField && supportedSchema) {

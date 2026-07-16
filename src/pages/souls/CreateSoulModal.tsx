@@ -9,8 +9,8 @@ import i18n from '../../i18n';
 import { ChipsInput } from '../incarnations/ChipsInput';
 import styles from '../common.module.css';
 
-// SID: FQDN-like — строчные буквы/цифры, точки, дефисы. Не хардкодим валидацию
-// hostname-правил RFC, следуем спеке SoulCreateRequest (docs/soul/identity.md).
+// SID: FQDN-like — lowercase letters/digits, dots, hyphens. We do not hardcode
+// RFC hostname validation rules, we follow the SoulCreateRequest spec (docs/soul/identity.md).
 const SID_PATTERN = /^[a-z0-9][a-z0-9.-]{0,253}$/;
 
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -31,8 +31,8 @@ interface Props {
   onClose: () => void;
 }
 
-// Компонент success-state: показывает bootstrap_token один раз (для transport=agent)
-// или подтверждение регистрации (transport=ssh). Токен не логируется.
+// Success-state component: shows the bootstrap_token once (for transport=agent)
+// or a registration confirmation (transport=ssh). The token is not logged.
 function SuccessView({
   reply,
   onClose,

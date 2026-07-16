@@ -1,7 +1,7 @@
-// Status-tone маппинг для Soul-history timeline. Записи приходят из двух
-// источников — scenario (apply_runs) и errand (errands), у каждого свой словарь
-// статусов; общий мапер покрывает оба. Вынесено из SoulDetail.tsx (react-refresh:
-// в файле страницы — только компоненты).
+// Status-tone mapping for the Soul-history timeline. Records come from two
+// sources -- scenario (apply_runs) and errand (errands), each with its own status
+// vocabulary; the shared mapper covers both. Extracted from SoulDetail.tsx (react-refresh:
+// the page file should contain only components).
 
 export function soulHistoryStatusTone(
   s: string | undefined,
@@ -31,8 +31,8 @@ export function soulHistoryStatusTone(
   }
 }
 
-// Терминальные статусы — для решения «нужен ли polling». Всё, чего нет здесь,
-// считается running (pending/running/applying/неизвестное-нетерминальное).
+// Terminal statuses -- for deciding whether polling is needed. Anything not here
+// is treated as running (pending/running/applying/unknown-non-terminal).
 const SOUL_HISTORY_TERMINAL: ReadonlySet<string> = new Set([
   'success',
   'succeeded',

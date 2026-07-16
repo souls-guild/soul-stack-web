@@ -13,7 +13,7 @@ import { Badge, Pager } from '../../components/primitives';
 import { pushStatusTone } from './status';
 import styles from '../common.module.css';
 
-// satisfies гарантирует, что список ⊆ PushRunStatus; tsc упадёт при добавлении нового статуса в backend
+// satisfies guarantees the list ⊆ PushRunStatus; tsc will fail if a new status is added on backend
 const STATUSES = [
   'pending',
   'running',

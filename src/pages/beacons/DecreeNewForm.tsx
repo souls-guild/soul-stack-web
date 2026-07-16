@@ -17,7 +17,7 @@ export function DecreeNewForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [covenInput, setCovenInput] = useState('');
 
-  // Подсасываем список Vigil-ов и Incarnation-ов для UX (datalist).
+  // Pull in the list of Vigils and Incarnations for UX (datalist).
   const vigils = useQuery({
     queryKey: ['vigils.list', { limit: 200, offset: 0 }],
     queryFn: () => keeperApi.vigils.list({ limit: 200 }),
@@ -45,7 +45,7 @@ export function DecreeNewForm() {
       action_scenario: '',
       action_input_json: '{}',
       cooldown: '',
-      enabled: false, // default-deny, оператор включает явно.
+      enabled: false, // default-deny, operator enables explicitly.
     },
   });
 

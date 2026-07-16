@@ -1,27 +1,27 @@
 import type { ScenarioInputSchema, ScenarioInputSchemaProperty } from '../../api/keeper';
 
-// Per-field контракт. Простые типы (string/integer/number/boolean) рендерятся
-// типизированным полем; составные (array/object/oneOf/…) — per-field JSON-textarea
-// (значение хранится как raw-JSON-строка). Раньше один составной тип ронял ВСЮ
-// форму в raw-JSON-fallback (all-or-nothing) — это прятало простые поля схемы.
+// Per-field contract. Simple types (string/integer/number/boolean) render as a
+// typed field; composite types (array/object/oneOf/...) - per-field JSON textarea
+// (value stored as a raw JSON string). Previously one composite type would drop
+// the ENTIRE form into raw-JSON-fallback (all-or-nothing) - this hid simple schema fields.
 //
-// Backend-shape input_schema — flat-map `{ field: { type, description?, required? } }`,
-// НЕ JSON-Schema-обёртка `{ type: 'object', properties: {...} }`.
+// Backend-shape input_schema is a flat-map `{ field: { type, description?, required? } }`,
+// NOT a JSON-Schema wrapper `{ type: 'object', properties: {...} }`.
 
 // ---------------------------------------------------------------------------
-// Мини-CEL-эвалуатор для show_when-предикатов.
+// Mini CEL evaluator for show_when predicates.
 //
-// Поддерживаемый синтаксис (достаточно для show_when):
-//   - Операторы: ==, !=, &&, ||, in
-//   - Литералы: строки в кавычках, числа, true/false
-//   - Доступ к полям ввода: input.<field>
-//   - Скобки для группировки
+// Supported syntax (enough for show_when):
+//   - Operators: ==, !=, &&, ||, in
+//   - Literals: quoted strings, numbers, true/false
+//   - Access to input fields: input.<field>
+//   - Parentheses for grouping
 //
-// Намеренно не реализует: арифметику, функции, has(), list-литералы,
-// тернарный оператор — эти конструкции не нужны для show_when.
+// Intentionally not implemented: arithmetic, functions, has(), list literals,
+// ternary operator - these constructs aren't needed for show_when.
 //
-// При синтаксической ошибке или неизвестной конструкции → true (показывать
-// поле, а не прятать без причины — graceful fallback).
+// On a syntax error or unknown construct -> true (show the field
+// rather than hide it without reason - graceful fallback).
 // ---------------------------------------------------------------------------
 
 type CelValue = string | number | boolean | null;
@@ -31,12 +31,12 @@ export function evalShowWhen(expr: string | undefined, inputState: Record<string
   try {
     return Boolean(parseCelExpr(expr.trim(), inputState));
   } catch {
-    // Неизвестная конструкция → показываем (безопасный дефолт)
+    // Unknown construct -> show it (safe default)
     return true;
   }
 }
 
-// ---- Рекурсивный нисходящий парсер ----
+// ---- Recursive descent parser ----
 
 interface TokenStream {
   tokens: string[];
@@ -44,8 +44,8 @@ interface TokenStream {
 }
 
 function tokenize(expr: string): string[] {
-  // Простой токенизатор: разбивает на: строки, числа, идентификаторы/ключевые слова,
-  // операторы (&&, ||, ==, !=, in, скобки, точки, запятые).
+  // Simple tokenizer: splits into: strings, numbers, identifiers/keywords,
+  // operators (&&, ||, ==, !=, in, parentheses, dots, commas).
   const re = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[0-9]+(?:\.[0-9]+)?|[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*|&&|\|\||==|!=|[()[\],]/g;
   return expr.match(re) ?? [];
 }
@@ -92,13 +92,13 @@ function parseComparison(ts: TokenStream, inputState: Record<string, unknown>): 
     if (op === '==') return celEq(left, right);
     if (op === '!=') return !celEq(left, right);
     if (op === 'in') {
-      // CEL: `value in list` — right может быть строкой из input,
-      // которая может представлять список enum-значений (или просто сравнение).
-      // Для show_when типичная форма: `input.mode in ["a","b"]` — но т.к. list-
-      // литералы [.] не входят в токенизатор, поддерживаем упрощённую форму:
-      // left == right — семантика "left содержится в right".
-      // Пример: `input.type in "sentinel,cluster"` → false-позиция не нужна,
-      // поэтому трактуем как строковое `includes`.
+      // CEL: `value in list` - right can be a string from input,
+      // which may represent a list of enum values (or just a comparison).
+      // For show_when the typical form is: `input.mode in ["a","b"]` - but since
+      // list literals [.] aren't part of the tokenizer, we support a simplified form:
+      // left == right - semantics "left is contained in right".
+      // Example: `input.type in "sentinel,cluster"` -> a false-branch isn't needed,
+      // so we treat it as a string `includes`.
       if (typeof right === 'string') {
         return right.split(',').map((s) => s.trim()).includes(String(left));
       }
@@ -112,7 +112,7 @@ function parsePrimary(ts: TokenStream, inputState: Record<string, unknown>): Cel
   const tok = peek(ts);
   if (tok === undefined) return null;
 
-  // Скобки
+  // Parentheses
   if (tok === '(') {
     consume(ts);
     const val = parseOr(ts, inputState);
@@ -120,31 +120,31 @@ function parsePrimary(ts: TokenStream, inputState: Record<string, unknown>): Cel
     return val;
   }
 
-  // Строковые литералы
+  // String literals
   if ((tok.startsWith('"') && tok.endsWith('"')) || (tok.startsWith("'") && tok.endsWith("'"))) {
     consume(ts);
     return tok.slice(1, -1).replace(/\\"/g, '"').replace(/\\'/g, "'");
   }
 
-  // Числовые литералы
+  // Numeric literals
   if (/^[0-9]/.test(tok)) {
     consume(ts);
     return tok.includes('.') ? parseFloat(tok) : parseInt(tok, 10);
   }
 
-  // Булевые литералы
+  // Boolean literals
   if (tok === 'true') { consume(ts); return true; }
   if (tok === 'false') { consume(ts); return false; }
   if (tok === 'null') { consume(ts); return null; }
 
-  // Доступ к полю: input.<name> или input.<name>.<subname>
+  // Field access: input.<name> or input.<name>.<subname>
   if (tok.startsWith('input.')) {
     consume(ts);
-    const path = tok.slice('input.'.length); // может быть составным
+    const path = tok.slice('input.'.length); // may be a compound path
     return resolveInputPath(path, inputState);
   }
 
-  // Голый идентификатор (вдруг встретится) — пропускаем
+  // Bare identifier (in case one shows up) - skip it
   consume(ts);
   return null;
 }
@@ -166,10 +166,10 @@ function resolveInputPath(path: string, inputState: Record<string, unknown>): Ce
 }
 
 function celEq(a: CelValue, b: CelValue): boolean {
-  // Нестрогое сравнение: число и строка числа считаются равными.
+  // Loose comparison: a number and its string form are considered equal.
   if (a === b) return true;
   if (a === null || b === null) return false;
-  // Числовое сравнение через строку (input.[field] хранится как string)
+  // Numeric comparison via string (input.[field] is stored as a string)
   const sa = String(a);
   const sb = String(b);
   return sa === sb;
@@ -179,29 +179,29 @@ export type ScenarioFieldValue = string | number | boolean | undefined;
 export type ScenarioFieldsState = Record<string, ScenarioFieldValue>;
 
 // ---------------------------------------------------------------------------
-// Redis-директивы (NIM-76): inline-валидация + typeahead ключей map-поля.
+// Redis directives (NIM-76): inline validation + typeahead of map-field keys.
 //
-// Каталог (серия→имена) прокидывается в MapEditor; валидируются ТОЛЬКО поля с
-// truthy `x-directives`. Версия реактивна (create — выбор оператора; day-2 —
-// state.redis_version). Каталог не на руках → graceful-degrade (не блокируем).
+// The catalog (series->names) is threaded through to MapEditor; ONLY fields with
+// a truthy `x-directives` are validated. Version is reactive (create - operator's
+// choice; runtime - state.redis_version). Catalog unavailable -> graceful-degrade (don't block).
 // ---------------------------------------------------------------------------
 
-// UI-контекст каталога директив. `loaded` — каталог реально доступен (иначе не валидируем).
+// UI context for the directive catalog. `loaded` - catalog is actually available (otherwise don't validate).
 export interface DirectiveCatalogContext {
   directives: Record<string, string[]>;
   loaded: boolean;
 }
 
-// Метка поля-словаря директив (truthy `x-directives`, напр. "redis"). Имя поля не хардкодим.
+// Tag of a directive-dictionary field (truthy `x-directives`, e.g. "redis"). Field name is not hardcoded.
 export function directiveFieldTag(prop: ScenarioInputSchemaProperty): string | undefined {
   const tag = prop['x-directives'];
   return typeof tag === 'string' && tag !== '' ? tag : undefined;
 }
 
-// Серия Redis из полной версии: первые два компонента ("8.2.2" → "8.2").
-// Зеркалит backend-regex `^([0-9]+:)?<серия>[.]`: снимает whitespace, ведущий "v"
-// ("v8.2.2") и Debian-epoch ("5:7.4.1-1~deb12u7" → "7.4"), иначе epoch-пинованная
-// версия молча выключила бы валидацию, а backend отверг бы директиву уже на рендере.
+// Redis series from a full version: the first two components ("8.2.2" -> "8.2").
+// Mirrors the backend regex `^([0-9]+:)?<series>[.]`: strips whitespace, a leading "v"
+// ("v8.2.2"), and a Debian epoch ("5:7.4.1-1~deb12u7" -> "7.4") - otherwise an epoch-pinned
+// version would silently disable validation, and the backend would reject the directive at render time.
 export function versionToSeries(version: string | undefined): string | undefined {
   if (!version) return undefined;
   const cleaned = version
@@ -213,8 +213,8 @@ export function versionToSeries(version: string | undefined): string | undefined
   return `${parts[0]}.${parts[1]}`;
 }
 
-// Имена директив для версии из каталога, либо undefined — валидация неприменима
-// (каталог не загружен / серия неизвестна / серии нет в каталоге). undefined → graceful.
+// Directive names for the version from the catalog, or undefined - validation not applicable
+// (catalog not loaded / series unknown / series not in catalog). undefined -> graceful.
 export function directiveNamesForVersion(
   catalog: DirectiveCatalogContext | undefined,
   version: string | undefined,
@@ -226,32 +226,32 @@ export function directiveNamesForVersion(
   return Array.isArray(names) ? names : undefined;
 }
 
-// Есть ли в схеме хоть одно поле-словарь директив (гейт для fetch каталога/версии).
+// Whether the schema has at least one directive-dictionary field (gate for fetching the catalog/version).
 export function schemaHasDirectiveField(schema: ScenarioInputSchema | undefined | null): boolean {
   if (!schema || typeof schema !== 'object') return false;
   return Object.values(schema).some((prop) => Boolean(prop) && directiveFieldTag(prop) !== undefined);
 }
 
-// Вычисляет обязательность поля по текущему input-state.
-// required:true → всегда обязательно.
-// required_when → обязательно, когда CEL-предикат истинен (тот же evalShowWhen-контекст).
-// Для boolean-полей обязательность игнорируется (false — допустимое значение).
+// Computes whether a field is required from the current input state.
+// required:true -> always required.
+// required_when -> required when the CEL predicate is true (same evalShowWhen context).
+// For boolean fields, requiredness is ignored (false is a valid value).
 export function isFieldRequired(
   prop: ScenarioInputSchemaProperty,
   inputState: Record<string, unknown>,
 ): boolean {
   if (prop.type === 'boolean') return false;
   if (prop.required === true) return true;
-  // NIM-72: object-$type несёт field-level обязательность в x-required (ключ
-  // required занят массивом обязательных детей). По ней ставим `*` на поле.
+  // NIM-72: object-$type carries field-level requiredness in x-required (the key
+  // `required` is taken by the array of required children). We set `*` on the field from it.
   if (prop['x-required'] === true) return true;
   if (prop.required_when) return evalShowWhen(prop.required_when, inputState);
   return false;
 }
 
-// Схема пригодна для per-field рендера, если это непустой объект полей. Любой
-// набор типов (включая составные) рисуется per-field; единственный fallback на
-// общий DynamicInputBuilder — отсутствие/пустота схемы (свободный input).
+// A schema is suitable for per-field render if it's a non-empty field object. Any
+// set of types (including composite) is rendered per-field; the only fallback to
+// the generic DynamicInputBuilder is an absent/empty schema (free-form input).
 export function isSupportedInputSchema(
   schema: ScenarioInputSchema | undefined | null,
 ): boolean {
@@ -265,7 +265,7 @@ export function isSupportedInputSchema(
 }
 
 // Array-of-object: type=array + items.type=object + items.properties.
-// Рендерится карточками с под-полями, не JSON-textarea (не TypedListField).
+// Rendered as cards with sub-fields, not a JSON textarea (not TypedListField).
 export function isArrayOfObjectField(prop: ScenarioInputSchemaProperty): boolean {
   return (
     prop.type === 'array' &&
@@ -275,9 +275,9 @@ export function isArrayOfObjectField(prop: ScenarioInputSchemaProperty): boolean
   );
 }
 
-// Typed list (ADR-045 S8b): type=array + scalar/sid items → рендерится числовым/строковым
-// списком с +/- кнопками, НЕ JSON-textarea. Значение в state — JSON-строка массива.
-// Исключение: items.type=object+properties → ArrayOfObjectField (не TypedListField).
+// Typed list (ADR-045 S8b): type=array + scalar/sid items -> rendered as a numeric/string
+// list with +/- buttons, NOT a JSON textarea. Value in state is a JSON string of the array.
+// Exception: items.type=object+properties -> ArrayOfObjectField (not TypedListField).
 export function isTypedListField(prop: ScenarioInputSchemaProperty): boolean {
   if (prop.type !== 'array' || prop.items == null) return false;
   if (isArrayOfObjectField(prop)) return false;
@@ -286,8 +286,8 @@ export function isTypedListField(prop: ScenarioInputSchemaProperty): boolean {
 
 const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
 
-// B2: type=object + isMap=true + items.type скалярный → KEY→VALUE-редактор.
-// cloud.profile (map без items / items.type=map|object) → JSON-textarea.
+// B2: type=object + isMap=true + items.type scalar -> KEY->VALUE editor.
+// cloud.profile (map without items / items.type=map|object) -> JSON textarea.
 export function isMapWithScalarItems(prop: ScenarioInputSchemaProperty): boolean {
   return (
     prop.type === 'object' &&
@@ -297,8 +297,8 @@ export function isMapWithScalarItems(prop: ScenarioInputSchemaProperty): boolean
   );
 }
 
-// Тип значения map: из items.type (isMap-путь) ИЛИ additional_properties.type
-// (backend-путь без флага isMap). Дефолт — string.
+// Map value type: from items.type (isMap path) OR additional_properties.type
+// (backend path without the isMap flag). Default is string.
 export function mapValueType(prop: ScenarioInputSchemaProperty): string {
   if (prop.items?.type) return prop.items.type;
   const ap = prop['additional_properties'];
@@ -309,9 +309,9 @@ export function mapValueType(prop: ScenarioInputSchemaProperty): string {
   return 'string';
 }
 
-// Map по additional_properties: type=object + additional_properties — скалярная
-// схема (есть type). Backend шлёт redis_settings/update_config как
-// {type:object, additional_properties:{type:string}} БЕЗ флага isMap → тоже MapEditor.
+// Map via additional_properties: type=object + additional_properties - a scalar
+// schema (has type). The backend sends redis_settings/update_config as
+// {type:object, additional_properties:{type:string}} WITHOUT the isMap flag -> also MapEditor.
 export function isMapWithAdditionalProps(prop: ScenarioInputSchemaProperty): boolean {
   if (prop.type !== 'object') return false;
   const ap = prop['additional_properties'];
@@ -320,15 +320,15 @@ export function isMapWithAdditionalProps(prop: ScenarioInputSchemaProperty): boo
   return typeof apType === 'string' && SCALAR_TYPES.has(apType);
 }
 
-// Одиночный типизированный объект: type=object + непустой properties, НЕ map
-// (isMap/additional_properties) и НЕ provision. Рендерится рекурсивно под-полями,
-// не JSON-textarea. AclUser (add_user.user): {type:object, properties:{name,perms,state}}.
+// Single typed object: type=object + non-empty properties, NOT a map
+// (isMap/additional_properties) and NOT provision. Rendered recursively via sub-fields,
+// not a JSON textarea. AclUser (add_user.user): {type:object, properties:{name,perms,state}}.
 export function isObjectWithProperties(prop: ScenarioInputSchemaProperty): boolean {
   if (prop.type !== 'object') return false;
   if (isProvisionObjectField(prop)) return false;
   if (isMapWithScalarItems(prop)) return false;
   if (isMapWithAdditionalProps(prop)) return false;
-  // additional_properties как схема-объект (есть type) → это map, не типизированный объект.
+  // additional_properties as a schema object (has type) -> it's a map, not a typed object.
   const ap = prop['additional_properties'];
   if (ap && typeof ap === 'object' && !Array.isArray(ap) && typeof (ap as Record<string, unknown>)['type'] === 'string') {
     return false;
@@ -337,10 +337,10 @@ export function isObjectWithProperties(prop: ScenarioInputSchemaProperty): boole
   return Boolean(props && typeof props === 'object' && !Array.isArray(props) && Object.keys(props as object).length > 0);
 }
 
-// Составной тип (array/object) — рендерится per-field JSON-textarea.
-// Исключения: type=array+items → TypedListField; type=object+map → MapEditor;
-// type=array+items.type=object+items.properties → ArrayOfObjectField;
-// type=object+properties → ObjectField (рекурсивный).
+// Composite type (array/object) - rendered as a per-field JSON textarea.
+// Exceptions: type=array+items -> TypedListField; type=object+map -> MapEditor;
+// type=array+items.type=object+items.properties -> ArrayOfObjectField;
+// type=object+properties -> ObjectField (recursive).
 export function isCompositeType(prop: ScenarioInputSchemaProperty): boolean {
   if (isTypedListField(prop)) return false;
   if (isMapWithScalarItems(prop)) return false;
@@ -350,8 +350,8 @@ export function isCompositeType(prop: ScenarioInputSchemaProperty): boolean {
   return prop.type === 'array' || prop.type === 'object';
 }
 
-// Пресет безопасных ACL-дефолтов для AclUser-объектов. Единый источник для
-// ArrayOfObjectField (per-item add) и одиночного object (defaultsFromSchema).
+// Preset of safe ACL defaults for AclUser objects. A single source for
+// ArrayOfObjectField (per-item add) and a single object (defaultsFromSchema).
 export const ACL_USER_PRESET: Record<string, string> = {
   perms: 'allchannels allkeys +@all -@admin -@dangerous +info',
   state: 'on',
@@ -361,10 +361,10 @@ export function defaultsFromSchema(schema: ScenarioInputSchema): ScenarioFieldsS
   const out: ScenarioFieldsState = {};
   for (const [key, prop] of Object.entries(schema)) {
     if (isObjectWithProperties(prop)) {
-      // Рекурсивные дефолты под-полей, сериализованные в JSON-строку объекта
-      // (значение object-with-properties хранится строкой, как composite/map).
+      // Recursive sub-field defaults, serialized into a JSON string of the object
+      // (an object-with-properties value is stored as a string, same as composite/map).
       const sub = defaultsFromSchema(getObjectProperties(prop));
-      // AclUser: preset безопасных ACL-дефолтов (паритет с ArrayOfObjectField).
+      // AclUser: preset of safe ACL defaults (parity with ArrayOfObjectField).
       if (prop['x-type'] === 'AclUser') {
         for (const [k, v] of Object.entries(ACL_USER_PRESET)) {
           if (sub[k] === undefined || sub[k] === '') sub[k] = v;
@@ -374,8 +374,8 @@ export function defaultsFromSchema(schema: ScenarioInputSchema): ScenarioFieldsS
       continue;
     }
     if (prop.default !== undefined) {
-      // Составной default ([] / {}) сериализуем в raw-JSON-строку (state хранит
-      // составные значения строкой, как и редактируется per-field textarea).
+      // Composite default ([] / {}) is serialized into a raw JSON string (state stores
+      // composite values as a string, same as edited by the per-field textarea).
       out[key] = isCompositeType(prop)
         ? JSON.stringify(prop.default)
         : (prop.default as ScenarioFieldValue);
@@ -388,9 +388,9 @@ export function defaultsFromSchema(schema: ScenarioInputSchema): ScenarioFieldsS
   return out;
 }
 
-// Вычисляет набор видимых имён полей по form + текущему state.
-// Поле видимо, если: show_when его секции истинно/отсутствует И show_when самого поля истинно/отсутствует.
-// Если form не задан — возвращает undefined (все поля видимы — нет фильтрации).
+// Computes the set of visible field names from form + the current state.
+// A field is visible if: its section's show_when is true/absent AND the field's own show_when is true/absent.
+// If form is not set - returns undefined (all fields visible - no filtering).
 import type { ScenarioForm } from '../../api/keeper';
 export function computeVisibleFields(
   form: ScenarioForm | undefined,
@@ -409,13 +409,13 @@ export function computeVisibleFields(
   return visible;
 }
 
-// Имена required-полей схемы, которые в текущем state пусты (зеркалит backend
-// required-валидацию: '' / undefined считаются незаполненными). Для boolean
-// required игнорируется — false валиден. Для составных полей пустота — пустая
-// raw-строка (textarea не заполнена).
-// visibleFields: если передано — проверяем только видимые поля (show_when).
-// Скрытые поля пропускаются — UI не шлёт их в payload.
-// Учитывает required_when: поле обязательно когда CEL-предикат истинен (isFieldRequired).
+// Names of required schema fields that are empty in the current state (mirrors the backend's
+// required validation: '' / undefined are considered unfilled). For boolean fields,
+// required is ignored - false is valid. For composite fields, emptiness means an empty
+// raw string (textarea not filled).
+// visibleFields: if passed - check only visible fields (show_when).
+// Hidden fields are skipped - the UI doesn't send them in the payload.
+// Accounts for required_when: field is required when the CEL predicate is true (isFieldRequired).
 export function missingRequiredFields(
   schema: ScenarioInputSchema | undefined | null,
   state: ScenarioFieldsState,
@@ -425,8 +425,8 @@ export function missingRequiredFields(
   const out: string[] = [];
   const inputState = state as Record<string, unknown>;
   for (const [key, prop] of Object.entries(schema)) {
-    // Одиночный типизированный объект: обязательность задаётся object-level
-    // required:[children] — проверяем непустоту обязательных под-полей.
+    // Single typed object: requiredness is set at the object level via
+    // required:[children] - we check that required sub-fields are non-empty.
     if (isObjectWithProperties(prop)) {
       if (visibleFields !== undefined && !visibleFields.has(key)) continue;
       const reqRaw: unknown = prop.required;
@@ -440,11 +440,11 @@ export function missingRequiredFields(
       continue;
     }
     if (!isFieldRequired(prop, inputState)) continue;
-    // Скрытое поле (show_when=false) — не требуется.
+    // Hidden field (show_when=false) - not required.
     if (visibleFields !== undefined && !visibleFields.has(key)) continue;
     const v = state[key];
     if (v === undefined || (typeof v === 'string' && v.trim() === '')) { out.push(key); continue; }
-    // Typed list: пустой массив [] считается незаполненным для required-поля.
+    // Typed list: an empty array [] counts as unfilled for a required field.
     if (isTypedListField(prop) && typeof v === 'string') {
       const parsed = tryParseJson(v);
       if (parsed.ok && Array.isArray(parsed.value) && parsed.value.length === 0) out.push(key);
@@ -453,10 +453,10 @@ export function missingRequiredFields(
   return out;
 }
 
-// Сериализация в payload: '' пропускается, числа конвертируются, составные поля
-// парсятся из raw-JSON (невалидный JSON → строка пропускается, blocked submit
-// ловит это раньше). Возвращает {ok:false, invalid:[...]} если составное поле
-// содержит непарсимый JSON — caller блокирует submit и подсвечивает поле.
+// Serialization into payload: '' is skipped, numbers are converted, composite fields
+// are parsed from raw JSON (invalid JSON -> the field is skipped, blocked submit
+// catches it earlier). Returns {ok:false, invalid:[...]} if a composite field
+// contains unparseable JSON - the caller blocks submit and highlights the field.
 export function serializeFields(
   schema: ScenarioInputSchema,
   state: ScenarioFieldsState,
@@ -465,8 +465,8 @@ export function serializeFields(
   for (const [key, prop] of Object.entries(schema)) {
     const raw = state[key];
     if (raw === undefined || raw === '') continue;
-    // Array-of-object: хранится как JSON-строка массива объектов.
-    // Отдаём в payload как распарсенный массив (объекты с нативными строками).
+    // Array-of-object: stored as a JSON string of an array of objects.
+    // Emitted to the payload as a parsed array (objects with native strings).
     if (isArrayOfObjectField(prop)) {
       const parsed = tryParseJson(String(raw));
       if (parsed.ok && Array.isArray(parsed.value)) {
@@ -474,8 +474,8 @@ export function serializeFields(
       }
       continue;
     }
-    // Typed list (ADR-045 S8b): хранится как JSON-строка сырых строк ["", "123"].
-    // Конвертируем элементы: int → parseInt (NaN фильтруется), иначе → строка.
+    // Typed list (ADR-045 S8b): stored as a JSON string of raw strings ["", "123"].
+    // Convert elements: int -> parseInt (NaN filtered out), otherwise -> string.
     if (isTypedListField(prop)) {
       const parsed = tryParseJson(String(raw));
       if (parsed.ok && Array.isArray(parsed.value)) {
@@ -496,8 +496,8 @@ export function serializeFields(
       }
       continue;
     }
-    // Map (isMap ИЛИ additional_properties) — JSON-строка объекта {"key":"val",...}.
-    // Конвертируем значения по value-типу (int → parseInt).
+    // Map (isMap OR additional_properties) - a JSON string of an object {"key":"val",...}.
+    // Convert values by value type (int -> parseInt).
     if (isMapWithScalarItems(prop) || isMapWithAdditionalProps(prop)) {
       const parsed = tryParseJson(String(raw));
       if (parsed.ok && typeof parsed.value === 'object' && parsed.value !== null && !Array.isArray(parsed.value)) {
@@ -523,8 +523,8 @@ export function serializeFields(
       }
       continue;
     }
-    // Одиночный типизированный объект — рекурсивная сериализация под-полей
-    // (subState хранится как ScenarioFieldsState в JSON-строке объекта).
+    // Single typed object - recursive serialization of sub-fields
+    // (subState is stored as ScenarioFieldsState in a JSON string of the object).
     if (isObjectWithProperties(prop)) {
       const subState = parseObjectFieldValue(raw);
       out[key] = serializeFields(getObjectProperties(prop), subState);
@@ -550,9 +550,9 @@ export function serializeFields(
   return out;
 }
 
-// Имена составных полей, чьё непустое raw-значение не парсится в JSON. Caller
-// блокирует submit/«Далее», пока есть невалидные (как required-валидация).
-// Включает JSON-textarea (isCompositeType) и MapEditor (isMapWithScalarItems).
+// Names of composite fields whose non-empty raw value doesn't parse as JSON. The caller
+// blocks submit/"Next" while any are invalid (like required validation).
+// Includes JSON textarea (isCompositeType) and MapEditor (isMapWithScalarItems).
 export function invalidCompositeFields(
   schema: ScenarioInputSchema | undefined | null,
   state: ScenarioFieldsState,
@@ -576,8 +576,8 @@ function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false 
   }
 }
 
-// Разбирает сериализованное значение object-with-properties поля в под-state
-// (Record под-поле→ScenarioFieldValue). Пустое/непарсимое → {}.
+// Parses the serialized value of an object-with-properties field into sub-state
+// (Record sub-field->ScenarioFieldValue). Empty/unparseable -> {}.
 export function parseObjectFieldValue(raw: ScenarioFieldValue): ScenarioFieldsState {
   if (raw === undefined || raw === '') return {};
   const parsed = tryParseJson(String(raw));
@@ -590,13 +590,13 @@ export function parseObjectFieldValue(raw: ScenarioFieldValue): ScenarioFieldsSt
 // ---------------------------------------------------------------------------
 // Cloud-provision helpers (UX-clarity, ADR-061)
 //
-// Provision-поле — объект с вложенным enabled:boolean (enabled=false по
-// умолчанию). Специальный рендер: toggle + под-поля; подсказка об existing-souls.
+// A provision field - an object with a nested enabled:boolean (enabled=false by
+// default). Special render: toggle + sub-fields; hint about existing souls.
 // ---------------------------------------------------------------------------
 
 /**
- * Распознаёт provision-поле: object с properties.enabled.type=boolean.
- * Это признак «cloud-create opt-in»-секции, которую рендерим специально.
+ * Recognizes a provision field: object with properties.enabled.type=boolean.
+ * This is the marker of a "cloud-create opt-in" section, which we render specially.
  */
 export function isProvisionObjectField(prop: ScenarioInputSchemaProperty): boolean {
   if (prop.type !== 'object') return false;
@@ -607,10 +607,10 @@ export function isProvisionObjectField(prop: ScenarioInputSchemaProperty): boole
 }
 
 /**
- * Вычисляет ожидаемое число хостов из текущего input-state.
- * sentinel → 1 + replicas_per_master
- * cluster  → shards × (1 + replicas_per_master)
- * Возвращает null, если нужных полей нет или значения не числа.
+ * Computes the expected host count from the current input state.
+ * sentinel -> 1 + replicas_per_master
+ * cluster  -> shards x (1 + replicas_per_master)
+ * Returns null if the needed fields are missing or the values aren't numbers.
  */
 export function computeRequiredHostCount(state: ScenarioFieldsState): number | null {
   const replicas = toInt(state['replicas_per_master']);
@@ -621,7 +621,7 @@ export function computeRequiredHostCount(state: ScenarioFieldsState): number | n
     if (shards === null || replicas === null) return null;
     return shards * (1 + replicas);
   }
-  // sentinel / любой режим с replicas_per_master
+  // sentinel / any mode with replicas_per_master
   if (replicas !== null) {
     return 1 + replicas;
   }

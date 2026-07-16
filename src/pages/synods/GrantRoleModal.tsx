@@ -9,7 +9,7 @@ import styles from '../common.module.css';
 interface Props {
   open: boolean;
   synodName: string;
-  /** Уже привязанные роли (исключаются из выбора). */
+  /** Roles already bound (excluded from selection). */
   currentRoles: string[];
   onClose: () => void;
 }
@@ -26,7 +26,7 @@ export function GrantRoleModal({ open, synodName, currentRoles, onClose }: Props
   const [failures, setFailures] = useState<Failure[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Каталог ролей кластера — небольшой, фильтруем на клиенте.
+  // Cluster role catalog -- small, filter on the client.
   const rolesQ = useQuery({
     queryKey: ['rbac.roles'],
     queryFn: () => keeperApi.roles.list(),
@@ -38,7 +38,7 @@ export function GrantRoleModal({ open, synodName, currentRoles, onClose }: Props
     (r): r is RoleView => typeof r?.name === 'string' && !currentRoles.includes(r.name),
   );
 
-  // Fan-out: N идемпотентных POST-ов; partial failure не откатывает успешные.
+  // Fan-out: N idempotent POSTs; partial failure does not roll back successful ones.
   const mu = useMutation({
     mutationFn: async (): Promise<Failure[]> => {
       const results = await Promise.allSettled(

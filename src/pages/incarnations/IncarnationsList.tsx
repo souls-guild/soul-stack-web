@@ -23,7 +23,7 @@ import {
 } from './covenTraitsFilter.helpers';
 import styles from '../common.module.css';
 
-// satisfies гарантирует, что список ⊆ IncarnationStatus; tsc упадёт при добавлении нового статуса в backend
+// satisfies ensures the list is ⊆ IncarnationStatus; tsc fails if a new status is added on the backend
 const INCARNATION_STATUSES = [
   'provisioning',
   'ready',
@@ -52,13 +52,13 @@ function formatTimeAgo(iso: string | null | undefined): string {
   return `${Math.floor(deltaSec / 86_400)}d ${ago}`;
 }
 
-// Экранирование regex-специальных символов (для snapshot-перехода в RunWizard).
+// Escapes regex-special characters (for the snapshot transition into RunWizard).
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Строит incarnationRegex из набора имён (snapshot: OR из anchored-имён).
-// Вызывается только когда canRunSet=true (items.length > 0), поэтому names гарантированно непуст.
+// Builds incarnationRegex from a set of names (snapshot: OR of anchored names).
+// Only called when canRunSet=true (items.length > 0), so names is guaranteed non-empty.
 function buildSnapshotRegex(names: string[]): string {
   if (names.length === 1) return `^${escapeRegex(names[0])}$`;
   return `^(${names.map(escapeRegex).join('|')})$`;
@@ -75,21 +75,21 @@ export function IncarnationsList() {
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // State-фильтры (динамические, из схемы сервиса).
+  // State filters (dynamic, from the service schema).
   const [statePredicates, setStatePredicates] = useState<StateFilterPredicate[]>([]);
-  // per-field ошибки 422 от backend.
+  // per-field 422 errors from the backend.
   const [stateFieldErrors, setStateFieldErrors] = useState<Record<string, string>>({});
 
-  // Client-side мультиселект coven+traits поверх уже загруженного набора
-  // (нет server-side traits-фильтра/каталога; coven-фильтр выше — server-side
-  // single exact-match, этот — доп. AND-слой для комбинации с traits).
+  // Client-side coven+traits multiselect over the already-loaded set
+  // (no server-side traits filter/catalog; the coven filter above is server-side
+  // single exact-match, this is an extra AND-layer combined with traits).
   const [covenTraitsFilter, setCovenTraitsFilter] = useState<CovenTraitsFilterValue>(EMPTY_COVEN_TRAITS_FILTER);
 
   const trimmedCoven = coven.trim();
   const covenValid = trimmedCoven === '' || COVEN_PATTERN.test(trimmedCoven);
   const effectiveCoven = covenValid && trimmedCoven !== '' ? trimmedCoven : undefined;
 
-  // Только заполненные предикаты отправляем на backend.
+  // Only send filled-in predicates to the backend.
   const activePredicates = useMemo(
     () => statePredicates.filter((p) => p.value.trim() !== ''),
     [statePredicates],
@@ -123,30 +123,30 @@ export function IncarnationsList() {
         state_filters: activePredicates.length > 0 ? activePredicates : undefined,
       }),
     enabled: covenValid,
-    // При 422 (ошибка нечислового значения в numeric-op) — не краш, парсим field-errors.
+    // On 422 (non-numeric value in a numeric-op) — no crash, parse field-errors.
     retry: (failCount, err) => {
       if (err instanceof ApiError && err.status === 422) return false;
       return failCount < 2;
     },
   });
 
-  // Обрабатываем 422: парсим detail как JSON {errors: [{field, message}]} или
-  // используем detail-строку как общее сообщение. Разносим по полям predicate.
+  // Handle 422: parse detail as JSON {errors: [{field, message}]} or
+  // use the detail string as a generic message. Distribute across predicate fields.
   const stateFilter422 = useMemo(() => {
     if (!(q.error instanceof ApiError) || q.error.status !== 422) return null;
     return q.error.message;
   }, [q.error]);
 
-  // При новом 422 — пробрасываем ошибку в first-match поля.
-  // Простая эвристика: если detail содержит имя поля — кладём туда.
-  // Иначе кладём на первый активный предикат.
+  // On a new 422 — propagate the error to the first-match field.
+  // Simple heuristic: if detail contains a field name — put it there.
+  // Otherwise put it on the first active predicate.
   useEffect(() => {
     if (!stateFilter422) {
       setStateFieldErrors({});
       return;
     }
     const errors: Record<string, string> = {};
-    // Пробуем найти field из activePredicates в строке детали.
+    // Try to find a field from activePredicates in the detail string.
     let matched = false;
     for (const pred of activePredicates) {
       if (stateFilter422.includes(pred.field)) {
@@ -155,15 +155,15 @@ export function IncarnationsList() {
         break;
       }
     }
-    // Fallback: первое поле.
+    // Fallback: first field.
     if (!matched && activePredicates.length > 0) {
       errors[activePredicates[0].field] = stateFilter422;
     }
     setStateFieldErrors(errors);
   }, [stateFilter422, activePredicates]);
 
-  // Client-side search (по имени) + coven/traits мультиселект (AND). Sort —
-  // server-side; items приходят уже sorted, доп. фильтры не меняют порядок.
+  // Client-side search (by name) + coven/traits multiselect (AND). Sort is
+  // server-side; items arrive already sorted, extra filters don't change order.
   const filtered = useMemo(() => {
     const items = q.data?.items ?? [];
     const term = search.trim().toLowerCase();
@@ -174,8 +174,8 @@ export function IncarnationsList() {
     });
   }, [q.data, search, covenTraitsFilter]);
 
-  // Опции мультиселекта считаем от полного набора (до client-side filter),
-  // иначе выбор сужал бы сам себя до нуля видимых опций.
+  // Multiselect options are computed from the full set (before the client-side filter),
+  // otherwise the selection would narrow itself down to zero visible options.
   const covenTraitsSourceItems = q.data?.items ?? [];
 
   function toggleSort(key: SortKey) {
@@ -192,8 +192,8 @@ export function IncarnationsList() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
-  // Кнопка «Run по набору» (snapshot): активна если выбран сервис + есть активные
-  // state-предикаты + есть загруженные результаты.
+  // "Run set" button (snapshot): enabled when a service is selected + there are active
+  // state predicates + loaded results exist.
   const hasStateFilter = activePredicates.length > 0;
   const canRunSet = Boolean(serviceFilter && hasStateFilter && (q.data?.items ?? []).length > 0 && !q.isLoading);
 
@@ -201,9 +201,9 @@ export function IncarnationsList() {
     if (!canRunSet || !q.data) return;
     const names = (q.data.items ?? []).map((it: IncarnationGetReply) => it.name);
     const regex = buildSnapshotRegex(names);
-    // Передаём в RunWizard через incarnation_regex (сырой готовый regex, без повторного escape).
-    // НЕ используем incarnation (одиночное имя) — это другой param, RunWizard обернул бы его
-    // заново в ^…$, дав двойное экранирование. incarnation_regex идёт в state as-is.
+    // Pass to RunWizard via incarnation_regex (raw ready-made regex, no re-escaping).
+    // We do NOT use incarnation (single name) — that's a different param, RunWizard would
+    // re-wrap it in ^…$, causing double escaping. incarnation_regex goes into state as-is.
     const params = new URLSearchParams({
       workload: 'scenario',
       service: serviceFilter,
@@ -214,7 +214,7 @@ export function IncarnationsList() {
 
   const serviceItems = services.data?.items ?? [];
 
-  // total из ответа backend; если ответа нет — не показываем счётчик.
+  // total from the backend response; if there's no response, don't show the counter.
   const total = q.data?.total;
 
   return (
@@ -239,7 +239,7 @@ export function IncarnationsList() {
         </div>
       </div>
 
-      {/* Основные фильтры */}
+      {/* Primary filters */}
       <div className={styles.filters}>
         <label>
           <div className={styles.metaKey}>{t('incarnations:filterSearchByName')}</div>
@@ -263,7 +263,7 @@ export function IncarnationsList() {
             value={serviceFilter}
             onChange={(e) => {
               setServiceFilter(e.target.value);
-              // При смене сервиса сбрасываем state-фильтры (поля разные у каждого сервиса).
+              // Reset state filters when the service changes (fields differ per service).
               setStatePredicates([]);
               setStateFieldErrors({});
             }}
@@ -322,7 +322,7 @@ export function IncarnationsList() {
         </label>
       </div>
 
-      {/* Панель state-фильтра — только при выбранном сервисе */}
+      {/* State filter panel — only when a service is selected */}
       <div>
         <div className={styles.metaKey} style={{ marginBottom: 6 }}>
           {t('incarnations:stateFilterTitle')}
@@ -349,7 +349,7 @@ export function IncarnationsList() {
         )}
       </div>
 
-      {/* Мультиселект coven+traits (client-side, AND, поверх уже загруженного набора) */}
+      {/* coven+traits multiselect (client-side, AND, over the already-loaded set) */}
       {covenTraitsSourceItems.length > 0 ? (
         <CovenTraitsFilter
           items={covenTraitsSourceItems}
@@ -358,7 +358,7 @@ export function IncarnationsList() {
         />
       ) : null}
 
-      {/* Счётчик total */}
+      {/* Total counter */}
       {total !== undefined && !q.isLoading ? (
         <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
           {t('incarnations:totalCount', { count: total })}
@@ -378,7 +378,7 @@ export function IncarnationsList() {
             : String(q.error)}
         </div>
       ) : null}
-      {/* 422: общая плашка дополнительно к per-field ошибкам в панели */}
+      {/* 422: generic banner in addition to per-field errors in the panel */}
       {stateFilter422 ? (
         <div className={styles.errorBox}>
           {t('incarnations:stateFilter422', { detail: stateFilter422 })}

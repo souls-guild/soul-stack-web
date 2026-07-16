@@ -11,13 +11,13 @@ interface Props {
   aid: string;
   open: boolean;
   onClose: () => void;
-  // Опциональный hook на успешный revoke — нужен detail-странице, чтобы
-  // переключить локальный UI на «revoked».
+  // Optional hook on successful revoke — needed by the detail page to
+  // switch the local UI to "revoked".
   onSuccess?: () => void;
 }
 
-// Расшифровка серверной 409 «last cluster-admin» в человеческое сообщение.
-// Бэкенд возвращает problem+json с type/title/detail (ADR-013, self-lockout).
+// Decoding the server's 409 "last cluster-admin" into a human message.
+// The backend returns problem+json with type/title/detail (ADR-013, self-lockout).
 function prettyError(err: unknown): string {
   const t = i18n.t.bind(i18n);
   if (err instanceof ApiError) {

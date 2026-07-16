@@ -161,7 +161,7 @@ export function CadencesList() {
         </table>
       )}
 
-      {/* Модалка подтверждения Enable */}
+      {/* Enable confirmation modal */}
       <Modal
         open={confirmEnable !== null}
         title={t('cadences:enableTitle')}
@@ -192,7 +192,7 @@ export function CadencesList() {
         ) : null}
       </Modal>
 
-      {/* Модалка подтверждения Disable */}
+      {/* Disable confirmation modal */}
       <Modal
         open={confirmDisable !== null}
         title={t('cadences:disableTitle')}

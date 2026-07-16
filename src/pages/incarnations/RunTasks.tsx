@@ -7,9 +7,9 @@ import type { RunTaskView } from '../../api/keeper';
 import styles from './RunTasks.module.css';
 import common from '../common.module.css';
 
-// Схема-2 master-detail хода задач прогона (NIM-37). Данные — RunTaskView[] из
-// /runs/{apply_id}/tasks (сервер джойнит план с per-host исходами: live И история
-// одним ответом). Компонент презентационный — фетч/поллинг/nudge живут в RunDetail.
+// Scheme-2 master-detail run task progress (NIM-37). Data is RunTaskView[] from
+// /runs/{apply_id}/tasks (server joins the plan with per-host outcomes: live AND history
+// in one response). The component is presentational — fetch/polling/nudge live in RunDetail.
 
 const TONE_COLOR: Record<string, string> = {
   ok: 'var(--success)',
@@ -23,7 +23,7 @@ function taskKey(t: RunTaskView): string {
   return `${t.passage}:${t.plan_index}`;
 }
 
-// Значение params для kv-строки: скаляр как есть, объект/массив — компактный JSON.
+// Params value for a kv-line: scalar as-is, object/array — compact JSON.
 function paramValue(v: unknown): string {
   if (v === null) return 'null';
   if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
@@ -34,10 +34,10 @@ function paramValue(v: unknown): string {
   }
 }
 
-// output = register_data (структура, НЕ строка): компактный key→value непустых
-// полей. Пустые ('' / null / undefined) скрываем — 0 и false остаются значимыми
+// output = register_data (a structure, NOT a string): compact key->value of non-empty
+// fields. Empty ('' / null / undefined) are hidden — 0 and false remain significant
 // (exit_code:0, changed:false). exec: exit_code/changed/stdout|stderr; file:
-// path/mode/sha256. Не-объект (легаси/строка) рендерим как скаляр.
+// path/mode/sha256. Non-object (legacy/string) is rendered as a scalar.
 function OutputCell({ output, sid }: { output: unknown; sid: string }) {
   const testid = `run-task-output-${sid}`;
   if (output == null || typeof output !== 'object') {
@@ -74,9 +74,9 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
   const { t } = useTranslation();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Дефолт-выбор (пока юзер не кликнул): первая задача с упавшим хостом, иначе
-  // последняя (свежая в порядке плана). Пересчитывается при live-догрузке задач —
-  // «текущая» задача остаётся в фокусе сама.
+  // Default selection (until the user clicks): first task with a failed host, otherwise
+  // the last one (most recent in plan order). Recomputed on live task loading —
+  // the "current" task stays in focus on its own.
   const defaultTask = useMemo(() => {
     const failed = tasks.find((tk) => (tk.hosts ?? []).some((h) => taskStatusTone(h.status) === 'danger'));
     return failed ?? tasks[tasks.length - 1];

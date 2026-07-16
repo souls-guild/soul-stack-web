@@ -81,7 +81,7 @@ export function UnlockModal({ open, incarnationName, onClose }: Props) {
             placeholder={t('incarnations:unlockReasonPlaceholder')}
             spellCheck={false}
             aria-invalid={errors.reason ? 'true' : undefined}
-            // maxLength синхронизирован с backend incarnation.ReasonMaxLen=500
+            // maxLength synced with backend incarnation.ReasonMaxLen=500
             maxLength={500}
             {...register('reason')}
             style={{

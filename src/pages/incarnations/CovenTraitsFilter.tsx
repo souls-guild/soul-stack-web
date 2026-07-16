@@ -1,10 +1,10 @@
-// Client-side мультиселект-фильтр coven + traits поверх уже загруженного набора
-// инкарнаций (нет server-side каталога/фильтра traits — ADR-042 не хардкодим
-// каталог, вычисляем опции из фактически подгруженных строк). Комбинация двух
-// селектов работает по AND: выбранный coven ⊆ item.covens И выбранная
-// trait-пара присутствует в item.traits (несколько traits-выборов — тоже AND).
-// Чистые функции — в ./covenTraitsFilter.helpers (react-refresh не позволяет
-// смешивать non-component экспорты с компонентом в одном файле).
+// Client-side multi-select filter for coven + traits over the already loaded set
+// of incarnations (no server-side catalog/filter for traits — ADR-042: we don't hardcode
+// the catalog, options are computed from the rows actually fetched). The two
+// selects combine via AND: selected coven ⊆ item.covens AND the selected
+// trait pair is present in item.traits (multiple trait selections are also AND).
+// Pure functions live in ./covenTraitsFilter.helpers (react-refresh doesn't allow
+// mixing non-component exports with the component in a single file).
 
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +22,7 @@ interface Props {
   onChange: (next: CovenTraitsFilterValue) => void;
 }
 
-/** Мультиселект coven + traits (client-side, AND), опции — из подгруженного набора. */
+/** Multi-select coven + traits (client-side, AND), options come from the fetched set. */
 export function CovenTraitsFilter({ items, value, onChange }: Props) {
   const { t } = useTranslation();
 

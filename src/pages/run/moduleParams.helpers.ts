@@ -1,17 +1,17 @@
 import type { ModuleInputSource, ModuleParam, ScenarioInputSchema } from '../../api/keeper';
 
-// Маппинг ModuleParam[] (из каталога модулей) на flat-map ScenarioInputSchema,
-// чтобы переиспользовать ScenarioInputFields + scenarioInputFields.helpers
-// (serializeFields / missingRequiredFields / defaultsFromSchema). Типы input-DSL
-// (string/int/bool/list/map и синонимы) нормализуются в простые типы формы.
-// ADR-045 S4: enum/pattern/format/source пробрасываются для расширенного UI
-// (SID-picker, pattern-валидация, dropdown).
+// Mapping of ModuleParam[] (from the module catalog) to flat-map ScenarioInputSchema,
+// to reuse ScenarioInputFields + scenarioInputFields.helpers
+// (serializeFields / missingRequiredFields / defaultsFromSchema). input-DSL types
+// (string/int/bool/list/map and synonyms) are normalized to simple form types.
+// ADR-045 S4: enum/pattern/format/source are passed through for the extended UI
+// (SID picker, pattern validation, dropdown).
 
 const INT_TYPES = new Set(['int', 'integer', 'int64', 'int32']);
 const NUMBER_TYPES = new Set(['number', 'float', 'float64', 'double']);
 const BOOL_TYPES = new Set(['bool', 'boolean']);
-// list/array → array; map/object → object (normalizeType).
-// map дополнительно сохраняется флагом isMap для KEY→VALUE-редактора.
+// list/array -> array; map/object -> object (normalizeType).
+// map is additionally kept as an isMap flag for the KEY->VALUE editor.
 const ARRAY_TYPES = new Set(['list', 'array']);
 const MAP_TYPES = new Set(['map']);
 const OBJECT_TYPES = new Set(['object']);
@@ -37,9 +37,9 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
       type: normalizeType(p.type),
       required: Boolean(p.required),
       description: p.description,
-      // secret-флаг прокидываем для возможной маскировки/подсказки в UI.
+      // secret flag is passed through for possible masking/hint in the UI.
       secret: Boolean(p.secret),
-      // ADR-045: UI-форма расширений — enum/pattern/format/source/items.
+      // ADR-045: UI extension fields — enum/pattern/format/source/items.
       ...(p.enum != null ? { enum: p.enum } : {}),
       ...(p.pattern != null ? { pattern: p.pattern } : {}),
       ...(p.format != null ? { format: p.format } : {}),
@@ -47,16 +47,16 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
       // B3: multiline → textarea; example → placeholder.
       ...(p.multiline != null ? { multiline: p.multiline } : {}),
       ...(p.example != null ? { example: p.example } : {}),
-      // B2: isMap сохраняет признак type=map (нормализован в object) для KEY→VALUE-редактора.
+      // B2: isMap preserves the type=map marker (normalized to object) for the KEY->VALUE editor.
       ...(isMapRawType(p.type) ? { isMap: true } : {}),
-      // S8b: items описывает тип элемента (list) или значения (map).
+      // S8b: items describes the element type (list) or value type (map).
       ...(p.items != null ? { items: {
         type: normalizeType(p.items.type),
         format: p.items.format,
         pattern: p.items.pattern,
         source: p.items.source,
         enum: p.items.enum ?? undefined,
-        // isMap для вложенного items (если elements тоже map).
+        // isMap for nested items (if elements are also a map).
         ...(isMapRawType(p.items.type) ? { isMap: true } : {}),
       } } : {}),
     };
@@ -64,11 +64,11 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
   return out;
 }
 
-// Re-export для использования в SidPicker без прямого импорта api/keeper.
+// Re-export for use in SidPicker without a direct api/keeper import.
 export type { ModuleInputSource };
 
-// Есть ли у модуля формализованные параметры (plugin-модули). Пустой массив —
-// core-модуль без input-схемы (рендерим cmd-поля / dynamic builder).
+// Whether the module has formalized parameters (plugin modules). An empty array —
+// a core module without an input schema (renders cmd fields / dynamic builder).
 export function hasParams(params: ModuleParam[] | undefined): boolean {
   return Array.isArray(params) && params.length > 0;
 }

@@ -16,8 +16,8 @@ interface Props {
   incarnationName: string;
 }
 
-// Скачивание текущего runtime-state как JSON-файла. Blob + objectURL —
-// без обращения к серверу (данные уже в памяти у клиента).
+// Download the current runtime state as a JSON file. Blob + objectURL —
+// without hitting the server (data is already in memory on the client).
 function downloadStateJson(name: string, state: Record<string, unknown>, version: number): void {
   const payload = { incarnation: name, state_schema_version: version, state };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -31,18 +31,18 @@ function downloadStateJson(name: string, state: Record<string, unknown>, version
   URL.revokeObjectURL(url);
 }
 
-// Tab «Runtime State» — текущая структурированная конфигурация incarnation
-// (что система знает после успешных apply-прогонов). Записывается
-// scenario-applier-ом, читается через `register.*` и в `state_changes`.
+// Tab "Runtime State" — the incarnation's current structured configuration
+// (what the system knows after successful apply runs). Written by the
+// scenario applier, read via `register.*` and in `state_changes`.
 //
-// Если в state.hosts (object keyed by SID) есть per-host записи — отдельная
-// секция с таблицей.
+// If state.hosts (object keyed by SID) has per-host entries — a separate
+// section with a table.
 export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) {
   const { t } = useTranslation();
   const isEmpty = !state || (typeof state === 'object' && Object.keys(state).length === 0);
 
-  // state.hosts — convention: scenario может писать per-host state в
-  // state.hosts[<sid>] = {...} (см. ТЗ от пользователя; не обязательное поле).
+  // state.hosts — convention: a scenario may write per-host state to
+  // state.hosts[<sid>] = {...} (per user spec; not a required field).
   const hostsRaw = state && typeof state === 'object'
     ? (state as Record<string, unknown>).hosts
     : null;
@@ -55,9 +55,9 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
     }
   }
 
-  // NIM-74: state.redis_users — таблица ACL-юзеров с reveal-глазом. Discovery грузим
-  // лениво (только если ключ есть в state); при 404/ошибке — graceful, редис-юзеры
-  // отрисуются обычным JSON-фильтром ниже.
+  // NIM-74: state.redis_users — table of ACL users with a reveal eye. Discovery is loaded
+  // lazily (only if the key is present in state); on 404/error — graceful, Redis users
+  // render via the plain JSON filter below.
   const redisUsersRaw = state && typeof state === 'object'
     ? (state as Record<string, unknown>).redis_users
     : undefined;
@@ -72,7 +72,7 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
   const showRedisUsersTable = hasRedisUsers && Boolean(revealableItem);
   const redisUsers = showRedisUsersTable ? normalizeRedisUsers(redisUsersRaw) : [];
 
-  // Остаток state без hosts (и без redis_users, когда он вынесен в таблицу) — чтобы не дублировать.
+  // The rest of state without hosts (and without redis_users when moved to the table) — to avoid duplication.
   const hiddenKeys = new Set<string>(['hosts']);
   if (showRedisUsersTable) hiddenKeys.add('redis_users');
   const stateWithoutHosts = state && typeof state === 'object'

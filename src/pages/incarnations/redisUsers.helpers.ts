@@ -4,8 +4,8 @@ export interface RedisUser {
   state?: unknown;
 }
 
-// state.redis_users: v14 — типизированный массив [{name,perms,state}] (ADR-062 AclUser);
-// legacy (до 005_to_006) — map name→{perms,state}. Нормализуем оба, не падаем на мусоре.
+// state.redis_users: v14 - typed array [{name,perms,state}] (ADR-062 AclUser);
+// legacy (before 005_to_006) - map name->{perms,state}. Normalize both, don't crash on garbage.
 export function normalizeRedisUsers(raw: unknown): RedisUser[] {
   if (Array.isArray(raw)) {
     return raw

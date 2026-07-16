@@ -14,19 +14,19 @@ import styles from '../common.module.css';
 
 type Mode = 'append' | 'remove' | 'replace';
 
-// Два режима модалки:
-//   - single: правка ковенов одного Soul (на странице detail). Селектор —
-//     {sids: [sid]}. Чаще всего mode=replace с новым набором.
-//   - bulk: массовая операция из списка с multi-select. Селектор —
-//     {sids: [<selected>]}, оператор выбирает mode + одну label (append/remove)
-//     или набор labels (replace).
+// Two modal modes:
+//   - single: edit covens of one Soul (on the detail page). Selector —
+//     {sids: [sid]}. Most often mode=replace with a new set.
+//   - bulk: bulk operation from a list with multi-select. Selector —
+//     {sids: [<selected>]}, operator picks mode + a single label (append/remove)
+//     or a set of labels (replace).
 //
-// API: POST /v1/souls/coven с SoulCovenAssignRequest. Ответ — SoulCovenAssignReply
-// с matched/changed/status (completed|partial). При partial показываем warning.
+// API: POST /v1/souls/coven with SoulCovenAssignRequest. Response — SoulCovenAssignReply
+// with matched/changed/status (completed|partial). On partial we show a warning.
 interface Props {
   open: boolean;
   onClose: () => void;
-  // single — текущие covens конкретной Soul, для preview chips.
+  // single — current covens of a specific Soul, for preview chips.
   variant:
     | { kind: 'single'; sid: string; currentCovens: string[] }
     | { kind: 'bulk'; sids: string[] };
@@ -54,7 +54,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
     onSuccess: (r) => {
       setReply(r);
       setServerError(null);
-      // Инвалидируем кэш и detail, и list-а — оба зависят от covens.
+      // Invalidate cache of both detail and list — both depend on covens.
       qc.invalidateQueries({ queryKey: ['souls'] });
       if (variant.kind === 'single') {
         qc.invalidateQueries({ queryKey: ['soul', variant.sid] });
@@ -109,7 +109,7 @@ export function CovenAssignModal({ open, onClose, variant }: Props) {
       ? `${t('souls:covenAssignment')}: ${variant.sid}`
       : t('souls:bulkCovenTitle', { count: targetCount, noun: targetCount === 1 ? 'Soul' : 'Souls' });
 
-  // Success state — показываем reply matched/changed/status.
+  // Success state — display the reply matched/changed/status.
   if (reply) {
     return (
       <Modal

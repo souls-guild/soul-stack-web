@@ -62,7 +62,7 @@ export function ProviderCreateModal({ open, onClose }: Props) {
 
   const onValid = (v: ProviderCreateFormValues) => {
     setServerError(null);
-    // credentials XOR credentials_ref — шлём поле активного режима (ADR-064).
+    // credentials XOR credentials_ref — send the field of the active mode (ADR-064).
     const body: ProviderCreateRequest = {
       name: v.name,
       type: v.type,

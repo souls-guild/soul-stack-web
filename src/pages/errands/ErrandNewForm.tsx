@@ -31,10 +31,10 @@ import {
 import styles from '../common.module.css';
 
 // Submit-flow:
-//   1. Валидируем форму через zod resolver конкретного модуля.
-//   2. Маппим в ErrandRunRequest (module/input/timeout_seconds/dry_run).
-//   3. POST /v1/souls/{sid}/exec → sync (ErrandResult) или async (ErrandAccepted).
-//   4. В обоих случаях навигируем на /errands/<errand_id> (detail с polling).
+//   1. Validate the form via the zod resolver of the specific module.
+//   2. Map into ErrandRunRequest (module/input/timeout_seconds/dry_run).
+//   3. POST /v1/souls/{sid}/exec -> sync (ErrandResult) or async (ErrandAccepted).
+//   4. In both cases navigate to /errands/<errand_id> (detail with polling).
 
 type ModuleKind = 'core.cmd.shell' | 'core.exec.run' | 'custom';
 
@@ -44,9 +44,9 @@ function pickKindFromQuery(m: string | null): ModuleKind {
   return 'core.cmd.shell';
 }
 
-// Для non-known errand-safe модулей из каталога — формируем select-value
-// в виде `__m:<name>` чтобы отличать от literal 'custom' и из onChange
-// восстанавливать имя модуля для prefill CustomForm.
+// For non-known errand-safe modules from the catalog — build the select value
+// as `__m:<name>` to distinguish it from the literal 'custom' and, from onChange,
+// recover the module name for prefilling CustomForm.
 function encodeNonKnown(name: string): string {
   return `__m:${name}`;
 }
@@ -80,12 +80,12 @@ export function ErrandNewForm() {
   const prefilledModule = params.get('module');
 
   const [kind, setKind] = useState<ModuleKind>(() => pickKindFromQuery(prefilledModule));
-  // Имя модуля для CustomForm: из query-prefill или из выбора non-known в каталоге.
+  // Module name for CustomForm: from query prefill or from a non-known catalog selection.
   const [customModuleName, setCustomModuleName] = useState<string>(() =>
     prefilledModule && !isKnownModule(prefilledModule) ? prefilledModule : '',
   );
 
-  // errand-safe модули из каталога — backend-политика, не хардкод.
+  // errand-safe modules from the catalog — backend policy, not hardcoded.
   const moduleCatalog = useQuery({
     queryKey: ['modules.catalog', true] as const,
     queryFn: () => keeperApi.modules.list({ errand_safe: true }),
@@ -94,7 +94,7 @@ export function ErrandNewForm() {
   });
   const errandSafeModules = moduleCatalog.data?.items ?? [];
 
-  // souls list — для dropdown подсказок. Подгружаем только когда sid не задан через query.
+  // souls list — for dropdown suggestions. Only fetched when sid is not set via query.
   const souls = useQuery({
     queryKey: ['errand.new.souls'],
     queryFn: () => keeperApi.souls.list({ limit: 200 }),
@@ -158,8 +158,8 @@ export function ErrandNewForm() {
             style={selectStyle}
           >
             {errandSafeModules.map((m) => (
-              // Known-модули: option.value = имя (typed-форма).
-              // Non-known errand-safe: value = __m:<name> → CustomForm с prefill.
+              // Known modules: option.value = name (typed form).
+              // Non-known errand-safe: value = __m:<name> -> CustomForm with prefill.
               <option key={m.name} value={isKnownModule(m.name) ? m.name : encodeNonKnown(m.name)}>
                 {m.name}
               </option>
@@ -233,14 +233,14 @@ export function ErrandNewForm() {
   );
 }
 
-// --- generic shared subcomponents (типизированы через FieldValues, без any) ---
+// --- generic shared subcomponents (typed via FieldValues, no any) ---
 
 interface SidFieldProps<T extends FieldValues> {
   prefilledSid: string;
   soulsOptions: string[];
   register: UseFormRegister<T>;
   errorMsg?: string;
-  // Имя поля в схеме (у нас всегда `sid`, но typed-связь нужна для register).
+  // Field name in the schema (always `sid` for us, but the typed link is needed for register).
   name: Path<T>;
 }
 
@@ -292,7 +292,7 @@ interface EnvFieldsProps<T extends FieldValues> {
   append: (v: { key: string; value: string }) => void;
   remove: (i: number) => void;
   register: UseFormRegister<T>;
-  // basePath — `env` или другое, мы передаём literal-name.
+  // basePath — `env` or another, we pass the literal name.
   basePath: ArrayPath<T>;
 }
 

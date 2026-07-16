@@ -1,26 +1,26 @@
-// Target DSL UI → API-форма (ErrandRunTarget / Tide-target).
+// Target DSL UI -> API shape (ErrandRunTarget / Tide-target).
 //
-// UI поддерживает 5 режимов выбора:
+// UI supports 5 selection modes:
 //   sids        — multi-select SID (FQDN).
-//   coven       — список Coven-меток (chips).
-//   glob        — `prod-*` (FQDN-маска, шлётся как CEL `sid.glob("…")`).
-//   regex       — `^db-[0-9]+$` (POSIX RE2, шлётся как `sid.matches("…")`).
-//   cel_where   — raw CEL предикат.
+//   coven       — list of Coven labels (chips).
+//   glob        — `prod-*` (FQDN mask, sent as CEL `sid.glob("...")`).
+//   regex       — `^db-[0-9]+$` (POSIX RE2, sent as `sid.matches("...")`).
+//   cel_where   — raw CEL predicate.
 //
-// Backend (Errand multi-target и Tide invocation-time override) ожидает форму
-// `{ sids?: [...], coven?: [...], where?: "<CEL>" }`. Translator AND-merge-ит
-// все включённые режимы через `where`-конъюнкцию.
+// Backend (Errand multi-target and Tide invocation-time override) expects the
+// shape `{ sids?: [...], coven?: [...], where?: "<CEL>" }`. Translator AND-merges
+// all enabled modes via a `where` conjunction.
 
 import type { ErrandRunTarget } from '../../api/keeper';
 import i18n from '../../i18n';
 
-// Pure-функции (вне React-дерева) используют глобальный i18n-инстанс.
+// Pure functions (outside the React tree) use the global i18n instance.
 const t = i18n.t.bind(i18n);
 
 export type TargetMode = 'sids' | 'coven' | 'glob' | 'regex' | 'cel_where';
 
 export interface TargetSpec {
-  // Активные режимы (порядок не важен; AND-merge во `where`).
+  // Active modes (order does not matter; AND-merged into `where`).
   modes: ReadonlySet<TargetMode>;
   sids: string[];
   coven: string[];
@@ -38,13 +38,13 @@ export const EMPTY_TARGET_SPEC: TargetSpec = {
   celWhere: '',
 };
 
-// Escape для подстановки строкового literal-а в CEL: backslash и double-quote.
-// Других escape-ов CEL не требует для базового string literal.
+// Escaping for substituting a string literal into CEL: backslash and double-quote.
+// CEL requires no other escapes for a basic string literal.
 function celString(s: string): string {
   return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-// CEL-AND-merge: если where-предикатов несколько, склеиваем через `&&` с paren-обёрткой.
+// CEL AND-merge: if there are multiple where-predicates, join via `&&` with paren-wrapping.
 function andMerge(parts: string[]): string | undefined {
   const nonEmpty = parts.filter((p) => p.trim().length > 0);
   if (nonEmpty.length === 0) return undefined;
@@ -54,7 +54,7 @@ function andMerge(parts: string[]): string | undefined {
 
 export interface TranslateResult {
   target: ErrandRunTarget;
-  // Не-fatal предупреждения (например, пустой glob, пустой sids-список и т.п.).
+  // Non-fatal warnings (e.g. empty glob, empty sids list, etc).
   warnings: string[];
 }
 
@@ -103,7 +103,7 @@ export function translateTarget(spec: TargetSpec): TranslateResult {
   return { target, warnings };
 }
 
-// Краткая текстовая сводка для preview-counter / submit-кнопки.
+// Short text summary for the preview-counter / submit button.
 export function describeTarget(spec: TargetSpec): string {
   const parts: string[] = [];
   if (spec.modes.has('sids') && spec.sids.length > 0) parts.push(`${spec.sids.length} SID`);
@@ -114,7 +114,7 @@ export function describeTarget(spec: TargetSpec): string {
   return parts.length === 0 ? t('run:targetNotSet') : parts.join(' AND ');
 }
 
-// Считаем «есть ли реально хоть что-то задающее scope». Используется для блокировки submit.
+// Checks whether anything actually defines a scope. Used to gate submit.
 export function hasAnyTarget(spec: TargetSpec): boolean {
   if (spec.modes.has('sids') && spec.sids.length > 0) return true;
   if (spec.modes.has('coven') && spec.coven.length > 0) return true;
@@ -124,7 +124,7 @@ export function hasAnyTarget(spec: TargetSpec): boolean {
   return false;
 }
 
-// CSV-парсер для target_sids/target_coven: trim + drop empty.
+// CSV parser for target_sids/target_coven: trim + drop empty.
 function splitCsv(raw: string): string[] {
   return raw
     .split(',')
@@ -132,15 +132,15 @@ function splitCsv(raw: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-// Восстановление TargetSpec из URL search-params. Используется bulk-run actions
-// со списочных страниц (SoulsList / HostsTab / ServiceDetail) для pre-fill
-// Step 3 Wizard-а. Поддерживаемые ключи:
-//   target_sids   — CSV SID-ов → mode='sids'.
-//   target_coven  — CSV Coven-меток → mode='coven'.
-//   target_glob   — FQDN-маска → mode='glob'.
-//   target_regex  — RE2 → mode='regex'.
-//   target_where  — raw CEL → mode='cel_where'.
-// Несколько ключей одновременно — AND-merge (несколько активных режимов).
+// Restores TargetSpec from URL search-params. Used by bulk-run actions from
+// list pages (SoulsList / HostsTab / ServiceDetail) to pre-fill Wizard
+// Step 3. Supported keys:
+//   target_sids   — CSV of SIDs -> mode='sids'.
+//   target_coven  — CSV of Coven labels -> mode='coven'.
+//   target_glob   — FQDN mask -> mode='glob'.
+//   target_regex  — RE2 -> mode='regex'.
+//   target_where  — raw CEL -> mode='cel_where'.
+// Multiple keys at once -> AND-merge (multiple active modes).
 export function specFromQueryParams(params: URLSearchParams): TargetSpec {
   const modes = new Set<TargetMode>();
   const sidsRaw = params.get('target_sids');
@@ -164,8 +164,8 @@ export function specFromQueryParams(params: URLSearchParams): TargetSpec {
   return { modes, sids, coven, glob, regex, celWhere };
 }
 
-// Был ли в query вообще задан target-параметр (чтобы wizard понял, что нужно
-// прыгать на Step 3 минуя Step 2 при готовых workload-params).
+// Whether a target-parameter was set in the query at all (so the wizard knows
+// to jump to Step 3 skipping Step 2 when workload-params are already set).
 export function queryHasTargetParams(params: URLSearchParams): boolean {
   return (
     params.has('target_sids') ||
@@ -176,22 +176,22 @@ export function queryHasTargetParams(params: URLSearchParams): boolean {
   );
 }
 
-// Фильтры со списочной страницы Souls (status/transport/coven) + soulprint-DSL
-// → CEL-фрагмент для передачи в Wizard через ?target_where=...
-// status=connected         → `status == "connected"`
-// transport=agent          → `transport == "agent"`
-// coven=[prod,stage]       → `("prod" in covens) || ("stage" in covens)`
-// soulprint os.family=debian → `soulprint.self.os.family == "debian"`
-// AND-merge всех непустых частей с paren-обёрткой.
+// Filters from the Souls list page (status/transport/coven) + soulprint-DSL
+// -> CEL fragment to pass to the Wizard via ?target_where=...
+// status=connected         -> `status == "connected"`
+// transport=agent          -> `transport == "agent"`
+// coven=[prod,stage]       -> `("prod" in covens) || ("stage" in covens)`
+// soulprint os.family=debian -> `soulprint.self.os.family == "debian"`
+// AND-merge of all non-empty parts with paren-wrapping.
 export interface SoulsFilterSnapshot {
   status?: string;
   transport?: string;
   covens?: string[];
-  // Уже распарсенные правила soulprintFilter. Передаются как есть, без
-  // re-парсинга: SoulsList уже умеет валидировать syntax.
+  // Already-parsed soulprintFilter rules. Passed through as-is, without
+  // re-parsing: SoulsList already validates syntax.
   soulprintRules?: ReadonlyArray<{ path: string; op: string; value: string | number }>;
-  // SID-search (contains) — переводится в sid.glob или sid.matches; здесь
-  // используем подстроку через CEL `sid.contains(...)`. Если пусто — игнорим.
+  // SID-search (contains) — translated to sid.glob or sid.matches; here
+  // we use substring via CEL `sid.contains(...)`. If empty — ignored.
   sidSearch?: string;
 }
 
@@ -219,9 +219,9 @@ export function filtersToCEL(snap: SoulsFilterSnapshot): string {
   return andMerge(parts) ?? '';
 }
 
-// Перевод одного soulprintFilter-правила в CEL. Wildcard '*' → matches(...).
-// Семантика — упрощённое best-effort: CEL backend сам решает, разрешён ли
-// он для where-таргетинга; здесь мы только генерируем фрагмент.
+// Translation of a single soulprintFilter rule into CEL. Wildcard '*' -> matches(...).
+// Semantics are simplified best-effort: the CEL backend itself decides whether
+// it is allowed for where-targeting; here we only generate the fragment.
 function soulprintRuleToCEL(rule: { path: string; op: string; value: string | number }): string | null {
   const path = `soulprint.self.${rule.path}`;
   const v = rule.value;
@@ -234,7 +234,7 @@ function soulprintRuleToCEL(rule: { path: string; op: string; value: string | nu
       default: return null;
     }
   }
-  // Строка: wildcard → matches с конверсией '*' → '.*'.
+  // String: wildcard -> matches with conversion of '*' -> '.*'.
   const isWildcard = v.includes('*');
   if (isWildcard) {
     const re = v.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');

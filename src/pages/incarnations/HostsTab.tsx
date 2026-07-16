@@ -13,16 +13,16 @@ import { AddHostModal } from './AddHostModal';
 import { RemoveHostModal } from './RemoveHostModal';
 import styles from '../common.module.css';
 
-// Hosts-вкладка для IncarnationDetail.
+// Hosts tab for IncarnationDetail.
 //
-// Источники данных:
-//   1. incarnation.spec.hosts[] — declared-список оператора (ADR-008). Editing
-//      через PATCH /v1/incarnations/{name}/hosts (mode=append/remove). Add host —
-//      модалка AddHostModal (select SID из реестра souls + опц. role); Remove —
-//      per-row кнопка. spec приходит как opaque jsonb (Record<string,unknown>),
-//      hosts[] извлекаем руками (extractDeclaredHosts).
-//   2. Connected souls — derived view: souls с coven=incarnation.name (см. ADR-008,
-//      incarnation.name — корневая Coven-метка).
+// Data sources:
+//   1. incarnation.spec.hosts[] — the operator's declared list (ADR-008). Editing
+//      via PATCH /v1/incarnations/{name}/hosts (mode=append/remove). Add host —
+//      the AddHostModal (select SID from the souls registry + opt. role); Remove —
+//      a per-row button. spec arrives as opaque jsonb (Record<string,unknown>),
+//      hosts[] is extracted manually (extractDeclaredHosts).
+//   2. Connected souls — derived view: souls with coven=incarnation.name (see ADR-008,
+//      incarnation.name is the root Coven label).
 
 interface DeclaredHost {
   sid: string;
@@ -50,9 +50,9 @@ function extractDeclaredHosts(spec: Record<string, unknown> | null | undefined):
   return out;
 }
 
-// Per-host runtime data — convention: scenario может писать per-host state в
-// incarnation.state.hosts[<sid>] = {...}. Поле не обязательное; если scenario
-// его не использует — секция показывает empty state.
+// Per-host runtime data — convention: a scenario can write per-host state to
+// incarnation.state.hosts[<sid>] = {...}. The field is optional; if the scenario
+// doesn't use it, the section shows an empty state.
 function extractRuntimeHosts(
   state: Record<string, unknown> | null | undefined,
 ): Array<{ sid: string; role: string | null; data: Record<string, unknown> }> {
@@ -74,8 +74,8 @@ interface Props {
   incarnationName: string;
   spec: Record<string, unknown> | null | undefined;
   state: Record<string, unknown> | null | undefined;
-  // Статус incarnation: editing spec.hosts заблокировано при destroying/destroy_failed
-  // (backend вернёт 409). UI прячет кнопки заранее.
+  // Incarnation status: editing spec.hosts is blocked while destroying/destroy_failed
+  // (backend returns 409). UI hides the buttons preemptively.
   status?: string;
 }
 
@@ -85,16 +85,16 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
   const declared = extractDeclaredHosts(spec);
   const runtimeHosts = extractRuntimeHosts(state);
   const [addOpen, setAddOpen] = useState(false);
-  // sid выбранного к удалению хоста; null → модалка подтверждения закрыта.
+  // sid of the host selected for removal; null -> the confirmation modal is closed.
   const [removeSid, setRemoveSid] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  // Editing spec.hosts недоступно при сносе — backend вернёт 409. Прячем UI заранее.
+  // Editing spec.hosts is unavailable during destroy — backend returns 409. Hide the UI preemptively.
   const editingBlocked = status === 'destroying' || status === 'destroy_failed';
 
-  // Connected souls — фильтруем souls по coven=incarnation.name.
-  // Это derived view, не authoritative-список; реальное соответствие проверяется
-  // probe-сценарием (ADR-008).
+  // Connected souls — filter souls by coven=incarnation.name.
+  // This is a derived view, not an authoritative list; the real correspondence is checked
+  // by the probe scenario (ADR-008).
   const connected = useQuery({
     queryKey: ['incarnation-souls', incarnationName],
     queryFn: () => keeperApi.souls.list({ coven: [incarnationName], limit: 200 }),

@@ -16,18 +16,18 @@ interface Props {
   onClose: () => void;
 }
 
-// Issue Token для Soul (transport: agent). API:
+// Issue Token for a Soul (transport: agent). API:
 //   - POST /v1/souls/{sid}/issue-token?force=<bool>
-//   - 200 → SoulIssueTokenReply (plain bootstrap_token, отдаётся один раз);
-//   - 409 → активный токен есть, нужен force=true (старый ревокируется);
-//   - 422 → transport: ssh (модалка не должна открываться для ssh).
-// Отдельного revoke-endpoint нет: revoke = re-issue с force=true. Это
-// проговорено в UI рядом с чекбоксом.
+//   - 200 -> SoulIssueTokenReply (plain bootstrap_token, returned once);
+//   - 409 -> an active token exists, needs force=true (old one is revoked);
+//   - 422 -> transport: ssh (modal should not open for ssh).
+// There is no separate revoke endpoint: revoke = re-issue with force=true.
+// This is explained in the UI next to the checkbox.
 //
-// Замечание про ttl_seconds: openapi.yaml /v1/souls/{sid}/issue-token не
-// принимает body — TTL берётся серверный по умолчанию (см. описание endpoint
-// «TTL по умолчанию»). Поле формы сохраняем для UX, но запрос его не несёт;
-// показываем пользователю как hint о серверном дефолте.
+// Note on ttl_seconds: openapi.yaml /v1/souls/{sid}/issue-token does not
+// accept a body -- TTL is taken from the server default (see endpoint
+// description "default TTL"). We keep the form field for UX, but the
+// request does not carry it; shown to the user as a hint about the server default.
 export function IssueTokenModal({ open, sid, onClose }: Props) {
   const { t } = useTranslation();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export function IssueTokenModal({ open, sid, onClose }: Props) {
     }
   }
 
-  // Success state — показываем plain-токен и warning.
+  // Success state -- show plain token and warning.
   if (issued) {
     return (
       <Modal

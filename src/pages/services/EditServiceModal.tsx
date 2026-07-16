@@ -15,8 +15,8 @@ interface Props {
   service: ServiceView;
 }
 
-// PATCH /v1/services/{name} — replace-семантика mutable-полей (git/ref/refresh);
-// name — ключ записи, не меняется.
+// PATCH /v1/services/{name} — replace semantics for mutable fields (git/ref/refresh);
+// name is the record key and does not change.
 export function EditServiceModal({ open, onClose, service }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();

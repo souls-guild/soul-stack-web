@@ -1,8 +1,8 @@
-// SidPicker — autocomplete-поле для выбора SID(ов) с дебаунсом и form-prep.
+// SidPicker — autocomplete field for choosing SID(s) with debounce and form-prep.
 // ADR-045 S4: format:sid (single) / type:array+format:sid (multi).
 //
-// Если incarnationContext не задан (свободный Command без incarnation) —
-// деградирует в text-input без автокомплита (graceful fallback, не падает).
+// If incarnationContext isn't set (a free-standing Command without an incarnation) —
+// degrades to a text input without autocomplete (graceful fallback, doesn't crash).
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,16 +10,16 @@ import { keeperApi } from '../../api/keeper';
 import type { ModuleFormPrepRequest, ModuleInputSource } from '../../api/keeper';
 
 export interface SidPickerProps {
-  /** Текущее значение. Single: строка. Multi: JSON-массив строк в сыром виде. */
+  /** Current value. Single: a string. Multi: a raw JSON array of strings. */
   value: string | undefined;
   onChange: (v: string) => void;
-  /** source из ModuleParam — описывает, откуда брать SID-ы (incarnation_hosts/choir). */
+  /** source from ModuleParam — describes where to get SIDs from (incarnation_hosts/choir). */
   source?: ModuleInputSource;
-  /** Имя incarnation из контекста wizard (для incarnation_hosts source). */
+  /** Incarnation name from the wizard context (for the incarnation_hosts source). */
   incarnationContext?: string;
-  /** Имя choir (если source.choir задан и нужен choir-контекст). */
+  /** Choir name (if source.choir is set and a choir context is needed). */
   choirName?: string;
-  /** Имя модуля (нужно для form-prep URL). */
+  /** Module name (needed for the form-prep URL). */
   moduleName: string;
   multi?: boolean;
   required?: boolean;
@@ -49,21 +49,21 @@ export function SidPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Текущий multi-список: парсим из raw-JSON-массива.
+  // Current multi-list: parsed from the raw JSON array.
   const multiValues: string[] = multi ? parseMulti(value) : [];
 
-  // source задаёт привязку к инкарнации/choir — единый источник истины для обеих веток ниже.
+  // source defines the incarnation/choir binding — single source of truth for both branches below.
   const hasSource = Boolean(source?.incarnation_hosts || source?.choir);
 
-  // Есть ли у нас контекст для form-prep.
+  // Do we have a context for form-prep.
   const hasContext = Boolean(incarnationContext && hasSource);
 
-  // Строим body source для form-prep.
+  // Build the body source for form-prep.
   function buildFormPrepSource(): ModuleFormPrepRequest['source'] {
     if (source?.choir && incarnationContext && choirName) {
       return { choir: { incarnation: incarnationContext, name: choirName } };
     }
-    // incarnation_hosts — имя инкарнации строкой.
+    // incarnation_hosts — the incarnation name as a string.
     return { incarnation_hosts: incarnationContext ?? '' };
   }
 
@@ -90,7 +90,7 @@ export function SidPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefix, open, hasContext, incarnationContext, moduleName]);
 
-  // Закрыть dropdown при клике вне.
+  // Close the dropdown on an outside click.
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -112,10 +112,10 @@ export function SidPicker({
     boxSizing: 'border-box',
   };
 
-  // Source задан, но нет incarnationContext (свободный command-прогон).
-  // Text-ввод здесь бесполезен — backend не сможет резолвить произвольный SID
-  // для source:choir/incarnation_hosts без привязки к инкарнации.
-  // Показываем понятное пояснение вместо вводимого поля.
+  // source is set, but there's no incarnationContext (a free-standing command run).
+  // A text input is useless here — the backend can't resolve an arbitrary SID
+  // for source:choir/incarnation_hosts without an incarnation binding.
+  // Show a clear explanation instead of an input field.
   if (!hasContext && hasSource) {
     const hintKey = source?.choir
       ? 'sidPickerNoContextChoir'
@@ -139,7 +139,7 @@ export function SidPicker({
     );
   }
 
-  // Нет source (обычное поле sid без source) — легитимный text-ввод.
+  // No source (a plain sid field without source) — a legitimate text input.
   if (!hasContext) {
     return (
       <div>
@@ -236,7 +236,7 @@ export function SidPicker({
         onChange={(e) => { setPrefix(e.target.value); setOpen(true); }}
         onFocus={() => { setPrefix(value ?? ''); setOpen(true); }}
         onBlur={() => {
-          // Небольшая задержка, чтобы успел сработать клик по пункту.
+          // Small delay so a click on the item has time to fire.
           setTimeout(() => setOpen(false), 150);
         }}
         placeholder={t('sidPickerPlaceholder')}

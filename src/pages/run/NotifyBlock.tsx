@@ -1,7 +1,7 @@
 /**
- * Блок «Уведомления о прогоне» для Step 4 RunWizard (разовые notify[]).
- * Каждый элемент — VoyageNotify (herald + on + only_failures/only_changes + annotations + projection).
- * Разовые правила живут только для этого прогона; постоянные — Tidings (/notifications).
+ * "Run notifications" block for Step 4 of RunWizard (one-off notify[]).
+ * Each item is a VoyageNotify (herald + on + only_failures/only_changes + annotations + projection).
+ * One-off rules apply only to this run; permanent ones — Tidings (/notifications).
  */
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import type { VoyageNotify, VoyageNotifyOn } from '../../api/keeper';
 import { Button } from '../../components/primitives';
 import styles from './WizardSteps.module.css';
 
-// Значение по умолчанию для нового notify-элемента.
+// Default value for a new notify item.
 const DEFAULT_NOTIFY: VoyageNotify = {
   herald: '',
   on: [],
@@ -30,7 +30,7 @@ interface KeyValue {
   value: string;
 }
 
-// Вспомогательный редактор key-value для annotations.
+// Helper key-value editor for annotations.
 function KVEditor({
   pairs,
   onChange,
@@ -114,7 +114,7 @@ function KVEditor({
   );
 }
 
-// Вспомогательный редактор списка строк (projection paths).
+// Helper editor for a list of strings (projection paths).
 function ProjectionEditor({
   paths,
   onChange,
@@ -177,7 +177,7 @@ function ProjectionEditor({
   );
 }
 
-// Конвертация VoyageNotify.annotations (Record<string,unknown> | undefined) ↔ KeyValue[].
+// Conversion of VoyageNotify.annotations (Record<string,unknown> | undefined) <-> KeyValue[].
 function annotationsToKV(ann: Record<string, unknown> | undefined): KeyValue[] {
   if (!ann) return [];
   return Object.entries(ann).map(([key, value]) => ({ key, value: String(value) }));
@@ -188,7 +188,7 @@ function kvToAnnotations(pairs: KeyValue[]): Record<string, string> | undefined 
   return Object.fromEntries(valid.map((p) => [p.key.trim(), p.value]));
 }
 
-// Один notify-элемент (collapsed/expanded редактор).
+// A single notify item (collapsed/expanded editor).
 function NotifyItem({
   index,
   value,
@@ -204,15 +204,15 @@ function NotifyItem({
 }) {
   const { t } = useTranslation();
 
-  // Локальный state для пар ключ-значение аннотаций.
-  // Нельзя вычислять из value.annotations при каждом рендере:
-  // kvToAnnotations отбрасывает пустые ключи → новая строка исчезает сразу после добавления.
+  // Local state for annotation key-value pairs.
+  // Cannot derive from value.annotations on every render:
+  // kvToAnnotations drops empty keys -> a new row would disappear right after being added.
   const [kvPairs, setKvPairs] = useState<KeyValue[]>(() =>
     annotationsToKV(value.annotations as Record<string, unknown> | undefined),
   );
 
-  // Синхронизируем локальный state при внешней смене value.annotations
-  // (например, при сбросе формы), но не при каждом onChange от самого редактора.
+  // Sync local state when value.annotations changes externally
+  // (e.g. on form reset), but not on every onChange from the editor itself.
   const annotationsKey = JSON.stringify(value.annotations);
   useEffect(() => {
     setKvPairs(annotationsToKV(value.annotations as Record<string, unknown> | undefined));
@@ -291,7 +291,7 @@ function NotifyItem({
         </Button>
       </div>
 
-      {/* on[] мультивыбор */}
+      {/* on[] multi-select */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 90 }}>
           {t('run:notifyOnLabel')}
@@ -346,7 +346,7 @@ function NotifyItem({
         </label>
       </div>
 
-      {/* Расширенные поля (annotations + projection) — сворачиваемые */}
+      {/* Advanced fields (annotations + projection) — collapsible */}
       <button
         type="button"
         onClick={() => setShowAdvanced((v) => !v)}
@@ -396,20 +396,20 @@ function NotifyItem({
 
 
 export interface NotifyBlockProps {
-  /** Текущий список notify-элементов. */
+  /** Current list of notify items. */
   value: VoyageNotify[];
   onChange: (next: VoyageNotify[]) => void;
   /**
-   * ephemeral (default) — разовые правила, действуют только для этого прогона.
-   * permanent — постоянное правило, живёт пока живёт расписание (cadence).
-   * Меняет только подзаголовок/hint; поля идентичны.
+   * ephemeral (default) — one-off rules, apply only to this run.
+   * permanent — a permanent rule, lives as long as the schedule (cadence) does.
+   * Only changes the subtitle/hint; fields are identical.
    */
   mode?: 'ephemeral' | 'permanent';
 }
 
 /**
- * NotifyBlock — секция «Уведомления о прогоне» в Step 4.
- * Фетчит список Heralds (для select). При пустом списке — ссылка «создать канал».
+ * NotifyBlock — the "run notifications" section in Step 4.
+ * Fetches the list of Heralds (for the select). If empty — a "create channel" link.
  */
 export function NotifyBlock({ value, onChange, mode = 'ephemeral' }: NotifyBlockProps) {
   const { t } = useTranslation();

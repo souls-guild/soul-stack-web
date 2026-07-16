@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
 }
 
-// DELETE /v1/services/{name} — удаляет запись реестра. Git-репо не трогается.
+// DELETE /v1/services/{name} — removes the registry entry. Git repo is untouched.
 export function DeregisterServiceModal({ open, service, onClose }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();

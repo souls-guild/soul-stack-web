@@ -1,7 +1,7 @@
-// Read-only отображение incarnation.traits (ADR-060) — companion к TraitsEditor
-// (write-виджет). Ключ → scalar | list of scalars; list-значения раскрываются
-// через запятую внутри одного чипа. maxVisible ограничивает число видимых
-// ключей, остальное сворачивается в чип «+N».
+// Read-only display of incarnation.traits (ADR-060) — companion to TraitsEditor
+// (write widget). Key -> scalar | list of scalars; list values are expanded
+// with a comma inside one chip. maxVisible limits the number of visible
+// keys, the rest collapses into a "+N" chip.
 
 import { useTranslation } from 'react-i18next';
 import { Badge } from '../../components/primitives';
@@ -19,7 +19,7 @@ interface Props {
   emptyFallback?: string;
 }
 
-/** Компактный набор чипов `key=value` из incarnation.traits. */
+/** Compact set of `key=value` chips from incarnation.traits. */
 export function TraitsChips({ traits, maxVisible = Infinity, emptyFallback = '—' }: Props) {
   const { t } = useTranslation();
   const entries = traits && typeof traits === 'object' ? Object.entries(traits) : [];

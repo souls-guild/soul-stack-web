@@ -9,7 +9,7 @@ import { isSigilDisabled } from './sigilUtils';
 import { Badge, Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// Известные namespace-ы Sigil-реестра (см. /v1/plugins/sigils schema description).
+// Known Sigil registry namespaces (see /v1/plugins/sigils schema description).
 // `mod` = SoulModule + soul_beacon, `cloud` = CloudDriver, `ssh` = SshProvider.
 const KNOWN_NAMESPACES = ['mod', 'cloud', 'ssh'] as const;
 
@@ -32,8 +32,8 @@ export function PluginsList() {
 
   const items = useMemo<PluginSigilView[]>(() => q.data?.items ?? [], [q.data]);
 
-  // Уникальные namespace-ы из ответа + known (на случай если ничего нет, чипы
-  // всё равно есть — чтобы было видно, какие бывают).
+  // Unique namespaces from the response + known ones (in case there's nothing yet,
+  // chips are still shown — so it's visible which ones exist).
   const allNamespaces = useMemo<string[]>(() => {
     const set = new Set<string>(KNOWN_NAMESPACES);
     for (const it of items) set.add(it.namespace);

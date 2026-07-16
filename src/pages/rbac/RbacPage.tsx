@@ -145,7 +145,7 @@ function PermissionsTab({ roles, onEdit }: PermissionsTabProps) {
 
 interface MembersTabProps {
   roles: RoleView[];
-  // Все операторы кластера (для inline-assign к оператору без ролей).
+  // All operators in the cluster (for inline-assign to an operator without roles).
   operators: readonly { aid: string; revoked_at?: string | null }[];
   onAssign: (aid: string) => void;
 }
@@ -164,7 +164,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
     onError: (err) => setServerError(prettyRbacError(err)),
   });
 
-  // Перестраиваем «роль → операторы» в «оператор → роли».
+  // Rebuild "role -> operators" into "operator -> roles".
   const byOperator = useMemo(() => {
     const acc = new Map<string, string[]>();
     for (const r of roles) {
@@ -174,7 +174,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
         else acc.set(aid, [r.name]);
       }
     }
-    // Добавим operators без ролей — чтобы было видно, кому assign-ить.
+    // Add operators without roles — so it's visible who to assign to.
     for (const op of operators) {
       if (op.revoked_at) continue;
       if (!acc.has(op.aid)) acc.set(op.aid, []);
@@ -201,7 +201,7 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
           {byOperator.map(([aid, rs]) => (
             <tr key={aid}>
               <td className="mono">
-                {/* AID кликабелен — ведёт на карточку архонта */}
+                {/* AID is clickable — links to the archon card */}
                 <Link
                   to={`/archons/${encodeURIComponent(aid)}`}
                 >
@@ -288,8 +288,8 @@ export function RbacPage() {
     queryFn: () => keeperApi.roles.list(),
   });
 
-  // operators.list — нужен только на табе members, чтобы показать
-  // Архонтов без ролей. На roles/permissions табах не дёргаем.
+  // operators.list is only needed on the members tab, to show
+  // Archons without roles. Not fetched on the roles/permissions tabs.
   const operatorsQ = useQuery({
     queryKey: ['rbac.operators-for-assign'],
     queryFn: () => keeperApi.operators.list({ limit: 200 }),
@@ -299,8 +299,8 @@ export function RbacPage() {
   const roles = useMemo(() => rolesQ.data?.items ?? [], [rolesQ.data]);
   const operators = operatorsQ.data?.items ?? [];
 
-  // Каталог permissions — из backend. Недоступен/пуст → graceful (picker
-  // покажет hint, save всё равно сохранит уже имеющиеся права через preserved).
+  // Permission catalog — from the backend. Unavailable/empty -> graceful (picker
+  // shows a hint, save still preserves existing permissions via preserved).
   const permsQ = useQuery({
     queryKey: ['rbac.permissions'],
     queryFn: () => keeperApi.permissions.list(),

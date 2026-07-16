@@ -6,12 +6,12 @@ interface Props {
   value: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
-  // Опциональный валидатор: вернёт текст ошибки, либо null если ок.
+  // Optional validator: returns an error message, or null if OK.
   validate?: (token: string) => string | null;
   ariaLabel?: string;
 }
 
-// Tags-input: Enter / запятая / пробел добавляет токен, Backspace в пустом — удаляет последний.
+// Tags input: Enter / comma / space adds a token, Backspace on empty deletes the last one.
 export function ChipsInput({ value, onChange, placeholder, validate, ariaLabel }: Props) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');

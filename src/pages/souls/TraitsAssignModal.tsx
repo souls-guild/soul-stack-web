@@ -12,12 +12,12 @@ import styles from '../common.module.css';
 
 type TraitMode = 'merge' | 'replace' | 'remove';
 
-// Две формы:
-//   - single: правка trait на одном Soul (SoulDetail). Режим: merge или replace.
-//   - bulk:   массовая операция из списка с multi-select. Режимы: все три.
+// Two forms:
+//   - single: edit a trait on one Soul (SoulDetail). Mode: merge or replace.
+//   - bulk:   bulk operation from the list with multi-select. Modes: all three.
 //
-// API: POST /v1/souls/traits. Разрядность: merge/replace → traits-map;
-// remove → ключи (keys). dry_run опционален (не выставляем из UI).
+// API: POST /v1/souls/traits. Shape: merge/replace -> traits-map;
+// remove -> keys. dry_run is optional (not exposed from the UI).
 // Permission soul.traits-assign.
 interface Props {
   open: boolean;
@@ -27,10 +27,10 @@ interface Props {
     | { kind: 'bulk'; sids: string[] };
 }
 
-// Пара редактора трейт-записей.
+// A pair for the trait-entry editor.
 type TraitPair = { key: string; value: string };
 
-// Валидация ключа трейта: kebab/snake-case ([a-z][a-z0-9]*([_-][a-z0-9]+)*) — NIM-67, зеркало soul.TraitKeyPattern.
+// Trait key validation: kebab/snake-case ([a-z][a-z0-9]*([_-][a-z0-9]+)*) -- NIM-67, mirrors soul.TraitKeyPattern.
 const TRAIT_KEY_PATTERN = /^[a-z][a-z0-9]*([_-][a-z0-9]+)*$/;
 
 function validateTraitKey(k: string): string | null {
@@ -38,12 +38,12 @@ function validateTraitKey(k: string): string | null {
   return null;
 }
 
-// Распаковываем набор пар в map (последний ключ побеждает).
+// Unpack a set of pairs into a map (last key wins).
 function pairsToMap(pairs: TraitPair[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const { key, value } of pairs) {
     if (key.trim() !== '') {
-      // Если значение похоже на JSON-массив — парсим в list. Иначе scalar-строка.
+      // If the value looks like a JSON array -- parse into a list. Otherwise a scalar string.
       const trimmed = value.trim();
       if (trimmed.startsWith('[')) {
         try {
@@ -131,10 +131,10 @@ export function TraitsAssignModal({ open, onClose, variant }: Props) {
       return;
     }
 
-    // merge / replace — проверяем пары.
+    // merge / replace -- validate the pairs.
     const validPairs = pairs.filter((p) => p.key.trim() !== '');
     if (validPairs.length === 0 && mode === 'replace') {
-      // replace с пустым map — допустимо (очистить все трейты).
+      // replace with an empty map -- allowed (clears all traits).
     }
     for (const { key } of validPairs) {
       const err = validateTraitKey(key);
@@ -153,7 +153,7 @@ export function TraitsAssignModal({ open, onClose, variant }: Props) {
       ? `${t('souls:traitAssignment')}: ${variant.sid}`
       : t('souls:bulkTraitTitle', { count: targetCount, noun: targetCount === 1 ? 'Soul' : 'Souls' });
 
-  // Success — показываем matched/changed/status.
+  // Success -- show matched/changed/status.
   if (reply) {
     return (
       <Modal
@@ -285,8 +285,8 @@ export function TraitsAssignModal({ open, onClose, variant }: Props) {
   );
 }
 
-// Редактор trait-пар (merge/replace режимы).
-// Каждая пара: key (kebab-case) → value (scalar string или JSON-list).
+// Editor for trait pairs (merge/replace modes).
+// Each pair: key (kebab-case) -> value (scalar string or JSON-list).
 interface PairsEditorProps {
   pairs: TraitPair[];
   onChange: (next: TraitPair[]) => void;

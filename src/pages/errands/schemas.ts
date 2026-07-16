@@ -1,16 +1,16 @@
-// Zod-схемы для Errand-формы (ADR-033).
+// Zod schemas for the Errand form (ADR-033).
 //
-// Поле `module` — дискриминатор: для known core-модулей выбираем типизированную
-// форму, иначе fall-back на JSON-textarea (с client-side JSON.parse валидацией).
-// Submit-payload — `ErrandRunRequest` из openapi (см. ../../api/keeper.ts).
+// The `module` field is a discriminator: for known core modules pick a typed
+// form, otherwise fall back to a JSON textarea (with client-side JSON.parse validation).
+// Submit payload — `ErrandRunRequest` from openapi (see ../../api/keeper.ts).
 
 import { z } from 'zod';
 import i18n from '../../i18n';
 
 const t = i18n.t.bind(i18n);
 
-// SID = FQDN. Минимально-валидируем формат — не пусто, без пробелов; полноценная
-// FQDN-валидация на сервере.
+// SID = FQDN. Minimal format validation — non-empty, no spaces; full
+// FQDN validation happens server-side.
 const sidSchema = z
   .string()
   .min(1, t('runhistory:zodSidRequired'))
@@ -23,16 +23,16 @@ const timeoutSchema = z
   .positive(t('runhistory:zodPositive'))
   .max(3600, t('runhistory:zodMaxTimeout'));
 
-// `env: map<string,string>` — превратим в массив пар {key,value} для динамической
-// формы; на submit-е свернём в Record.
+// `env: map<string,string>` — turn into an array of {key,value} pairs for the dynamic
+// form; collapse back into a Record on submit.
 const envPairSchema = z.object({
   key: z.string().min(1, t('runhistory:zodKeyRequired')),
   value: z.string(),
 });
 
-// core.cmd.shell — командная строка в /bin/sh -c.
-// Имена полей (cmd/cwd) — те, что реально шлются в API; UI-label-ы могут быть
-// человекочитаемыми («Command» / «Working dir»), см. ErrandNewForm.tsx.
+// core.cmd.shell — command line in /bin/sh -c.
+// Field names (cmd/cwd) are the ones actually sent to the API; UI labels can be
+// human-readable ("Command" / "Working dir"), see ErrandNewForm.tsx.
 export const shellSchema = z.object({
   module: z.literal('core.cmd.shell'),
   sid: sidSchema,
@@ -44,12 +44,12 @@ export const shellSchema = z.object({
 });
 export type ShellInput = z.infer<typeof shellSchema>;
 
-// core.exec.run — argv-форма (без shell). API ждёт `cmd` — путь к бинарю.
+// core.exec.run — argv form (no shell). API expects `cmd` — path to the binary.
 export const execSchema = z.object({
   module: z.literal('core.exec.run'),
   sid: sidSchema,
   cmd: z.string().min(1, t('runhistory:zodArgsBinaryRequired')),
-  // args — текстарea с line-per-arg; парсим в массив строк.
+  // args — textarea with line-per-arg; parsed into an array of strings.
   args_raw: z.string().default(''),
   timeout_seconds: timeoutSchema.default(30),
   cwd: z.string().optional(),
@@ -58,7 +58,7 @@ export const execSchema = z.object({
 });
 export type ExecInput = z.infer<typeof execSchema>;
 
-// Fallback для любых других модулей — JSON-textarea с валидацией.
+// Fallback for any other modules — JSON textarea with validation.
 export const jsonFallbackSchema = z.object({
   module: z.string().min(1, t('runhistory:zodModuleRequired')),
   sid: sidSchema,
@@ -83,20 +83,20 @@ export const jsonFallbackSchema = z.object({
 });
 export type JsonFallbackInput = z.infer<typeof jsonFallbackSchema>;
 
-// Top-level discriminated union. Дискриминатор — `module`.
+// Top-level discriminated union. Discriminator — `module`.
 export const errandSchema = z.discriminatedUnion('module', [
   shellSchema,
   execSchema,
-  // Для произвольной строки используем jsonFallbackSchema — дискриминатор
-  // тут НЕ literal, а string; чтобы discriminatedUnion корректно сматчил, в
-  // компоненте мы переключаем kind вручную (см. ErrandNewForm.tsx). Здесь
-  // оставляем только known-литералы; fallback парсим отдельной схемой.
+  // For an arbitrary string we use jsonFallbackSchema — the discriminator
+  // here is NOT a literal but a string; for discriminatedUnion to match correctly, the
+  // component switches kind manually (see ErrandNewForm.tsx). Here we
+  // only keep known literals; the fallback is parsed with a separate schema.
 ]);
 export type KnownErrandInput = z.infer<typeof errandSchema>;
 
-// Модули, для которых есть typed-форма с отдельными полями (вместо JSON-fallback).
-// Это UI-решение (какие формы реализованы), НЕ политика whitelist — actual whitelist
-// определяется backend-ом через GET /v1/modules?errand_safe=true.
+// Modules that have a typed form with separate fields (instead of a JSON fallback).
+// This is a UI decision (which forms are implemented), NOT a whitelist policy — the actual whitelist
+// is determined by the backend via GET /v1/modules?errand_safe=true.
 export type KnownModule = 'core.cmd.shell' | 'core.exec.run';
 
 const TYPED_MODULES: readonly KnownModule[] = ['core.cmd.shell', 'core.exec.run'];
@@ -105,9 +105,9 @@ export function isKnownModule(m: string): m is KnownModule {
   return (TYPED_MODULES as readonly string[]).includes(m);
 }
 
-// Маппинг формы → ErrandRunRequest.input (Record<string, unknown>).
-// Имена параметров строго те, что ждёт core-модуль на стороне Soul:
-// см. soul/internal/coremod/cmd/cmd.go и .../exec/exec.go.
+// Mapping from the form -> ErrandRunRequest.input (Record<string, unknown>).
+// Parameter names are exactly what the core module expects on the Soul side:
+// see soul/internal/coremod/cmd/cmd.go and .../exec/exec.go.
 export function shellToInput(v: ShellInput): Record<string, unknown> {
   const out: Record<string, unknown> = { cmd: v.cmd };
   if (v.cwd) out.cwd = v.cwd;

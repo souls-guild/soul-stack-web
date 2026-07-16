@@ -1,10 +1,10 @@
-// Чистые функции client-side мультиселект-фильтра coven+traits (вынесены из
-// CovenTraitsFilter.tsx — react-refresh/only-export-components требует
-// не смешивать non-component экспорты с компонентом в одном файле).
+// Pure functions for the client-side coven+traits multiselect filter (extracted
+// from CovenTraitsFilter.tsx - react-refresh/only-export-components requires
+// not mixing non-component exports with the component in one file).
 
 import type { IncarnationGetReply } from '../../api/keeper';
 
-/** `key=value` пара trait, сериализованная для выбора в мультиселекте. */
+/** `key=value` trait pair, serialized for selection in the multiselect. */
 export type TraitFilterOption = string;
 
 export interface CovenTraitsFilterValue {
@@ -19,7 +19,7 @@ function traitValueToOptions(val: unknown): string[] {
   return [String(val)];
 }
 
-/** Извлекает уникальные `key=value` опции traits из подгруженных инкарнаций. */
+/** Extracts unique `key=value` trait options from the loaded incarnations. */
 export function collectTraitOptions(items: IncarnationGetReply[]): string[] {
   const set = new Set<string>();
   for (const item of items) {
@@ -42,7 +42,7 @@ export function collectCovenOptions(items: IncarnationGetReply[]): string[] {
   return [...set].sort();
 }
 
-/** item матчит выбранный набор coven/traits (AND между coven и traits, AND внутри traits). */
+/** item matches the selected coven/traits set (AND between coven and traits, AND within traits). */
 export function matchesCovenTraitsFilter(
   item: IncarnationGetReply,
   filter: CovenTraitsFilterValue,

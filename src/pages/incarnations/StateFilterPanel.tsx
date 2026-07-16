@@ -1,10 +1,10 @@
-// Динамическая панель фильтрации по state-полям incarnation.
+// Dynamic filter panel over an incarnation's state fields.
 //
-// Список полей берётся из state_schema сервиса через getStateSchema() + extractFields().
-// Операторы фиксированы контрактом API (eq/ne/gt/gte/lt/lte) — это протокол, не данные.
-// Числовые типы (integer, number) поддерживают полный набор op; строки — eq/ne; bool/enum — eq/ne.
-// Несколько предикатов объединяются по AND.
-// Ошибка 422 от backend (нечисло в numeric-op) — отображается per-field, не краш.
+// The field list comes from the service state_schema via getStateSchema() + extractFields().
+// Operators are fixed by the API contract (eq/ne/gt/gte/lt/lte) — this is a protocol, not data.
+// Numeric types (integer, number) support the full op set; strings — eq/ne; bool/enum — eq/ne.
+// Multiple predicates are combined with AND.
+// A 422 error from the backend (non-number in a numeric-op) is displayed per-field, no crash.
 
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ import { keeperApi, type StateFilterPredicate } from '../../api/keeper';
 import { extractFields, isSchemaDegraded } from './stateSchema';
 import { Button } from '../../components/primitives';
 
-// Набор операторов по типу поля. Контракт API — не данные с backend.
+// Operator set by field type. This is an API contract — not backend data.
 const NUMERIC_OPS: StateFilterPredicate['op'][] = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'];
 const STRING_OPS: StateFilterPredicate['op'][] = ['eq', 'ne'];
 
@@ -29,7 +29,7 @@ function opsForType(type: string): StateFilterPredicate['op'][] {
 export interface StateFilterPanelProps {
   serviceName: string;
   predicates: StateFilterPredicate[];
-  // per-field ошибки от backend (key = field имя, value = сообщение)
+  // per-field errors from the backend (key = field name, value = message)
   fieldErrors: Record<string, string>;
   onChange: (predicates: StateFilterPredicate[]) => void;
 }
@@ -49,7 +49,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
     [schemaQ.data],
   );
 
-  // Схема загружается, или деградировала (404/501/502) — скрываем панель.
+  // Schema is loading, or degraded (404/501/502) — hide the panel.
   if (schemaQ.isLoading) {
     return (
       <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>
@@ -64,7 +64,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
       </div>
     );
   }
-  // Схема доступна, но поля не задекларированы — ничего не показываем.
+  // Schema is available, but fields aren't declared — show nothing.
   if (!fields || fields.length === 0) {
     return (
       <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>
@@ -87,7 +87,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
     const next = predicates.map((p, i) => {
       if (i !== idx) return p;
       const updated = { ...p, ...patch };
-      // При смене поля — сброс op на первый доступный для нового типа.
+      // On field change — reset op to the first one available for the new type.
       if ('field' in patch) {
         const fieldDef = fields!.find((f) => f.name === updated.field);
         const availOps = opsForType(fieldDef?.type ?? 'string');
@@ -113,7 +113,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
             key={idx}
             style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}
           >
-            {/* Выбор поля из схемы */}
+            {/* Field selection from the schema */}
             <select
               aria-label={t('incarnations:stateFilterField')}
               value={pred.field}
@@ -134,7 +134,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
               ))}
             </select>
 
-            {/* Оператор */}
+            {/* Operator */}
             <select
               aria-label={t('incarnations:stateFilterOp')}
               value={pred.op}
@@ -152,7 +152,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
               ))}
             </select>
 
-            {/* Значение */}
+            {/* Value */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <input
                 type={isNumeric ? 'number' : 'text'}
@@ -176,7 +176,7 @@ export function StateFilterPanel({ serviceName, predicates, fieldErrors, onChang
               ) : null}
             </div>
 
-            {/* Удалить предикат */}
+            {/* Remove predicate */}
             <button
               type="button"
               aria-label={t('incarnations:stateFilterRemove')}

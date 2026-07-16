@@ -1,12 +1,12 @@
-// Zod-схемы для Souls-модалок (Issue Token, Coven Assignment).
+// Zod schemas for Souls modals (Issue Token, Coven Assignment).
 //
-// Coven-форма: lowercase kebab-case (openapi.yaml SoulCovenAssignRequest.labels[].pattern).
-// TTL: min 60s — нижняя граница bootstrap-токена, верхняя — без ограничений в API
-// (по умолчанию 3600s, документация Keeper не вводит hard-cap на стороне OpenAPI).
+// Coven form: lowercase kebab-case (openapi.yaml SoulCovenAssignRequest.labels[].pattern).
+// TTL: min 60s -- lower bound of the bootstrap token, upper bound is unrestricted in the API
+// (default 3600s, Keeper documentation does not introduce a hard-cap on the OpenAPI side).
 
 import { z } from 'zod';
 
-// Coven-метка по ADR-008: lowercase, цифры, дефис-разделитель, ≤ 63 символов.
+// Coven label per ADR-008: lowercase, digits, hyphen-separated, <= 63 characters.
 export const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 export const covenLabelSchema = z
@@ -24,8 +24,8 @@ export const issueTokenSchema = z.object({
 });
 export type IssueTokenInput = z.infer<typeof issueTokenSchema>;
 
-// Bulk coven-assign: append/remove → одна label; replace → набор labels.
-// XOR-форма проверяется на уровне UI (radio mode → разные поля).
+// Bulk coven-assign: append/remove -> a single label; replace -> a set of labels.
+// The XOR form is validated at the UI level (radio mode -> different fields).
 export const bulkCovenAssignSchema = z
   .object({
     mode: z.enum(['append', 'remove', 'replace']),
@@ -34,7 +34,7 @@ export const bulkCovenAssignSchema = z
   })
   .superRefine((v, ctx) => {
     if (v.mode === 'replace') {
-      // labels допускает пустой массив = «снять все»; UI это понимает.
+      // labels allows an empty array = "remove all"; the UI understands this.
       if (v.labels === undefined) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

@@ -9,15 +9,15 @@ import styles from '../common.module.css';
 interface Props {
   open: boolean;
   aid: string;
-  // Все роли в кластере — для select. Мембершип конкретного оператора
-  // выводится отсюда через role.operators.includes(aid).
+  // All roles in the cluster — for the select. A given operator's membership
+  // is derived from this via role.operators.includes(aid).
   roles: readonly RoleView[];
   onClose: () => void;
 }
 
-// Назначить роль оператору: POST /v1/roles/{name}/operators с {aid}.
-// Сервер 204 на success, идемпотентно. Не показываем роли, в которых
-// оператор уже состоит (фильтр по operators[]).
+// Assign a role to an operator: POST /v1/roles/{name}/operators with {aid}.
+// Server returns 204 on success, idempotent. Roles the operator already
+// belongs to are hidden (filtered by operators[]).
 export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();

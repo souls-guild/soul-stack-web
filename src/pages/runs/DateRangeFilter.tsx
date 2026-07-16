@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import { hasDateRange, type DateRange } from './dateRange';
 
-// Два date-input (от/до по started_at) + очистка. Клиентский фильтр поверх
-// загруженной страницы (см. dateRange.ts) — общий контрол для /runs и Command
-// runs. `metaKeyClass` пробрасывается, чтобы лейбл совпал с соседними фильтрами.
+// Two date-inputs (from/to over started_at) + clear. Client-side filter over
+// the loaded page (see dateRange.ts) — shared control for /runs and Command
+// runs. `metaKeyClass` is passed through so the label matches neighboring filters.
 
 interface Props {
   value: DateRange;

@@ -362,16 +362,16 @@ export function ServiceDetail() {
   );
 }
 
-// Кликабельный web-URL git-репо — только для http(s)-источников. git:// / ssh /
-// file:// браузер открыть как ссылку не может → возвращаем null (рендерим mono-текст).
-// `.git`-суффикс отрезаем для чистого repo-href (большинство хостингов редиректят).
+// Clickable web URL of the git repo — only for http(s) sources. git:// / ssh /
+// file:// cannot be opened as a link by the browser -> return null (renders as mono text).
+// The `.git` suffix is stripped for a clean repo-href (most hosts redirect anyway).
 function gitWebUrl(git: string | undefined): string | null {
   if (!git) return null;
   if (!/^https?:\/\//i.test(git)) return null;
   return git.replace(/\.git$/i, '');
 }
 
-// Заголовочная форма git@ref. git кликабелен, если http(s).
+// Header form git@ref. git is clickable if http(s).
 function GitRefInline({ git, gitRef }: { git: string; gitRef: string }) {
   const href = gitWebUrl(git);
   return (
@@ -400,8 +400,8 @@ function GitUrl({ git }: { git: string }) {
   );
 }
 
-// Возвращает скалярные поля (string/integer) из list SchemaField — идут в колонки.
-// Составные (object/array) — отдельная группа для компактного отображения.
+// Returns scalar fields (string/integer) from the SchemaField list — go into columns.
+// Composite fields (object/array) — a separate group for compact display.
 function partitionFields(fields: SchemaField[]): {
   scalar: SchemaField[];
   composite: SchemaField[];
@@ -418,7 +418,7 @@ function partitionFields(fields: SchemaField[]): {
   return { scalar, composite };
 }
 
-// Форматирует значение составного поля для компактного показа в ячейке.
+// Formats a composite field value for compact display in a cell.
 function compositeCell(val: unknown): string {
   if (val === undefined || val === null) return '—';
   if (Array.isArray(val)) return val.length === 0 ? '—' : `${val.length} items`;
@@ -429,13 +429,13 @@ function compositeCell(val: unknown): string {
   return String(val);
 }
 
-// Форматирует скалярное значение; null/undefined → «—».
+// Formats a scalar value; null/undefined -> "-".
 function scalarCell(val: unknown): string {
   if (val === undefined || val === null) return '—';
   return String(val);
 }
 
-// MAX_SCALAR_COLS — сколько state-колонок до горизонтального скролла.
+// MAX_SCALAR_COLS — how many state columns before horizontal scroll kicks in.
 const MAX_SCALAR_COLS = 6;
 
 type IncarnationsTabProps = {
@@ -446,7 +446,7 @@ type IncarnationsTabProps = {
 function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
   const { t } = useTranslation();
 
-  // Вычисляем колонки из state_schema (graceful: если schema недоступна — только базовые колонки).
+  // Compute columns from state_schema (graceful: if schema unavailable — only base columns).
   const allFields = stateSchema.data
     ? extractFields(stateSchema.data.schema as Record<string, unknown> | undefined)
     : null;
@@ -454,7 +454,7 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
     ? partitionFields(allFields)
     : { scalar: [], composite: [] };
 
-  // Показываем горизонтальный скролл при более чем MAX_SCALAR_COLS скалярных колонок.
+  // Show horizontal scroll when there are more than MAX_SCALAR_COLS scalar columns.
   const needsScroll = scalarFields.length > MAX_SCALAR_COLS;
 
   return (
@@ -533,10 +533,10 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
   );
 }
 
-// Schema-таб сервиса (не incarnation) — state_schema-метаданные на ref сервиса:
-// state_schema_version + опц. декларация структуры state + список миграций.
-// Переиспользует extractFields/isSchemaDegraded из incarnations/SchemaTab.
-// Источник — GET /v1/services/{name}/state-schema?ref=<service.ref>; graceful на 404/501/502.
+// Schema tab for the service (not incarnation) — state_schema metadata on the
+// service ref: state_schema_version + optional state structure declaration + migration list.
+// Reuses extractFields/isSchemaDegraded from incarnations/SchemaTab.
+// Source — GET /v1/services/{name}/state-schema?ref=<service.ref>; graceful on 404/501/502.
 function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: string }) {
   const { t } = useTranslation();
   const q = useQuery({
@@ -734,7 +734,7 @@ function ServiceDepsTab({
 }
 
 function scenarioInputSummary(s: ServiceScenarioInfo): string {
-  // input_schema — flat-map field→property; имена полей = ключи map.
+  // input_schema — flat-map field->property; field names = map keys.
   const schema = s.input_schema;
   if (!schema || typeof schema !== 'object') return '—';
   const names = Object.keys(schema);

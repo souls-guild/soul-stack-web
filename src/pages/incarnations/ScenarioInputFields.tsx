@@ -32,31 +32,31 @@ interface Props {
   schema: ScenarioInputSchema;
   value: ScenarioFieldsState;
   onChange: (next: ScenarioFieldsState) => void;
-  // Показать inline-ошибку под пустыми required-полями (после попытки submit
-  // или при включённой live-валидации).
+  // Show an inline error under empty required fields (after a submit attempt
+  // or when live validation is enabled).
   showErrors?: boolean;
-  // ADR-045: контекст для SID-picker (incarnation_hosts source).
+  // ADR-045: context for the SID picker (incarnation_hosts source).
   incarnationContext?: string;
-  // Имя модуля для form-prep (нужно SidPicker-у).
+  // Module name for form-prep (needed by SidPicker).
   moduleName?: string;
-  // Callback: вызывается при изменении набора map-полей с ошибками.
-  // Caller включает эти поля в submit-gate (наряду с invalidCompositeFields).
+  // Callback: invoked when the set of map fields with errors changes.
+  // The caller includes these fields in the submit gate (alongside invalidCompositeFields).
   onInvalidMapChange?: (fieldNames: string[]) => void;
-  // Callback: набор полей с pattern-ошибками (для gate на стороне caller-а).
+  // Callback: set of fields with pattern errors (for the gate on the caller's side).
   onPatternErrorChange?: (fieldNames: string[]) => void;
-  // Опциональный презентационный слой — разбивка полей на именованные секции.
-  // Если присутствует — рендерим секционно; иначе — плоский layout (обратная совместимость).
+  // Optional presentation layer — splitting fields into named sections.
+  // If present — rendered by section; otherwise flat layout (backward compat).
   form?: ScenarioForm;
-  // Имя создаваемой инкарнации (для подсказки existing-souls в ProvisionField).
+  // Name of the incarnation being created (for the existing-souls hint in ProvisionField).
   incarnationName?: string;
-  // NIM-76: каталог Redis-директив (серия→имена) для полей с x-directives.
+  // NIM-76: Redis directive catalog (series -> names) for fields with x-directives.
   directiveCatalog?: DirectiveCatalogContext;
-  // NIM-76: полная версия Redis ("8.2.2") — серия выбирается на клиенте. Реактивна.
+  // NIM-76: full Redis version ("8.2.2") — series is chosen client-side. Reactive.
   directiveVersion?: string;
 }
 
-// Агрегатор ошибок по имени поля. Хранит карту name→hasError и оповещает
-// callback-ом при каждом изменении. Стабильный identity через useRef.
+// Per-field-name error aggregator. Holds a name->hasError map and notifies
+// via the callback on each change. Stable identity via useRef.
 function useFieldErrorAggregator(cb: ((names: string[]) => void) | undefined) {
   const errorsRef = useRef<Record<string, boolean>>({});
   const cbRef = useRef(cb);
@@ -64,7 +64,7 @@ function useFieldErrorAggregator(cb: ((names: string[]) => void) | undefined) {
 
   return function notify(name: string, hasError: boolean) {
     const prev = errorsRef.current[name];
-    if (prev === hasError) return; // нет изменений — не дёргаем callback
+    if (prev === hasError) return; // no change — don't fire the callback
     errorsRef.current = { ...errorsRef.current, [name]: hasError };
     cbRef.current?.(Object.keys(errorsRef.current).filter((k) => errorsRef.current[k]));
   };
@@ -98,7 +98,7 @@ export function ScenarioInputFields({
     placeholderOverride?: string,
     hintOverride?: string,
   ) {
-    // Provision-поле (object с properties.enabled:boolean) рендерится специально.
+    // The provision field (object with properties.enabled:boolean) is rendered specially.
     if (isProvisionObjectField(prop)) {
       const v = value[key];
       return (
@@ -142,11 +142,11 @@ export function ScenarioInputFields({
     );
   }
 
-  // Секционный рендер: если form задан и содержит секции — раскладываем поля по секциям.
-  // Поля, не попавшие ни в одну секцию — «Default» секция в конце (плоско).
-  // show_when: вычисляется client-side по текущим значениям input (мини-CEL).
+  // Sectional render: if form is set and has sections — lay out fields by section.
+  // Fields not assigned to any section go into a "Default" section at the end (flat).
+  // show_when: computed client-side from current input values (mini-CEL).
   if (form?.sections && form.sections.length > 0) {
-    // Строим set имён, включённых в секции, чтобы найти «остаток».
+    // Build a set of names assigned to sections, to find the "leftover".
     const assignedNames = new Set<string>();
     for (const section of form.sections) {
       for (const field of section.fields ?? []) {
@@ -158,7 +158,7 @@ export function ScenarioInputFields({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {form.sections.map((section) => {
-          // show_when секции: если false — прячем всю секцию со всеми полями.
+          // section show_when: if false — hide the whole section with all its fields.
           const sectionVisible = evalShowWhen(section.show_when, value as Record<string, unknown>);
           if (!sectionVisible) return null;
 
@@ -166,11 +166,11 @@ export function ScenarioInputFields({
             .map((f) => {
               const prop = (schema ?? {})[f.name];
               if (!prop) return null;
-              // show_when поля: если false — поле не рендерим.
-              // Скрытое поле не отправляется (caller не включает его в payload).
+              // field show_when: if false — the field isn't rendered.
+              // A hidden field isn't sent (the caller doesn't include it in the payload).
               const fieldVisible = evalShowWhen(f.show_when, value as Record<string, unknown>);
               if (!fieldVisible) return null;
-              // label: из form.fields[].label → prop.description → имя поля
+              // label: from form.fields[].label -> prop.description -> field name
               const labelOverride = f.label ?? prop.description ?? f.name;
               return renderField(f.name, prop, labelOverride, f.placeholder, f.hint);
             })
@@ -197,11 +197,11 @@ export function ScenarioInputFields({
     );
   }
 
-  // Плоский рендер (нет form или нет секций): обратная совместимость.
-  // isFieldRequired учитывает required_when реактивно по текущему value.
-  // NIM-72: одиночный object-with-properties держим в верхней группе (не в advanced-
-  // collapse) — иначе add_user.user (required=[children], isFieldRequired=false) хоронит
-  // всю форму в свёрнутый <details>. Layout-only, без ложного required-маркера.
+  // Flat render (no form or no sections): backward compatibility.
+  // isFieldRequired accounts for required_when reactively based on the current value.
+  // NIM-72: keep a standalone object-with-properties in the top group (not in the advanced
+  // collapse) — otherwise add_user.user (required=[children], isFieldRequired=false) buries
+  // the whole form in a collapsed <details>. Layout-only, no false required marker.
   const requiredEntries = entries.filter(([, prop]) => isFieldRequired(prop, value as Record<string, unknown>) || isObjectWithProperties(prop));
   const optionalEntries = entries.filter(([, prop]) => !isFieldRequired(prop, value as Record<string, unknown>) && !isObjectWithProperties(prop));
 
@@ -234,7 +234,7 @@ export function ScenarioInputFields({
   );
 }
 
-// Секция формы: title + description + collapsed + children.
+// Form section: title + description + collapsed + children.
 interface FormSectionProps {
   sectionKey: string;
   title?: string;
@@ -247,7 +247,7 @@ function FormSection({ sectionKey, title, description, collapsed, children }: Fo
   const hasHeader = Boolean(title || description);
 
   if (collapsed) {
-    // Сворачиваемая секция через <details>.
+    // Collapsible section via <details>.
     return (
       <details
         data-testid={`form-section-${sectionKey}`}
@@ -309,37 +309,37 @@ function FormSection({ sectionKey, title, description, collapsed, children }: Fo
 
 interface OneProps {
   name: string;
-  // required вычислен снаружи через isFieldRequired (учитывает required_when реактивно).
+  // required is computed externally via isFieldRequired (accounts for required_when reactively).
   required: boolean;
   missing: boolean;
   prop: ScenarioInputSchemaProperty;
   value: ScenarioFieldValue;
-  // Текущее состояние всех полей формы (для реактивного required_when).
+  // Current state of all form fields (for reactive required_when).
   inputState: Record<string, unknown>;
   onChange: (v: ScenarioFieldValue) => void;
   incarnationContext?: string;
   moduleName?: string;
-  // Callback: (fieldName, hasError) — поднимает ошибку map-поля к родителю.
+  // Callback: (fieldName, hasError) — propagates a map-field error up to the parent.
   onMapError?: (name: string, hasError: boolean) => void;
-  // Callback: (fieldName, hasError) — поднимает pattern-ошибку к родителю.
+  // Callback: (fieldName, hasError) — propagates a pattern error up to the parent.
   onPatternError?: (name: string, hasError: boolean) => void;
-  // Опциональная подпись из ScenarioForm: заменяет имя поля в label.
+  // Optional label override from ScenarioForm: replaces the field name in the label.
   labelOverride?: string;
-  // Из ScenarioFormField: placeholder и hint (оба опциональны).
+  // From ScenarioFormField: placeholder and hint (both optional).
   placeholderOverride?: string;
   hintOverride?: string;
-  // Показывать inline-ошибки required у под-полей объекта (NIM-72, рекурсивный ObjectField).
+  // Show inline required errors on object sub-fields (NIM-72, recursive ObjectField).
   showErrors?: boolean;
-  // NIM-76: каталог Redis-директив + версия (для MapEditor полей с x-directives).
+  // NIM-76: Redis directive catalog + version (for MapEditor fields with x-directives).
   directiveCatalog?: DirectiveCatalogContext;
   directiveVersion?: string;
 }
 
 function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride, showErrors, directiveCatalog, directiveVersion }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
   const { t } = useTranslation();
-  // Текст label без маркера (маркер рендерится отдельным span).
+  // Label text without the marker (the marker is rendered as a separate span).
   const labelBaseText = labelOverride ?? name;
-  // Красная звёздочка для обязательных полей.
+  // Red asterisk for required fields.
   const requiredMarker = required ? (
     <span
       data-testid={`field-required-marker-${name}`}
@@ -349,12 +349,12 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
       *
     </span>
   ) : null;
-  // labelText — строка без маркера (используется там, где нужен plain-string: placeholder MapEditor и пр.).
+  // labelText — string without the marker (used where a plain string is needed: MapEditor placeholder etc.).
   const labelText = labelBaseText;
-  // placeholder: placeholderOverride → prop.example → undefined.
+  // placeholder: placeholderOverride -> prop.example -> undefined.
   const resolvedPlaceholder = placeholderOverride ?? prop.example;
-  // hint: hintOverride → prop.description → undefined.
-  // Hint отображается под полем; если hintOverride задан — он важнее description.
+  // hint: hintOverride -> prop.description -> undefined.
+  // Hint is shown under the field; if hintOverride is set — it takes priority over description.
   const resolvedHint = hintOverride ?? prop.description;
   const baseStyle: React.CSSProperties = {
     padding: '8px 10px',
@@ -444,7 +444,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // ADR-045 S8b: type=array + items.type=int|string → типизированный список с +/-.
+  // ADR-045 S8b: type=array + items.type=int|string -> typed list with +/-.
   if (isTypedListField(prop)) {
     return (
       <TypedListField
@@ -461,8 +461,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // ADR-045 B2 + NIM-72: type=object + map (isMap+scalar items ИЛИ
-  // additional_properties-скаляр) → KEY→VALUE-редактор.
+  // ADR-045 B2 + NIM-72: type=object + map (isMap+scalar items OR
+  // additional_properties-scalar) -> KEY->VALUE editor.
   if (isMapWithScalarItems(prop) || isMapWithAdditionalProps(prop)) {
     return (
       <MapEditor
@@ -482,8 +482,8 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // Array-of-object: type=array + items.type=object + items.properties → карточки.
-  // Каждый элемент массива рендерится карточкой с под-полями по items.properties.
+  // Array-of-object: type=array + items.type=object + items.properties -> cards.
+  // Each array element is rendered as a card with sub-fields from items.properties.
   if (isArrayOfObjectField(prop)) {
     return (
       <ArrayOfObjectField
@@ -500,9 +500,9 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // NIM-72: одиночный типизированный объект (type=object + properties) →
-  // рекурсивный рендер под-полей через тот же движок (enum→select, вложенный
-  // map/object/boolean — «бесплатно»). Раньше падал в JSON-textarea.
+  // NIM-72: a standalone typed object (type=object + properties) ->
+  // recursive sub-field render via the same engine (enum->select, nested
+  // map/object/boolean — "for free"). Previously fell back to a JSON textarea.
   if (isObjectWithProperties(prop)) {
     return (
       <ObjectField
@@ -525,9 +525,9 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     );
   }
 
-  // Составной тип (array/object): per-field JSON-textarea. Значение хранится
-  // raw-строкой; невалидный JSON подсвечивается inline (submit блокируется
-  // caller-ом через invalidCompositeFields).
+  // Composite type (array/object): per-field JSON textarea. Value is stored
+  // as a raw string; invalid JSON is highlighted inline (submit is blocked
+  // by the caller via invalidCompositeFields).
   if (isCompositeType(prop)) {
     const raw = value === undefined ? '' : String(value);
     const jsonError = raw.trim() !== '' && !isParsableJson(raw);
@@ -593,7 +593,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
       </label>
     );
   }
-  // string + enum → select (enum выше приоритетом pattern).
+  // string + enum -> select (enum takes priority over pattern).
   if (prop.enum && Array.isArray(prop.enum) && prop.enum.length > 0) {
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -620,7 +620,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
       </label>
     );
   }
-  // ADR-045 S4: pattern → inline-валидация regex при вводе (работает и для textarea).
+  // ADR-045 S4: pattern -> inline regex validation on input (also works for textarea).
   const strVal = value === undefined ? '' : String(value);
   const patternError =
     prop.pattern && strVal.trim() !== ''
@@ -645,7 +645,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     }
   }
 
-  // ADR-045 B3: multiline=true → textarea вместо однострочного input.
+  // ADR-045 B3: multiline=true -> textarea instead of a single-line input.
   if (prop.multiline) {
     return (
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -711,9 +711,9 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
   );
 }
 
-// ADR-045 S8b: Типизированный список (list[int]/list[string]) — набор числовых
-// или строковых инпутов с кнопками добавить/удалить. Значение хранится как
-// JSON-строка массива (для совместимости с serializeFields).
+// ADR-045 S8b: Typed list (list[int]/list[string]) — a set of numeric
+// or string inputs with add/remove buttons. Value is stored as a
+// JSON array string (for compatibility with serializeFields).
 interface TypedListFieldProps {
   name: string;
   labelText: string;
@@ -731,7 +731,7 @@ function TypedListField({ name, labelText, required, prop, value, onChange, miss
   const itemsType = prop.items?.type ?? 'string';
   const isInt = itemsType === 'integer';
 
-  // Разбираем текущее значение в массив строк (для отображения в инпутах).
+  // Parse the current value into a string array (for display in inputs).
   function parseItems(): string[] {
     if (value === undefined || value === '') return [];
     try {
@@ -746,8 +746,8 @@ function TypedListField({ name, labelText, required, prop, value, onChange, miss
   const items = parseItems();
 
   function commit(next: string[]) {
-    // Всегда сохраняем сырые строки — валидация inline, серилизация при submit
-    // (serializeFields парсит JSON-строку и конвертирует числа).
+    // Always store raw strings — validation is inline, serialization happens at submit
+    // (serializeFields parses the JSON string and converts numbers).
     onChange(JSON.stringify(next));
   }
 
@@ -849,8 +849,8 @@ function TypedListField({ name, labelText, required, prop, value, onChange, miss
   );
 }
 
-// Array-of-object виджет: каждый элемент — карточка с под-полями по items.properties.
-// Значение хранится как JSON-строка массива объектов (для совместимости с serializeFields).
+// Array-of-object widget: each element is a card with sub-fields from items.properties.
+// Value is stored as a JSON string of an object array (for compatibility with serializeFields).
 interface ArrayOfObjectFieldProps {
   name: string;
   labelText: string;
@@ -866,13 +866,13 @@ interface ArrayOfObjectFieldProps {
 function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, missing, baseStyle, hintOverride }: ArrayOfObjectFieldProps) {
   const { t } = useTranslation();
 
-  // properties под-полей из items
+  // sub-field properties from items
   const itemProperties = (prop.items?.['properties'] ?? {}) as Record<string, ScenarioInputSchemaProperty>;
   const itemRequiredKeys: string[] = Array.isArray(prop.items?.['required']) ? (prop.items?.['required'] as string[]) : [];
-  // x-type — имя типа элемента (опционально, из items['x-type'])
+  // x-type — element type name (optional, from items['x-type'])
   const xType = prop.items?.['x-type'] as string | undefined;
 
-  // Разбираем текущее значение в массив объектов
+  // Parse the current value into an object array
   function parseItems(): Array<Record<string, string>> {
     if (value === undefined || value === '') return [];
     try {
@@ -880,7 +880,7 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
       if (Array.isArray(parsed)) {
         return parsed.map((item) => {
           if (item && typeof item === 'object' && !Array.isArray(item)) {
-            // Конвертируем значения в строки для хранения в локальном state
+            // Convert values to strings for storage in local state
             const rec: Record<string, string> = {};
             for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
               rec[k] = v === undefined || v === null ? '' : String(v);
@@ -900,7 +900,7 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
 
   function commit(next: Array<Record<string, string>>) {
     setItems(next);
-    // Сериализуем в JSON-строку массива объектов (пустые строки сохраняем как есть)
+    // Serialize into a JSON string of an object array (empty strings kept as-is)
     onChange(JSON.stringify(next));
   }
 
@@ -910,8 +910,8 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
   }
 
   function handleAdd() {
-    // Создаём новый элемент с пустыми значениями для всех под-полей.
-    // Для типа AclUser применяем preset безопасных дефолтов.
+    // Create a new element with empty values for all sub-fields.
+    // For type AclUser, apply a preset of safe defaults.
     const preset = xType === 'AclUser' ? ACL_USER_PRESET : {};
     const newItem: Record<string, string> = {};
     for (const k of Object.keys(itemProperties)) {
@@ -1062,10 +1062,10 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
   );
 }
 
-// NIM-72: одиночный типизированный объект (AclUser add_user.user). Рекурсивно
-// рендерит под-поля через ScenarioInputOneField (тот же движок). Значение —
-// JSON-строка объекта под-полей (subState = ScenarioFieldsState), сериализуется
-// рекурсивно в serializeFields. object-level required:[children] → маркеры/gate.
+// NIM-72: a standalone typed object (AclUser add_user.user). Recursively
+// renders sub-fields via ScenarioInputOneField (the same engine). Value is a
+// JSON string of the sub-field object (subState = ScenarioFieldsState), serialized
+// recursively in serializeFields. object-level required:[children] -> markers/gate.
 interface ObjectFieldProps {
   name: string;
   labelText: string;
@@ -1092,7 +1092,7 @@ function ObjectField({ name, labelText, required, prop, value, onChange, missing
   const requiredKeys: string[] = Array.isArray(reqRaw) ? (reqRaw as string[]) : [];
   const xType = prop['x-type'] as string | undefined;
 
-  // subState парсится из value на каждый рендер (single source of truth — внешний value).
+  // subState is parsed from value on every render (single source of truth — the external value).
   const subState = parseObjectFieldValue(value);
 
   function handleSubChange(subKey: string, subVal: ScenarioFieldValue) {
@@ -1164,12 +1164,12 @@ function isParsableJson(text: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// ProvisionField — специальный рендер для cloud-provision object-поля.
+// ProvisionField — special render for the cloud-provision object field.
 //
-// Показывает toggle «Создать VM автоматически» (enabled) вверху секции.
-// Когда enabled=true: отображаются под-поля (provider/profile/await_timeout/
-// ssh_provider и любые другие из properties, кроме enabled).
-// Когда enabled=false: показывает подсказку о режиме existing-souls.
+// Shows the "Create VM automatically" toggle (enabled) at the top of the section.
+// When enabled=true: sub-fields are shown (provider/profile/await_timeout/
+// ssh_provider and any others from properties except enabled).
+// When enabled=false: shows a hint about existing-souls mode.
 // ---------------------------------------------------------------------------
 interface ProvisionFieldProps {
   name: string;
@@ -1177,7 +1177,7 @@ interface ProvisionFieldProps {
   value: ScenarioFieldValue;
   onChange: (v: ScenarioFieldValue) => void;
   labelOverride?: string;
-  // Имя инкарнации (для подсказки «coven <name>»).
+  // Incarnation name (for the "coven <name>" hint).
   incarnationName?: string;
 }
 
@@ -1196,7 +1196,7 @@ function ProvisionField({ name, prop, value, onChange, labelOverride, incarnatio
     onChange(next);
   }
 
-  // Sub-поля из properties, исключаем enabled (рендерится как toggle).
+  // Sub-fields from properties, excluding enabled (rendered as the toggle).
   const subProps = getObjectProperties(prop);
   const subEntries = Object.entries(subProps).filter(([k]) => k !== 'enabled');
 
@@ -1213,14 +1213,14 @@ function ProvisionField({ name, prop, value, onChange, labelOverride, incarnatio
 
   return (
     <div data-testid={`field-provision-${name}`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Заголовок секции */}
+      {/* Section header */}
       {sectionTitle ? (
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {sectionTitle}
         </div>
       ) : null}
 
-      {/* Главный toggle — enabled */}
+      {/* Main toggle — enabled */}
       <label
         data-testid={`field-provision-toggle-${name}`}
         style={{
@@ -1249,7 +1249,7 @@ function ProvisionField({ name, prop, value, onChange, labelOverride, incarnatio
         </span>
       </label>
 
-      {/* Под-поля — только когда enabled */}
+      {/* Sub-fields — only when enabled */}
       {enabled ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 12, borderLeft: '2px solid color-mix(in srgb, var(--accent) 30%, var(--border))' }}>
           {subEntries.map(([subKey, subProp]) => {
@@ -1293,7 +1293,7 @@ function ProvisionField({ name, prop, value, onChange, labelOverride, incarnatio
           })}
         </div>
       ) : (
-        /* Подсказка: existing-souls режим */
+        /* Hint: existing-souls mode */
         <div
           data-testid={`field-provision-disabled-hint-${name}`}
           style={{
@@ -1312,11 +1312,11 @@ function ProvisionField({ name, prop, value, onChange, labelOverride, incarnatio
   );
 }
 
-// ADR-045 B2: KEY→VALUE-редактор для type=map + scalar items.
-// Черновые пары хранятся в локальном state (включая незаполненные ключи);
-// внешний onChange ВСЕГДА получает валидный JSON-строку применимых пар (last-wins
-// при дублях) или пустую строку — sentinel 'invalid-map' устранён (major-1 fix).
-// Ошибочность (duplicate/incomplete/bad-int) сигнализируется через onErrorChange.
+// ADR-045 B2: KEY->VALUE editor for type=map + scalar items.
+// Draft pairs are stored in local state (including unfilled keys);
+// the external onChange ALWAYS receives a valid JSON string of applicable pairs (last-wins
+// on duplicates) or an empty string — the 'invalid-map' sentinel was removed (major-1 fix).
+// Error state (duplicate/incomplete/bad-int) is signaled via onErrorChange.
 interface MapEditorProps {
   name: string;
   labelText: string;
@@ -1326,20 +1326,20 @@ interface MapEditorProps {
   onChange: (v: ScenarioFieldValue) => void;
   missing: boolean;
   baseStyle: React.CSSProperties;
-  // Callback: поднимает ошибку/её снятие к ScenarioInputFields для gate-а submit-а.
+  // Callback: propagates an error/its clearing up to ScenarioInputFields for the submit gate.
   onErrorChange?: (name: string, hasError: boolean) => void;
   hintOverride?: string;
-  // NIM-76: каталог Redis-директив (серия→имена) + текущая версия. Валидируем ключи
-  // ТОЛЬКО при truthy prop['x-directives'] И загруженном каталоге (иначе graceful).
+  // NIM-76: Redis directive catalog (series -> names) + current version. Keys are validated
+  // ONLY when prop['x-directives'] is truthy AND the catalog is loaded (otherwise graceful).
   directiveCatalog?: DirectiveCatalogContext;
   directiveVersion?: string;
 }
 
 type PairError = 'duplicate' | 'incomplete' | 'unknown-directive' | null;
 
-// Вычисляет ошибки пар map-редактора — единый источник правды для рендера и commitPairs.
-// knownDirectives (NIM-76): непустой Set → ключ вне каталога = 'unknown-directive';
-// null/undefined → директивы не проверяем (каталог не на руках → graceful-degrade).
+// Computes map-editor pair errors — the single source of truth for render and commitPairs.
+// knownDirectives (NIM-76): non-empty Set -> a key outside the catalog = 'unknown-directive';
+// null/undefined -> directives aren't validated (catalog not available -> graceful degrade).
 function computePairErrors(
   pairs: Array<[string, string]>,
   isInt: boolean,
@@ -1384,12 +1384,12 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
   const itemsType = mapValueType(prop);
   const isInt = itemsType === 'integer';
 
-  // Локальный state пар (включает черновые с пустым ключом).
-  // Инициализируется из внешнего value при первом рендере.
+  // Local pair state (includes drafts with an empty key).
+  // Initialized from the external value on first render.
   const [pairs, setPairs] = useState<Array<[string, string]>>(() => parseJsonPairs(value));
 
-  // NIM-76: имена директив для валидации/typeahead — только для помеченного поля
-  // (x-directives) и при загруженном каталоге + известной серии. Иначе null → не валидируем.
+  // NIM-76: directive names for validation/typeahead — only for the flagged field
+  // (x-directives) and when the catalog is loaded + series is known. Otherwise null -> no validation.
   const directiveTag = directiveFieldTag(prop);
   const directiveNames = useMemo(
     () => (directiveTag ? directiveNamesForVersion(directiveCatalog, directiveVersion) : undefined),
@@ -1403,20 +1403,20 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
     ? `directives-${name}-${versionToSeries(directiveVersion)}`
     : undefined;
 
-  // Ошибки текущих пар — через единую функцию (источник правды).
+  // Errors for the current pairs — via the shared function (source of truth).
   const { pairErrors, valErrors } = computePairErrors(pairs, isInt, knownDirectives);
 
-  // Реактивная перепроверка при смене версии/каталога (commitPairs покрывает правки
-  // пар; этот эффект — смену серии директив и начальную валидацию pre-filled value).
+  // Reactive recheck when version/catalog changes (commitPairs covers pair edits;
+  // this effect covers a directive-series change and initial validation of a pre-filled value).
   useEffect(() => {
     const { hasError } = computePairErrors(pairs, isInt, knownDirectives);
     onErrorChange?.(name, hasError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [knownDirectives]);
 
-  // Снимаем ошибку при размонтировании поля (скрытие show_when-секции или смена
-  // сценария): иначе агрегатор держит stale-ключ и submit-gate залипает без видимого
-  // на экране поля. Refs агрегатора стабильны → колбэк первого рендера корректен.
+  // Clear the error on field unmount (hiding a show_when section or a scenario
+  // change): otherwise the aggregator keeps a stale key and the submit gate sticks with no
+  // field visible on screen. Aggregator refs are stable -> the first-render callback is correct.
   useEffect(() => {
     return () => onErrorChange?.(name, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1425,18 +1425,18 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
   function commitPairs(next: Array<[string, string]>) {
     setPairs(next);
 
-    // Пересчитываем ошибки для нового набора пар через ту же функцию.
+    // Recompute errors for the new pair set via the same function.
     const { hasError: nextHasError } = computePairErrors(next, isInt, knownDirectives);
 
-    // Внешний state — ВСЕГДА валидный JSON: только пары с непустым ключом,
-    // дубли — last-wins (черновик переживает re-mount без потери введённого).
+    // External state is ALWAYS valid JSON: only pairs with a non-empty key,
+    // duplicates are last-wins (a draft survives re-mount without losing input).
     const obj: Record<string, string> = {};
     for (const [k, v] of next) {
       if (k.trim() !== '') obj[k] = v;
     }
     onChange(Object.keys(obj).length > 0 ? JSON.stringify(obj) : '');
 
-    // Сигнализируем об ошибке через отдельный канал (НЕ через порчу value).
+    // Signal the error via a separate channel (NOT by corrupting value).
     onErrorChange?.(name, nextHasError);
   }
 
@@ -1505,7 +1505,7 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
               style={{
                 ...baseStyle,
                 flex: 1,
-                // unknown-directive — проблема ключа, значение не подсвечиваем.
+                // unknown-directive — a key problem, we don't highlight the value.
                 border: `1px solid ${valErrors[idx] || (pairErrors[idx] && pairErrors[idx] !== 'unknown-directive') ? 'var(--danger)' : 'var(--border)'}`,
               }}
             />
@@ -1557,7 +1557,7 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
           ) : null}
         </div>
       ))}
-      {/* NIM-76: один общий datalist на редактор — typeahead имён директив серии. */}
+      {/* NIM-76: one shared datalist per editor — typeahead of series directive names. */}
       {directiveNames && directivesDatalistId ? (
         <datalist id={directivesDatalistId} data-testid={`field-map-directives-${name}`}>
           {directiveNames.map((d) => (

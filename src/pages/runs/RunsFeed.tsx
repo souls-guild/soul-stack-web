@@ -22,15 +22,15 @@ import { EMPTY_DATE_RANGE, inDateRange, hasDateRange, toServerRange, type DateRa
 import { DateRangeFilter } from './DateRangeFilter';
 import styles from '../common.module.css';
 
-// Единая страница /runs (ADR-069 §B2): сегмент-фильтр по типу прогона + колоночная
-// сортировка. Два режима таблицы:
-//   union (All/Voyage/Push/Errand) — client-union источников, КЛИЕНТСКАЯ сортировка.
-//   scenario (Scenario) — apply_run через GET /v1/runs, СЕРВЕРНАЯ сортировка+пагинация+stats.
-// Каждый endpoint опционален: 404/501 → тихо пропускается. Polling 5s при running.
+// Unified /runs page (ADR-069 part B2): segment filter by run type + column
+// sorting. Two table modes:
+//   union (All/Voyage/Push/Errand) — client-side union of sources, CLIENT-SIDE sort.
+//   scenario (Scenario) — apply_run via GET /v1/runs, SERVER-SIDE sort+pagination+stats.
+// Each endpoint is optional: 404/501 -> silently skipped. Polling 5s while running.
 
 type Segment = 'all' | 'scenario' | 'voyage' | 'push' | 'errand';
 
-// Структурные лейблы сегментов — English-identical в обоих locale (web-CLAUDE.md).
+// Structural segment labels — English-identical in both locales (web-CLAUDE.md).
 const SEGMENTS: { id: Segment; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'scenario', label: 'Scenario' },
@@ -51,8 +51,8 @@ interface FeedRow {
   finishedAt?: string;
 }
 
-// Type-бейдж union-строки маппится на таксономию сегментов (Scenario/Voyage/Push/Errand),
-// чтобы колонка Type совпадала с сегмент-селектором. Scenario/command-нюанс вояжа виден в Target.
+// The Type badge of a union row maps onto the segment taxonomy (Scenario/Voyage/Push/Errand),
+// so the Type column matches the segment selector. The voyage scenario/command nuance is visible in Target.
 function typeLabel(type: RunType): string {
   switch (type) {
     case 'scenario':
@@ -67,7 +67,7 @@ function typeLabel(type: RunType): string {
   }
 }
 
-// Объединённый набор терминальных статусов всех run-типов (Voyage | Push | Errand).
+// Combined set of terminal statuses across all run types (Voyage | Push | Errand).
 type AnyRunStatus = VoyageStatus | PushRunStatus | ErrandStatus;
 const TERMINAL_STATUSES = [
   'success',
@@ -99,7 +99,7 @@ function tparse(ts: string | undefined): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-// Voyage → /voyages/:id; Push → /push-runs/:id; Errand → /errands/:id.
+// Voyage -> /voyages/:id; Push -> /push-runs/:id; Errand -> /errands/:id.
 function detailPath(type: Exclude<RunType, 'scenario'>, id: string): string {
   const enc = encodeURIComponent(id);
   switch (type) {
@@ -113,15 +113,15 @@ function detailPath(type: Exclude<RunType, 'scenario'>, id: string): string {
   }
 }
 
-// 404/501 → фича не задеплоена, секцию пропускаем (не показываем как ошибку).
+// 404/501 -> feature not deployed, skip the section (don't show as an error).
 function isOptionalMiss(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 501);
 }
 
 const LIMIT = 50;
 
-// Унифицированные статус-группы для multi-select-фильтра. success ↔ succeeded,
-// running = любой non-terminal. Пустой набор = без фильтра по статусу.
+// Unified status groups for the multi-select filter. success <-> succeeded,
+// running = any non-terminal. Empty set = no status filter.
 type StatusGroup = 'success' | 'failed' | 'running' | 'cancelled';
 const STATUS_GROUP_ORDER: StatusGroup[] = ['success', 'failed', 'running', 'cancelled'];
 const STATUS_GROUP_MATCH: Record<StatusGroup, (status: string) => boolean> = {
@@ -131,7 +131,7 @@ const STATUS_GROUP_MATCH: Record<StatusGroup, (status: string) => boolean> = {
   cancelled: (s) => s === 'cancelled',
 };
 
-// --- Union client-sort (SoulsList-паттерн) со вторичным tie-break по id (детерминизм). ---
+// --- Union client-sort (SoulsList pattern) with secondary tie-break by id (determinism). ---
 type UnionSortKey = 'type' | 'id' | 'target' | 'status' | 'started' | 'finished';
 type SortDir = 'asc' | 'desc';
 
@@ -159,10 +159,10 @@ function compareUnion(a: FeedRow, b: FeedRow, key: UnionSortKey, dir: SortDir): 
   }
   const primary = dir === 'asc' ? cmp : -cmp;
   if (primary !== 0) return primary;
-  return a.id.localeCompare(b.id); // детерминированный tie-break (dir-независимый)
+  return a.id.localeCompare(b.id); // deterministic tie-break (dir-independent)
 }
 
-// --- Scenario server-sort whitelist (совпадает с backend GET /v1/runs). ---
+// --- Scenario server-sort whitelist (matches backend GET /v1/runs). ---
 type ScenSortKey = 'incarnation' | 'service' | 'scenario' | 'status' | 'started_at' | 'finished_at';
 
 type AriaSort = 'ascending' | 'descending' | 'none';
@@ -175,11 +175,11 @@ function sortGlyph(active: boolean, dir: SortDir): string {
   return dir === 'asc' ? ' ▲' : ' ▼';
 }
 
-// Агрегатные статусы прогона (Scenario stats); satisfies ловит drift при расширении enum.
+// Aggregate run statuses (Scenario stats); satisfies catches drift when the enum expands.
 const SCEN_STATUSES = ['applying', 'success', 'failed', 'cancelled'] as const satisfies readonly RunStatus[];
 
-// Клиентский текстовый поиск по уже загруженным union-строкам (case-insensitive substring
-// по id/target/status). Только клиент — union и так «первые N каждого типа».
+// Client-side text search over already-loaded union rows (case-insensitive substring
+// over id/target/status). Client-only — union is already "first N of each type" anyway.
 function matchesUnionSearch(row: FeedRow, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
@@ -225,29 +225,29 @@ export function RunsFeed() {
   // union client-sort state.
   const [unionSortKey, setUnionSortKey] = useState<UnionSortKey>('started');
   const [unionSortDir, setUnionSortDir] = useState<SortDir>('desc');
-  // Клиентский поиск по уже загруженным union-строкам (NIM-42 PART B).
+  // Client-side search over already-loaded union rows (NIM-42 PART B).
   const [unionSearch, setUnionSearch] = useState('');
 
-  // scenario server-sort + пагинация + СЕРВЕРНЫЕ фильтры (incarnation + status).
-  // status здесь single-select apply_run-статуса (НЕ union-statusSet): server-paginated
-  // сегмент обязан фильтровать server-side, иначе Pager/total врут.
+  // scenario server-sort + pagination + SERVER-SIDE filters (incarnation + status).
+  // status here is a single-select apply_run status (NOT the union-statusSet): a
+  // server-paginated segment must filter server-side or Pager/total will lie.
   const [scenSortKey, setScenSortKey] = useState<ScenSortKey>('started_at');
   const [scenSortDir, setScenSortDir] = useState<SortDir>('desc');
   const [offset, setOffset] = useState(0);
   const [incarnation, setIncarnation] = useState('');
   const [scenarioStatus, setScenarioStatus] = useState<RunStatus | ''>('');
-  // NIM-42: серверный Service-фильтр + свободный поиск q (substring по
-  // incarnation/scenario/service/started_by) — оба в query И queryKey.
+  // NIM-42: server-side Service filter + free-text search q (substring over
+  // incarnation/scenario/service/started_by) — both in the query AND queryKey.
   const [scenService, setScenService] = useState('');
   const [scenQuery, setScenQuery] = useState('');
-  // NIM-42: серверный диапазон started_at (отдельный от union dateRange) —
-  // конвертится в started_after/started_before через toServerRange.
+  // NIM-42: server-side started_at range (separate from union dateRange) —
+  // converted to started_after/started_before via toServerRange.
   const [scenDateRange, setScenDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
 
   const wantVoyage = segment === 'all' || segment === 'voyage';
   const wantPush = segment === 'all' || segment === 'push';
   const wantErrand = segment === 'all' || segment === 'errand';
-  const wantScenarioUnion = segment === 'all'; // apply_run как 4-й источник — только в All.
+  const wantScenarioUnion = segment === 'all'; // apply_run as a 4th source — only in All.
   const isScenario = segment === 'scenario';
 
   const voyagesQ = useQuery({
@@ -274,7 +274,7 @@ export function RunsFeed() {
       q.state.data ? ((q.state.data.items ?? []).some((e) => isRunning(e.status)) ? 5000 : false) : false,
     retry: false,
   });
-  // 4-й union-источник (All): первые N scenario apply_run, дефолт-сортировка сервера.
+  // 4th union source (All): first N scenario apply_run, default server sort.
   const applyUnionQ = useQuery({
     queryKey: ['runs-feed', 'apply-union'],
     queryFn: () => keeperApi.runs.list({ limit: LIMIT }),
@@ -284,8 +284,8 @@ export function RunsFeed() {
     retry: false,
   });
 
-  // Scenario-режим: серверная сортировка + СЕРВЕРНЫЙ фильтр (status/incarnation) + пагинация.
-  // Всё (sort/sort_dir/status/incarnation/offset) в query И в queryKey.
+  // Scenario mode: server-side sort + SERVER-SIDE filter (status/incarnation) + pagination.
+  // Everything (sort/sort_dir/status/incarnation/offset) is in the query AND queryKey.
   const scenServerRange = toServerRange(scenDateRange);
   const scenarioQ = useQuery({
     queryKey: [
@@ -326,8 +326,8 @@ export function RunsFeed() {
     enabled: isScenario,
     retry: false,
   });
-  // Каталог сервисов для Service-фильтра (ADR-042 — no hardcode). Нет каталога/ошибка
-  // → просто пустой список опций (graceful degradation), без краха фильтр-бара.
+  // Service catalog for the Service filter (ADR-042 — no hardcode). No catalog/error
+  // -> just an empty options list (graceful degradation), no filter-bar crash.
   const servicesQ = useQuery({
     queryKey: ['services', 'list'],
     queryFn: () => keeperApi.services.list(),
@@ -335,7 +335,7 @@ export function RunsFeed() {
     retry: false,
   });
 
-  // Жёсткие ошибки union-источников (не 404/501); optional-miss молчим.
+  // Hard errors from union sources (not 404/501); optional-miss stays silent.
   const unionErrors: string[] = [];
   for (const [label, q] of [
     ['Voyages', voyagesQ],
@@ -412,7 +412,7 @@ export function RunsFeed() {
     return rows;
   }, [wantVoyage, wantPush, wantErrand, wantScenarioUnion, voyagesQ.data, pushQ.data, errandsQ.data, applyUnionQ.data]);
 
-  // Client-фильтр (status-группы + date-range + свободный поиск по загруженным строкам)
+  // Client filter (status groups + date-range + free-text search over loaded rows)
   // + client-sort union.
   function passesClientFilters(row: FeedRow): boolean {
     if (statusSet.size > 0) {
@@ -429,8 +429,8 @@ export function RunsFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unionRows, statusSet, dateRange, unionSearch, unionSortKey, unionSortDir]);
 
-  // Scenario фильтруется ТОЛЬКО server-side (status/incarnation в query) — client-фильтр
-  // сломал бы Pager/total; отдаём items как есть (сервер уже отфильтровал+отсортировал).
+  // Scenario is filtered ONLY server-side (status/incarnation in query) — a client filter
+  // would break Pager/total; items are passed through as-is (server already filtered+sorted).
   const scenView = scenarioQ.data?.items ?? [];
 
   const unionLoading =
@@ -454,7 +454,7 @@ export function RunsFeed() {
     }
   }
 
-  // Смена сортировки Scenario СБРАСЫВАЕТ offset в 0 (серверная пагинация).
+  // Changing Scenario sort RESETS offset to 0 (server-side pagination).
   function toggleScenSort(key: ScenSortKey) {
     setOffset(0);
     if (scenSortKey === key) {
@@ -650,7 +650,7 @@ export function RunsFeed() {
   );
 }
 
-// --- union-режим (All/Voyage/Push/Errand) ---
+// --- union mode (All/Voyage/Push/Errand) ---
 function UnionSegment({
   segment,
   rows,
@@ -764,7 +764,7 @@ function UnionSegment({
   );
 }
 
-// --- scenario-режим (apply_run, серверная сортировка+пагинация+stats) ---
+// --- scenario mode (apply_run, server-side sort+pagination+stats) ---
 function ScenarioSegment({
   statsQ,
   scenarioQ,
@@ -789,7 +789,7 @@ function ScenarioSegment({
   onSort: (k: ScenSortKey) => void;
 }) {
   const { t } = useTranslation();
-  // Sortable-колонки — whitelist backend GET /v1/runs (Apply ID / Started by не входят).
+  // Sortable columns — whitelist from backend GET /v1/runs (Apply ID / Started by are excluded).
 
   function ScenTh({ colKey, label }: { colKey: ScenSortKey; label: string }) {
     const active = sortKey === colKey;

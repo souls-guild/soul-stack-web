@@ -38,7 +38,7 @@ function statusTone(s: string | undefined): 'ok' | 'warn' | 'danger' | 'info' | 
   }
 }
 
-// CSV (`core.cmd.shell, core.exec.run`) → массив exact-match.
+// CSV (`core.cmd.shell, core.exec.run`) -> array exact-match.
 // Multi-value `?module=X&module=Y` server-side OR (openapi commit 157ee27).
 function parseModuleCsv(input: string): string[] {
   return input

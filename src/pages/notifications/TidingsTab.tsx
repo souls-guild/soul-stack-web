@@ -9,8 +9,8 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { TidingModal } from './TidingModal';
 import styles from '../common.module.css';
 
-// Tiding — постоянное правило подписки. Ephemeral-правила (voyage-bound)
-// не отображаются в этой вкладке: backend скрывает их по умолчанию.
+// Tiding — a persistent subscription rule. Ephemeral rules (voyage-bound)
+// are not shown in this tab: backend hides them by default.
 
 function relDate(iso?: string | null): string {
   if (!iso) return '—';
@@ -38,7 +38,7 @@ export function TidingsTab() {
   const [editing, setEditing] = useState<Tiding | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Tiding | null>(null);
 
-  // Если URL содержит ?cadence=<name> — открываем форму создания с предзаполнением.
+  // If the URL has ?cadence=<name> — open the create form with a preset value.
   const prefillCadence = searchParams.get('cadence') ?? undefined;
   useEffect(() => {
     if (prefillCadence) {

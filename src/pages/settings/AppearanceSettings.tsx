@@ -1,7 +1,7 @@
-// Вкладка Settings / Appearance — выбор темы, шрифта и языка.
-// Тема: useTheme() из ThemeProvider (контекст), отображает все THEME_MODES.
-// Шрифт: useFont() из FontProvider — независимый селектор (см. useFont.ts), не привязан к теме.
-// Язык: LangToggle / changeLang из i18n (react-i18next persist через localStorage).
+// Settings / Appearance tab — theme, font, and language selection.
+// Theme: useTheme() from ThemeProvider (context), displays all THEME_MODES.
+// Font: useFont() from FontProvider — independent selector (see useFont.ts), not tied to theme.
+// Language: LangToggle / changeLang from i18n (react-i18next persisted via localStorage).
 
 import { useTheme, THEME_MODES, type ThemeMode } from '../../hooks/useTheme';
 import { useFont, FONT_MODES, FONT_STACKS, type FontMode } from '../../hooks/useFont';

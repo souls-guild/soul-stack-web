@@ -49,7 +49,7 @@ export function PushApply() {
     [inventoryRaw],
   );
 
-  // Парсинг input — однократно, иначе вылетит для каждого symbol-а.
+  // Parse input — once, otherwise it would re-run on every keystroke.
   const inputParsed = useMemo<{ ok: true; value: Record<string, unknown> } | { ok: false; err: string }>(() => {
     const trimmed = inputRaw.trim();
     if (!trimmed) return { ok: true, value: {} };
@@ -80,7 +80,7 @@ export function PushApply() {
     },
   });
 
-  // Poll GET /v1/push/{apply_id} до терминала.
+  // Poll GET /v1/push/{apply_id} until terminal.
   const poll = useQuery({
     queryKey: ['push.get', applyId],
     queryFn: () => keeperApi.push.get(applyId!),
@@ -92,7 +92,7 @@ export function PushApply() {
     },
   });
 
-  // Сброс apply_id при сабмите нового прогона.
+  // Reset apply_id when submitting a new run.
   useEffect(() => {
     if (submit.isPending) setApplyId(null);
   }, [submit.isPending]);

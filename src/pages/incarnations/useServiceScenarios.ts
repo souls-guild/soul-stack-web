@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import { keeperApi, type ServiceScenarioInfo } from '../../api/keeper';
 
-// Тянет /v1/services/{name}/scenarios. Endpoint опционален (фиксируется параллельно
-// в backend-slice-е), поэтому 404/501/network-fail отдаются как `unavailable: true`,
-// и UI рисует text input fallback.
+// Fetches /v1/services/{name}/scenarios. Endpoint is optional (being finalized in
+// parallel in the backend slice), so 404/501/network-fail are returned as `unavailable: true`,
+// and the UI renders a text input fallback.
 export interface ScenariosQueryResult {
   loading: boolean;
   unavailable: boolean;

@@ -9,9 +9,9 @@ import { useAuth } from '../hooks/useAuth';
 import { ApiError, NetworkError } from '../api/client';
 import styles from './Login.module.css';
 
-// JWT — 3 base64url-сегмента, разделённых точкой. Контент не валидируем —
-// authoritative проверка на стороне Keeper-а.
-// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
+// JWT — 3 base64url segments separated by dots. We don't validate content —
+// authoritative check happens on the Keeper side.
+// Messages — i18n keys in the `admin` namespace; rendered via t(fieldError.message).
 const schema = z.object({
   token: z
     .string()

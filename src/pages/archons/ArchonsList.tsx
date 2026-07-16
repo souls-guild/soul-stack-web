@@ -50,7 +50,7 @@ function createdViaTone(v: OperatorCreatedVia | string | undefined):
   }
 }
 
-// JWT отдаётся один раз — показываем в modal-блоке с кнопкой copy.
+// JWT is given out once — we show it in a modal block with a copy button.
 function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: string; onClose: () => void }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -107,8 +107,8 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
   );
 }
 
-// Multi-select ролей: select-добавление + chips для уже выбранных. Каталог
-// ролей подгружается из /v1/roles; если ручка недоступна — disabled+hint.
+// Multi-select of roles: select-to-add + chips for already-selected. The role
+// catalog is loaded from /v1/roles; if the endpoint is unavailable — disabled+hint.
 function RolesPicker({
   roles,
   selected,
@@ -315,28 +315,28 @@ export function ArchonsList() {
   const [aidNew, setAidNew] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  // Подсказка: backend отверг roles[] (404/501) — Архонт всё равно создался без ролей.
+  // Hint: backend rejected roles[] (404/501) — the Archon was still created without roles.
   const [rolesUnsupported, setRolesUnsupported] = useState(false);
   const [revealed, setRevealed] = useState<{ jwt: string; expiresAt?: string } | null>(null);
 
-  // Каталог ролей кластера — для multi-select. Если ручка недоступна,
-  // показываем подсказку, что выбор ролей сейчас не работает.
+  // Cluster role catalog — for the multi-select. If the endpoint is unavailable,
+  // we show a hint that role selection is currently not working.
   const rolesQ = useQuery({
     queryKey: ['rbac.roles'],
     queryFn: () => keeperApi.roles.list(),
     staleTime: 30_000,
   });
-  // Защита от malformed-ответа (нет items / item без name) — UI не падает,
-  // просто получает пустой каталог.
+  // Guard against a malformed response (no items / item without a name) — the UI
+  // doesn't crash, it just gets an empty catalog.
   const availableRoles: RoleView[] = (rolesQ.data?.items ?? []).filter(
     (r): r is RoleView => typeof r?.name === 'string' && r.name.length > 0,
   );
 
   const [authMethod, setAuthMethod] = useState<OperatorAuthMethod | ''>('');
-  // Клиентская строка поиска: фильтрует по aid и display_name среди загруженной страницы.
+  // Client-side search string: filters by aid and display_name within the loaded page.
   const [searchQuery, setSearchQuery] = useState('');
-  // Default ON: revoked-Архонты не маячат в списке. Снять чекбокс — показать всех
-  // (включая revoked, с красным chip и disabled-action-кнопками).
+  // Default ON: revoked Archons don't clutter the list. Uncheck the box — show everyone
+  // (including revoked, with a red chip and disabled action buttons).
   const [hideRevoked, setHideRevoked] = useState(true);
   const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
@@ -347,8 +347,8 @@ export function ArchonsList() {
     queryFn: () =>
       keeperApi.operators.list({
         auth_method: authMethod || undefined,
-        // hideRevoked=true → не запрашиваем revoked (API default = только активные).
-        // hideRevoked=false → revoked=true, чтобы backend вернул и отозванных.
+        // hideRevoked=true → don't request revoked (API default = active only).
+        // hideRevoked=false → revoked=true, so the backend also returns revoked ones.
         revoked: hideRevoked ? undefined : true,
         limit,
         offset,
@@ -358,9 +358,9 @@ export function ArchonsList() {
   const createMut = useMutation({
     mutationFn: async (): Promise<OperatorCreateReply> => {
       const base = { aid: aidNew, display_name: displayName };
-      // Если оператор выбрал роли — пробуем с extended payload. Backend без
-      // поддержки create-with-roles может ответить 404/501 на extended-форму:
-      // в этом случае создаём без ролей и выставляем флаг unsupported.
+      // If the operator selected roles — try with an extended payload. A backend
+      // without create-with-roles support may respond 404/501 to the extended form:
+      // in that case we create without roles and set the unsupported flag.
       if (selectedRoles.length > 0) {
         try {
           return await keeperApi.operators.create({ ...base, roles: selectedRoles });
@@ -396,11 +396,11 @@ export function ArchonsList() {
   const displayNameValid = displayNameTrimmed.length >= 1 && displayNameTrimmed.length <= 128;
 
   const rawItems = list.data?.items ?? [];
-  // Belt-and-suspenders: даже если backend вернёт revoked в выдаче, при включённом
-  // фильтре их не показываем. Y в счётчике = total из API (включая то, что
-  // отфильтровано клиентом), X = реально видимые после client-side фильтра.
+  // Belt-and-suspenders: even if the backend returns revoked in the response, we
+  // don't show them when the filter is on. Y in the counter = total from the API
+  // (including what's filtered client-side), X = actually visible after the client-side filter.
   const afterRevoke = hideRevoked ? rawItems.filter((op) => !op.revoked_at) : rawItems;
-  // Client-side поиск по aid и display_name (без учёта регистра).
+  // Client-side search by aid and display_name (case-insensitive).
   const needle = searchQuery.trim().toLowerCase();
   const items = needle
     ? afterRevoke.filter(

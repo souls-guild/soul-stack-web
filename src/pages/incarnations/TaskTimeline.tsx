@@ -5,9 +5,9 @@ import { taskStatusTone } from '../../components/status';
 import { taskRowKey, type TaskRow } from './taskRow';
 import styles from '../common.module.css';
 
-// Единый per-task рендерер прогона (NIM-37): live (SSE) и история (audit)
-// приходят как нормализованные TaskRow и рисуются одной таблицей. Модель и
-// нормализация — в ./taskRow.
+// Unified per-task run renderer (NIM-37): live (SSE) and history (audit)
+// arrive as normalized TaskRow and are drawn as a single table. The model and
+// normalization live in ./taskRow.
 export function TaskTimeline({
   rows,
   degraded = false,

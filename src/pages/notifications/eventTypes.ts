@@ -1,22 +1,22 @@
 /**
- * Каталог event_types для Tiding-правил (ADR-052, ADR-042).
+ * Catalog of event_types for Tiding rules (ADR-052, ADR-042).
  *
- * ADR-042: UI не хардкодит динамические каталоги — backend отдаёт их через
- * GET /v1/event-types (areas + point_events). Этот файл экспортирует хук
- * useEventTypeCatalog, который фетчит каталог и возвращает плоские массивы
- * для рендера чипов в TidingModal.
+ * ADR-042: UI does not hardcode dynamic catalogs — backend serves them via
+ * GET /v1/event-types (areas + point_events). This file exports the
+ * useEventTypeCatalog hook, which fetches the catalog and returns flat arrays
+ * for rendering chips in TidingModal.
  *
- * KNOWN_EVENT_TYPE_AREAS — статический fallback, использовался до реализации
- * backend-эндпоинта. Теперь используется ТОЛЬКО в существующих тестах,
- * которые проверяют наличие конкретных типов. Не использовать в новом коде UI.
+ * KNOWN_EVENT_TYPE_AREAS — a static fallback, used before the backend
+ * endpoint was implemented. Now used ONLY in existing tests that check for
+ * specific types. Do not use in new UI code.
  */
 
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
 
 /**
- * @deprecated Использовать useEventTypeCatalog. Оставлен только для тестов
- * совместимости. Источник правды — backend GET /v1/event-types.
+ * @deprecated Use useEventTypeCatalog. Kept only for test
+ * compatibility. Source of truth — backend GET /v1/event-types.
  */
 export const KNOWN_EVENT_TYPE_AREAS = [
   'scenario_run.*',
@@ -28,15 +28,15 @@ export const KNOWN_EVENT_TYPE_AREAS = [
 ] as const;
 
 /**
- * Фетчит каталог event-types с backend (GET /v1/event-types).
- * Возвращает:
- *   - areas: строки вида `scenario_run.*` (glob-подписки на всю область).
- *   - pointEvents: строки вида `incarnation.run_completed` (точечные типы).
- *   - allTypes: объединённый массив areas + pointEvents (для рендера чипов).
- *   - isLoading / isError: статус запроса.
+ * Fetches the event-types catalog from backend (GET /v1/event-types).
+ * Returns:
+ *   - areas: strings like `scenario_run.*` (glob subscriptions for a whole area).
+ *   - pointEvents: strings like `incarnation.run_completed` (point types).
+ *   - allTypes: combined array of areas + pointEvents (for rendering chips).
+ *   - isLoading / isError: request status.
  *
- * Graceful fallback при ошибке фетча: пустые массивы (чипов не будет,
- * пользователь может ввести тип вручную в кастомное поле).
+ * Graceful fallback on fetch error: empty arrays (no chips shown,
+ * the user can still type a type manually in the custom field).
  */
 export function useEventTypeCatalog() {
   const q = useQuery({

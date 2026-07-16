@@ -14,7 +14,7 @@ import { JsonViewer } from '../../components/JsonViewer';
 import { pushStatusTone } from './status';
 import styles from '../common.module.css';
 
-// satisfies: перечисление ⊆ PushRunStatus; при добавлении статуса в backend tsc потребует пересмотра.
+// satisfies: enum ⊆ PushRunStatus; adding a status on backend will make tsc demand a review.
 const NON_TERMINAL_STATUSES = ['pending', 'running'] as const satisfies readonly PushRunStatus[];
 const NON_TERMINAL: ReadonlySet<string> = new Set(NON_TERMINAL_STATUSES);
 
@@ -25,7 +25,7 @@ interface HostSummary {
   error?: string;
 }
 
-// summary это additionalProperties: true. Достаём hosts[] guarded.
+// summary is additionalProperties: true. Extract hosts[] guarded.
 function readHosts(summary: PushApplyView['summary'] | undefined): HostSummary[] | null {
   if (!summary || typeof summary !== 'object') return null;
   const hosts = (summary as { hosts?: unknown }).hosts;

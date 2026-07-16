@@ -1,13 +1,13 @@
-// Zod-схема Provider create-формы. Регэкспы синхронизированы с openapi.yaml
-// (ProviderCreateRequest.name/type kebab-case); серверная валидация — источник
-// правды (422 показываем как server-error). Сообщения — i18n-ключи namespace
-// `providers`; рендер через t(fieldError.message).
+// Zod schema for the Provider create form. Regexes are synced with openapi.yaml
+// (ProviderCreateRequest.name/type kebab-case); server-side validation is the
+// source of truth (422 is shown as a server-error). Messages — i18n keys under
+// namespace `providers`; rendered via t(fieldError.message).
 
 import { z } from 'zod';
 
 const KEBAB = /^[a-z0-9-]{1,63}$/;
 
-/** Парсит "key: value" построчно в объект credentials. Строки без ':' игнорируются. */
+/** Parses "key: value" line by line into a credentials object. Lines without ':' are ignored. */
 export function parseCredentialsKV(raw: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of raw.split('\n')) {
@@ -20,9 +20,9 @@ export function parseCredentialsKV(raw: string): Record<string, string> {
   return out;
 }
 
-// credentials — dual-mode (ADR-064): значение (KV) XOR credentials_ref. XOR
-// структурно гарантирован переключателем; refine требует непустой активный режим
-// (клиентская проверка «заполни ровно одно»).
+// credentials — dual-mode (ADR-064): value (KV) XOR credentials_ref. XOR
+// is structurally guaranteed by the toggle; refine requires the active mode to
+// be non-empty (client-side check "fill exactly one").
 export const providerCreateSchema = z
   .object({
     name: z.string().trim().min(1, 'providers:errNameRequired').regex(KEBAB, 'providers:errNamePattern'),

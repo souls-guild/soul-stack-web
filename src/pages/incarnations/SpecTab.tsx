@@ -7,9 +7,9 @@ interface Props {
   spec: Record<string, unknown> | null | undefined;
 }
 
-// Tab «Spec» — declared-параметры incarnation, заданные оператором при создании
-// (и/или ADR-008 spec.hosts[] для bootstrap-create). Read-only: API сейчас не
-// принимает PATCH spec (см. HostsTab BACKLOG).
+// Tab "Spec" — declared parameters of the incarnation, set by the operator on creation
+// (and/or ADR-008 spec.hosts[] for bootstrap-create). Read-only: the API currently doesn't
+// accept PATCH spec (see HostsTab BACKLOG).
 export function SpecTab({ spec }: Props) {
   const { t } = useTranslation();
   const isEmpty = !spec || (typeof spec === 'object' && Object.keys(spec).length === 0);

@@ -9,7 +9,7 @@ import { runStatusTone } from '../../components/status';
 import styles from '../common.module.css';
 import donutStyles from './OverviewDonuts.module.css';
 
-// Дашборд-счётчик с иконкой, значением и ссылкой на список.
+// Dashboard counter with an icon, value, and link to the list.
 function StatCard({
   label,
   value,
@@ -39,7 +39,7 @@ function StatCard({
   );
 }
 
-// Строка в таблице последних прогонов.
+// Row in the recent runs table.
 interface RecentRun {
   id: string;
   kind: string;
@@ -60,11 +60,11 @@ function formatRelative(iso: string | undefined): string {
   return `${Math.floor(deltaSec / 86_400)}d ago`;
 }
 
-// Tone souls-статуса для donut/legend. connected=ok(зелёный), pending=warn(жёлтый),
-// disconnected/revoked/expired=danger(красный, "error-подобные"), destroyed/неизвестный=muted.
-// Не переиспользуем soulTone() из components/status — та функция шарит badge-tone
-// с другими страницами (SoulsList/SoulDetail) и в другом контрасте помечает
-// pending как muted, а не warn; здесь своя, ТЗ-специфичная палитра donut-сегментов.
+// Tone for the soul status donut/legend. connected=ok(green), pending=warn(yellow),
+// disconnected/revoked/expired=danger(red, "error-like"), destroyed/unknown=muted.
+// We don't reuse soulTone() from components/status — that function shares badge-tone
+// with other pages (SoulsList/SoulDetail) and marks pending as muted (not warn)
+// in a different contrast; this is its own donut-segment palette specific to this page.
 function statusDonutTone(status: string): DonutTone {
   switch (status as SoulStatus) {
     case 'connected':
@@ -80,8 +80,8 @@ function statusDonutTone(status: string): DonutTone {
   }
 }
 
-// Coven-донат не имеет статусной семантики — цикличная нейтральная палитра
-// по индексу, чтобы соседние сегменты визуально различались.
+// The coven donut has no status semantics — a cyclic neutral palette
+// by index, so neighboring segments are visually distinct.
 const COVEN_PALETTE: DonutTone[] = ['accent', 'info', 'warn', 'ok', 'danger', 'muted'];
 
 function statusMapToSlices(byStatus: Record<string, number>): DonutSlice[] {
@@ -104,21 +104,21 @@ function covenMapToSlices(byCoven: Record<string, number>): DonutSlice[] {
 export function OverviewPage() {
   const { t } = useTranslation();
 
-  // Souls — сводка по статусам/транспорту/coven одним запросом (ADR-047 scoped).
+  // Souls — summary by status/transport/coven in one request (ADR-047 scoped).
   const soulsStatsQ = useQuery({
     queryKey: ['overview.souls.stats'],
     queryFn: () => keeperApi.souls.stats(),
     staleTime: 15_000,
   });
 
-  // HA-топология Keeper-кластера + self_health.
+  // HA topology of the Keeper cluster + self_health.
   const clusterQ = useQuery({
     queryKey: ['overview.cluster'],
     queryFn: () => keeperApi.cluster.get(),
     staleTime: 15_000,
   });
 
-  // Incarnations — total и count по статусам.
+  // Incarnations — total and count by status.
   const incarnationsQ = useQuery({
     queryKey: ['overview.incarnations'],
     queryFn: () => keeperApi.incarnations.list({ limit: 1 }),
@@ -130,7 +130,7 @@ export function OverviewPage() {
     staleTime: 15_000,
   });
 
-  // Voyages — последние 5 (для секции «последние прогоны»).
+  // Voyages — last 5 (for the "recent runs" section).
   const voyagesRecent = useQuery({
     queryKey: ['overview.voyages.recent'],
     queryFn: () => keeperApi.voyages.list({ limit: 5 }),
@@ -146,7 +146,7 @@ export function OverviewPage() {
   const soulsTotal = soulsStatsQ.data?.total ?? 0;
   const staleCount = soulsStatsQ.data?.stale_count ?? 0;
   const covensCount = Object.keys(byCoven).length;
-  // agent→pull, ssh→push (backend-словарь transport, UI-лейблы см. описание /v1/souls/stats).
+  // agent->pull, ssh->push (backend transport vocabulary, UI labels see /v1/souls/stats description).
   const pullCount = byTransport['agent'] ?? 0;
   const pushCount = byTransport['ssh'] ?? 0;
 
@@ -154,8 +154,8 @@ export function OverviewPage() {
   const covenSlices = covenMapToSlices(byCoven);
 
   const recentRuns: RecentRun[] = ((voyagesRecent.data?.items ?? []) as Voyage[]).map((v) => {
-    // Показываем краткий target: для scenario — первая инкарнация из target.incarnations,
-    // для command — первый coven или where-фрагмент.
+    // Show a short target: for scenario — the first incarnation from target.incarnations,
+    // for command — the first coven or a where-fragment.
     const targetLabel =
       v.target?.incarnations?.[0] ??
       v.target?.coven?.[0] ??
@@ -171,7 +171,7 @@ export function OverviewPage() {
     };
   });
 
-  // Есть ли ошибки — показываем деградацию, не краш.
+  // Whether there are errors — show degradation, not a crash.
   const hasError = soulsStatsQ.isError || clusterQ.isError || incarnationsQ.isError;
 
   return (
@@ -189,7 +189,7 @@ export function OverviewPage() {
         </div>
       ) : null}
 
-      {/* Счётчики */}
+      {/* Counters */}
       <section className={styles.section} aria-label={t('pages:overviewCounters')}>
         <div className={styles.summaryGrid}>
           <StatCard
@@ -230,7 +230,7 @@ export function OverviewPage() {
         </div>
       </section>
 
-      {/* Souls: 2 donut (статус + coven) */}
+      {/* Souls: 2 donuts (status + coven) */}
       <section className={styles.section} aria-label={t('pages:overviewSoulsCharts')}>
         <div className={donutStyles.donutGrid}>
           <div className={donutStyles.donutCard}>
@@ -268,7 +268,7 @@ export function OverviewPage() {
         </div>
       </section>
 
-      {/* SelfCheck: HA-топология Keeper-кластера */}
+      {/* SelfCheck: Keeper cluster HA topology */}
       <section className={styles.section} aria-label={t('pages:overviewClusterTitle')}>
         <h2 className={styles.sectionTitle}>{t('pages:overviewClusterTitle')}</h2>
         {clusterQ.isLoading ? (
@@ -325,8 +325,8 @@ export function OverviewPage() {
               <span className={donutStyles.selfHealthLabel}>{t('pages:overviewSelfHealthTitle')}</span>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {Object.entries(clusterQ.data?.self_health ?? {}).map(([component, status]) => {
-                  // Контракт (keeper/internal/api/handlers/cluster.go): значение — либо
-                  // литерал "ok", либо произвольная строка-причина сбоя (title на badge).
+                  // Contract (keeper/internal/api/handlers/cluster.go): the value is either
+                  // the literal "ok", or an arbitrary failure-reason string (title on the badge).
                   const ok = status === 'ok';
                   return (
                     <Badge key={component} tone={ok ? 'ok' : 'danger'} title={ok ? undefined : status}>
@@ -340,7 +340,7 @@ export function OverviewPage() {
         )}
       </section>
 
-      {/* Последние прогоны */}
+      {/* Recent runs */}
       <section className={styles.section} aria-label={t('pages:overviewRecentRuns')}>
         <h2 className={styles.sectionTitle}>{t('pages:overviewRecentRuns')}</h2>
         {voyagesRecent.isLoading ? (

@@ -38,7 +38,7 @@ export function RegisterServiceModal({ open, onClose }: Props) {
         name: values.name.trim(),
         git: values.git.trim(),
         ref: values.ref.trim(),
-        // refresh опционален — пустую строку не отправляем (openapi: опущено = без авто-refresh).
+        // refresh is optional — do not send an empty string (openapi: omitted = no auto-refresh).
         ...(values.refresh.trim() ? { refresh: values.refresh.trim() } : {}),
       }),
     onSuccess: (view) => {

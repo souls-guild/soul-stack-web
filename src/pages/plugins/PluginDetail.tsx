@@ -12,7 +12,7 @@ import styles from '../common.module.css';
 
 type Tab = 'overview' | 'audit' | 'kinds';
 
-// Plugin-kind title (structural — имена контрактов) + i18n-ключ summary.
+// Plugin-kind title (structural — contract names) + i18n key for summary.
 const KIND_INFO: Record<string, { title: string; summaryKey: string }> = {
   mod: { title: 'soul_module / soul_beacon', summaryKey: 'admin:pluginKindModSummary' },
   cloud: { title: 'cloud_driver', summaryKey: 'admin:pluginKindCloudSummary' },
@@ -30,7 +30,7 @@ export function PluginDetail() {
   }>();
   const [tab, setTab] = useState<Tab>('overview');
 
-  // GET /v1/plugins/sigils/{ns}/{name}/{ref} в API нет — lookup из list-а.
+  // No GET /v1/plugins/sigils/{ns}/{name}/{ref} in the API — look up from the list.
   const list = useQuery({
     queryKey: ['plugins.sigils.list'],
     queryFn: () => keeperApi.plugins.sigils.list(),
@@ -42,9 +42,9 @@ export function PluginDetail() {
     );
   }, [list.data, namespace, name, ref]);
 
-  // Audit-история допуска/ревокации по correlation_id невозможна (id не отдаётся).
-  // Фильтруем по type=plugin.sigil.allowed / plugin.sigil.revoked и ищем event-ы,
-  // где payload содержит соответствующий (ns, name, ref).
+  // Audit history for allow/revoke by correlation_id is not possible (id is not exposed).
+  // We filter by type=plugin.sigil.allowed / plugin.sigil.revoked and look for events
+  // whose payload contains the matching (ns, name, ref).
   const audit = useQuery({
     queryKey: ['plugins.sigil.audit', namespace, name, ref],
     queryFn: () =>
@@ -68,8 +68,8 @@ export function PluginDetail() {
     mutationFn: () => keeperApi.plugins.sigils.revoke(namespace, name, ref),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plugins.sigils.list'] });
-      // После revoke страница продолжит работать (revoked_at появится),
-      // navigate возвращает к списку, чтобы оператор увидел обновление.
+      // After revoke the page keeps working (revoked_at appears),
+      // navigate takes us back to the list so the operator sees the update.
       navigate('/plugins');
     },
   });

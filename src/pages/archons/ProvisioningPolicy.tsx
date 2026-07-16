@@ -1,7 +1,7 @@
-// Экран управления provisioning-policy операторов (ADR-058 Часть B).
-// GET /v1/provisioning-policy — читаем; PUT /v1/provisioning-policy — сохраняем.
-// Допустимые методы (user/ldap/oidc) — зафиксированы в ProvisioningPolicyUpdateRequest
-// OpenAPI-схемой; не динамический runtime-каталог.
+// Screen for managing the operator provisioning policy (ADR-058 Part B).
+// GET /v1/provisioning-policy — read; PUT /v1/provisioning-policy — save.
+// Allowed methods (user/ldap/oidc) — fixed by the ProvisioningPolicyUpdateRequest
+// OpenAPI schema; not a dynamic runtime catalog.
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,11 +14,11 @@ import { ApiError } from '../../api/client';
 import { Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// Полный набор допустимых методов (зафиксирован в ProvisioningPolicyUpdateRequest.allowed_methods
-// enum в OpenAPI-схеме как {"user"|"ldap"|"oidc"}).
-// Compile-time exhaustiveness guard: Record<ProvisioningMethod, true> требует
-// КАЖДОГО члена union как ключа — добавление нового метода в OpenAPI-схему
-// обновит ProvisioningMethod и сломает сборку, пока ALL_METHODS не обновлён.
+// Full set of allowed methods (fixed by the ProvisioningPolicyUpdateRequest.allowed_methods
+// enum in the OpenAPI schema as {"user"|"ldap"|"oidc"}).
+// Compile-time exhaustiveness guard: Record<ProvisioningMethod, true> requires
+// EVERY union member as a key — adding a new method to the OpenAPI schema
+// will update ProvisioningMethod and break the build until ALL_METHODS is updated.
 const _ALL_METHODS_EXHAUSTIVE: Record<ProvisioningMethod, true> = {
   user: true,
   ldap: true,
@@ -38,7 +38,7 @@ export function ProvisioningPolicy() {
   const { t } = useTranslation();
   const qc = useQueryClient();
 
-  // Локальное состояние чекбоксов — инициализируется из ответа API.
+  // Local checkbox state — initialized from the API response.
   const [selected, setSelected] = useState<Set<ProvisioningMethod>>(new Set(ALL_METHODS));
   const [initDone, setInitDone] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
@@ -49,18 +49,18 @@ export function ProvisioningPolicy() {
     staleTime: 30_000,
   });
 
-  // Синхронизируем чекбоксы с ответом API только при первой загрузке.
+  // Sync checkboxes with the API response only on first load.
   useEffect(() => {
     if (policyQ.data && !initDone) {
       const data = policyQ.data;
       if (data.policy_set && data.allowed_methods) {
-        // Фильтруем только известные UI методы (защита от неизвестных значений).
+        // Filter to only known UI methods (guard against unknown values).
         const known = (data.allowed_methods as string[]).filter(
           (m): m is ProvisioningMethod => (ALL_METHODS as string[]).includes(m),
         );
         setSelected(new Set(known));
       } else {
-        // policy_set=false → все методы разрешены (дефолт).
+        // policy_set=false → all methods allowed (default).
         setSelected(new Set(ALL_METHODS));
       }
       setInitDone(true);

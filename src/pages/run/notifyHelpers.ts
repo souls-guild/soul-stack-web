@@ -1,13 +1,13 @@
 /**
- * Вспомогательные функции для notify-блока RunWizard.
- * В отдельном файле чтобы не нарушать react-refresh/only-export-components.
+ * Helper functions for the RunWizard notify block.
+ * In a separate file to avoid violating react-refresh/only-export-components.
  */
 import type { VoyageNotify } from '../../api/keeper';
 
 /**
- * Сериализует notify-элементы для отправки в API.
- * Пустой herald — элемент невалиден, пропускается.
- * Projection без непустых путей — не шлём. Annotations пустые — не шлём.
+ * Serializes notify items for sending to the API.
+ * An empty herald — the item is invalid, skipped.
+ * Projection with no non-empty paths — not sent. Empty annotations — not sent.
  */
 export function serializeNotify(items: VoyageNotify[]): VoyageNotify[] | undefined {
   const valid = items.filter((it) => it.herald.trim());

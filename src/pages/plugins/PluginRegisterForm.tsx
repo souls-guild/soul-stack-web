@@ -11,13 +11,13 @@ import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// kebab-case; такой же pattern фигурирует в openapi для namespace/name плагинов.
+// kebab-case; the same pattern appears in openapi for plugin namespace/name.
 const KEBAB_RE = /^[a-z][a-z0-9-]*$/;
-// Tag-ref вида v1.2.3 (одиночный path-сегмент — branch-ref со слешем сервер
-// откажет 422; см. описание /v1/plugins/sigils/{namespace}/{name}/{ref}).
+// Tag-ref like v1.2.3 (a single path segment — a branch-ref with a slash the
+// server will reject with 422; see /v1/plugins/sigils/{namespace}/{name}/{ref} description).
 const TAG_REF_RE = /^[A-Za-z0-9._-]+$/;
 
-// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
+// Messages — i18n keys under namespace `admin`; rendered via t(fieldError.message).
 const schema = z.object({
   namespace: z
     .string()
@@ -60,8 +60,8 @@ export function PluginRegisterForm() {
       setReply(data);
       setServerError(null);
       qc.invalidateQueries({ queryKey: ['plugins.sigils.list'] });
-      // Не уходим со страницы сразу — оператор должен увидеть посчитанный sha256.
-      // Кнопка «К записи» уведёт на detail после факт-чека.
+      // Don't leave the page right away — the operator should see the computed sha256.
+      // The "To entry" button navigates to detail after the fact-check.
       void vars;
     },
     onError: (err) => {

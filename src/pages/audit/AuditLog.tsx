@@ -14,7 +14,7 @@ import { JsonViewer } from '../../components/JsonViewer';
 import i18n from '../../i18n';
 import styles from '../common.module.css';
 
-// satisfies гарантирует, что список ⊆ AuditEventSource; tsc упадёт при добавлении нового source в backend
+// satisfies guarantees the list ⊆ AuditEventSource; tsc will fail if a new source is added in the backend
 const SOURCES = [
   'signal',
   'api',
@@ -24,7 +24,7 @@ const SOURCES = [
   'background',
 ] as const satisfies readonly AuditEventSource[];
 
-// Color-coding badge по source. Tone-набор фиксированный (Badge.tsx).
+// Color-coding badge by source. Tone set is fixed (Badge.tsx).
 function sourceTone(s: AuditEventSource | string | undefined):
   'ok' | 'warn' | 'danger' | 'info' | 'muted' {
   switch (s) {
@@ -45,17 +45,17 @@ function sourceTone(s: AuditEventSource | string | undefined):
   }
 }
 
-// Маппинг dot-нотации event-типов в i18n-ключи admin-namespace.
-// Точки заменяются на _ для совместимости с JSON-ключами (i18next не поддерживает
-// вложенные точки в flat-namespace; graceful fallback — отсутствующий ключ → undefined).
+// Mapping of dot-notation event types to i18n keys in the admin namespace.
+// Dots are replaced with _ for compatibility with JSON keys (i18next doesn't support
+// nested dots in a flat namespace; graceful fallback — a missing key → undefined).
 function auditEventLabelKey(type: string): string {
   return `admin:auditEventLabel_${type.replace(/\./g, '_')}`;
 }
 
 const PAYLOAD_LIMIT_CHARS = 64_000;
 
-// Большие/binary-подобные payload-ы рендерим обрезанными — UI не должен
-// зависать на 10MB JSON-е. Truncation видна оператору, не молчаливая.
+// Large/binary-like payloads are rendered truncated — the UI shouldn't
+// hang on a 10MB JSON. Truncation is visible to the operator, not silent.
 function maybeTruncatePayload(payload: unknown): { value: unknown; truncated: boolean } {
   if (payload == null) return { value: payload, truncated: false };
   let text: string;
@@ -76,7 +76,7 @@ function maybeTruncatePayload(payload: unknown): { value: unknown; truncated: bo
   };
 }
 
-// Multi-value CSV input ("scenario.applied, push.applied") → массив без пустых.
+// Multi-value CSV input ("scenario.applied, push.applied") → array without empties.
 function parseCsv(input: string): string[] {
   return input
     .split(',')
@@ -85,15 +85,15 @@ function parseCsv(input: string): string[] {
 }
 
 // datetime-local input (`YYYY-MM-DDTHH:mm`) → RFC3339 (`...:00Z`).
-// Пустая строка → undefined, чтобы не уехать в query.
+// An empty string → undefined, so it doesn't end up in the query.
 function localToRfc3339(local: string): string | undefined {
   if (!local) return undefined;
-  // datetime-local — naive, без TZ. Считаем UTC для предсказуемости фильтра.
+  // datetime-local — naive, no TZ. We treat it as UTC for filter predictability.
   return `${local}:00Z`;
 }
 
-// Строит URL для deep-link на конкретное audit-событие по correlation_id.
-// Формат: /ui/audit?correlation_id=<id>
+// Builds a deep-link URL to a specific audit event by correlation_id.
+// Format: /ui/audit?correlation_id=<id>
 function buildAuditCorrLink(correlationId: string): string {
   const base = window.location.origin;
   return `${base}/ui/audit?correlation_id=${encodeURIComponent(correlationId)}`;
@@ -104,12 +104,12 @@ function EventCard({ ev }: { ev: AuditEvent }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const { value, truncated } = useMemo(() => maybeTruncatePayload(ev.payload), [ev.payload]);
-  // Получаем лейбл через i18n (graceful: если ключ не найден — undefined).
+  // Get the label via i18n (graceful: if the key is not found — undefined).
   const evLabel = useMemo(() => {
     if (!ev.type) return undefined;
     const key = auditEventLabelKey(ev.type);
     const raw = t(key);
-    // i18next возвращает сам ключ если перевода нет → проверяем совпадение.
+    // i18next returns the key itself if there's no translation → we check for a match.
     return raw !== key ? raw : undefined;
   }, [ev.type, t]);
 
@@ -120,7 +120,7 @@ function EventCard({ ev }: { ev: AuditEvent }) {
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {/* silent — clipboard может быть недоступен */});
+    }).catch(() => {/* silent — clipboard may be unavailable */});
   }
 
   return (
@@ -199,8 +199,8 @@ function EventCard({ ev }: { ev: AuditEvent }) {
 
 export function AuditLog() {
   const { t } = useTranslation();
-  // Поддерживаем deep-link `/audit?archon_aid=archon-alice` из ArchonDetail
-  // («Activity»-tab открывает audit с предустановленным фильтром).
+  // We support the deep-link `/audit?archon_aid=archon-alice` from ArchonDetail
+  // (the "Activity" tab opens audit with a preset filter).
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [typeCsv, setTypeCsv] = useState('');

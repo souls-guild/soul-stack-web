@@ -57,16 +57,16 @@ import { serializeNotify } from './notifyHelpers';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
 
-// Workload-тип Step 1. Push убран — он стал внутренним транспортом unified-Run,
-// больше не пользовательский тип (route /push остаётся deprecated).
+// Workload type for Step 1. Push was removed — it became the internal transport of unified-Run,
+// no longer a user-facing type (route /push remains deprecated).
 type Workload = 'scenario' | 'command';
 
-// Режим запуска: one-time Voyage или recurring Cadence.
+// Run mode: one-time Voyage or recurring Cadence.
 type RunMode = 'voyage' | 'cadence';
 
-// Stepper-определение. Семантика Step 2/3 различается по workload:
-//   Scenario: Step2=выбор scenario, Step3=incarnations, Step4=input+options.
-//   Command:  Step2=выбор хостов, Step3=module+params, Step4=options.
+// Stepper definition. Step 2/3 semantics differ by workload:
+//   Scenario: Step2=select scenario, Step3=incarnations, Step4=input+options.
+//   Command:  Step2=select hosts, Step3=module+params, Step4=options.
 const STEPS: Array<{ id: 1 | 2 | 3 | 4; label: string }> = [
   { id: 1, label: 'Workload' },
   { id: 2, label: 'Select' },
@@ -74,8 +74,8 @@ const STEPS: Array<{ id: 1 | 2 | 3 | 4; label: string }> = [
   { id: 4, label: 'Options' },
 ];
 
-// Step 1 — выбор workload. `title` — имя workload-сущности (English, не переводится);
-// `descKey` — i18n-ключ описания (переводится).
+// Step 1 — workload selection. `title` is the workload entity name (English, not translated);
+// `descKey` is the i18n key for the description (translated).
 const WORKLOADS: Array<{ kind: Workload; title: string; descKey: string; icon: typeof Box }> = [
   { kind: 'scenario', title: 'Scenario apply', descKey: 'run:workloadScenarioDesc', icon: Box },
   { kind: 'command', title: 'Command', descKey: 'run:workloadCommandDesc', icon: Terminal },
@@ -84,74 +84,74 @@ const WORKLOADS: Array<{ kind: Workload; title: string; descKey: string; icon: t
 interface ScenarioStateValues {
   service: string;
   scenario: string;
-  // Regex по имени incarnation — источник истины множества для fan-out. Список
-  // совпавших показывается read-only; сценарий запускается на ВСЕХ совпавших.
+  // Regex over incarnation name — the source of truth for the fan-out set. The list
+  // of matches is shown read-only; the scenario runs on ALL matches.
   incarnationRegex: string;
-  // Производное от incarnationRegex множество имён (резолвится в Step3 при наличии
-  // загруженного списка incarnations). Хранится в state, чтобы submit и валидация
-  // не зависели от смонтированности шага.
+  // The set of names derived from incarnationRegex (resolved in Step3 once the
+  // incarnations list is loaded). Stored in state so submit and validation
+  // don't depend on the step being mounted.
   incarnations: string[];
   fields: ScenarioFieldsState;
-  // Используется только когда scenario без typed input_schema — DynamicInputBuilder.
+  // Used only when the scenario has no typed input_schema — DynamicInputBuilder.
   inputObj: Record<string, unknown>;
 }
 
-// Command-модуль выбирается из каталога (GET /v1/modules) через ModulePicker.
-// `moduleName` — имя без state-суффикса (`core.cmd`); `moduleState` — выбранный
-// state (`shell`); полный адрес для submit — `<moduleName>.<moduleState>`.
+// The Command module is picked from the catalog (GET /v1/modules) via ModulePicker.
+// `moduleName` is the name without the state suffix (`core.cmd`); `moduleState` is the
+// selected state (`shell`); the full address for submit is `<moduleName>.<moduleState>`.
 //
-// Ветвление формы параметров:
-//   - модуль с params[] → типизированная per-field форма (ScenarioInputFields).
-//   - каталог недоступен (404/501) → free-text имя + DynamicInputBuilder.
+// Params-form branching:
+//   - a module with params[] -> typed per-field form (ScenarioInputFields).
+//   - catalog unavailable (404/501) -> free-text name + DynamicInputBuilder.
 interface CommandStateValues {
-  // Имя выбранного модуля (без state-суффикса), напр. `core.cmd`. Пусто — не выбран.
+  // Name of the selected module (without the state suffix), e.g. `core.cmd`. Empty — not selected.
   moduleName: string;
-  // Выбранный state модуля (`shell`/`run`/...). Полный адрес — `moduleName.moduleState`.
+  // Selected module state (`shell`/`run`/...). Full address — `moduleName.moduleState`.
   moduleState: string;
-  // Допустимые state-суффиксы выбранного модуля (для dropdown при >1).
+  // Valid state suffixes of the selected module (for the dropdown when >1).
   moduleStates: string[];
-  // core | plugin (из каталога). '' пока ничего не выбрано.
+  // core | plugin (from the catalog). '' while nothing is selected.
   moduleKind: ModuleKind | '';
-  // Параметры модуля из каталога (для авто-формы; пусты у core).
+  // Module params from the catalog (for the auto-form; empty for core).
   moduleParams: ModuleParam[];
-  // Типизированные значения params-формы (для модулей с params[]).
+  // Typed values of the params form (for modules with params[]).
   paramFields: ScenarioFieldsState;
   timeoutSeconds: number;
-  // Free-text fallback (каталог недоступен): имя модуля + динамический input.
+  // Free-text fallback (catalog unavailable): module name + dynamic input.
   customModule: string;
   customInput: Record<string, unknown>;
 }
 
-// Тип enum batch_mode берётся из types.gen через VoyageCreateRequest — не хардкодим строки.
+// The batch_mode enum type is taken from types.gen via VoyageCreateRequest — no hardcoded strings.
 type VoyageBatchMode = NonNullable<import('../../api/types.gen').components['schemas']['VoyageCreateRequest']['batch_mode']>;
 
 interface OptionsState {
-  // Новое унифицированное строковое поле batch (N | N%). Keeper парсит, UI не парсит.
+  // New unified string batch field (N | N%). Keeper parses it, the UI does not.
   batch: string;
-  // Порог провалов: N | N%. Keeper парсит. Пусто = поведение по on_failure.
+  // Failure threshold: N | N%. Keeper parses it. Empty = behavior follows on_failure.
   maxFailures: string;
   concurrency: string;
-  // VoyageOnFailure = 'abort' | 'continue' (супerset ErrandRunOnFailure).
+  // VoyageOnFailure = 'abort' | 'continue' (superset of ErrandRunOnFailure).
   onFailure: VoyageOnFailure;
   dryRun: boolean;
   wait: boolean;
-  // Отложенный старт (ISO-8601). Пусто → немедленный старт.
+  // Delayed start (ISO-8601). Empty -> immediate start.
   scheduleAt: string;
-  // Режим батчинга (ADR-043). barrier = последовательные Leg-и (дефолт); window = скользящее окно.
+  // Batching mode (ADR-043). barrier = sequential Legs (default); window = sliding window.
   batchMode: VoyageBatchMode;
-  // Пауза между Leg-ами в ms (barrier). Пусто = без паузы.
+  // Pause between Legs in ms (barrier). Empty = no pause.
   interBatchIntervalMs: string;
-  // Пауза между единицами окна в ms (window). Пусто = без паузы.
+  // Pause between window units in ms (window). Empty = no pause.
   interUnitIntervalMs: string;
-  // Presence-фильтр: только живые хосты. Применяется к kind=command.
+  // Presence filter: live hosts only. Applies to kind=command.
   requireAlive: boolean;
 }
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
-// Лёгкая UX-валидация формата batch: N или N% (авторитет — backend 422).
+// Light UX validation of the batch format: N or N% (authority is backend 422).
 const BATCH_FORMAT_RE = /^\d+%?$/;
 
-// Cadence-специфичный state (используется только при runMode='cadence').
+// Cadence-specific state (used only when runMode='cadence').
 interface CadenceState {
   cadenceName: string;
   scheduleKind: CadenceScheduleKind;
@@ -160,15 +160,15 @@ interface CadenceState {
   overlapPolicy: CadenceOverlapPolicy;
 }
 
-// Черновик wizard-а в sessionStorage: переживает навигацию away/back между шагами
-// и сменой workload (под-шаги пере-монтируются — без persist локальный state шага
-// терялся бы). Очищается после успешного submit.
+// Wizard draft in sessionStorage: survives navigation away/back between steps
+// and workload changes (sub-steps are remounted — without persistence the local step
+// state would be lost). Cleared after a successful submit.
 const DRAFT_KEY = 'run-wizard-draft';
 
-// Версия схемы черновика. Поднимать при любом изменении формы под-state-ов
-// (новое поле, смена типа). loadDraft() отбрасывает черновики с другой/отсутствующей
-// версией — старый persisted-state предыдущей формы визарда игнорируется, визард
-// стартует с дефолтов, а не падает на отсутствующем поле.
+// Draft schema version. Bump it on any change to the sub-state shapes
+// (new field, type change). loadDraft() discards drafts with a different/missing
+// version — old persisted state from a previous wizard form shape is ignored, the wizard
+// starts from defaults instead of crashing on a missing field.
 const DRAFT_VERSION = 10;
 
 interface WizardDraft {
@@ -184,10 +184,10 @@ interface WizardDraft {
   notify: VoyageNotify[];
 }
 
-// Дефолты под-state-ов. Используются как база default-merge при восстановлении
-// черновика и как initial-state при отсутствии query-intent/черновика. Любое
-// поле, отсутствующее в загруженном черновике, берётся отсюда (вторая линия
-// защиты от рассинхрона формы, независимая от версионирования).
+// Defaults for sub-states. Used as the base for a default-merge when restoring
+// a draft and as the initial state when there's no query-intent/draft. Any
+// field missing from the loaded draft is taken from here (a second line of
+// defense against form desync, independent of versioning).
 const DEFAULT_SCENARIO_STATE: ScenarioStateValues = {
   service: '',
   scenario: '',
@@ -236,7 +236,7 @@ function loadDraft(): WizardDraft | null {
     const raw = sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<WizardDraft> | null;
-    // Версия не совпадает (или отсутствует у черновика старой формы) → игнорируем.
+    // Version mismatch (or missing on a draft from an old form shape) -> ignore.
     if (!parsed || parsed.v !== DRAFT_VERSION) return null;
     return parsed as WizardDraft;
   } catch {
@@ -244,7 +244,7 @@ function loadDraft(): WizardDraft | null {
   }
 }
 
-// Гарантирует массив: если в черновике пришёл не-массив/undefined — дефолтный [].
+// Guarantees an array: if the draft has a non-array/undefined — default to [].
 function asArray<T>(value: unknown, fallback: T[]): T[] {
   return Array.isArray(value) ? (value as T[]) : fallback;
 }
@@ -254,10 +254,10 @@ function pickWorkloadFromQuery(raw: string | null): Workload {
   return 'scenario';
 }
 
-// Разбор query-param `module` (deep-link / bulk-run) на (name, state).
-// Полный адрес `core.cmd.shell` → name=`core.cmd`, state=`shell`. Дефолт —
-// core.cmd.shell. Plugin-модули в формате `official.postgres-user.present` тоже
-// корректно разбиваются (последний сегмент — state).
+// Parses the `module` query-param (deep-link / bulk-run) into (name, state).
+// Full address `core.cmd.shell` -> name=`core.cmd`, state=`shell`. Default —
+// core.cmd.shell. Plugin modules in the `official.postgres-user.present` format also
+// split correctly (the last segment is the state).
 function pickInitialCommandModule(raw: string | null): { name: string; state: string } {
   if (!raw) return { name: 'core.cmd', state: 'shell' };
   const idx = raw.lastIndexOf('.');
@@ -270,9 +270,9 @@ export function RunWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Любой явный query-param = намерение deep-link → черновик игнорируется (свежий
-  // вход через bulk-run/ссылку начинает заново). Без query-params восстанавливаем
-  // сохранённый черновик (навигация away/back между шагами).
+  // Any explicit query-param = deep-link intent -> the draft is ignored (a fresh
+  // entry via bulk-run/link starts over). Without query-params we restore
+  // the saved draft (navigation away/back between steps).
   const hasQueryIntent = useMemo(
     () =>
       ['workload', 'service', 'scenario', 'incarnation', 'incarnation_regex', 'module', 'target_coven', 'target_regex', 'target_sids'].some(
@@ -282,7 +282,7 @@ export function RunWizard() {
   );
   const draft = useMemo<WizardDraft | null>(
     () => (hasQueryIntent ? null : loadDraft()),
-    // читаем один раз на mount.
+    // read once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -291,18 +291,18 @@ export function RunWizard() {
   const initialService = searchParams.get('service') ?? '';
   const initialScenario = searchParams.get('scenario') ?? '';
   const initialIncarnation = searchParams.get('incarnation') ?? '';
-  // incarnation_regex — сырой regex от snapshot-Run (IncarnationsList.handleRunSet).
-  // Передаётся как есть в incarnationRegex без повторного экранирования/обёртки.
+  // incarnation_regex — a raw regex from snapshot-Run (IncarnationsList.handleRunSet).
+  // Passed through as-is into incarnationRegex without re-escaping/wrapping.
   const initialIncarnationRegex = searchParams.get('incarnation_regex') ?? '';
   const initialModuleParam = searchParams.get('module');
 
-  // Pre-fill host-criteria из query (bulk-run actions со списочных страниц):
-  //   target_sids → нет прямого mapping в criteria; кладём как sidRegex-anchor-OR
-  //   target_coven → covens; target_regex → sidRegex; target_where не маппится
-  //   на DSL (raw CEL), игнорируется в criteria-режиме.
+  // Pre-fill host-criteria from the query (bulk-run actions from list pages):
+  //   target_sids -> no direct mapping to criteria; stored as a sidRegex-anchor-OR
+  //   target_coven -> covens; target_regex -> sidRegex; target_where is not mapped
+  //   to the DSL (raw CEL), ignored in criteria mode.
   const initialCriteria = useMemo<HostCriteria>(
     () => criteriaFromQuery(searchParams),
-    // searchParams читаем один раз на mount.
+    // read searchParams once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -315,14 +315,14 @@ export function RunWizard() {
   const [workload, setWorkload] = useState<Workload>(draft?.workload ?? initialWorkload);
   const [runMode, setRunMode] = useState<RunMode>(() => {
     if (draft) return draft.runMode ?? 'voyage';
-    // deep-link ?recurrence=true → сразу открывает cadence-режим
+    // deep-link ?recurrence=true -> immediately opens cadence mode
     return searchParams.get('recurrence') === 'true' ? 'cadence' : 'voyage';
   });
 
-  // Инициализация под-state-ов: при наличии черновика — default-merge на уровне
-  // под-объекта (новое поле всегда имеет значение из дефолта, если в черновике
-  // его нет), массивные поля дополнительно страхуются по типу через asArray.
-  // Без черновика — initial из query (или дефолты).
+  // Sub-state initialization: if a draft exists — default-merge at the
+  // sub-object level (a new field always has the default value if it's
+  // missing from the draft), array fields are additionally type-guarded via asArray.
+  // Without a draft — initial from the query (or defaults).
   const [scenarioState, setScenarioState] = useState<ScenarioStateValues>(() => {
     if (draft) {
       const d = draft.scenarioState ?? {};
@@ -332,11 +332,11 @@ export function RunWizard() {
         incarnations: asArray(d.incarnations, DEFAULT_SCENARIO_STATE.incarnations),
       };
     }
-    // Приоритет: incarnation_regex (snapshot-OR, уже готовый regex) > incarnation (одиночная инкарнация).
+    // Priority: incarnation_regex (snapshot-OR, already a ready regex) > incarnation (single incarnation).
     const regexFromSnapshot = initialIncarnationRegex;
     const regexFromSingle = initialIncarnation ? `^${escapeRegex(initialIncarnation)}$` : '';
     const incarnationRegex = regexFromSnapshot || regexFromSingle;
-    // incarnations-пре-фил только для одиночного deep-link (snapshot-list резолвится в Step3).
+    // incarnations pre-fill only for a single deep-link (snapshot-list is resolved in Step3).
     const incarnations = initialIncarnation && !initialIncarnationRegex ? [initialIncarnation] : [];
     return {
       ...DEFAULT_SCENARIO_STATE,
@@ -358,7 +358,7 @@ export function RunWizard() {
       };
     }
     const m = pickInitialCommandModule(initialModuleParam);
-    // Если задан ?module= с params → предзаполним paramFields при загрузке каталога.
+    // If ?module= is set with params -> pre-fill paramFields once the catalog loads.
     return {
       ...DEFAULT_COMMAND_STATE,
       moduleName: m.name,
@@ -395,21 +395,21 @@ export function RunWizard() {
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Ошибки map-полей и pattern-полей (поднимаются из ScenarioInputFields).
-  // Включаются в submit-gate наряду с invalidCompositeFields/missingRequired.
+  // Errors for map fields and pattern fields (bubbled up from ScenarioInputFields).
+  // Included in the submit gate alongside invalidCompositeFields/missingRequired.
   const [scenarioInvalidMaps, setScenarioInvalidMaps] = useState<string[]>([]);
   const [scenarioPatternErrors, setScenarioPatternErrors] = useState<string[]>([]);
   const [commandInvalidMaps, setCommandInvalidMaps] = useState<string[]>([]);
   const [commandPatternErrors, setCommandPatternErrors] = useState<string[]>([]);
 
-  // Persist черновика на каждое изменение wizard-state. sessionStorage —
-  // переживает навигацию внутри вкладки браузера, чистится при закрытии вкладки.
+  // Persist the draft on every wizard-state change. sessionStorage —
+  // survives navigation within the browser tab, cleared on tab close.
   useEffect(() => {
     const payload: WizardDraft = { v: DRAFT_VERSION, step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState, notify };
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
     } catch {
-      // sessionStorage недоступен (private-mode/quota) — persist опционален, не падаем.
+      // sessionStorage unavailable (private-mode/quota) — persist is optional, don't crash.
     }
   }, [step, workload, runMode, scenarioState, commandState, hostCriteria, options, cadenceState, notify]);
 
@@ -428,13 +428,13 @@ export function RunWizard() {
   const inputSchema: ScenarioInputSchema | undefined = selectedScenarioMeta?.input_schema;
   const usePerField = isSupportedInputSchema(inputSchema);
 
-  // NIM-76: day-2 update_config — версия Redis не задаётся в форме, берём её из
-  // state.redis_version инкарнации (первая из resolved-множества). Гейтим на наличие
-  // поля с x-directives в схеме (не тянем incarnation/каталог для не-redis сценариев).
+  // NIM-76: operational update_config — Redis version isn't set in the form, we take it from
+  // the incarnation's state.redis_version (the first of the resolved set). Gated on the presence
+  // of an x-directives field in the schema (don't fetch incarnation/catalog for non-redis scenarios).
   const hasDirectiveField = useMemo(() => schemaHasDirectiveField(inputSchema), [inputSchema]);
-  // Directive-валидация (hard-block, 3A) применима ТОЛЬКО к одиночному таргету: при
-  // fan-out на >1 инкарнацию их redis_version могут различаться → одна версия жёстко
-  // блокировала бы валидные на других. >1 → graceful (не валидируем; backend 422 финален).
+  // Directive validation (hard-block, 3A) applies ONLY to a single target: with
+  // fan-out onto >1 incarnation their redis_version can differ -> one version would
+  // hard-block ones valid on others. >1 -> graceful (no validation; backend 422 is final).
   const dayTwoSingle = workload === 'scenario' && scenarioState.incarnations.length === 1;
   const dayTwoIncarnation = dayTwoSingle ? scenarioState.incarnations[0] : '';
   const incarnationDetailQ = useQuery({
@@ -453,8 +453,8 @@ export function RunWizard() {
     [directivesQ.directives, directivesQ.loading, directivesQ.unavailable],
   );
 
-  // --- Резолв хостов для Command (live preview + submit). ---
-  // Всегда грузим soul-список (для preview); фильтрация — client-side.
+  // --- Host resolution for Command (live preview + submit). ---
+  // Always load the soul list (for preview); filtering is client-side.
   const soulsListQ = useQuery({
     queryKey: ['run.command.souls.list'],
     queryFn: () => keeperApi.souls.list({ limit: 1000 }),
@@ -465,14 +465,14 @@ export function RunWizard() {
   const parsedSoulprint = useMemo(() => parseCriteriaSoulprint(hostCriteria), [hostCriteria]);
   const sidRegexComp = useMemo(() => compileSidRegex(hostCriteria.sidRegex), [hostCriteria.sidRegex]);
 
-  // Stage 1: стабильные критерии (incarnation/coven/sid-regex) — без soulprint-fetch.
+  // Stage 1: stable criteria (incarnation/coven/sid-regex) — without a soulprint-fetch.
   const stableMatched = useMemo<SoulListEntry[]>(() => {
     if (workload !== 'command' || !hasAnyCriteria(hostCriteria)) return [];
     return allSouls.filter((s) => matchStableCriteria(s, hostCriteria, sidRegexComp.re));
   }, [workload, hostCriteria, allSouls, sidRegexComp.re]);
 
-  // Stage 2: soulprint-fetch только для уже отфильтрованных stable-кандидатов и
-  // только если soulprint-критерий задан.
+  // Stage 2: soulprint-fetch only for the already-filtered stable candidates and
+  // only if a soulprint criterion is set.
   const soulprintActive = needsSoulprint(hostCriteria);
   const soulprintQueries = useQueries({
     queries: stableMatched.map((row) => ({
@@ -491,7 +491,7 @@ export function RunWizard() {
 
   const soulprintLoading = soulprintActive && soulprintQueries.some((res) => res.isLoading);
 
-  // Stage 3: финальный список SID после soulprint-правил.
+  // Stage 3: final SID list after soulprint rules.
   const resolvedSouls = useMemo<SoulListEntry[]>(() => {
     if (!soulprintActive) return stableMatched;
     const out: SoulListEntry[] = [];
@@ -500,20 +500,20 @@ export function RunWizard() {
       if (matchSoulprint(sp?.typed_facts, parsedSoulprint.rules)) out.push(stableMatched[i]);
     }
     return out;
-    // soulprintQueries — массив result-объектов, ссылочно стабилен в рамках рендера.
+    // soulprintQueries — an array of result objects, referentially stable within a render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soulprintActive, stableMatched, parsedSoulprint.rules, soulprintQueries.map((q) => q.data)]);
 
   const resolvedSids = useMemo(() => resolvedSouls.map((s) => s.sid), [resolvedSouls]);
 
-  // --- Резолв incarnations для Scenario (preview + multi-select). ---
+  // --- Incarnation resolution for Scenario (preview + multi-select). ---
   const incarnationsListQ = useQuery({
     queryKey: ['run.scenario.incarnations.list', scenarioState.service],
     queryFn: () => keeperApi.incarnations.list({ service: scenarioState.service, limit: 500 }),
     enabled: workload === 'scenario' && Boolean(scenarioState.service),
   });
 
-  // Souls по covens=incarnation-имени → host-count каждой incarnation.
+  // Souls by covens=incarnation-name -> host count for each incarnation.
   const incarnationNames = useMemo(
     () => (incarnationsListQ.data?.items ?? []).map((i) => i.name),
     [incarnationsListQ.data],
@@ -523,8 +523,8 @@ export function RunWizard() {
     queryFn: () => keeperApi.souls.list({ coven: incarnationNames, limit: 1000 }),
     enabled: workload === 'scenario' && incarnationNames.length > 0,
   });
-  // Map incarnation-name → host-count (по coven-membership). undefined если souls
-  // ещё грузятся или endpoint недоступен — тогда показываем имя без count.
+  // Map incarnation-name -> host count (by coven membership). undefined if souls
+  // are still loading or the endpoint is unavailable — then show the name without a count.
   const hostCountByIncarnation = useMemo<Record<string, number> | undefined>(() => {
     const souls = incarnationSoulsQ.data?.items;
     if (!souls) return undefined;
@@ -538,17 +538,17 @@ export function RunWizard() {
     return counts;
   }, [incarnationSoulsQ.data, incarnationNames]);
 
-  // --- Step-валидация. ---
+  // --- Step validation. ---
   const canAdvanceFromStep2 = useMemo(() => {
     if (workload === 'scenario') {
       return Boolean(scenarioState.service && scenarioState.scenario);
     }
-    // command: Step2 — выбор хостов; нужен хоть один критерий И непустой резолв.
+    // command: Step2 — host selection; needs at least one criterion AND a non-empty resolution.
     return hasAnyCriteria(hostCriteria) && resolvedSids.length > 0;
   }, [workload, scenarioState, hostCriteria, resolvedSids]);
 
-  // Пустые required-поля typed input_schema сценария (зеркалит backend 422).
-  // Учитываем show_when: скрытые поля не входят в gate.
+  // Empty required fields of the scenario's typed input_schema (mirrors backend 422).
+  // Accounts for show_when: hidden fields are excluded from the gate.
   const scenarioMissingRequired = useMemo(
     () => {
       if (workload !== 'scenario' || !usePerField) return [];
@@ -558,13 +558,13 @@ export function RunWizard() {
     [workload, usePerField, inputSchema, scenarioState.fields, selectedScenarioMeta?.form],
   );
 
-  // Составные поля (array/object) с непарсимым JSON — блокируют submit/«Далее».
+  // Composite fields (array/object) with unparseable JSON — block submit/"Next".
   const scenarioInvalidComposite = useMemo(
     () => (workload === 'scenario' && usePerField ? invalidCompositeFields(inputSchema, scenarioState.fields) : []),
     [workload, usePerField, inputSchema, scenarioState.fields],
   );
 
-  // Пустые required params типизированной формы (модули с params[]).
+  // Empty required params of the typed form (modules with params[]).
   const commandMissingRequired = useMemo(() => {
     if (workload !== 'command' || !hasParams(commandState.moduleParams)) return [];
     return missingRequiredFields(paramsToInputSchema(commandState.moduleParams), commandState.paramFields);
@@ -581,9 +581,9 @@ export function RunWizard() {
       );
     }
     // command: Step3 — module+params.
-    // Free-text fallback (каталог недоступен): нужно имя модуля.
+    // Free-text fallback (catalog unavailable): a module name is needed.
     if (!commandState.moduleName.trim()) return false;
-    // Модуль с params — все required заполнены, нет map-ошибок и pattern-ошибок.
+    // A module with params — all required filled, no map errors and no pattern errors.
     if (hasParams(commandState.moduleParams)) {
       return (
         commandMissingRequired.length === 0 &&
@@ -591,7 +591,7 @@ export function RunWizard() {
         commandPatternErrors.length === 0
       );
     }
-    // Модуль без формализованных params (free-text fallback) — имени достаточно.
+    // A module without formalized params (free-text fallback) — the name is enough.
     return true;
   }, [
     workload,
@@ -630,8 +630,8 @@ export function RunWizard() {
     },
   });
 
-  /** Конвертирует datetime-local строку в ISO-8601 с зоной для OpenAPI date-time.
-   * Пустая строка → undefined. Invalid Date → undefined (guard, до submit не доходит). */
+  /** Converts a datetime-local string to ISO-8601 with a timezone for OpenAPI date-time.
+   * Empty string -> undefined. Invalid Date -> undefined (guard, never reaches submit). */
   function scheduleAtIso(raw: string): string | undefined {
     const s = raw.trim();
     if (!s) return undefined;
@@ -640,14 +640,14 @@ export function RunWizard() {
     return d.toISOString();
   }
 
-  // Строит общую часть опций для обоих workload.
+  // Builds the common options part for both workloads.
   function buildOptionsPayload() {
     const c = parseIntOrEmpty(options.concurrency);
     const concurrency = c && c > 0 ? c : 50;
     const batchMode = options.batchMode;
 
-    // Новые строковые поля batch / max_failures — шлём сырую строку, Keeper парсит.
-    // Пустая строка = не задано → не шлём поле (undefined → omit).
+    // New string fields batch / max_failures — send the raw string, Keeper parses it.
+    // Empty string = not set -> the field isn't sent (undefined -> omit).
     const batch = options.batch.trim() || undefined;
     const maxFailures = options.maxFailures.trim() || undefined;
 
@@ -677,14 +677,14 @@ export function RunWizard() {
   }
 
   /**
-   * Строит recipe-часть (kind + workload-поля + target).
+   * Builds the recipe part (kind + workload fields + target).
    *
-   * forCadence=true (command): шлёт declared-критерии (coven/where) вместо
-   * snapshot sids, чтобы backend резолвил target на каждом тике (late-binding).
+   * forCadence=true (command): sends declared criteria (coven/where) instead of
+   * snapshot sids, so the backend resolves the target on every tick (late-binding).
    *
-   * Исключение — если coven не задан и оператор использовал только
-   * regex/soulprint: fallback на snapshot sids (declared-target был бы пустым).
-   * UI предупреждает об этом плашкой cadenceSnapshotOnlyWarn.
+   * Exception — if coven isn't set and the operator used only
+   * regex/soulprint: falls back to snapshot sids (declared-target would be empty).
+   * The UI warns about this with the cadenceSnapshotOnlyWarn banner.
    */
   function buildRecipePayload(forCadence = false): RecipePayload {
     if (workload === 'scenario') {
@@ -699,8 +699,8 @@ export function RunWizard() {
         target: { incarnations: scenarioState.incarnations },
       };
     } else {
-      // Полный адрес модуля — `<name>.<state>` (state опускается, если пуст —
-      // free-text fallback мог не задать его).
+      // Full module address — `<name>.<state>` (state is omitted if empty —
+      // the free-text fallback may not have set it).
       const moduleName = commandState.moduleState
         ? `${commandState.moduleName}.${commandState.moduleState}`
         : commandState.moduleName;
@@ -711,16 +711,16 @@ export function RunWizard() {
         input = commandState.customInput;
       }
 
-      // Cadence (forCadence=true): отправляем declared coven-критерии для late-binding.
-      // Backend Voyage-resolver поддерживает `target.coven[]` для kind=command и
-      // резолвит их в snapshot хостов на каждом тике — новые coven-члены подхватятся.
+      // Cadence (forCadence=true): send declared coven criteria for late-binding.
+      // The backend Voyage-resolver supports `target.coven[]` for kind=command and
+      // resolves them into a host snapshot on every tick — new coven members get picked up.
       //
-      // Исключение: если coven не задан (оператор задал только sidRegex/soulprint),
-      // declared-target будет пустым → fallback на snapshot sids (UI предупреждает).
+      // Exception: if coven isn't set (the operator only set sidRegex/soulprint),
+      // declared-target would be empty -> fallback to snapshot sids (UI warns).
       if (forCadence && hostCriteria.covens.length > 0) {
         const declaredTarget: VoyageTarget = { coven: hostCriteria.covens };
-        // where не evaluate-ится в MVP (backend сохраняет, не применяет), но
-        // передаём для будущей совместимости, если оператор задал его через UI.
+        // where isn't evaluated in the MVP (backend stores it, doesn't apply it), but
+        // we pass it for future compatibility, in case the operator set it via the UI.
         return {
           kind: 'command',
           module: moduleName,
@@ -729,7 +729,7 @@ export function RunWizard() {
         };
       }
 
-      // Разовый Voyage или Cadence без coven: snapshot sids (корректно по ADR-043 §5/§8).
+      // A one-off Voyage or Cadence without coven: snapshot sids (correct per ADR-043 5/8).
       return {
         kind: 'command',
         module: moduleName,
@@ -787,23 +787,23 @@ export function RunWizard() {
     return `/cadences/${encodeURIComponent(reply.cadence_id)}`;
   }
 
-  // batch — лёгкая UX-валидация: пусто = ok; если заполнено — должно соответствовать
-  // грамматике keeper (^(\d+)%?$). Авторитетная проверка — на backend (422).
-  // window + непустой batch → backend вернёт 422 (молча блокируем только явно-мусорный формат).
+  // batch — light UX validation: empty = ok; if filled — must match
+  // the keeper grammar (^(\d+)%?$). Authoritative check — on the backend (422).
+  // window + non-empty batch -> backend returns 422 (we silently block only obviously garbage formats).
   const batchValid = useMemo(() => {
     const s = options.batch.trim();
-    if (!s) return true; // пусто — ok
+    if (!s) return true; // empty — ok
     return BATCH_FORMAT_RE.test(s);
   }, [options.batch]);
 
-  // scheduleAt — опциональное поле; если задано, должно быть в будущем.
+  // scheduleAt — optional field; if set, must be in the future.
   const scheduleAtValid = useMemo(() => {
     const s = options.scheduleAt.trim();
-    if (!s) return true; // пусто — немедленный запуск, валидно
+    if (!s) return true; // empty — immediate start, valid
     return new Date(s) > new Date();
   }, [options.scheduleAt]);
 
-  // Cadence-специфичная валидация Step 4.
+  // Cadence-specific validation for Step 4.
   const cadenceValid = useMemo(() => {
     if (runMode !== 'cadence') return true;
     if (!cadenceState.cadenceName.trim()) return false;
@@ -811,25 +811,25 @@ export function RunWizard() {
       const s = parseIntOrEmpty(cadenceState.intervalSeconds);
       return Boolean(s && s >= CONSTRAINTS.cadenceIntervalSecondsMin);
     }
-    // cron: непустая строка (формат проверяет backend)
+    // cron: non-empty string (format is checked by the backend)
     return cadenceState.cronExpr.trim().length > 0;
   }, [runMode, cadenceState]);
 
   const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchValid && (runMode === 'cadence' ? cadenceValid : scheduleAtValid) && !submitMu.isPending;
 
-  // --- Preview-логика батчей ---
-  // Snapshot-target: явные SID / regex / инкарнации — scope известен клиенту.
-  // Late-binding target: coven — scope резолвит Keeper; нужен /preview.
+  // --- Batch preview logic ---
+  // Snapshot target: explicit SID / regex / incarnations — scope known to the client.
+  // Late-binding target: coven — scope resolved by Keeper; needs /preview.
   //
-  // Для Command: coven[] непустой → late-binding.
-  // Для Scenario: incarnations[] — snapshot (список известен после regex-резолва).
+  // For Command: coven[] non-empty -> late-binding.
+  // For Scenario: incarnations[] — snapshot (list known after regex resolution).
   const isLateBinding = workload === 'command' && hostCriteria.covens.length > 0 && hostCriteria.sidRegex.trim().length === 0 && hostCriteria.soulprint.trim().length === 0;
 
-  // Scope для snapshot-count: для scenario = число инкарнаций; для command = число resolved SIDs.
+  // Scope for snapshot-count: for scenario = number of incarnations; for command = number of resolved SIDs.
   const snapshotScope = workload === 'scenario' ? scenarioState.incarnations.length : resolvedSids.length;
 
-  // Локальный расчёт числа батчей для snapshot-target.
-  // batch = '' | 'N' | 'N%'. При window — всегда 1 (batch не используется в window-семантике).
+  // Local computation of the batch count for a snapshot target.
+  // batch = '' | 'N' | 'N%'. For window — always 1 (batch isn't used in window semantics).
   const localBatchCount = useMemo(() => {
     if (options.batchMode === 'window') return 1;
     const s = options.batch.trim();
@@ -846,15 +846,15 @@ export function RunWizard() {
     return Math.ceil(snapshotScope / n);
   }, [options.batch, options.batchMode, snapshotScope]);
 
-  // Preview-запрос для late-binding target (debounce на смену TARGET — не на ввод batch).
-  // Строим тело preview как buildRecipePayload() + buildOptionsPayload(), но без draft.
-  // Мы не можем вызывать build* внутри useMemo/useCallback (они читают state через closure),
-  // поэтому вычисляем primit-ключи прямо здесь для стабильного queryKey.
+  // Preview request for a late-binding target (debounce on TARGET change — not on batch input).
+  // Builds the preview body like buildRecipePayload() + buildOptionsPayload(), but without a draft.
+  // We cannot call build* inside useMemo/useCallback (they read state via closure),
+  // so we compute primitive keys right here for a stable queryKey.
   const previewTargetKey = isLateBinding
     ? JSON.stringify({ covens: hostCriteria.covens.slice().sort() })
     : null;
 
-  // Строим тело preview только при необходимости (lazy, только для late-binding).
+  // Build the preview body only when needed (lazy, only for late-binding).
   const buildPreviewBody = useCallback((): VoyageCreateRequest | null => {
     if (!isLateBinding) return null;
     const moduleName = commandState.moduleState
@@ -878,7 +878,7 @@ export function RunWizard() {
     };
   }, [isLateBinding, commandState, hostCriteria.covens, options]);
 
-  // Debounce target-key для preview-запроса: меняем queryKey только после settle target.
+  // Debounce the target key for the preview request: change queryKey only after the target settles.
   const previewTargetKeyDebounced = useDebounce(previewTargetKey, 400);
 
   const previewQ = useQuery({
@@ -893,10 +893,10 @@ export function RunWizard() {
     retry: false,
   });
 
-  // Самый дальний достижимый шаг по валидации (gate каждого шага). Stepper красит
-  // «done» только реально пройденные шаги и запрещает прыжок вперёд за невалидный
-  // шаг — раньше клик по номеру «4» красил все предыдущие done (белым), даже если
-  // их данные не введены.
+  // The furthest step reachable by validation (gate per step). The stepper marks
+  // "done" only for steps actually completed and blocks jumping forward past an invalid
+  // step — previously clicking on step "4" marked all previous steps done (white), even if
+  // their data hadn't been entered.
   const maxReachableStep = useMemo<1 | 2 | 3 | 4>(() => {
     if (!canAdvanceFromStep2) return 2;
     if (!canAdvanceFromStep3) return 3;
@@ -1047,9 +1047,9 @@ function Stepper({
 }: {
   step: 1 | 2 | 3 | 4;
   workload: Workload;
-  // Самый дальний шаг, докуда дошла валидация. Шаг считается «done» (пройден),
-  // только если он позади и его gate реально пройден; прыжок вперёд за этот
-  // предел запрещён.
+  // The furthest step validation has reached. A step counts as "done" (completed)
+  // only if it's behind the current one and its gate is actually passed; jumping forward past this
+  // limit is disallowed.
   maxReachableStep: 1 | 2 | 3 | 4;
   onJump: (s: 1 | 2 | 3 | 4) => void;
 }) {
@@ -1064,9 +1064,9 @@ function Stepper({
     <ol className={styles.steps} aria-label="Wizard steps">
       {STEPS.map((s) => {
         const active = s.id === step;
-        // «done» = позади текущего И валидация дошла дальше него (gate пройден).
+        // "done" = behind the current one AND validation has progressed past it (gate passed).
         const done = s.id < step && s.id < maxReachableStep;
-        // Доступен клик: текущий, любой пройденный/назад, или следующий достижимый.
+        // Clickable: current, any completed/behind, or the next reachable one.
         const reachable = s.id <= Math.max(step, maxReachableStep);
         const cls = `${styles.step} ${active ? styles.stepActive : ''} ${done ? styles.stepDone : ''}`;
         return (
@@ -1102,7 +1102,7 @@ function Step1({
   const { t } = useTranslation();
   return (
     <>
-      {/* Режим запуска: One-time / Recurring */}
+      {/* Run mode: One-time / Recurring */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <label className={`${styles.radioCard} ${runMode === 'voyage' ? styles.radioCardActive : ''}`} style={{ flex: 1 }}>
           <input
@@ -1136,7 +1136,7 @@ function Step1({
         </label>
       </div>
 
-      {/* Выбор workload */}
+      {/* Workload selection */}
       <div className={styles.radioRow} role="radiogroup" aria-label="Workload type">
         {WORKLOADS.map((w) => {
           const active = workload === w.kind;
@@ -1170,7 +1170,7 @@ interface ScenariosQueryResultMin {
   items: ServiceScenarioInfo[];
 }
 
-// Step 2 Scenario: выбор service → scenario.
+// Step 2 Scenario: select service -> scenario.
 function Step2ScenarioSelect({
   value,
   onChange,
@@ -1234,10 +1234,10 @@ function Step2ScenarioSelect({
   );
 }
 
-// Step 3 Scenario: regex по имени incarnation → read-only список совпавших
-// (фан-аут на ВСЕ совпавшие) + input-параметры сценария. Выбора (чекбоксов) нет:
-// множество задаётся одной regex (концепция «scenario = запуск на N инкарнаций,
-// выбранных regex»).
+// Step 3 Scenario: regex over incarnation name -> a read-only list of matches
+// (fan-out onto ALL matches) + scenario input params. No selection (checkboxes):
+// the set is defined by a single regex (the concept "scenario = run on N incarnations
+// selected by regex").
 function Step3ScenarioIncarnations({
   value,
   onChange,
@@ -1255,9 +1255,9 @@ function Step3ScenarioIncarnations({
   directiveVersion,
 }: {
   value: ScenarioStateValues;
-  // Dispatch (а не plain-callback): два derived-эффекта ниже (defaults-seed и
-  // matched-sync) используют функциональный апдейт, иначе их onced-closure `value`
-  // затирал бы изменения друг друга (race между эффектами на одном рендере).
+  // Dispatch (rather than a plain callback): the two derived effects below (defaults-seed and
+  // matched-sync) use a functional update, otherwise their once-closed `value`
+  // would overwrite each other's changes (a race between effects in the same render).
   onChange: Dispatch<SetStateAction<ScenarioStateValues>>;
   incarnationsLoading: boolean;
   incarnationNames: string[];
@@ -1275,8 +1275,8 @@ function Step3ScenarioIncarnations({
   const { t } = useTranslation();
   const scenarioNote = splitScenarioNote(selectedScenarioMeta?.description);
 
-  // Сидируем defaults при смене supported schema, но НЕ затираем уже введённые/
-  // восстановленные из черновика значения (иначе re-mount шага сбрасывал бы input).
+  // Seed defaults when the supported schema changes, but do NOT overwrite already-entered/
+  // draft-restored values (otherwise remounting the step would reset input).
   useEffect(() => {
     if (usePerField && inputSchema) {
       onChange((prev) =>
@@ -1288,10 +1288,10 @@ function Step3ScenarioIncarnations({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usePerField, inputSchema]);
 
-  // Компиляция regex.
-  // `*` (ровно один символ) → специальный кейс «все»: матчит все incarnations сервиса.
-  // Пустая строка (или только пробелы) → не задано, НЕВАЛИДНО (блокирует «Далее»).
-  // Невалидная regex → 0 совпадений + ошибка.
+  // Regex compilation.
+  // `*` (exactly one character) -> special case "all": matches every incarnation of the service.
+  // Empty string (or whitespace only) -> not set, INVALID (blocks "Next").
+  // Invalid regex -> 0 matches + error.
   const filterRe = useMemo(() => {
     const r = value.incarnationRegex.trim();
     if (!r) return { re: null as RegExp | null, error: null as string | null, empty: true, matchAll: false };
@@ -1309,8 +1309,8 @@ function Step3ScenarioIncarnations({
     return incarnationNames.filter((n) => filterRe.re!.test(n));
   }, [incarnationNames, filterRe]);
 
-  // Множество для fan-out — производное от regex; синхронизируем в state, чтобы
-  // submit/валидация видели актуальный список независимо от рендера шага.
+  // The fan-out set is derived from the regex; synced into state so
+  // submit/validation see the current list regardless of the step's render.
   const matchedKey = matched.join('\n');
   useEffect(() => {
     onChange((prev) => (matchedKey === prev.incarnations.join('\n') ? prev : { ...prev, incarnations: matched }));
@@ -1459,8 +1459,8 @@ function Step3ScenarioIncarnations({
   );
 }
 
-// Step 2 Command: rich host selector. Критерии комбинируются (AND между разными,
-// OR внутри списка). Live-preview резолвнутого списка + counter.
+// Step 2 Command: rich host selector. Criteria are combined (AND between different ones,
+// OR within a list). Live preview of the resolved list + counter.
 function Step2CommandHosts({
   value,
   onChange,
@@ -1482,13 +1482,13 @@ function Step2CommandHosts({
   const sample = resolvedSouls.slice(0, 50);
   const active = hasAnyCriteria(value);
 
-  // Footgun-плашки для Cadence (late-binding предупреждения).
-  // earlyBinding: coven задан, но также есть regex/soulprint — они snapshot-only.
+  // Footgun banners for Cadence (late-binding warnings).
+  // earlyBinding: coven is set, but regex/soulprint are also present — they are snapshot-only.
   const cadenceEarlyBindingWarn =
     runMode === 'cadence' &&
     value.covens.length > 0 &&
     (value.sidRegex.trim().length > 0 || value.soulprint.trim().length > 0);
-  // snapshotOnly: нет coven, но есть regex/soulprint — весь target будет snapshot.
+  // snapshotOnly: no coven, but regex/soulprint present — the whole target will be a snapshot.
   const cadenceSnapshotOnlyWarn =
     runMode === 'cadence' &&
     value.covens.length === 0 &&
@@ -1553,7 +1553,7 @@ function Step2CommandHosts({
         ) : null}
       </label>
 
-      {/* Footgun-предупреждения для Cadence: показываем над preview */}
+      {/* Footgun warnings for Cadence: shown above the preview */}
       {cadenceSnapshotOnlyWarn ? (
         <div className={styles.warn} data-testid="cadence-snapshot-only-warn" style={{ marginBottom: 4 }}>
           {t('run:cadenceSnapshotOnlyWarn')}
@@ -1596,8 +1596,8 @@ function Step2CommandHosts({
   );
 }
 
-// Step 3 Command: module-search (каталог GET /v1/modules) + типизированная
-// форма params / cmd-поля / free-text fallback.
+// Step 3 Command: module search (catalog GET /v1/modules) + a typed
+// params form / cmd fields / free-text fallback.
 function Step3CommandParams({
   value,
   onChange,
@@ -1616,9 +1616,9 @@ function Step3CommandParams({
   const { t } = useTranslation();
   const [catalogUnavailable, setCatalogUnavailable] = useState(false);
 
-  // При первом рендере moduleParams может быть пуст (state инициализирован дефолтом без
-  // обращения к каталогу). Подтягиваем params из React Query кэша когда каталог загрузится.
-  // queryKey совпадает с ModulePicker(errandSafe=true) → единый кэш, нет дублирующего запроса.
+  // On the first render moduleParams may be empty (state was initialized with a default without
+  // touching the catalog). Pull params from the React Query cache once the catalog loads.
+  // queryKey matches ModulePicker(errandSafe=true) -> a single shared cache, no duplicate request.
   const catalogQ = useQuery({
     queryKey: ['modules.catalog', true] as const,
     queryFn: () => keeperApi.modules.list({ errand_safe: true }),
@@ -1638,8 +1638,8 @@ function Step3CommandParams({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogQ.data]);
 
-  // Выбор модуля из каталога: применяем имя, kind, params и первый state.
-  // Сбрасываем форму (cmd / paramFields), чтобы не нести значения старого модуля.
+  // Selecting a module from the catalog: apply name, kind, params and the first state.
+  // Reset the form (cmd / paramFields) so old module values don't carry over.
   function onSelectModule(item: ModuleCatalogItem) {
     const states = item.states ?? [];
     const next: CommandStateValues = {
@@ -1686,7 +1686,7 @@ function Step3CommandParams({
         )}
       </div>
 
-      {/* Выбор state, если у модуля их несколько (полный адрес — name.state). */}
+      {/* State selection, if the module has more than one (full address is name.state). */}
       <CommandStateSelect value={value} onChange={onChange} />
 
       {showParamsForm ? (
@@ -1734,9 +1734,9 @@ function Step3CommandParams({
   );
 }
 
-// Выбор state-суффикса, если у выбранного модуля их несколько (`core.service` —
-// running/stopped/...). При единственном/нулевом state секция скрыта (state
-// уже выставлен onSelectModule). Полный адрес submit-а — `moduleName.moduleState`.
+// Selection of the state suffix, if the selected module has more than one (`core.service` —
+// running/stopped/...). With a single/zero state the section is hidden (state
+// is already set in onSelectModule). Full submit address is `moduleName.moduleState`.
 function CommandStateSelect({
   value,
   onChange,
@@ -1804,7 +1804,7 @@ function Step4Options({
   const { t } = useTranslation();
   const isWindow = value.batchMode === 'window';
 
-  // Вычисляем UTC-эквивалент заполненного поля для отображения рядом с hint.
+  // Compute the UTC equivalent of the filled field for display next to the hint.
   const scheduleAtUtc = useMemo(() => {
     const s = value.scheduleAt.trim();
     if (!s) return null;
@@ -1815,8 +1815,8 @@ function Step4Options({
 
   return (
     <>
-      {/* Секция «Батчинг» — размер/порог пачки + поведение при провале batch-раннера
-          (on_failure логически про сам батчинг, не про время запуска). */}
+      {/* "Batching" section — batch size/threshold + behavior on batch-runner failure
+          (on_failure is logically about batching itself, not about run timing). */}
       <fieldset className={styles.optionsSection}>
         <legend className={styles.optionsSectionLegend}>{t('run:sectionBatchingLabel')}</legend>
 
@@ -1856,7 +1856,7 @@ function Step4Options({
           </div>
         </fieldset>
 
-        {/* Единое текстовое поле batch (N | N%) — скрыть при window */}
+        {/* Unified batch text field (N | N%) — hidden for window */}
         {!isWindow ? (
           <label className={styles.fieldRow}>
             <span className={styles.fieldLabel}>{t('run:batchLabel')}</span>
@@ -1879,7 +1879,7 @@ function Step4Options({
           </div>
         )}
 
-        {/* max_failures — всегда видимо (работает в обоих batch_mode) */}
+        {/* max_failures — always visible (works in both batch_mode values) */}
         <label className={styles.fieldRow}>
           <span className={styles.fieldLabel}>
             {t('run:maxFailuresLabel')}
@@ -1903,7 +1903,7 @@ function Step4Options({
           <span className={styles.hint}>{t('run:maxFailuresHint')}</span>
         </label>
 
-        {/* Предпоказ числа батчей */}
+        {/* Batch count preview */}
         {!isWindow && (isLateBinding ? (
           previewLoading ? (
             <div className={styles.hint} aria-label="batch preview">
@@ -1970,7 +1970,7 @@ function Step4Options({
           </div>
         </fieldset>
 
-        {/* inter_batch_interval_ms — только для barrier */}
+        {/* inter_batch_interval_ms — barrier only */}
         {!isWindow ? (
           <label className={styles.fieldRow}>
             <span className={styles.fieldLabel}>{t('run:interBatchIntervalLabel')}</span>
@@ -1987,7 +1987,7 @@ function Step4Options({
           </label>
         ) : null}
 
-        {/* inter_unit_interval_ms — только для window */}
+        {/* inter_unit_interval_ms — window only */}
         {isWindow ? (
           <label className={styles.fieldRow}>
             <span className={styles.fieldLabel}>{t('run:interUnitIntervalLabel')}</span>
@@ -2005,13 +2005,13 @@ function Step4Options({
         ) : null}
       </fieldset>
 
-      {/* Секция «Планирование» — когда стартует прогон: разово (schedule_at) или
-          по расписанию (Cadence: interval/cron/overlap_policy). */}
+      {/* "Scheduling" section — when the run starts: one-off (schedule_at) or
+          on a schedule (Cadence: interval/cron/overlap_policy). */}
       <fieldset className={styles.optionsSection}>
         <legend className={styles.optionsSectionLegend}>{t('run:sectionSchedulingLabel')}</legend>
 
         {runMode === 'cadence' ? (
-          /* Cadence-поля вместо scheduleAt */
+          /* Cadence fields instead of scheduleAt */
           <fieldset
             style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, margin: 0 }}
           >
@@ -2019,7 +2019,7 @@ function Step4Options({
               {t('run:cadenceScheduleLabel')}
             </legend>
 
-            {/* Имя Cadence */}
+            {/* Cadence name */}
             <label className={styles.fieldRow}>
               <span className={styles.fieldLabel}>{t('run:cadenceNameLabel')}</span>
               <input
@@ -2130,7 +2130,7 @@ function Step4Options({
         )}
       </fieldset>
 
-      {/* Секция «Флаги» — булевы переключатели поведения прогона. */}
+      {/* "Flags" section — boolean toggles for run behavior. */}
       <fieldset className={styles.optionsSection}>
         <legend className={styles.optionsSectionLegend}>{t('run:sectionFlagsLabel')}</legend>
 
@@ -2170,7 +2170,7 @@ function Step4Options({
         </label>
       </fieldset>
 
-      {/* Блок уведомлений — для Voyage (разовые) и Cadence (постоянные, mode=permanent) */}
+      {/* Notifications block — for Voyage (one-off) and Cadence (permanent, mode=permanent) */}
       <NotifyBlock
         value={notify}
         onChange={onNotifyChange}
@@ -2182,10 +2182,10 @@ function Step4Options({
 
 // --- helpers ---
 
-// Восстановление host-criteria из URL search-params (bulk-run actions со
-// списочных страниц). target_coven → covens; target_regex → sidRegex;
-// target_sids → sidRegex anchored-OR (точный список SID); target_where (raw CEL)
-// и target_glob в criteria-DSL не маппятся — игнорируются.
+// Restoring host-criteria from URL search-params (bulk-run actions from
+// list pages). target_coven -> covens; target_regex -> sidRegex;
+// target_sids -> sidRegex anchored-OR (exact SID list); target_where (raw CEL)
+// and target_glob are not mapped into the criteria DSL — ignored.
 function criteriaFromQuery(params: URLSearchParams): HostCriteria {
   const covenRaw = params.get('target_coven');
   const regexRaw = params.get('target_regex');
@@ -2221,7 +2221,7 @@ function parseIntOrEmpty(s: string): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
-// Простой debounce-хук: возвращает debounced-значение с задержкой ms.
+// Simple debounce hook: returns a debounced value with a ms delay.
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState<T>(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -42,9 +42,9 @@ export function IncarnationNewForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [createdApplyId, setCreatedApplyId] = useState<string | null>(null);
 
-  // Pre-fill из ?service=… (приходит из ServiceDetail → «Use in incarnation»).
-  // ?scenario=… игнорируем: input создаваемой incarnation берётся строго из
-  // ВЫБРАННОГО create-сценария (поле create=true в каталоге сценариев сервиса).
+  // Pre-fill from ?service=... (comes from ServiceDetail -> "Use in incarnation").
+  // ?scenario=... is ignored: the input of the incarnation being created comes strictly from
+  // the SELECTED create scenario (the create=true field in the service's scenario catalog).
   const prefilledService = searchParams.get('service') ?? '';
 
   const services = useQuery({
@@ -59,8 +59,8 @@ export function IncarnationNewForm() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<IncarnationCreateFormInput, unknown, IncarnationCreateFormOutput>({
-    // zodResolver (@hookform/resolvers v3) не пробрасывает output-тип transform-схемы
-    // в Resolver<Input, _, Output>; каст согласует типы без смены рантайма.
+    // zodResolver (@hookform/resolvers v3) doesn't propagate the transform schema's output type
+    // into Resolver<Input, _, Output>; the cast reconciles the types without changing runtime behavior.
     resolver: zodResolver(incarnationCreateSchema) as Resolver<
       IncarnationCreateFormInput,
       unknown,
@@ -72,20 +72,20 @@ export function IncarnationNewForm() {
   const selectedService = watch('service');
   const scenarios = useServiceScenarios(selectedService || undefined);
 
-  // Сценарии с флагом create=true — предлагаются оператору при создании incarnation.
-  // UI не хардкодит имя 'create': backend явно помечает нужные сценарии.
+  // Scenarios with the create=true flag are offered to the operator when creating an incarnation.
+  // UI doesn't hardcode the name 'create': the backend explicitly flags the relevant scenarios.
   const createScenarios = useMemo(
     () => scenarios.items.filter((s) => s.create),
     [scenarios.items],
   );
 
-  // Выбранный create-сценарий (dropdown). Пред-выбираем первый для удобства.
-  // undefined — ни один не выбран (недопустимо, если createScenarios.length >= 1).
+  // Selected create scenario (dropdown). Pre-select the first one for convenience.
+  // undefined — none selected (invalid if createScenarios.length >= 1).
   const [selectedCreateScenario, setSelectedCreateScenario] = useState<
     (typeof createScenarios)[number] | undefined
   >(undefined);
 
-  // Сбрасываем выбор при смене сервиса / обновлении каталога сценариев.
+  // Reset the selection when the service changes / the scenario catalog updates.
   useEffect(() => {
     setSelectedCreateScenario(createScenarios.length > 0 ? createScenarios[0] : undefined);
   }, [createScenarios]);
@@ -105,10 +105,10 @@ export function IncarnationNewForm() {
     setInvalidMaps([]);
   }, [usePerField, selectedService, createSchema]);
 
-  // Пустые required-поля create-input (зеркалит backend 422). Submit блокируется
-  // до заполнения; inline-ошибка под полем — после попытки submit.
-  // visibleFields учитывает show_when секций/полей — скрытые поля не блокируют.
-  // required_when учитывается через isFieldRequired внутри missingRequiredFields.
+  // Empty required create-input fields (mirrors backend 422). Submit is blocked
+  // until filled; inline error under the field appears after a submit attempt.
+  // visibleFields accounts for show_when of sections/fields — hidden fields don't block.
+  // required_when is handled via isFieldRequired inside missingRequiredFields.
   const missingRequired = useMemo(
     () => {
       if (!usePerField || !createSchema) return [];
@@ -118,42 +118,42 @@ export function IncarnationNewForm() {
     [usePerField, createSchema, selectedCreateScenario?.form, fields],
   );
 
-  // Блокируем submit, если сервис имеет create-сценарии, но ни один не выбран.
+  // Block submit if the service has create scenarios but none is selected.
   const missingScenarioSelection = createScenarios.length > 0 && !selectedCreateScenario;
 
-  // NIM-76: набор map-полей с ошибками (duplicate/incomplete/bad-int/unknown-directive)
-  // — включаем в submit-gate (жёсткий блок наравне с missingRequired).
+  // NIM-76: set of map fields with errors (duplicate/incomplete/bad-int/unknown-directive)
+  // — included in the submit gate (hard block alongside missingRequired).
   const [invalidMaps, setInvalidMaps] = useState<string[]>([]);
 
-  // NIM-76: каталог Redis-директив — только если в схеме есть поле с x-directives
-  // (не тянем каталог для не-redis сервисов). Версия реактивна из fields.
+  // NIM-76: Redis directive catalog — only if the schema has a field with x-directives
+  // (we don't fetch the catalog for non-redis services). Version is reactive from fields.
   const hasDirectiveField = useMemo(() => schemaHasDirectiveField(createSchema), [createSchema]);
   const directivesQ = useServiceDirectives(hasDirectiveField ? selectedService || undefined : undefined);
   const directiveCatalog = useMemo<DirectiveCatalogContext>(
     () => ({ directives: directivesQ.directives, loaded: !directivesQ.loading && !directivesQ.unavailable }),
     [directivesQ.directives, directivesQ.loading, directivesQ.unavailable],
   );
-  // Версия Redis из create-input — управляет набором директив. Контракт: version-поле
-  // create-схемы = top-level `redis_version` (приоритет) либо `version`. Реактивно из fields.
+  // Redis version from create-input — drives the directive set. Contract: the version field
+  // of the create schema = top-level `redis_version` (priority) or `version`. Reactive from fields.
   const directiveVersion = useMemo(() => {
     const raw = fields['redis_version'] ?? fields['version'];
     return raw === undefined || raw === '' ? undefined : String(raw);
   }, [fields]);
 
-  // Pre-submit предупреждение: provision выключен, но сценарий требует хосты.
-  // Вычисляем: есть ли provision-поле в схеме, включён ли provision, сколько нужно хостов.
+  // Pre-submit warning: provision is disabled but the scenario requires hosts.
+  // Computed: whether a provision field exists in the schema, whether provision is enabled, how many hosts are needed.
   const provisionWarning = useMemo(() => {
     if (!createSchema || !usePerField) return null;
-    // Ищем поле provision в схеме (объект с properties.enabled:boolean).
+    // Look for a provision field in the schema (an object with properties.enabled:boolean).
     const provisionEntry = Object.entries(createSchema).find(
       ([, prop]) => isProvisionObjectField(prop),
     );
     if (!provisionEntry) return null;
     const [provisionKey] = provisionEntry;
     const provisionRaw = fields[provisionKey];
-    // Если provision включён — предупреждение не нужно.
+    // If provision is enabled, no warning is needed.
     if (readProvisionEnabled(provisionRaw)) return null;
-    // Нужно ли N хостов? Считаем из replicas_per_master/shards.
+    // Are N hosts needed? Computed from replicas_per_master/shards.
     const requiredHosts = computeRequiredHostCount(fields);
     if (requiredHosts === null) return null;
     return requiredHosts;
@@ -179,18 +179,18 @@ export function IncarnationNewForm() {
   function onSubmit(values: IncarnationCreateFormOutput) {
     setServerError(null);
     setCreatedApplyId(null);
-    // Валидация выбора сценария — если есть create-сценарии, выбор обязателен.
+    // Scenario selection validation — if create scenarios exist, selection is required.
     if (missingScenarioSelection) {
       setServerError(t('incarnations:createScenarioRequired'));
       return;
     }
-    // Required-валидация ДО запроса (не доводим до backend 422).
+    // Required validation BEFORE the request (avoid hitting backend 422).
     if (missingRequired.length > 0) {
       setShowInputErrors(true);
       setServerError(t('incarnations:missingRequired', { fields: missingRequired.join(', ') }));
       return;
     }
-    // NIM-76: жёсткий блок при невалидных map-полях (в т.ч. unknown-directive).
+    // NIM-76: hard block on invalid map fields (incl. unknown-directive).
     if (invalidMaps.length > 0) {
       setShowInputErrors(true);
       return;
@@ -203,7 +203,7 @@ export function IncarnationNewForm() {
       service: values.service,
       covens: values.covens,
       input,
-      // Для bare-инкарнации (нет create-сценариев) — не передаём create_scenario.
+      // For a bare incarnation (no create scenarios) — don't pass create_scenario.
       ...(selectedCreateScenario ? { create_scenario: selectedCreateScenario.name } : {}),
       traits,
     });
@@ -311,7 +311,7 @@ export function IncarnationNewForm() {
           />
         </div>
 
-        {/* Dropdown выбора create-сценария — только если сервис имеет create-сценарии */}
+        {/* Create-scenario select dropdown — only if the service has create scenarios */}
         {selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length > 0 ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-testid="create-scenario-select-wrapper">
             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
@@ -347,7 +347,7 @@ export function IncarnationNewForm() {
           </label>
         ) : null}
 
-        {/* Хелп-блок create_from_souls: напоминает про onboarding souls до запуска */}
+        {/* create_from_souls help block: reminds about onboarding souls before running */}
         {selectedCreateScenario?.name?.includes('from_souls') ? (
           <div
             style={{
@@ -375,7 +375,7 @@ export function IncarnationNewForm() {
           </div>
         ) : null}
 
-        {/* Bare-инкарнация: сервис без create-сценариев */}
+        {/* Bare incarnation: service with no create scenarios */}
         {selectedService && !scenarios.loading && !scenarios.unavailable && createScenarios.length === 0 ? (
           <div
             style={{
@@ -420,7 +420,7 @@ export function IncarnationNewForm() {
           </div>
         ) : null}
 
-        {/* Pre-submit предупреждение: provision выключен, но топология требует хостов */}
+        {/* Pre-submit warning: provision is disabled but the topology requires hosts */}
         {provisionWarning !== null ? (
           <div
             data-testid="provision-host-warning"

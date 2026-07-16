@@ -67,8 +67,8 @@ export function SynodDetail() {
   const canGrantRole = hasPermission('synod.grant-role');
   const canRevokeRole = hasPermission('synod.revoke-role');
 
-  // Используем list и фильтруем по имени — у API нет GET /v1/synods/{name}.
-  // Если добавят — заменить на keeperApi.synods.get(name).
+  // Use list and filter by name -- the API has no GET /v1/synods/{name}.
+  // If it is added -- switch to keeperApi.synods.get(name).
   const synodsQ = useQuery({
     queryKey: ['synods'],
     queryFn: () => keeperApi.synods.list(),

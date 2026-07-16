@@ -1,17 +1,17 @@
 import { z } from 'zod';
 
-// kebab-case по openapi ServiceRegisterRequest.name (pattern '^[a-z][a-z0-9-]*$').
+// kebab-case per openapi ServiceRegisterRequest.name (pattern '^[a-z][a-z0-9-]*$').
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
 
-// git-источник: http(s):// | git:// | ssh (scp-форма user@host:path или ssh://) | file://.
-// file:// допускаем намеренно — dev гоняет на file-repos (см. live keeper).
+// git source: http(s):// | git:// | ssh (scp form user@host:path or ssh://) | file://.
+// file:// is allowed intentionally — dev runs against file-repos (see live keeper).
 const GIT_RE =
   /^(https?:\/\/|git:\/\/|ssh:\/\/|file:\/\/|[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:).+/;
 
-// Опц. duration авто-refresh ('5m', '1h30m'). Пусто = без авто-refresh.
+// Optional auto-refresh duration ('5m', '1h30m'). Empty = no auto-refresh.
 const DURATION_RE = /^\d+(ns|us|µs|ms|s|m|h)([0-9]+(ns|us|µs|ms|s|m|h))*$/;
 
-// Сообщения — i18n-ключи namespace `admin`; рендер через t(fieldError.message).
+// Messages are i18n keys in the `admin` namespace; rendered via t(fieldError.message).
 const gitField = z
   .string()
   .trim()

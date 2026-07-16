@@ -9,7 +9,7 @@ import styles from '../common.module.css';
 interface Props {
   open: boolean;
   synodName: string;
-  /** AID-ы архонтов, уже состоящих в группе (исключаются из поиска). */
+  /** AIDs of archons already in the group (excluded from the search). */
   currentMembers: string[];
   onClose: () => void;
 }
@@ -26,7 +26,7 @@ export function AddOperatorModal({ open, synodName, currentMembers, onClose }: P
   const [failures, setFailures] = useState<Failure[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  // Fan-out: N идемпотентных POST-ов; partial failure не откатывает успешные.
+  // Fan-out: N idempotent POSTs; partial failure does not roll back successful ones.
   const mu = useMutation({
     mutationFn: async (): Promise<Failure[]> => {
       const results = await Promise.allSettled(
@@ -44,7 +44,7 @@ export function AddOperatorModal({ open, synodName, currentMembers, onClose }: P
         reset();
         onClose();
       } else {
-        // Держим модалку открытой; в выборе оставляем только упавшие.
+        // Keep the modal open; leave only the failed ones in the selection.
         setFailures(failed);
         setSelected(failed.map((f) => f.aid));
       }

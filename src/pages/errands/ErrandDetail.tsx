@@ -17,7 +17,7 @@ import styles from '../common.module.css';
 
 type Tab = 'output' | 'params' | 'events';
 
-// satisfies: перечисление ⊆ ErrandStatus; при добавлении статуса в backend tsc потребует пересмотра.
+// satisfies: enumeration ⊆ ErrandStatus; adding a status in the backend will require tsc to revisit this.
 const TERMINAL_STATUSES = [
   'success',
   'failed',
@@ -44,8 +44,8 @@ function statusTone(s: string | undefined): 'ok' | 'warn' | 'danger' | 'info' | 
   }
 }
 
-// GET /v1/errands/{id} возвращает 200 ErrandResult (терминал) ИЛИ 202 ErrandAccepted
-// (running). Различаем по полю `started_at` (есть только у ErrandResult).
+// GET /v1/errands/{id} returns 200 ErrandResult (terminal) OR 202 ErrandAccepted
+// (running). Distinguished by the `started_at` field (present only on ErrandResult).
 function isResult(v: ErrandResult | ErrandAccepted | undefined): v is ErrandResult {
   if (!v) return false;
   return 'started_at' in v;
@@ -59,8 +59,8 @@ interface DerivedEvent {
 }
 
 function deriveEvents(r: ErrandResult): DerivedEvent[] {
-  // Backend сейчас не отдаёт по-шаговые TaskEvent-ы для одиночного Errand-а
-  // (см. observations). Делаем минимальную шкалу: started → finished + кратко
+  // Backend currently does not emit per-step TaskEvents for a single Errand
+  // (see observations). Build a minimal timeline: started -> finished + brief
   // exit/error_message.
   const events: DerivedEvent[] = [
     {
@@ -210,7 +210,7 @@ export function ErrandDetail() {
   const data = q.data;
   if (!data) return <div className={styles.empty}>{t('runhistory:errandNotFound')}</div>;
 
-  // Заголовок и meta-блок одинаковы для running/terminal — пользуемся available-полями.
+  // Header and meta block are the same for running/terminal — use available fields.
   const isFull = isResult(data);
   const result: ErrandResult | undefined = isFull ? data : undefined;
   const status = isFull ? data.status : 'running';
