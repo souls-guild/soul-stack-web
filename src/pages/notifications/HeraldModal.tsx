@@ -471,9 +471,9 @@ export function HeraldModal({ open, onClose, editing }: Props) {
 }
 
 /**
- * Рендерит один config-контрол по HeraldFieldSpec.Kind (ADR-042 no-hardcode:
- * маппинг FieldKind→UI-контрол, набор полей — из backend-каталога, не хардкод).
- * kind=enum: опции — из field.enum_values (backend HeraldFieldSpec.EnumValues).
+ * Renders a single config control by HeraldFieldSpec.Kind (ADR-042 no-hardcode:
+ * FieldKind->UI-control mapping, field set - from backend catalog, not hardcoded).
+ * kind=enum: options - from field.enum_values (backend HeraldFieldSpec.EnumValues).
  */
 function HeraldFieldControl({
   field,
@@ -654,9 +654,9 @@ function HeraldFieldControl({
 }
 
 /**
- * Секрет-поле канала с dual-mode вводом (ADR-064): значение (plaintext) XOR путь
- * (vault-ref). base-имя (bot_token_ref → bot_token) — plaintext-вариант в config;
- * *_ref — vault-путь. ref-инпут сохраняет testid herald-field-<name> (совместимость).
+ * Channel secret field with dual-mode input (ADR-064): value (plaintext) XOR path
+ * (vault-ref). base-name (bot_token_ref -> bot_token) - plaintext variant in config;
+ * *_ref - vault path. ref input keeps testid herald-field-<name> (compatibility).
  */
 function HeraldSecretFieldControl({
   field,

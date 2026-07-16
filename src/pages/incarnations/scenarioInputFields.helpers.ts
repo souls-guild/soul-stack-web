@@ -635,8 +635,8 @@ function toInt(v: ScenarioFieldValue): number | null {
 }
 
 /**
- * Извлекает properties объектного поля (provision). Если поле — не object
- * с properties — возвращает пустой объект.
+ * Extracts properties of an object field (provision). If the field is not
+ * an object with properties - returns an empty object.
  */
 export function getObjectProperties(
   prop: ScenarioInputSchemaProperty,
@@ -646,8 +646,8 @@ export function getObjectProperties(
 }
 
 /**
- * Читает значение enabled из сериализованного JSON-объекта provision-поля.
- * Возвращает false если поле пустое / unparseable.
+ * Reads the enabled value from a serialized JSON object of a provision field.
+ * Returns false if the field is empty / unparseable.
  */
 export function readProvisionEnabled(raw: ScenarioFieldValue): boolean {
   if (!raw || raw === '') return false;
@@ -658,8 +658,8 @@ export function readProvisionEnabled(raw: ScenarioFieldValue): boolean {
 }
 
 /**
- * Возвращает новую сериализованную строку объекта provision с обновлённым enabled.
- * Если raw пустой — создаёт объект с нуля.
+ * Returns a new serialized string of the provision object with updated enabled.
+ * If raw is empty - creates the object from scratch.
  */
 export function setProvisionEnabled(raw: ScenarioFieldValue, enabled: boolean): string {
   let obj: Record<string, unknown> = {};
@@ -674,7 +674,7 @@ export function setProvisionEnabled(raw: ScenarioFieldValue, enabled: boolean): 
 }
 
 /**
- * Возвращает новую сериализованную строку с обновлённым sub-полем.
+ * Returns a new serialized string with an updated sub-field.
  */
 export function setProvisionSubField(
   raw: ScenarioFieldValue,
@@ -697,7 +697,7 @@ export function setProvisionSubField(
 }
 
 /**
- * Читает строковое sub-поле из сериализованного provision JSON.
+ * Reads a string sub-field from serialized provision JSON.
  */
 export function readProvisionSubField(raw: ScenarioFieldValue, subKey: string): string {
   if (!raw || raw === '') return '';

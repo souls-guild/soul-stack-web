@@ -2,9 +2,9 @@ import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 
 /**
- * Расшифровка серверных ошибок Synod-операций в человеческое сообщение.
- * Коды: synod-already-exists / synod-builtin / would-lock-out-cluster / not-found.
- * 403 subset-check: сервер отклонил grant-role/add-operator (privilege escalation).
+ * Decodes server errors from Synod operations into a human-readable message.
+ * Codes: synod-already-exists / synod-builtin / would-lock-out-cluster / not-found.
+ * 403 subset-check: server rejected grant-role/add-operator (privilege escalation).
  */
 export function prettySynodError(err: unknown): string {
   const t = i18n.t.bind(i18n);
