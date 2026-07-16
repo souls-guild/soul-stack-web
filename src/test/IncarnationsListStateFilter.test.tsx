@@ -1,14 +1,14 @@
-// Тесты: state-фильтр инкарнаций (ADR-042 тупой фронт + server-side sort + snapshot Run).
+// Tests: incarnation state filter (ADR-042 dumb frontend + server-side sort + snapshot Run).
 //
-// Проверяем:
-// 1. Панель фильтра не появляется без выбора сервиса.
-// 2. При выборе сервиса — фетчится state-schema, поля берутся из схемы (не хардкод).
-// 3. Добавление предиката → запрос к /v1/incarnations с state.<field>=<op>:<value>.
-// 4. 422 от backend → per-field ошибка, не краш.
-// 5. Server-side sort: сортировка передаётся как sort/sort_dir, не client-side.
-// 6. Счётчик total из ответа backend.
-// 7. Кнопка «Run по набору» → navigate с service + incarnation_regex (param НЕ incarnation).
-// 8. RunWizard с ?incarnation_regex=... реально резолвит список инкарнаций (не экранированный литерал).
+// Checks:
+// 1. Filter panel does not appear without selecting a service.
+// 2. On service selection - state-schema is fetched, fields come from the schema (not hardcoded).
+// 3. Adding a predicate -> request to /v1/incarnations with state.<field>=<op>:<value>.
+// 4. 422 from backend -> per-field error, no crash.
+// 5. Server-side sort: sorting is passed as sort/sort_dir, not client-side.
+// 6. Total counter from backend response.
+// 7. "Run on set" button -> navigate with service + incarnation_regex (param NOT incarnation).
+// 8. RunWizard with ?incarnation_regex=... actually resolves the list of incarnations (not an escaped literal).
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -80,7 +80,7 @@ const INCARNATIONS_REPLY = {
   total: 2,
 };
 
-// Ждём пока select получит option с нужным value.
+// Wait until select gets an option with the needed value.
 async function waitForOption(select: HTMLElement, value: string) {
   await waitFor(() => {
     const opt = within(select as HTMLSelectElement).queryByRole('option', { name: value });
@@ -102,13 +102,13 @@ describe('IncarnationsList — state filter', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/выберите сервис для фильтрации по state/i).length).toBeGreaterThan(0);
     });
-    // Кнопки «Добавить условие» не должно быть, пока сервис не выбран.
+    // "Add condition" button should not be present until service is selected.
     expect(screen.queryByText(/добавить условие/i)).not.toBeInTheDocument();
   });
 
   it('поля берутся из схемы (не хардкод) после выбора сервиса', async () => {
-    // Более специфичный маршрут (/v1/services/redis/state-schema) должен быть раньше
-    // общего (/v1/services), иначе startsWith-матчинг выберет неверный route.
+    // More specific route (/v1/services/redis/state-schema) must come before
+    // the general one (/v1/services), otherwise startsWith matching will pick the wrong route.
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_REPLY },
       { method: 'GET', url: '/v1/services', body: SERVICES_REPLY },
@@ -116,19 +116,19 @@ describe('IncarnationsList — state filter', () => {
     ]);
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
-    // Ждём загрузки services (option redis появляется в select).
+    // Wait for services to load (option redis appears in select).
     const allSelects = screen.getAllByRole('combobox');
-    const serviceSelect = allSelects[0]; // первый select = сервис
+    const serviceSelect = allSelects[0]; // first select = service
     await waitForOption(serviceSelect, 'redis');
     await userEvent.selectOptions(serviceSelect, 'redis');
 
-    // Ждём появления кнопки «Добавить условие» (панель загружает схему).
+    // Wait for "Add condition" button to appear (panel loads the schema).
     const addBtn = await screen.findByRole('button', { name: /добавить условие/i });
 
-    // Добавляем предикат.
+    // Add a predicate.
     await userEvent.click(addBtn);
 
-    // Проверяем: в select поля схемы redis_version и maxmemory (не хардкод — из схемы).
+    // Check: field select has schema fields redis_version and maxmemory (not hardcoded - from schema).
     const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
     const options = within(fieldSelect).getAllByRole('option');
     const optionValues = options.map((o) => o.textContent);
@@ -170,31 +170,31 @@ describe('IncarnationsList — state filter', () => {
     const addBtn2 = await screen.findByRole('button', { name: /добавить условие/i });
     await userEvent.click(addBtn2);
 
-    // Выбираем поле maxmemory.
+    // Select the maxmemory field.
     const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
     await userEvent.selectOptions(fieldSelect, 'maxmemory');
 
-    // Устанавливаем оператор gte.
+    // Set the gte operator.
     const opSelect = screen.getByRole('combobox', { name: /оператор/i });
     await userEvent.selectOptions(opSelect, 'gte');
 
-    // Вводим значение.
+    // Enter a value.
     const valueInput = screen.getByRole('spinbutton', { name: /значение/i });
     await userEvent.clear(valueInput);
     await userEvent.type(valueInput, '1024');
 
-    // Ждём запроса с state-предикатом.
+    // Wait for the request with the state predicate.
     await waitFor(() => {
       expect(capturedUrl).not.toBeNull();
-      // URL содержит state.maxmemory=gte:1024 (URL-encoded).
+      // URL contains state.maxmemory=gte:1024 (URL-encoded).
       expect(decodeURIComponent(capturedUrl!)).toContain('state.maxmemory=gte:1024');
     }, { timeout: 3000 });
   });
 
   it('422 от backend → показывает ошибку, не краш', async () => {
-    // Первый запрос к incarnations отдаём 422 сразу (без state-фильтров).
-    // Чтобы 422 сработал при заполненном предикате — создаём мок,
-    // который возвращает 422 всегда для /v1/incarnations.
+    // First request to incarnations returns 422 immediately (without state filters).
+    // To trigger 422 with a filled predicate - create a mock,
+    // that always returns 422 for /v1/incarnations.
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -210,7 +210,7 @@ describe('IncarnationsList — state filter', () => {
         });
       }
       if (method === 'GET' && urlStr.startsWith('/v1/incarnations')) {
-        // Если запрос содержит state-предикат — возвращаем 422.
+        // If the request contains a state predicate - return 422.
         if (urlStr.includes('state.')) {
           return new Response(
             JSON.stringify({ title: 'Unprocessable Entity', detail: 'state.maxmemory: non-numeric value for operator gte' }),
@@ -279,21 +279,21 @@ describe('IncarnationsList — state filter', () => {
 
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
-    // По умолчанию sort=created_at desc.
+    // Default sort=created_at desc.
     await waitFor(() => {
       expect(capturedUrl).not.toBeNull();
       expect(capturedUrl).toContain('sort=created_at');
       expect(capturedUrl).toContain('sort_dir=desc');
     });
 
-    // Ждём рендера таблицы и кнопки сортировки.
+    // Wait for table render and sort button.
     await waitFor(() => {
       expect(screen.getByText('redis-prod')).toBeInTheDocument();
     });
 
-    // Кликаем по колонке Имя — должна смениться сортировка.
+    // Click on the Name column - sort should change.
     capturedUrl = null;
-    // Кнопка сортировки внутри th; найдём по полному тексту.
+    // Sort button is inside th; find by full text.
     const sortButtons = screen.getAllByRole('button');
     const nameBtn = sortButtons.find((b) => b.textContent?.trim().startsWith('Имя'));
     expect(nameBtn).toBeDefined();
@@ -307,8 +307,8 @@ describe('IncarnationsList — state filter', () => {
   });
 
   it('кнопка «Run по набору» вызывает navigate с service + incarnation regex (snapshot)', async () => {
-    // Более специфичный маршрут (/v1/services/redis/state-schema) должен быть раньше
-    // общего (/v1/services), иначе startsWith-матчинг выберет неверный route.
+    // More specific route (/v1/services/redis/state-schema) must come before
+    // the general one (/v1/services), otherwise startsWith matching will pick the wrong route.
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_REPLY },
       { method: 'GET', url: '/v1/services', body: SERVICES_REPLY },
@@ -324,22 +324,22 @@ describe('IncarnationsList — state filter', () => {
       expect(screen.getByText(/добавить условие/i)).toBeInTheDocument();
     });
 
-    // Добавляем предикат: переключаем поле на maxmemory (integer → spinbutton),
-    // затем вводим значение, чтобы предикат стал активным и появилась кнопка Run.
+    // Add a predicate: switch field to maxmemory (integer -> spinbutton),
+    // then enter a value so the predicate becomes active and the Run button appears.
     await userEvent.click(screen.getByText(/добавить условие/i));
     const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
     await userEvent.selectOptions(fieldSelect, 'maxmemory');
     const valueInput = screen.getByRole('spinbutton', { name: /значение/i });
     await userEvent.type(valueInput, '100');
 
-    // Ждём загрузки результатов.
+    // Wait for results to load.
     await waitFor(() => {
       expect(screen.getByText('redis-prod')).toBeInTheDocument();
     });
 
-    // Кнопка «Run по набору» должна появиться.
-    // aria-label = runSetAria = «Запустить сценарий...» — доступное имя для AT;
-    // text-контент кнопки — «Run по набору».
+    // "Run on set" button should appear.
+    // aria-label = runSetAria = "Run scenario..." - accessible name for AT;
+    // button text content - "Run on set".
     const runBtn = await screen.findByRole('button', { name: /запустить сценарий на отфильтрованном наборе/i });
     await userEvent.click(runBtn);
 
@@ -347,29 +347,29 @@ describe('IncarnationsList — state filter', () => {
     const calledWith: string = navigateSpy.mock.calls[0][0];
     expect(calledWith).toContain('/run');
     expect(calledWith).toContain('service=redis');
-    // КРИТИЧНО: param должен быть incarnation_regex (не incarnation).
-    // incarnation (одиночное имя) RunWizard оборачивает в ^…$ — при snapshot-OR это
-    // двойное экранирование, и regex не совпадёт ни с одной инкарнацией.
+    // CRITICAL: param must be incarnation_regex (not incarnation).
+    // incarnation (a single name) is wrapped by RunWizard in ^...$ - for snapshot-OR this is
+    // double escaping, and the regex will not match any incarnation.
     expect(calledWith).toContain('incarnation_regex=');
     expect(calledWith).not.toContain('&incarnation=');
-    // Regex должен содержать имена инкарнаций.
+    // Regex must contain the incarnation names.
     const decoded = decodeURIComponent(calledWith);
     expect(decoded).toContain('redis-prod');
     expect(decoded).toContain('redis-staging');
   });
 
   it('RunWizard c ?incarnation_regex реально резолвит список (не экранированный литерал)', async () => {
-    // Этот тест воспроизводит находку 1/2 review: snapshot-Run передавал regex через
-    // param `incarnation`, который RunWizard повторно обрамлял в ^…$ → двойное экранирование
-    // → incarnationRegex содержал escaped-литерал вместо живого OR-regex → 0 совпадений.
+    // This test reproduces finding 1/2 from review: snapshot-Run passed regex via
+    // param `incarnation`, which RunWizard wrapped again in ^...$ -> double escaping
+    // -> incarnationRegex contained an escaped literal instead of a live OR-regex -> 0 matches.
     //
-    // После фикса IncarnationsList использует `incarnation_regex`, RunWizard кладёт его
-    // as-is в incarnationRegex. Step3 должен показать обе инкарнации из совпавшего regex.
+    // After the fix, IncarnationsList uses `incarnation_regex`, RunWizard puts it
+    // as-is into incarnationRegex. Step3 should show both incarnations matched by the regex.
 
     const INCARNATION_NAMES = ['redis-prod', 'redis-staging'];
     const snapshotRegex = `^(${INCARNATION_NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`;
 
-    // Общий fetch-stub для RunWizard.
+    // Common fetch stub for RunWizard.
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const json = (obj: unknown, status = 200) =>
@@ -400,7 +400,7 @@ describe('IncarnationsList — state filter', () => {
       return new Response('{}', { status: 404 });
     }));
 
-    // URL как будто пришёл из IncarnationsList.handleRunSet.
+    // URL as if it came from IncarnationsList.handleRunSet.
     const initialPath = `/run?workload=scenario&service=redis&incarnation_regex=${encodeURIComponent(snapshotRegex)}`;
 
     const qc = new QueryClient({
@@ -420,28 +420,28 @@ describe('IncarnationsList — state filter', () => {
       { wrapper: Wrap },
     );
 
-    // Переходим Step1 → Step2.
+    // Move Step1 -> Step2.
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // В Step2 service уже выбран из query — выбираем scenario.
+    // In Step2 service is already selected from query - select scenario.
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    // Переходим Step2 → Step3 (incarnation regex).
+    // Move Step2 -> Step3 (incarnation regex).
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // incarnationRegex уже заполнен из ?incarnation_regex (не обёрнут повторно).
-    // После загрузки incarnations список совпавших должен содержать ОБОИХ.
+    // incarnationRegex is already filled from ?incarnation_regex (not wrapped again).
+    // After incarnations load, the matched list should contain BOTH.
     await waitFor(() => {
       const matchList = screen.getByLabelText('Matched incarnations').textContent ?? '';
-      // РЕАЛЬНАЯ ПРОВЕРКА: оба имени видны, а не пустой список из-за двойного экранирования.
+      // REAL CHECK: both names are visible, not an empty list due to double escaping.
       expect(matchList).toContain('redis-prod');
       expect(matchList).toContain('redis-staging');
     }, { timeout: 3000 });
 
-    // Дополнительно: «Далее» не заблокирован (есть совпадения).
+    // Additionally: "Next" is not blocked (there are matches).
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
   });
 });

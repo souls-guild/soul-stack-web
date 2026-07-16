@@ -23,14 +23,14 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    // namespace с заглавными — не kebab-case.
+    // namespace with uppercase - not kebab-case.
     await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'BAD_NS');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'good-name');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Допустить/i }));
     await waitFor(() => {
-      // "kebab-case" встречается и в hint, и в error-message; должно стать
-      // минимум двух (hint всегда + error от Zod-резолвера на BAD_NS).
+      // "kebab-case" appears both in hint and in error-message; should become
+      // at least two (hint always + error from the Zod resolver on BAD_NS).
       const matches = screen.getAllByText(/kebab-case/i);
       expect(matches.length).toBeGreaterThanOrEqual(2);
     });

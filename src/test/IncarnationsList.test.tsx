@@ -51,7 +51,7 @@ describe('IncarnationsList', () => {
 
     expect(screen.getByRole('heading', { name: /Incarnations/i })).toBeInTheDocument();
     await waitFor(() => {
-      // Link на incarnation — единственный role=link с этим именем (имя same as coven-tag → badge не link).
+      // Link to incarnation - the only role=link with this name (name same as coven-tag -> badge is not a link).
       expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
     });
@@ -107,16 +107,16 @@ describe('IncarnationsList', () => {
 
     const user = userEvent.setup();
     const covenInput = await screen.findByPlaceholderText(/prod \/ staging/i);
-    // Поднимаемся до initial call с пустым coven.
+    // Roll back to initial call with empty coven.
     await waitFor(() => expect(called).toBeGreaterThanOrEqual(1));
     const initial = called;
     await user.type(covenInput, 'Prod-Bad!');
     expect(await screen.findByText(/Не валидная coven-метка/i)).toBeInTheDocument();
-    // Перезапроса с невалидным значением не было.
+    // No re-request with an invalid value was made.
     expect(called).toBe(initial);
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------
 
   it('[LINKS] имя сервиса рендерится ссылкой на /services/:name', async () => {
     installFetchMock([
@@ -160,7 +160,7 @@ describe('IncarnationsList', () => {
 
     await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
 
-    // Имена сервисов — ссылки на /services/:name.
+    // Service names are links to /services/:name.
     const redisLink = screen.getByRole('link', { name: 'redis' });
     expect(redisLink).toHaveAttribute('href', '/services/redis');
 
@@ -198,7 +198,7 @@ describe('IncarnationsList', () => {
 
     await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
 
-    // Версия — просто текст, не ссылка.
+    // Version is plain text, not a link.
     expect(screen.getByText('@v2.0.0')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /@v2\.0\.0/ })).not.toBeInTheDocument();
   });
@@ -215,7 +215,7 @@ describe('IncarnationsList', () => {
 
     await waitFor(() => expect(screen.getByText(/не найдено/i)).toBeInTheDocument());
 
-    // Нет ссылок на /services/*.
+    // No links to /services/*.
     expect(screen.queryByRole('link', { name: /redis|postgres/i })).not.toBeInTheDocument();
   });
 
@@ -261,11 +261,11 @@ describe('IncarnationsList', () => {
 
     await waitFor(() => expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument());
 
-    // Внутри таблицы: одна chip-ячейка + одна chip-опция мультиселекта — оба
-    // текстово равны 'team=platform', поэтому проверяем внутри table-скоупа.
+    // Inside the table: one chip cell + one chip option of the multiselect - both
+    // are textually equal to 'team=platform', so we check within the table scope.
     const table = screen.getByRole('table');
     expect(within(table).getByText('team=platform')).toBeInTheDocument();
-    // postgres-stage без traits — есть хотя бы один em-dash fallback (страница не падает).
+    // postgres-stage without traits - there is at least one em-dash fallback (page does not crash).
     expect(within(table).getAllByText('—').length).toBeGreaterThan(0);
   });
 
@@ -328,7 +328,7 @@ describe('IncarnationsList', () => {
 
     const user = userEvent.setup();
 
-    // Выбираем coven=stage (мультиселект) — оставляет redis-stage + postgres-stage.
+    // Select coven=stage (multiselect) - leaves redis-stage + postgres-stage.
     await user.click(screen.getByRole('button', { name: 'stage' }));
     await waitFor(() => {
       expect(screen.queryByRole('link', { name: 'redis-prod' })).not.toBeInTheDocument();
@@ -336,14 +336,14 @@ describe('IncarnationsList', () => {
     expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
 
-    // + trait team=platform (AND) — оставляет только redis-stage.
+    // + trait team=platform (AND) - leaves only redis-stage.
     await user.click(screen.getByRole('button', { name: 'team=platform' }));
     await waitFor(() => {
       expect(screen.queryByRole('link', { name: 'postgres-stage' })).not.toBeInTheDocument();
     });
     expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
 
-    // Сброс фильтра — возвращает все три.
+    // Reset filter - returns all three.
     await user.click(screen.getByText('Сбросить фильтр'));
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();

@@ -8,24 +8,24 @@ import { tokenStore } from '../api/tokenStore';
 import type { ProvisioningMethod } from '../api/keeper';
 
 // ── Guard: exhaustiveness ALL_METHODS ────────────────────────────────────────
-// Compile-time guard (Record<ProvisioningMethod, true>) находится в
-// ProvisioningPolicy.tsx — сборка ломается при добавлении нового метода в gen.
-// Этот runtime-тест дополнительно фиксирует текущий ожидаемый набор значений
-// и упадёт если ALL_METHODS/gen рассинхронизируются (например вручную).
+// Compile-time guard (Record<ProvisioningMethod, true>) lives in
+// ProvisioningPolicy.tsx — the build breaks when a new method is added to gen.
+// This runtime test additionally pins down the currently expected set of values
+// and fails if ALL_METHODS/gen go out of sync (e.g. manually).
 describe('ALL_METHODS exhaustiveness guard', () => {
   it('содержит ровно те методы, что определены в ProvisioningMethod union', async () => {
-    // Все возможные члены ProvisioningMethod из gen-схемы на момент написания.
-    // При добавлении нового метода в OpenAPI: (1) compile-time guard в
-    // ProvisioningPolicy.tsx сломает сборку, (2) этот массив тоже нужно обновить.
+    // All possible ProvisioningMethod members from the gen schema at time of writing.
+    // When adding a new method in OpenAPI: (1) the compile-time guard in
+    // ProvisioningPolicy.tsx breaks the build, (2) this array also needs updating.
     const KNOWN_METHODS: ProvisioningMethod[] = ['user', 'ldap', 'oidc'];
-    // ALL_METHODS не экспортируется — проверяем косвенно через DOM:
-    // компонент рендерит чекбокс (data-testid=method-checkbox-<m>) для каждого
-    // члена ALL_METHODS. Тест падает если метод есть в KNOWN_METHODS но не в DOM.
+    // ALL_METHODS is not exported — check indirectly via DOM:
+    // the component renders a checkbox (data-testid=method-checkbox-<m>) for each
+    // member of ALL_METHODS. Test fails if a method is in KNOWN_METHODS but not in DOM.
     installFetchMock([
       { method: 'GET', url: '/v1/provisioning-policy', body: { policy_set: false, allowed_methods: null } },
     ]);
     renderWithProviders(<ProvisioningPolicy />, '/provisioning-policy');
-    // Ждём загрузки (чекбоксы появляются после резолва query)
+    // Wait for load (checkboxes appear after the query resolves)
     await waitFor(() => {
       expect(screen.getByTestId('method-checkbox-user')).toBeInTheDocument();
     });
@@ -73,7 +73,7 @@ describe('ProvisioningPolicy', () => {
     });
     expect(screen.getByRole('checkbox', { name: /ldap/i })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /oidc/i })).toBeChecked();
-    // default-hint присутствует
+// default-hint is present
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
@@ -103,15 +103,15 @@ describe('ProvisioningPolicy', () => {
     ]);
     renderWithProviders(<ProvisioningPolicy />, '/provisioning-policy');
     const user = userEvent.setup();
-    // Ждём инициализации (только user отмечен)
+// Wait for init (only user is checked)
     await waitFor(() => {
       expect(screen.getByRole('checkbox', { name: /user/i })).toBeChecked();
     });
-    // Снимаем user
+// Uncheck user
     await user.click(screen.getByRole('checkbox', { name: /user/i }));
-    // Кнопка Save задизейблена
+// Save button is disabled
     expect(screen.getByTestId('save-policy-btn')).toBeDisabled();
-    // Anti-lockout alert виден
+// Anti-lockout alert is visible
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
@@ -140,12 +140,12 @@ describe('ProvisioningPolicy', () => {
     renderWithProviders(<ProvisioningPolicy />, '/provisioning-policy');
     const user = userEvent.setup();
 
-    // Ждём инициализации (все три отмечены)
+// Wait for init (all three checked)
     await waitFor(() => {
       expect(screen.getByRole('checkbox', { name: /ldap/i })).toBeChecked();
     });
 
-    // Снимаем ldap и oidc
+// Uncheck ldap and oidc
     await user.click(screen.getByRole('checkbox', { name: /ldap/i }));
     await user.click(screen.getByRole('checkbox', { name: /oidc/i }));
 
@@ -189,7 +189,7 @@ describe('ProvisioningPolicy', () => {
 
     await user.click(screen.getByTestId('save-policy-btn'));
 
-    // Saved message появляется
+// Saved message appears
     await waitFor(() => {
       const statuses = screen.getAllByRole('status');
       const savedStatus = statuses.find((el) => /обновлена|updated/i.test(el.textContent ?? ''));
@@ -247,7 +247,7 @@ describe('ProvisioningPolicy', () => {
     });
   });
 
-  // ── Guard: policy_set=true + allowed_methods=null → все методы (fallback) ──
+  // -- Guard: policy_set=true + allowed_methods=null -> all methods (fallback) --
 
   it('policy_set=true, allowed_methods=null → init уходит в fallback «все методы»', async () => {
     installFetchMock([
@@ -258,14 +258,14 @@ describe('ProvisioningPolicy', () => {
       },
     ]);
     renderWithProviders(<ProvisioningPolicy />, '/provisioning-policy');
-    // Ждём загрузки; все чекбоксы должны быть включены (fallback на ALL_METHODS)
+    // Wait for load; all checkboxes should be checked (fallback to ALL_METHODS)
     await waitFor(() => {
       expect(screen.getByRole('checkbox', { name: /user/i })).toBeChecked();
     });
     expect(screen.getByRole('checkbox', { name: /ldap/i })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /oidc/i })).toBeChecked();
-    // default-hint НЕ показывается (policy_set=true, но allowed_methods=null —
-    // это валидный ответ, UI рассматривает как «все разрешены», hint скрыт)
+    // default-hint is NOT shown (policy_set=true, but allowed_methods=null --
+    // this is a valid response, UI treats it as "all allowed", hint hidden)
     const statuses = screen.queryAllByRole('status');
     const hint = statuses.find((el) => /по умолчанию|default/i.test(el.textContent ?? ''));
     expect(hint).toBeUndefined();

@@ -115,7 +115,7 @@ describe('SoulDetail', () => {
           sid: 'host01.example.com',
           items: [
             {
-              // scenario с voyage_id → /voyages/:voyage_id
+              // scenario with voyage_id -> /voyages/:voyage_id
               type: 'scenario',
               id: 'apply-voyage-1',
               incarnation: 'redis-prod',
@@ -126,7 +126,7 @@ describe('SoulDetail', () => {
               voyage_id: 'voyage-abc',
             },
             {
-              // scenario без voyage_id → /incarnations/:incarnation
+              // scenario without voyage_id -> /incarnations/:incarnation
               type: 'scenario',
               id: 'apply-plain-2',
               incarnation: 'redis-prod',
@@ -136,7 +136,7 @@ describe('SoulDetail', () => {
               finished_at: '2026-05-27T09:00:30Z',
             },
             {
-              // errand с voyage_id → /voyages/:voyage_id
+              // errand with voyage_id -> /voyages/:voyage_id
               type: 'errand',
               id: 'errand-10',
               module: 'core.cmd.shell',
@@ -146,7 +146,7 @@ describe('SoulDetail', () => {
               voyage_id: 'voyage-abc',
             },
             {
-              // errand без voyage_id → не кликабельно (standalone)
+              // errand without voyage_id -> not clickable (standalone)
               type: 'errand',
               id: 'errand-9',
               module: 'core.cmd.shell',
@@ -185,19 +185,19 @@ describe('SoulDetail', () => {
       expect(screen.getByTestId('soul-history-table')).toBeInTheDocument();
     });
 
-    // scenario с voyage_id → /voyages/:voyage_id
+    // scenario with voyage_id -> /voyages/:voyage_id
     const voyageLink1 = screen.getByRole('link', { name: 'apply-voyage-1' });
     expect(voyageLink1).toHaveAttribute('href', '/voyages/voyage-abc');
-    // scenario без voyage_id → /incarnations/:incarnation
+    // scenario without voyage_id -> /incarnations/:incarnation
     const incLink = screen.getByRole('link', { name: 'apply-plain-2' });
     expect(incLink).toHaveAttribute('href', '/incarnations/redis-prod');
-    // errand с voyage_id → /voyages/:voyage_id
+    // errand with voyage_id -> /voyages/:voyage_id
     const voyageLink2 = screen.getByRole('link', { name: 'errand-10' });
     expect(voyageLink2).toHaveAttribute('href', '/voyages/voyage-abc');
-    // errand без voyage_id → plain span (не ссылка)
+    // errand without voyage_id -> plain span (not a link)
     expect(screen.queryByRole('link', { name: 'errand-9' })).toBeNull();
     expect(screen.getByText('errand-9')).toBeInTheDocument();
-    // module errand-записи виден
+    // module of the errand record is visible
     expect(screen.getAllByText('core.cmd.shell').length).toBeGreaterThan(0);
   });
 

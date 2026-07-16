@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 import i18n, { DEFAULT_LANG, changeLang, SUPPORTED_LANGS } from '../i18n';
 import { LangToggle } from '../components/layout/LangToggle';
 
-// ru — inline в src (bundled); en — static в public/locales (lazy через http-backend),
-// в node-тесте читается с диска.
+// ru is inline in src (bundled); en is static in public/locales (lazy via http-backend),
+// read from disk in the node test.
 const RU_DIR = path.resolve('src/i18n/locales/ru');
 const EN_DIR = path.resolve('public/locales/en');
 
@@ -18,11 +18,11 @@ function readNsKeys(dir: string, ns: string): string[] {
   return Object.keys(json).sort();
 }
 
-// http-backend в jsdom фетчит /locales/<lng>/<ns>.json — реального сервера нет,
-// поэтому отдаём содержимое public/locales с диска, иначе changeLanguage('en')
-// никогда не резолвится.
-// Стаб переустанавливается в beforeEach, т.к. глобальный afterEach из setup.ts
-// вызывает vi.unstubAllGlobals() после каждого теста.
+// http-backend in jsdom fetches /locales/<lng>/<ns>.json — there is no real server,
+// so we serve public/locales contents from disk, otherwise changeLanguage('en')
+// never resolves.
+// The stub is reinstalled in beforeEach because the global afterEach in setup.ts
+// calls vi.unstubAllGlobals() after every test.
 function installI18nFetch() {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
@@ -50,7 +50,7 @@ afterEach(async () => {
   await i18n.changeLanguage(DEFAULT_LANG);
 });
 
-// Тестовый компонент: кнопка-действие (локализуется) + имя сущности (English всегда).
+// Test component: action button (localized) + entity name (always English).
 function Sample() {
   const { t } = useTranslation();
   return (
@@ -103,7 +103,7 @@ describe('i18n', () => {
     expect(namespaces.length).toBeGreaterThan(0);
     for (const ns of namespaces) {
       const ruKeys = readNsKeys(RU_DIR, ns);
-      const enKeys = readNsKeys(EN_DIR, ns); // бросит, если файл отсутствует/битый.
+      const enKeys = readNsKeys(EN_DIR, ns); // throws if the file is missing/broken.
       expect(enKeys, `namespace ${ns}`).toEqual(ruKeys);
     }
   });

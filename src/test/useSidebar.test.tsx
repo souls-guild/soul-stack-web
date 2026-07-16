@@ -5,7 +5,7 @@ import { useSidebar } from '../hooks/useSidebar';
 describe('useSidebar', () => {
   beforeEach(() => {
     window.localStorage.clear();
-    // desktop по умолчанию
+    // desktop by default
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1280 });
   });
 

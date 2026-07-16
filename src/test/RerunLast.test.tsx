@@ -16,7 +16,7 @@ import { runnableScenarios } from '../pages/incarnations/reservedScenarios';
 import type { ServiceScenarioInfo } from '../api/keeper';
 import { tokenStore } from '../api/tokenStore';
 
-// Фикстура инкарнации с заданным статусом.
+// Incarnation fixture with a given status.
 function makeIncarnation(status: string) {
   return {
     name: 'test-inc',
@@ -33,7 +33,7 @@ function makeIncarnation(status: string) {
   };
 }
 
-// Fetch-мок для incarnation-get.
+// Fetch mock for incarnation-get.
 function mockFetch(incBody: unknown, overrides?: Record<string, { status: number; body: unknown }>) {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
@@ -58,7 +58,7 @@ function mockFetch(incBody: unknown, overrides?: Record<string, { status: number
 }
 
 // ────────────────────────────────────────────────────────────
-// 1. Фильтрация runnableScenarios по полю runnable
+// 1. Filtering runnableScenarios by the runnable field
 // ────────────────────────────────────────────────────────────
 describe('runnableScenarios — фильтр по полю runnable', () => {
   const scenarios: ServiceScenarioInfo[] = [
@@ -94,20 +94,20 @@ describe('runnableScenarios — фильтр по полю runnable', () => {
   });
 
   it('fallback: если runnable отсутствует — lifecycle скрыт, operational виден (обратная совместимость)', () => {
-    // Старый backend не отдаёт runnable — имитируем отсутствие поля.
+    // Old backend doesn't return runnable -- simulate a missing field.
     const legacy = [
       { name: 'create',  kind: 'lifecycle' as const, path: '' },
       { name: 'restart', kind: 'operational' as const, path: '' },
     ];
     const res = runnableScenarios(legacy);
-    // legacy-режим fallback: lifecycle скрыт (runnable undefined → !isLifecycle=false → false)
+    // legacy-mode fallback: lifecycle hidden (runnable undefined -> !isLifecycle=false -> false)
     expect(res.map((s) => s.name)).not.toContain('create');
     expect(res.map((s) => s.name)).toContain('restart');
   });
 });
 
 // ────────────────────────────────────────────────────────────
-// 2. Кнопка «Перезапустить последний упавший» — видимость по статусу
+// 2. "Rerun last failed" button -- visibility by status
 // ────────────────────────────────────────────────────────────
 describe('IncarnationDetail — кнопка rerunLast', () => {
   function renderDetail(status: string) {
@@ -151,13 +151,13 @@ describe('IncarnationDetail — кнопка rerunLast', () => {
     expect(
       screen.queryByRole('button', { name: /перезапустить последний упавший/i }),
     ).not.toBeInTheDocument();
-    // Unlock-кнопка при этом есть (isLocked=true).
+    // Unlock button is present regardless (isLocked=true).
     expect(screen.getByRole('button', { name: /unlock/i })).toBeInTheDocument();
   });
 });
 
 // ────────────────────────────────────────────────────────────
-// 3. Модалка требует reason
+// 3. Modal requires reason
 // ────────────────────────────────────────────────────────────
 describe('RerunLastModal — валидация reason', () => {
   it('не отправляет запрос при пустом reason', async () => {
@@ -189,19 +189,19 @@ describe('RerunLastModal — валидация reason', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
 
-    // Модалка открылась — заголовок есть.
+    // Modal opened -- title is present.
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    // Кликаем confirm без заполнения reason (кнопка внутри dialog — последняя из совпавших).
+    // Click confirm without filling reason (button inside dialog -- last of the matches).
     const dialog = screen.getByRole('dialog');
     const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
     await user.click(btns[0]);
 
-    // POST не ушёл.
+    // POST was not sent.
     expect(postCount).toBe(0);
-    // Валидационное сообщение (минимум 5 символов).
+    // Validation message (minimum 5 characters).
     await waitFor(() => {
       expect(screen.getByText(/минимум 5 символов/i)).toBeInTheDocument();
     });
@@ -209,7 +209,7 @@ describe('RerunLastModal — валидация reason', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 4. Happy-path: POST с reason → 202 (incl. scenario) → тост с именем сценария
+// 4. Happy-path: POST with reason -> 202 (incl. scenario) -> toast with scenario name
 // ────────────────────────────────────────────────────────────
 describe('RerunLastModal — happy-path', () => {
   it('POST уходит с {reason}, 202 → тост с именем сценария и apply_id', async () => {
@@ -261,16 +261,16 @@ describe('RerunLastModal — happy-path', () => {
     await user.type(textarea, 'исправлен конфиг вручную');
 
     await user.click(screen.getAllByRole('button', { name: /перезапустить последний упавший/i }).find(
-      (b) => !b.hasAttribute('title'), // кнопка внутри модалки, без title-тултипа
+      (b) => !b.hasAttribute('title'), // button inside the modal, without a title tooltip
     ) ?? screen.getAllByRole('button', { name: /перезапустить последний упавший/i })[0]);
 
-    // POST ушёл по правильному URL.
+    // POST was sent to the correct URL.
     await waitFor(() => {
       expect(postUrl).toMatch(/\/v1\/incarnations\/test-inc\/rerun-last/);
     });
     expect(capturedBody).toEqual({ reason: 'исправлен конфиг вручную' });
 
-    // Тост с именем сценария и apply_id появился.
+    // Toast with the scenario name and apply_id appeared.
     await waitFor(() => {
       expect(screen.getByRole('status')).toBeInTheDocument();
     });
@@ -281,7 +281,7 @@ describe('RerunLastModal — happy-path', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 4b. reasonMax: >500 символов — клиентская ошибка, POST не уходит
+// 4b. reasonMax: >500 characters -- client-side error, POST is not sent
 // ────────────────────────────────────────────────────────────
 describe('RerunLastModal — reasonMax 500 символов', () => {
   it('reason длиннее 500 символов — показывает ошибку, POST не уходит', async () => {
@@ -315,9 +315,9 @@ describe('RerunLastModal — reasonMax 500 символов', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    // Вводим строку длиннее 500 символов (501 'a').
-    // fireEvent.change используется намеренно: jsdom не применяет HTML-атрибут maxLength,
-    // поэтому только через прямое изменение значения можно протестировать Zod-валидацию.
+    // Enter a string longer than 500 characters (501 'a').
+    // fireEvent.change is used deliberately: jsdom doesn't enforce the HTML maxLength attribute,
+    // so only a direct value change lets us test the Zod validation.
     const textarea = screen.getByRole('textbox');
     const { fireEvent } = await import('@testing-library/react');
     fireEvent.change(textarea, { target: { value: 'a'.repeat(501) } });
@@ -326,9 +326,9 @@ describe('RerunLastModal — reasonMax 500 символов', () => {
     const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
     await user.click(btns[0]);
 
-    // POST не ушёл
+    // POST was not sent
     expect(postCount).toBe(0);
-    // Показано клиентское сообщение об ошибке
+    // Client-side error message shown
     await waitFor(() => {
       expect(screen.getByText(/максимум 500 символов/i)).toBeInTheDocument();
     });
@@ -336,7 +336,7 @@ describe('RerunLastModal — reasonMax 500 символов', () => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 5. 409 — два разных кейса конфликта
+// 5. 409 -- two different conflict cases
 // ────────────────────────────────────────────────────────────
 describe('RerunLastModal — 409 conflict', () => {
   async function submit409(type: string, detail: string) {

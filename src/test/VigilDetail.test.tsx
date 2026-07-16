@@ -48,7 +48,7 @@ describe('VigilDetail', () => {
     expect(screen.getByText(/Portent history/i)).toBeInTheDocument();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------------------
 
   it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
     installFetchMock([
@@ -62,9 +62,9 @@ describe('VigilDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: /redis-down/ })).toBeInTheDocument());
 
-    // В meta-секции created_by_aid должна быть ссылкой.
+    // In the meta section, created_by_aid must be a link.
     const links = screen.getAllByRole('link', { name: 'archon-alice' });
-    // Минимум одна ссылка ведёт на /archons/archon-alice.
+    // At least one link points to /archons/archon-alice.
     expect(links.some((l) => l.getAttribute('href') === '/archons/archon-alice')).toBe(true);
   });
 
@@ -80,9 +80,9 @@ describe('VigilDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: /redis-down/ })).toBeInTheDocument());
 
-    // Нет ссылок на архонтов.
+    // No links to archons.
     expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
-    // Плейсхолдер «—» присутствует.
+    // The "--" placeholder is present.
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 });

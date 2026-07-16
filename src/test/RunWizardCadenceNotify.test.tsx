@@ -1,11 +1,11 @@
 /**
- * Guard-тесты задачи B (C-N4): notify-блок в cadence-режиме.
+ * Guard tests for task B (C-N4): notify block in cadence mode.
  *
- * Инварианты:
- *   1. notify-block виден в cadence-режиме (permanent-подзаголовок).
- *   2. notify-block виден в voyage-режиме (ephemeral-подзаголовок).
- *   3. submitCadence шлёт notify в теле POST /v1/cadences.
- *   4. Late-binding parity: notify-значения сохраняются при переходах (как другие поля).
+ * Invariants:
+ *   1. notify-block is visible in cadence mode (permanent subtitle).
+ *   2. notify-block is visible in voyage mode (ephemeral subtitle).
+ *   3. submitCadence sends notify in the POST /v1/cadences body.
+ *   4. Late-binding parity: notify values persist across transitions (like other fields).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -91,7 +91,7 @@ function setupFetch() {
   return posts;
 }
 
-/** Переход на Step 4 в cadence-режиме (Scenario). */
+/** Transition to Step 4 in cadence mode (Scenario). */
 async function navigateToStep4Cadence(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByLabelText('Регулярно'));
   await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -112,7 +112,7 @@ async function navigateToStep4Cadence(user: ReturnType<typeof userEvent.setup>) 
 beforeEach(() => {
   tokenStore.set('tok-test');
   sessionStorage.clear();
-  // @ts-expect-error EventSource не в jsdom
+  // @ts-expect-error EventSource not in jsdom
   globalThis.EventSource = class {
     readyState = 0;
     close() {}
@@ -130,7 +130,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
 
     await navigateToStep4Cadence(user);
 
-    // notify-block должен присутствовать
+    // notify-block should be present
     expect(screen.getByTestId('notify-block')).toBeInTheDocument();
   });
 
@@ -139,7 +139,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     renderWizard();
     const user = userEvent.setup();
 
-    // Voyage (дефолт)
+    // Voyage (default)
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
@@ -164,11 +164,11 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
 
     await navigateToStep4Cadence(user);
 
-    // Заполнить имя cadence
+    // Fill in the cadence name
     await user.clear(screen.getByTestId('cadence-name'));
     await user.type(screen.getByTestId('cadence-name'), 'redis-hourly');
 
-    // Добавить notify
+    // Add notify
     await user.click(screen.getByTestId('notify-add-btn'));
 
     // Herald select
@@ -203,7 +203,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     await user.clear(screen.getByTestId('cadence-name'));
     await user.type(screen.getByTestId('cadence-name'), 'redis-hourly');
 
-    // notify не добавляем
+    // don't add notify
     await user.click(screen.getByRole('button', { name: /Создать расписание/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
 
@@ -211,7 +211,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     expect(cadencePosts).toHaveLength(1);
 
     const body = cadencePosts[0].body as Record<string, unknown>;
-    // notify не передаётся если пусто
+    // notify is not sent when empty
     expect(body.notify).toBeUndefined();
   });
 });

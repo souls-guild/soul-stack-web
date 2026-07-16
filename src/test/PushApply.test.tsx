@@ -75,13 +75,13 @@ describe('PushApply', () => {
 
     await waitFor(
       () => {
-        // success-Badge появится после второго poll.
+        // success Badge appears after the second poll.
         const badges = screen.queryAllByText('success');
         expect(badges.length).toBeGreaterThan(0);
       },
       { timeout: 5000 },
     );
-    // host01 встречается и в textarea-inventory, и в host-таблице — поэтому getAll.
+    // host01 appears both in the textarea-inventory and the host table -- hence getAll.
     const occurrences = screen.getAllByText('host01');
     expect(occurrences.length).toBeGreaterThanOrEqual(1);
   });

@@ -60,7 +60,7 @@ function setupMocks(opts: { items?: unknown[]; runs?: unknown[]; deleteStatus?: 
   const items = opts.items ?? [CADENCE_INTERVAL, CADENCE_CRON];
   const runs = opts.runs ?? [VOYAGE_CHILD];
   installFetchMock([
-    // Порядок важен: более специфичные пути РАНЬШЕ.
+    // Order matters: more specific paths FIRST.
     { method: 'GET', url: '/v1/cadences/cad-01/runs', body: { items: runs, offset: 0, limit: 50, total: runs.length } },
     { method: 'GET', url: '/v1/cadences/cad-01', body: CADENCE_INTERVAL },
     { method: 'POST', url: '/v1/cadences/cad-01/enable', body: { cadence_id: 'cad-01', enabled: true } },
@@ -122,20 +122,20 @@ describe('CadencesList', () => {
 
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
-    // redis-hourly enabled=true — кнопка-тоггл для disable
+    // redis-hourly enabled=true - toggle button for disable
     const disableBtn = screen.getByRole('button', { name: /Выключить/i });
     await user.click(disableBtn);
 
-    // Модалка открылась — нет мгновенного mutate
+    // Modal opened - no immediate mutate
     await waitFor(() =>
       expect(screen.getByText('Выключить расписание?')).toBeInTheDocument(),
     );
-    // Текст с предупреждением о последствии
+    // Text warning about the consequence
     expect(screen.getByText(/ПЕРЕСТАНЕТ спавнить прогоны/)).toBeInTheDocument();
-    // Имя фигурирует
+    // Name appears
     expect(screen.getAllByText(/redis-hourly/).length).toBeGreaterThan(0);
 
-    // disable-запрос ещё НЕ был отправлен
+    // disable request has NOT been sent yet
     const calls = vi.mocked(globalThis.fetch).mock.calls;
     const disableCallBefore = calls.find(([input, init]) => {
       const url = typeof input === 'string' ? input : (input as Request).url;
@@ -159,7 +159,7 @@ describe('CadencesList', () => {
     await user.click(screen.getByRole('button', { name: /Выключить/i }));
     await waitFor(() => expect(screen.getByText('Выключить расписание?')).toBeInTheDocument());
 
-    // Подтверждаем
+    // Confirm
     await user.click(screen.getByRole('button', { name: /Подтвердить/i }));
 
     await waitFor(() => {
@@ -187,10 +187,10 @@ describe('CadencesList', () => {
     await user.click(screen.getByRole('button', { name: /Выключить/i }));
     await waitFor(() => expect(screen.getByText('Выключить расписание?')).toBeInTheDocument());
 
-    // Отменяем
+    // Cancel
     await user.click(screen.getByRole('button', { name: /Отмена/i }));
 
-    // Модалка закрылась
+    // Modal closed
     await waitFor(() =>
       expect(screen.queryByText('Выключить расписание?')).not.toBeInTheDocument(),
     );
@@ -235,7 +235,7 @@ describe('CadencesList', () => {
     });
     expect(enableCallBefore).toBeUndefined();
 
-    // Подтверждаем
+    // Confirm
     await user.click(screen.getByRole('button', { name: /Подтвердить/i }));
 
     await waitFor(() => {

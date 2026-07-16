@@ -5,7 +5,7 @@ import { renderWithProviders } from './renderWithProviders';
 import { RunTasks } from '../pages/incarnations/RunTasks';
 import type { RunTaskView } from '../api/keeper';
 
-// Схема-2 master-detail (NIM-37): чистый рендерер из RunTaskView[] (join сервера).
+// Schema-2 master-detail (NIM-37): pure renderer from RunTaskView[] (server-side join).
 const TASKS: RunTaskView[] = [
   {
     plan_index: 0,
@@ -18,7 +18,7 @@ const TASKS: RunTaskView[] = [
       {
         sid: 'redis-1.local',
         status: 'TASK_STATUS_CHANGED',
-        // output = register_data (структура, НЕ строка) — реальный контракт S1a.
+        // output = register_data (structure, NOT a string) — actual S1a contract.
         output: { changed: true, exit_code: 0, stdout: 'installed redis-7.2.4', stderr: '' },
       },
       { sid: 'redis-2.local', status: 'TASK_STATUS_OK', output: { changed: false, exit_code: 0 } },
@@ -46,17 +46,17 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
   it('рендерит список всех задач + панель деталей; дефолт-выбор = упавшая задача с error', () => {
     renderWithProviders(<RunTasks tasks={TASKS} />, '/');
 
-    // Список: обе задачи как строки-опции.
+    // List: both tasks as string options.
     expect(screen.getByTestId('run-task-item-0')).toBeInTheDocument();
     expect(screen.getByTestId('run-task-item-1')).toBeInTheDocument();
     expect(screen.getByTestId('run-task-item-0')).toHaveTextContent('Install redis package');
 
-    // Дефолт-выбор — первая задача с упавшим хостом (Configure sentinel).
+    // Default selection — the first task with a failed host (Configure sentinel).
     const detail = screen.getByTestId('run-task-detail');
     expect(within(detail).getByText('Configure sentinel')).toBeInTheDocument();
-    // Упавший хост показывает текст ошибки.
+    // Failed host shows the error text.
     expect(screen.getByTestId('run-task-error-redis-3.local')).toHaveTextContent("undefined variable 'quorum'");
-    // Статусы задач — enum, не переводятся.
+    // Task statuses — enum, not translated.
     expect(within(detail).getByText('TASK_STATUS_FAILED')).toBeInTheDocument();
   });
 
@@ -68,13 +68,13 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
 
     const detail = screen.getByTestId('run-task-detail');
     expect(within(detail).getByText('Install redis package')).toBeInTheDocument();
-    // Вход (params) — key/value.
+    // Input (params) — key/value.
     const params = screen.getByTestId('run-task-params');
     expect(within(params).getByText('name')).toBeInTheDocument();
     expect(within(params).getByText('redis')).toBeInTheDocument();
     expect(within(params).getByText('version')).toBeInTheDocument();
     expect(within(params).getByText('7.2.4')).toBeInTheDocument();
-    // Per-host строки выбранной задачи.
+    // Per-host rows of the selected task.
     expect(screen.getByTestId('run-task-host-redis-1.local')).toBeInTheDocument();
     expect(screen.getByTestId('run-task-host-redis-2.local')).toBeInTheDocument();
   });
@@ -101,17 +101,17 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     ];
     renderWithProviders(<RunTasks tasks={noLog} />, '/');
 
-    // Вход скрыт, значение секрета не утекает в params-блок.
+    // Input is hidden, secret value does not leak into the params block.
     expect(screen.getByTestId('run-task-params')).toHaveTextContent('скрыто (no_log)');
     expect(screen.queryByText('db_password')).not.toBeInTheDocument();
 
-    // Per-host output скрыт для обоих хостов; register_data/stderr не в DOM.
+    // Per-host output is hidden for both hosts; register_data/stderr not in DOM.
     expect(screen.getByTestId('run-task-output-h1.local')).toHaveTextContent('скрыто (no_log)');
     expect(screen.getByTestId('run-task-output-h2.local')).toHaveTextContent('скрыто (no_log)');
     expect(screen.queryByText(/SUPERSECRET/)).not.toBeInTheDocument();
     expect(screen.queryByText(/LEAKED-STDERR/)).not.toBeInTheDocument();
 
-    // Error: code + module видны, message (может нести секрет) — нет.
+    // Error: code + module visible, message (may carry a secret) — hidden.
     const err = screen.getByTestId('run-task-error-h2.local');
     expect(err).toHaveTextContent('render_failed');
     expect(err).toHaveTextContent('core.secret.written');
@@ -122,14 +122,14 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     const user = userEvent.setup();
     renderWithProviders(<RunTasks tasks={TASKS} />, '/');
 
-    // Задача 0 (Install redis) — не дефолт (дефолт = упавшая задача), кликаем.
+    // Task 0 (Install redis) — not the default (default = failed task), click it.
     await user.click(screen.getByTestId('run-task-item-0'));
 
     const out = screen.getByTestId('run-task-output-redis-1.local');
     expect(out).toHaveTextContent('exit_code');
     expect(out).toHaveTextContent('changed');
     expect(out).toHaveTextContent('installed redis-7.2.4');
-    // stderr:'' — пустое поле не рендерится (нет ключа stderr).
+    // stderr:'' — empty field is not rendered (no stderr key).
     expect(within(out).queryByText('stderr')).not.toBeInTheDocument();
   });
 

@@ -38,7 +38,7 @@ const AUDIT = {
       },
     },
     {
-      // Не наш ref — должен отфильтроваться.
+      // Not our ref - should be filtered out.
       id: '01J0AUDIT0002',
       type: 'plugin.sigil.allowed',
       source: 'api',
@@ -60,7 +60,7 @@ const AUDIT = {
 describe('PluginDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
-    // confirm/alert по умолчанию true для тестов revoke-action.
+    // confirm/alert default to true for revoke-action tests.
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
@@ -75,10 +75,10 @@ describe('PluginDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'soul-mod-acme' })).toBeInTheDocument();
     });
-    // Namespace 'mod' появляется в нескольких местах (header badge + meta + chip).
+    // Namespace 'mod' appears in several places (header badge + meta + chip).
     expect(screen.getAllByText('mod').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('@v1.0.0')).toBeInTheDocument();
-    // sha256 присутствует полным значением (в overview-блоке).
+    // sha256 is present as full value (in the overview block).
     expect(screen.getByText(ACTIVE.items[0].sha256)).toBeInTheDocument();
   });
 
@@ -112,7 +112,7 @@ describe('PluginDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('plugin.sigil.allowed')).toBeInTheDocument();
     });
-    // other-mod в payload — НЕ должен попадать в матч.
+    // other-mod in payload - must NOT be matched.
     expect(screen.queryByText('other-mod')).not.toBeInTheDocument();
   });
 

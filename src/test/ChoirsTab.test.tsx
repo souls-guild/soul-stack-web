@@ -8,7 +8,7 @@ import { ChoirsTab } from '../pages/incarnations/ChoirsTab';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-// Базовый incarnation fixture.
+// Base incarnation fixture.
 const INCARNATION = {
   name: 'redis-prod',
   service: 'redis',
@@ -75,10 +75,10 @@ describe('ChoirsTab', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  // --- рендер вкладки через IncarnationDetail ---
+  // --- rendering the tab via IncarnationDetail ---
 
   it('рендерит вкладку Choirs, переход открывает секцию', async () => {
-    // Более специфичные URL-ы идут первыми (installFetchMock использует startsWith).
+    // More specific URLs go first (installFetchMock uses startsWith).
     installFetchMock([
       { method: 'GET', url: '/v1/incarnations/redis-prod/choirs', body: CHOIRS_EMPTY },
       { method: 'GET', url: '/v1/incarnations/redis-prod', body: INCARNATION },
@@ -104,7 +104,7 @@ describe('ChoirsTab', () => {
     expect(screen.getByText(/Choir-ов нет/i)).toBeInTheDocument();
   });
 
-  // --- создание Choir ---
+  // --- creating a Choir ---
 
   it('Create Choir — модалка открывается, POST уходит при submit', async () => {
     let postCount = 0;
@@ -155,11 +155,11 @@ describe('ChoirsTab', () => {
     await user.click(screen.getByRole('tab', { name: /Choirs/i }));
     await waitFor(() => screen.getByRole('heading', { name: /Choirs/i }));
 
-    // Открываем модалку создания (aria-label — кнопка, не empty-hint).
+    // Open the create modal (aria-label - a button, not empty-hint).
     const createBtn = screen.getAllByRole('button').find((b) => /Создать Choir/.test(b.textContent ?? ''))!;
     await user.click(createBtn);
 
-    // Заполняем имя.
+    // Fill in the name.
     const nameInput = screen.getByTestId('choir-name-input');
     await user.type(nameInput, 'primaries');
 
@@ -172,7 +172,7 @@ describe('ChoirsTab', () => {
     expect(lastBody).toMatchObject({ choir_name: 'primaries' });
   });
 
-  // --- валидация имени choir ---
+  // --- choir name validation ---
 
   it('choir_name с невалидным паттерном → form-error, POST не уходит', async () => {
     let postCount = 0;
@@ -217,7 +217,7 @@ describe('ChoirsTab', () => {
     expect(postCount).toBe(0);
   });
 
-  // --- удаление Choir ---
+  // --- deleting a Choir ---
 
   it('Delete Choir — confirm-модалка, DELETE уходит только после подтверждения чекбоксом', async () => {
     let deleteCount = 0;
@@ -257,15 +257,15 @@ describe('ChoirsTab', () => {
       expect(screen.getByTestId('delete-choir-primaries')).toBeInTheDocument();
     });
 
-    // Кликаем на удаление.
+    // Click delete.
     await user.click(screen.getByTestId('delete-choir-primaries'));
 
-    // Модалка открылась. DELETE ещё не уходил.
+    // Modal opened. DELETE hasn't been sent yet.
     const confirmBtn = screen.getByTestId('delete-choir-confirm');
     expect(confirmBtn).toBeDisabled();
     expect(deleteCount).toBe(0);
 
-    // Чекбокс → confirm.
+    // Checkbox -> confirm.
     await user.click(screen.getByTestId('delete-choir-checkbox'));
     expect(confirmBtn).not.toBeDisabled();
     await user.click(confirmBtn);
@@ -275,7 +275,7 @@ describe('ChoirsTab', () => {
     });
   });
 
-  // --- добавление Voice ---
+  // --- adding a Voice ---
 
   it('Add Voice → POST уходит с sid/role/position', async () => {
     let voicePostCount = 0;
@@ -336,15 +336,15 @@ describe('ChoirsTab', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Choirs/i }));
 
-    // Раскрываем choir.
+    // Expand the choir.
     await waitFor(() => screen.getByTestId('choir-toggle-primaries'));
     await user.click(screen.getByTestId('choir-toggle-primaries'));
 
-    // Кнопка «Добавить Voice».
+    // "Add Voice" button.
     await waitFor(() => screen.getByText(/Добавить Voice/i));
     await user.click(screen.getByText(/Добавить Voice/i));
 
-    // Выбираем SID.
+    // Select SID.
     await waitFor(() => screen.getByTestId('voice-sid-select'));
     await user.selectOptions(screen.getByTestId('voice-sid-select'), 'host-a.local');
 

@@ -7,7 +7,7 @@ import { IncarnationNewForm } from '../pages/incarnations/IncarnationNewForm';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-// ─── минимальный fetchMock для тестов ─────────────────────────────────────────
+// --- minimal fetchMock for tests -------------------------------------------------
 
 const SERVICES_MOCK = {
   method: 'GET' as const,
@@ -70,11 +70,11 @@ describe('TraitsEditor в форме создания инкарнации', () 
     await user.click(screen.getByTestId('traits-add-row'));
 
     const toggleBtn = screen.getByTestId('trait-mode-toggle');
-    // изначально string-режим — кнопка показывает `[ ]`
+    // initially string mode -- button shows `[ ]`
     expect(toggleBtn).toHaveTextContent('[ ]');
 
     await user.click(toggleBtn);
-    // после переключения — list-режим, кнопка показывает `"…"`
+    // after toggling -- list mode, button shows `"..."`
     expect(toggleBtn).toHaveTextContent('"…"');
   });
 
@@ -105,11 +105,11 @@ describe('TraitsEditor в форме создания инкарнации', () 
 
     await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
 
-    // Заполняем name + service
+    // Fill in name + service
     await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
-    // Добавляем trait: key=env, value=prod
+    // Add trait: key=env, value=prod
     await user.click(screen.getByTestId('traits-add-row'));
     const [keyInput] = screen.getAllByRole('textbox', { name: /ключ trait/i });
     await user.type(keyInput, 'env');
@@ -155,7 +155,7 @@ describe('TraitsEditor в форме создания инкарнации', () 
     await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
-    // Добавляем строку, но НЕ заполняем ключ
+    // Add a row, but do NOT fill in the key
     await user.click(screen.getByTestId('traits-add-row'));
 
     await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
@@ -164,7 +164,7 @@ describe('TraitsEditor в форме создания инкарнации', () 
       const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
       expect(post).toBeTruthy();
       const parsed = JSON.parse(post!.body);
-      // traits отсутствует (не передаём пустой объект)
+      // traits is absent (do not send an empty object)
       expect(parsed.traits).toBeUndefined();
     });
   });

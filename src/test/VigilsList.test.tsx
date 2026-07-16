@@ -47,7 +47,7 @@ describe('VigilsList', () => {
       expect(screen.getByText('redis-down')).toBeInTheDocument();
       expect(screen.getByText('config-changed')).toBeInTheDocument();
     });
-    // subject рендерится: sid для первой, coven для второй.
+    // subject renders: sid for the first one, coven for the second.
     expect(screen.getByText('host01.example.com')).toBeInTheDocument();
     expect(screen.getByText('prod, redis-master')).toBeInTheDocument();
   });

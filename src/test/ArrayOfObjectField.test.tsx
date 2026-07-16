@@ -1,4 +1,4 @@
-// Тесты для ArrayOfObjectField виджета (array-of-object карточки с под-полями).
+// Tests for the ArrayOfObjectField widget (array-of-object cards with sub-fields).
 
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -13,9 +13,9 @@ import {
 } from '../pages/incarnations/scenarioInputFields.helpers';
 import { useState } from 'react';
 
-// Схема redis users-поля (как приходит из backend).
-// items содержит properties+required (массив строк) — это не-TypeScript-поля,
-// передаём через index-signature [key]:unknown, поэтому приводим через unknown.
+// Schema for the redis users field (as it arrives from the backend).
+// items contains properties+required (an array of strings) - these are non-TypeScript
+// fields, passed through the index-signature [key]:unknown, hence the cast via unknown.
 const aclUserSchema: ScenarioInputSchema = {
   users: {
     type: 'array',
@@ -33,7 +33,7 @@ const aclUserSchema: ScenarioInputSchema = {
   },
 };
 
-// Вспомогательный stateful wrapper
+// Helper stateful wrapper
 import type { ScenarioInputSchemaProperty } from '../api/keeper';
 
 function StatefulFields({
@@ -155,7 +155,7 @@ describe('ArrayOfObjectField рендер', () => {
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     expect(screen.getByTestId('field-arrayobj-subfield-required-users-0-name')).toBeTruthy();
     expect(screen.getByTestId('field-arrayobj-subfield-required-users-0-perms')).toBeTruthy();
-    // state — не обязательное, маркера нет
+    // state is not required, no marker
     expect(screen.queryByTestId('field-arrayobj-subfield-required-users-0-state')).toBeNull();
   });
 

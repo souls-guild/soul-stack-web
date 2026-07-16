@@ -44,16 +44,16 @@ describe('DecreeDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /restart-on-config/ })).toBeInTheDocument();
     });
-    // CEL where отображается в monospace pre-блоке
+    // CEL where is displayed in a monospace pre-block
     expect(screen.getByText(/portent\.kind == "core\.beacon\.file_changed"/)).toBeInTheDocument();
-    // action scenario / incarnation в meta
+    // action scenario / incarnation in meta
     expect(screen.getByText('restart')).toBeInTheDocument();
     expect(screen.getByText('redis-prod')).toBeInTheDocument();
     // Recent fires placeholder
     expect(screen.getByText(/Recent fires/i)).toBeInTheDocument();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------------
 
   it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
     installFetchMock([

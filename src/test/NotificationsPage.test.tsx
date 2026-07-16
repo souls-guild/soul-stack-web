@@ -69,7 +69,7 @@ const TIDING_CADENCE: Tiding = {
   created_by_aid: undefined,
 };
 
-// Ephemeral-правило (разовое, привязанное к Voyage).
+// Ephemeral rule (one-off, bound to a Voyage).
 const TIDING_EPHEMERAL: Tiding = {
   name: 'ephemeral-01hz',
   herald: 'ops-webhook',
@@ -91,9 +91,9 @@ const TIDING_EPHEMERAL: Tiding = {
 const HERALDS_REPLY = { items: [HERALD_WEBHOOK, HERALD_DISABLED], offset: 0, limit: 200, total: 2 };
 const HERALDS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
 
-// Каталог типов Herald-канала (GET /v1/herald-types, ADR-052 amendment) —
-// подмножество полей, достаточное для тестов формы (webhook — полный набор,
-// остальные — по одному репрезентативному полю).
+// Herald channel type catalog (GET /v1/herald-types, ADR-052 amendment) -
+// a subset of fields sufficient for form tests (webhook - full set,
+// the rest - one representative field each).
 const HERALD_TYPES_CATALOG = {
   types: [
     {
@@ -237,7 +237,7 @@ function setupMock(opts: MockOpts = {}): Call[] {
     }
     if (/^\/v1\/tidings\/[^/]+$/.test(url) && method === 'GET') {
       const name = url.split('/').pop();
-      // opts.tidingDetail имеет приоритет — позволяет подменить данные для конкретного теста.
+      // opts.tidingDetail takes priority - allows overriding data for a specific test.
       if (opts.tidingDetail && opts.tidingDetail.name === name) {
         return new Response(JSON.stringify(opts.tidingDetail), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
@@ -247,7 +247,7 @@ function setupMock(opts: MockOpts = {}): Call[] {
     if (url.startsWith('/v1/tidings') && method === 'GET') {
       return new Response(JSON.stringify(opts.tidings ?? TIDINGS_REPLY), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-    // Мутации
+    // Mutations
     if (/^\/v1\/heralds$/.test(url) && method === 'POST') {
       return new Response(JSON.stringify({ ...HERALD_WEBHOOK, name: 'new-webhook' }), { status: 201, headers: { 'Content-Type': 'application/json' } });
     }
@@ -349,7 +349,7 @@ describe('NotificationsPage — Heralds tab', () => {
       expect(parsed.config).toMatchObject({ url: 'https://example.com/hook' });
     });
 
-    // Модалка закрылась.
+    // Modal closed.
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /Создать Herald/i })).not.toBeInTheDocument();
     });
@@ -364,7 +364,7 @@ describe('NotificationsPage — Heralds tab', () => {
     await user.click(screen.getByTestId('herald-create-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Создать Herald/i });
-    // name пусто → кнопка Создать не должна отправить (required на input).
+    // name empty -> Create button should not submit (required on input).
     const nameInput = within(dialog).getByTestId('herald-name-input');
     expect(nameInput).toBeRequired();
   });
@@ -422,7 +422,7 @@ describe('NotificationsPage — Heralds tab', () => {
     const httpCheckbox = within(dialog).getByTestId('herald-field-http_allowed');
     await user.click(httpCheckbox);
 
-    // Warning должен появиться.
+    // Warning should appear.
     await waitFor(() => {
       const warnings = within(dialog).getAllByRole('alert');
       const hasWarn = warnings.some((el) => el.textContent?.includes('TLS'));
@@ -528,7 +528,7 @@ describe('NotificationsPage — Tidings tab', () => {
     });
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
 
-    // Выбрать event type.
+    // Select event type.
     await user.click(within(dialog).getByTestId('event-type-chip-scenario_run.*'));
 
     await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
@@ -555,7 +555,7 @@ describe('NotificationsPage — Tidings tab', () => {
     const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
     await user.type(within(dialog).getByTestId('tiding-name-input'), 'my-tiding');
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
-    // event_types пусто → Submit disabled.
+    // event_types empty -> Submit disabled.
     const submitBtn = within(dialog).getByRole('button', { name: /Создать/i });
     expect(submitBtn).toBeDisabled();
   });
@@ -573,7 +573,7 @@ describe('NotificationsPage — Tidings tab', () => {
     await user.type(within(dialog).getByTestId('tiding-name-input'), 'custom-tiding');
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
 
-    // Добавить произвольный тип.
+    // Add a custom type.
     await user.type(within(dialog).getByTestId('tiding-custom-event-type-input'), 'my_domain.custom');
     await user.click(within(dialog).getByTestId('tiding-add-custom-type-btn'));
 
@@ -616,7 +616,7 @@ describe('HeraldDetail', () => {
     renderNotificationsPage('/notifications/heralds/ops-webhook');
     await waitFor(() => {
       expect(screen.getByText('ops-webhook')).toBeInTheDocument();
-      // Tiding-ы этого Herald.
+      // Tidings of this Herald.
       expect(screen.getByText('run-failures')).toBeInTheDocument();
     });
   });
@@ -657,7 +657,7 @@ describe('TidingDetail', () => {
   });
 });
 
-// --- Guard-тесты: PUT replace-схема + deep-link ---
+// --- Guard tests: PUT replace schema + deep-link ---
 
 describe('PUT replace-схема — Herald edit', () => {
   beforeEach(() => {
@@ -673,7 +673,7 @@ describe('PUT replace-схема — Herald edit', () => {
     await user.click(screen.getByTestId('herald-edit-btn-ops-webhook'));
 
     const dialog = await screen.findByRole('dialog', { name: /Редактировать Herald/i });
-    // Меняем URL — очищаем и вводим новый.
+    // Change URL - clear and enter a new one.
     const urlInput = await within(dialog).findByTestId('herald-field-url');
     await user.clear(urlInput);
     await user.type(urlInput, 'https://new.example.com/hook');
@@ -684,7 +684,7 @@ describe('PUT replace-схема — Herald edit', () => {
       const put = calls.find((c) => /^\/v1\/heralds\/ops-webhook$/.test(c.url) && c.method === 'PUT');
       expect(put).toBeDefined();
       const parsed = JSON.parse(put!.body ?? '{}');
-      // Полная replace-схема: type + config + secret_ref + enabled обязательны.
+      // Full replace schema: type + config + secret_ref + enabled are required.
       expect(parsed).toHaveProperty('type');
       expect(parsed).toHaveProperty('config');
       expect(Object.prototype.hasOwnProperty.call(parsed, 'secret_ref')).toBe(true);
@@ -709,7 +709,7 @@ describe('PUT replace-схема — Tiding edit', () => {
     await user.click(screen.getByTestId('tiding-edit-btn-run-failures'));
 
     const dialog = await screen.findByRole('dialog', { name: /Редактировать Tiding/i });
-    // Меняем incarnation.
+    // Change incarnation.
     const incInput = within(dialog).getByTestId('tiding-incarnation-input');
     await user.clear(incInput);
     await user.type(incInput, 'new-service');
@@ -720,14 +720,14 @@ describe('PUT replace-схема — Tiding edit', () => {
       const put = calls.find((c) => /^\/v1\/tidings\/run-failures$/.test(c.url) && c.method === 'PUT');
       expect(put).toBeDefined();
       const parsed = JSON.parse(put!.body ?? '{}');
-      // Полная replace-схема.
+      // Full replace schema.
       expect(parsed).toHaveProperty('herald');
       expect(parsed).toHaveProperty('event_types');
       expect(Object.prototype.hasOwnProperty.call(parsed, 'only_failures')).toBe(true);
       expect(Object.prototype.hasOwnProperty.call(parsed, 'only_changes')).toBe(true);
-      // incarnation выставлен в 'new-service' — присутствует в JSON.
+      // incarnation is set to 'new-service' - present in JSON.
       expect(Object.prototype.hasOwnProperty.call(parsed, 'incarnation')).toBe(true);
-      // cadence пустой → отсутствует в JSON (undefined omit = "очистить" по replace-семантике).
+      // cadence is empty -> absent from JSON (undefined omit = "clear" per replace semantics).
       expect(Object.prototype.hasOwnProperty.call(parsed, 'cadence')).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(parsed, 'enabled')).toBe(true);
     });
@@ -742,18 +742,18 @@ describe('NotificationsPage — deep-link ?tab=tidings', () => {
   it('?tab=tidings сразу открывает таб Tidings', async () => {
     setupMock();
     renderNotificationsPage('/notifications?tab=tidings');
-    // Сразу должны быть tiding-ы, без клика по табу.
+    // Tidings should be present immediately, without clicking the tab.
     await waitFor(() => {
       expect(screen.getByText('run-failures')).toBeInTheDocument();
     });
-    // Таб Heralds не активен — содержимое HeraldsTab не отрисовано.
+    // Heralds tab is not active - HeraldsTab content is not rendered.
     expect(screen.queryByTestId('herald-create-btn')).not.toBeInTheDocument();
   });
 });
 
-// --- Новые тесты: TidingsTab без ephemeral + annotations/projection ---
+// --- New tests: TidingsTab without ephemeral + annotations/projection ---
 
-// Tiding с annotations+projection для тестов редактирования.
+// Tiding with annotations+projection for edit tests.
 const TIDING_WITH_ANNOT: Tiding = {
   name: 'run-failures',
   herald: 'ops-webhook',
@@ -781,7 +781,7 @@ describe('TidingsTab — без ephemeral', () => {
     setupMock({ tidings: TIDINGS_REPLY });
     renderNotificationsPage('/notifications?tab=tidings');
     await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
-    // Кнопка toggle ephemeral удалена.
+    // Ephemeral toggle button removed.
     expect(screen.queryByTestId('tiding-show-ephemeral-btn')).not.toBeInTheDocument();
   });
 
@@ -789,7 +789,7 @@ describe('TidingsTab — без ephemeral', () => {
     setupMock({ tidings: TIDINGS_REPLY });
     renderNotificationsPage('/notifications?tab=tidings');
     await waitFor(() => expect(screen.getByText('run-failures')).toBeInTheDocument());
-    // Нет ни одного ephemeral-бейджа в таблице.
+    // No ephemeral badge in the table.
     expect(screen.queryAllByTestId(/tiding-ephemeral-badge-/)).toHaveLength(0);
   });
 });
@@ -835,14 +835,14 @@ describe('TidingModal — annotations и projection', () => {
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));
 
-    // Добавить annotation.
+    // Add annotation.
     await user.click(within(dialog).getByTestId('tiding-annotation-add'));
     const keyInputs = within(dialog).getAllByLabelText(/^annotation key/);
     const valInputs = within(dialog).getAllByLabelText(/^annotation value/);
     await user.type(keyInputs[0], 'env');
     await user.type(valInputs[0], 'prod');
 
-    // Добавить projection-путь.
+    // Add projection path.
     await user.click(within(dialog).getByTestId('tiding-projection-add'));
     const pathInputs = within(dialog).getAllByTestId(/^tiding-projection-path-/);
     await user.type(pathInputs[0], 'voyage_id');
@@ -859,7 +859,7 @@ describe('TidingModal — annotations и projection', () => {
   });
 
   it('Edit Tiding — PUT несёт annotations+projection', async () => {
-    // Используем TIDING_WITH_ANNOT (постоянное правило с annotations и projection).
+    // Use TIDING_WITH_ANNOT (a persistent rule with annotations and projection).
     const calls = setupMock({ tidings: TIDINGS_REPLY, tidingDetail: TIDING_WITH_ANNOT });
     renderNotificationsPage('/notifications?tab=tidings');
     const user = userEvent.setup();
@@ -869,16 +869,16 @@ describe('TidingModal — annotations и projection', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Редактировать Tiding/i });
 
-    // Форма загружает существующие annotation/projection — добавляем ещё один annotation.
+    // Form loads existing annotation/projection - add one more annotation.
     await user.click(within(dialog).getByTestId('tiding-annotation-add'));
     const keyInputs = within(dialog).getAllByLabelText(/^annotation key/);
     const valInputs = within(dialog).getAllByLabelText(/^annotation value/);
-    // Первая пара из editing (env=prod), новая — последняя.
+    // First pair from editing (env=prod), new one is last.
     const lastIdx = keyInputs.length - 1;
     await user.type(keyInputs[lastIdx], 'team');
     await user.type(valInputs[lastIdx], 'ops');
 
-    // Добавляем ещё один projection-путь.
+    // Add one more projection path.
     await user.click(within(dialog).getByTestId('tiding-projection-add'));
     const pathInputs = within(dialog).getAllByTestId(/^tiding-projection-path-/);
     await user.type(pathInputs[pathInputs.length - 1], 'summary.failed');
@@ -897,7 +897,7 @@ describe('TidingModal — annotations и projection', () => {
   });
 
   it('Edit Tiding — стёр все пути → PUT без projection (omit == clear)', async () => {
-    // Открываем редактирование TIDING_WITH_ANNOT у которого projection=['summary.succeeded','voyage_id'].
+    // Open editing TIDING_WITH_ANNOT which has projection=['summary.succeeded','voyage_id'].
     const calls = setupMock({ tidings: TIDINGS_REPLY, tidingDetail: TIDING_WITH_ANNOT });
     renderNotificationsPage('/notifications?tab=tidings');
     const user = userEvent.setup();
@@ -907,7 +907,7 @@ describe('TidingModal — annotations и projection', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Редактировать Tiding/i });
 
-    // Удаляем все projection-пути.
+    // Remove all projection paths.
     let removeBtns = within(dialog).queryAllByLabelText(/^remove projection/);
     while (removeBtns.length > 0) {
       await user.click(removeBtns[0]);
@@ -920,13 +920,13 @@ describe('TidingModal — annotations и projection', () => {
       const put = calls.find((c) => /^\/v1\/tidings\/run-failures$/.test(c.url) && c.method === 'PUT');
       expect(put).toBeDefined();
       const parsed = JSON.parse(put!.body ?? '{}');
-      // projection отсутствует в body (omit == clear: пустой массив не отправляется).
+      // projection is absent from body (omit == clear: empty array is not sent).
       expect(Object.prototype.hasOwnProperty.call(parsed, 'projection')).toBe(false);
     });
   });
 });
 
-// --- Тесты: история доставок в HeraldDetail ---
+// --- Tests: delivery history in HeraldDetail ---
 
 const AUDIT_DELIVERY_DELIVERED = {
   id: 'AUD01DLVD000000000000001',
@@ -959,7 +959,7 @@ describe('HeraldDetail — история доставок', () => {
   });
 
   it('доставки отображаются: delivered (ok) и failed (danger)', async () => {
-    // Переопределяем мок аудита для этого теста.
+    // Override the audit mock for this test.
     const calls: { url: string; method: string }[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;

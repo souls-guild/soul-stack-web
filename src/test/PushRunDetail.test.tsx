@@ -61,7 +61,7 @@ describe('PushRunDetail', () => {
     expect(screen.getByText('ssh_auth')).toBeInTheDocument();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------------
 
   it('[LINKS] sid в per-host таблице — ссылка на /souls/:sid', async () => {
     installFetchMock([

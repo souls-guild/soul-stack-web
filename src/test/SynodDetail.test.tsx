@@ -6,7 +6,7 @@ import { renderWithProviders } from './renderWithProviders';
 import { SynodDetail } from '../pages/synods/SynodDetail';
 import { tokenStore } from '../api/tokenStore';
 
-// Тестовые данные.
+// Test data.
 const SYNODS_SAMPLE = {
   items: [
     {
@@ -34,7 +34,7 @@ const ROLES_SAMPLE = {
   ],
 };
 
-// Все архонты кластера для AddOperatorModal (server-side typeahead).
+// All cluster archons for AddOperatorModal (server-side typeahead).
 const OPERATORS_SAMPLE = {
   items: [
     { aid: 'archon-alice', display_name: 'Alice', auth_method: 'jwt', revoked_at: null },
@@ -170,7 +170,7 @@ describe('SynodDetail', () => {
       expect(screen.getByText('archon-alice')).toBeInTheDocument();
       expect(screen.getByText('archon-bob')).toBeInTheDocument();
     });
-    // Секция members присутствует.
+    // Members section is present.
     expect(screen.getByRole('region', { name: /members/i })).toBeInTheDocument();
   });
 
@@ -190,7 +190,7 @@ describe('SynodDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'empty-group' })).toBeInTheDocument();
     });
-    // archon-alice из ops-team не должна быть видна.
+    // archon-alice from ops-team must not be visible.
     expect(screen.queryByText('archon-alice')).not.toBeInTheDocument();
   });
 
@@ -211,7 +211,7 @@ describe('SynodDetail', () => {
   });
 
   it('isLoading: показывает loading-индикатор пока данные грузятся', async () => {
-    // Fetch никогда не резолвится — проверяем состояние loading.
+    // Fetch never resolves — checking the loading state.
     let resolve: ((v: Response) => void) | undefined;
     vi.stubGlobal('fetch', () =>
       new Promise<Response>((r) => {
@@ -221,7 +221,7 @@ describe('SynodDetail', () => {
     renderWithProviders(withRoute(), '/synods/ops-team');
     expect(screen.getByText(/Загрузка/i)).toBeInTheDocument();
 
-    // Разрешаем промис чтобы не утечь.
+    // Resolve the promise so it doesn't leak.
     resolve!(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
   });
 
@@ -229,7 +229,7 @@ describe('SynodDetail', () => {
     recordingFetch({ synodsStatus: 500 });
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => {
-      // errorBox содержит статус ошибки.
+      // errorBox contains the error status.
       expect(screen.getByText(/500/)).toBeInTheDocument();
     });
   });
@@ -338,7 +338,7 @@ describe('SynodDetail', () => {
     expect(screen.queryByTestId('grant-role-btn')).not.toBeInTheDocument();
   });
 
-  // --- Edit guard-тесты ---
+  // --- Edit guard tests ---
 
   it('[EDIT] кнопка edit-synod-btn открывает EditSynodModal с именем и описанием', async () => {
     const { within: w } = await import('@testing-library/react');
@@ -411,7 +411,7 @@ describe('SynodDetail', () => {
     expect(screen.getByRole('dialog', { name: /Редактировать Synod/i })).toBeInTheDocument();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------------------
 
   it('[LINKS] участники-архоны рендерятся ссылками на /archons/:aid', async () => {
     recordingFetch({});
@@ -445,11 +445,11 @@ describe('SynodDetail', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'empty-group' })).toBeInTheDocument());
 
-    // Нет ссылок на архонтов и роли в пустой группе.
+    // No links to archons and roles in an empty group.
     expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
   });
 
-  // ── Picker-тесты (typeahead multi-select) ─────────────────────────────────
+  // -- Picker tests (typeahead multi-select) -------------------------------------------
 
   it('[ADD] AddOperatorModal: typeahead-выбор → POST /v1/synods/{name}/operators', async () => {
     const { within: w } = await import('@testing-library/react');
@@ -462,7 +462,7 @@ describe('SynodDetail', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
     await user.click(w(dialog).getByTestId('add-operator-search'));
-    // archon-dave не состоит в ops-team → доступен в опциях.
+    // archon-dave is not a member of ops-team -> available in options.
     await user.click(await w(dialog).findByTestId('add-operator-option-archon-dave'));
     await user.click(w(dialog).getByTestId('add-operator-submit'));
 
@@ -475,9 +475,9 @@ describe('SynodDetail', () => {
     });
   });
 
-  // Гард NIM-70: headline-контракт — поиск архонтов СЕРВЕРНЫЙ (GET /v1/operators?q=…),
-  // а не «фетчим всех + .filter на клиенте». Регресс к клиентскому фильтру прошёл бы
-  // все прочие picker-тесты (они не печатают в поиск), но сломался бы на 50+ архонтах.
+  // Guard NIM-70: headline contract — archon search is SERVER-SIDE (GET /v1/operators?q=...),
+  // not "fetch all + .filter on the client". A regression to client-side filtering would pass
+  // all other picker tests (they don't type into the search), but would break with 50+ archons.
   it('[SERVER-Q] AddOperatorModal: ввод в поиск уходит как ?q= в GET /v1/operators', async () => {
     const { within: w } = await import('@testing-library/react');
     const calls = recordingFetch({});
@@ -488,7 +488,7 @@ describe('SynodDetail', () => {
     await user.click(screen.getByTestId('add-operator-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
-    // Печатаем подстроку — picker обязан прокинуть её на сервер (debounce внутри SearchMultiSelect).
+    // Type a substring — the picker must forward it to the server (debounce inside SearchMultiSelect).
     await user.type(w(dialog).getByTestId('add-operator-search'), 'dave');
 
     await waitFor(
@@ -518,7 +518,7 @@ describe('SynodDetail', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
     await user.click(w(dialog).getByTestId('grant-role-search'));
-    // soul-operator не привязан к ops-team → доступен в опциях.
+    // soul-operator is not tied to ops-team -> available in options.
     await user.click(await w(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(w(dialog).getByTestId('grant-role-submit'));
 

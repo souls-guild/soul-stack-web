@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { toServerRange } from '../pages/runs/dateRange';
 
-// toServerRange переводит локальную полночь границ from/to в UTC-ISO-инстанты
-// (started_after/started_before). Пинним зону UTC+3 без DST (Etc/GMT-3), чтобы
-// зафиксировать сам сдвиг локаль→UTC: под UTC значения были бы иными, поэтому
-// тест реально доказывает, что offset учитывается, а не проходит случайно.
+// toServerRange converts local midnight of the from/to bounds into UTC ISO instants
+// (started_after/started_before). We pin the zone to UTC+3 without DST (Etc/GMT-3) to
+// fix the local->UTC shift itself: under UTC the values would be the same regardless,
+// so this test actually proves the offset is accounted for, not passing by accident.
 describe('toServerRange (TZ=UTC+3)', () => {
   const origTZ = process.env.TZ;
   beforeAll(() => {

@@ -1,8 +1,8 @@
-// NIM-72 guard-тесты: одиночный типизированный object (AclUser) и map по
-// additional_properties больше НЕ падают в raw-JSON-textarea.
+// NIM-72 guard tests: a single typed object (AclUser) and a map via
+// additional_properties no longer fall into raw-JSON-textarea.
 //
-// Матчинг по data-testid (устойчиво к языку). Симптом-регресс: схема add_user.user
-// раньше проходила мимо спец-веток → field-composite-user textarea.
+// Matching by data-testid (language-agnostic). Symptom regression: the add_user.user
+// schema used to slip past the special branches -> field-composite-user textarea.
 
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -22,8 +22,8 @@ import {
   type ScenarioFieldsState,
 } from '../pages/incarnations/scenarioInputFields.helpers';
 
-// add_user.user — одиночный типизированный объект (backend-контракт NIM-72).
-// required — массив имён обязательных под-полей (JSON-Schema), не boolean → каст.
+// add_user.user — a single typed object (backend contract NIM-72).
+// required — array of required sub-field names (JSON-Schema), not boolean -> cast.
 const aclUserSchema: ScenarioInputSchema = {
   user: {
     type: 'object',
@@ -39,7 +39,7 @@ const aclUserSchema: ScenarioInputSchema = {
   } as unknown as ScenarioInputSchemaProperty,
 };
 
-// redis_settings/update_config — типизированный map через additional_properties (без isMap).
+// redis_settings/update_config — a typed map via additional_properties (without isMap).
 const additionalPropsMapSchema: ScenarioInputSchema = {
   opts: {
     type: 'object',
@@ -70,7 +70,7 @@ function StatefulFields({
   );
 }
 
-// ─── предикаты ────────────────────────────────────────────────────────────
+// -- predicates ----------------------------------------------------------
 describe('isObjectWithProperties хелпер', () => {
   it('true: type=object + properties (не map, не provision)', () => {
     expect(isObjectWithProperties(aclUserSchema.user)).toBe(true);
@@ -141,14 +141,14 @@ describe('isCompositeType исключает object-with-properties и additiona
   });
 });
 
-// ─── регресс на симптом: textarea → типизированные под-поля ────────────────
+// -- symptom regression: textarea -> typed sub-fields ------------------------
 describe('ObjectField рендер (симптом-регресс)', () => {
   it('рендерит field-object-user + под-поля, НЕ field-composite-user textarea', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.getByTestId('field-object-user')).toBeTruthy();
-    // Ключевой регресс: сырой JSON-textarea НЕ рендерится.
+    // Key regression: raw JSON textarea is NOT rendered.
     expect(screen.queryByTestId('field-composite-user')).toBeNull();
-    // Под-поля рендерятся типизированно.
+    // Sub-fields render typed.
     expect(screen.getByTestId('field-text-user.name')).toBeTruthy();
     expect(screen.getByTestId('field-text-user.perms')).toBeTruthy();
     expect(screen.getByTestId('field-enum-user.state')).toBeTruthy();
@@ -190,21 +190,21 @@ describe('ObjectField рендер (симптом-регресс)', () => {
 
   it('под-поле показывает голый subKey как лейбл (паритет с ArrayOfObjectField), testid остаётся namespaced', () => {
     render(<StatefulFields schema={aclUserSchema} />);
-    // testid — namespaced (field-text-user.name), но видимый лейбл — «name», не «user.name».
+    // testid is namespaced (field-text-user.name), but the visible label is "name", not "user.name".
     const nameLabel = screen.getByTestId('field-text-user.name').closest('label');
     expect(nameLabel?.textContent).toContain('name');
     expect(nameLabel?.textContent).not.toContain('user.name');
   });
 });
 
-// ─── ★layout: object НЕ хоронится в advanced-collapse (Variant B) ──────────
+// -- *layout: object is NOT buried in advanced-collapse (Variant B) ----------
 describe('object-with-properties не уходит в advanced-collapse', () => {
   it('★единственное object-поле без form → НЕ внутри advanced-collapse, collapse отсутствует', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     const objectField = screen.getByTestId('field-object-user');
-    // Ключевой регресс (старый layout хоронил object в свёрнутый <details>).
+    // Key regression (old layout buried object in a collapsed <details>).
     expect(objectField.closest('[data-testid="advanced-collapse"]')).toBeNull();
-    // Нет optional-полей → collapse не рендерится вовсе.
+    // No optional fields -> collapse doesn't render at all.
     expect(screen.queryByTestId('advanced-collapse')).toBeNull();
   });
 
@@ -216,17 +216,17 @@ describe('object-with-properties не уходит в advanced-collapse', () => 
     render(<StatefulFields schema={schema} />);
     const collapse = screen.getByTestId('advanced-collapse');
     const objectField = screen.getByTestId('field-object-user');
-    // object — в верхней группе, НЕ потомок collapse.
+    // object is in the top group, NOT a descendant of collapse.
     expect(collapse.contains(objectField)).toBe(false);
     expect(objectField.closest('[data-testid="advanced-collapse"]')).toBeNull();
-    // optional note — внутри collapse (контроль: партиция вообще работает).
+    // optional note — inside collapse (control: partitioning works at all).
     expect(collapse.contains(screen.getByTestId('field-text-note'))).toBe(true);
   });
 });
 
-// ─── x-required: `*` на самом object-поле (NIM-72) ────────────────────────
-// add_user.user несёт field-level required:true, backend проецирует его как
-// x-required (ключ required занят массивом детей). UI ставит `*` на поле.
+// -- x-required: `*` on the object field itself (NIM-72) ----------------------
+// add_user.user carries field-level required:true, backend projects it as
+// x-required (the required key is taken by the array of children). UI puts `*` on the field.
 const aclUserRequiredSchema: ScenarioInputSchema = {
   user: {
     ...(aclUserSchema.user as object),
@@ -251,12 +251,12 @@ describe('x-required → `*` на object-поле', () => {
   it('рендер: без x-required маркера на контейнере нет (под-поля свои маркеры сохраняют)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.queryByTestId('field-required-marker-user')).toBeNull();
-    // Контроль: под-поля required остаются размеченными.
+    // Control: required sub-fields stay marked.
     expect(screen.getByTestId('field-required-marker-user.name')).toBeTruthy();
   });
 });
 
-// ─── map через additional_properties ──────────────────────────────────────
+// -- map via additional_properties --------------------------------------------
 describe('additional_properties map → MapEditor', () => {
   it('рендерит field-map-opts, НЕ field-composite-opts textarea', () => {
     render(<StatefulFields schema={additionalPropsMapSchema} />);
@@ -272,7 +272,7 @@ describe('additional_properties map → MapEditor', () => {
   });
 });
 
-// ─── сериализация / дефолты / валидация ────────────────────────────────────
+// -- serialization / defaults / validation -------------------------------------
 describe('serializeFields object-with-properties', () => {
   it('собирает вложенный объект {name,perms,state} из под-state', () => {
     const state: ScenarioFieldsState = {

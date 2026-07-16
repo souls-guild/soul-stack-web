@@ -1,4 +1,4 @@
-// Тесты TraitsAssignModal: merge/replace/remove режимы, success-state, validation.
+// Tests for TraitsAssignModal: merge/replace/remove modes, success-state, validation.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -34,7 +34,7 @@ describe('TraitsAssignModal', () => {
   it('рендерит форму в режиме single с тремя режимами', () => {
     renderModal(true, { kind: 'single', sid: 'host01.example.com' });
     expect(screen.getByText('Trait assignment: host01.example.com')).toBeInTheDocument();
-    // Три radio-кнопки режима по data-testid
+    // Three mode radio buttons by data-testid
     expect(screen.getByTestId('trait-mode-merge')).toBeInTheDocument();
     expect(screen.getByTestId('trait-mode-replace')).toBeInTheDocument();
     expect(screen.getByTestId('trait-mode-remove')).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('TraitsAssignModal', () => {
     renderModal(true, { kind: 'single', sid: 'host01.example.com' });
     const user = userEvent.setup();
 
-    // Заполняем первую пару
+    // Fill in the first pair
     const keyInput = screen.getByTestId('trait-key-0');
     const valInput = screen.getByTestId('trait-val-0');
     await user.clear(keyInput);
@@ -65,7 +65,7 @@ describe('TraitsAssignModal', () => {
       expect(screen.getByText('completed')).toBeInTheDocument();
     });
     expect(screen.getByText('merge')).toBeInTheDocument();
-    // matched = 2, changed = 2 — оба числа в meta-блоке
+    // matched = 2, changed = 2 -- both numbers in the meta block
     const allTwos = screen.getAllByText('2');
     expect(allTwos.length).toBeGreaterThanOrEqual(2);
   });
@@ -84,7 +84,7 @@ describe('TraitsAssignModal', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByTestId('trait-mode-remove'));
-    // Не заполняем ключи — сразу apply
+    // Do not fill in keys -- apply right away
     await user.click(screen.getByRole('button', { name: /Применить/i }));
 
     await waitFor(() => {
@@ -119,7 +119,7 @@ describe('TraitsAssignModal', () => {
     });
   });
 
-  // NIM-67: ключ с underscore (snake_case) — валиден, не блокирует submit.
+  // NIM-67: key with underscore (snake_case) -- valid, does not block submit.
   it('принимает snake_case ключ owner_team (NIM-67)', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(JSON.stringify(SUCCESS_REPLY), {
@@ -140,7 +140,7 @@ describe('TraitsAssignModal', () => {
 
     await user.click(screen.getByRole('button', { name: /Применить/i }));
 
-    // Ключ с `_` НЕ отвергается валидацией — доходит до success-state.
+    // Key with `_` is NOT rejected by validation -- reaches success-state.
     await waitFor(() => {
       expect(screen.getByText('completed')).toBeInTheDocument();
     });

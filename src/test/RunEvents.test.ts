@@ -115,9 +115,9 @@ describe('subscribeRunEvents (fetch-streaming)', () => {
   });
 });
 
-// Audit-нормализация обслуживает graceful fallback-таймлайн (backend /tasks ещё
-// не задеплоен). Primary-путь (Схема-2) джойн делает сервер — SSE стал nudge-ом,
-// кадры в TaskRow больше не нормализуются.
+// Audit normalization serves the graceful fallback timeline (backend /tasks isn't
+// deployed yet). On the primary path (Schema-2) the server does the join -- SSE became a nudge,
+// frames are no longer normalized into TaskRow.
 describe('audit TaskRow normalization (fallback)', () => {
   it('normalizeAuditTaskPayload: status + plan_index + error.module; message ОТБРАСЫВАЕТСЯ (секрет-гигиена)', () => {
     const row = normalizeAuditTaskPayload({
@@ -135,7 +135,7 @@ describe('audit TaskRow normalization (fallback)', () => {
       status: 'TASK_STATUS_CHANGED',
       errorModule: 'm',
     });
-    // audit-message может нести секрет — на фронт НЕ переносим (не рендерится).
+    // audit-message may carry a secret -- NOT forwarded to the frontend (not rendered).
     expect(row).not.toHaveProperty('errorMessage');
     expect(row).not.toHaveProperty('message');
   });

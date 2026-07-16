@@ -46,7 +46,7 @@ describe('RunDetail', () => {
     expect(screen.getByText('create')).toBeInTheDocument();
     expect(screen.getByText('host-a.local')).toBeInTheDocument();
     expect(screen.getByText('host-b.local')).toBeInTheDocument();
-    // Успешный прогон — секции «Упавшая задача» нет.
+    // Successful run -- no "Failed task" section.
     expect(screen.queryByText('Упавшая задача')).not.toBeInTheDocument();
   });
 
@@ -128,10 +128,10 @@ describe('RunDetail', () => {
     await waitFor(() => {
       expect(screen.getAllByText('keeper').length).toBeGreaterThan(0);
     });
-    // sid="keeper" не кликабелен как soul — нет ссылки на /souls/keeper.
+    // sid="keeper" is not clickable as a soul -- no link to /souls/keeper.
     expect(screen.queryByRole('link', { name: /^keeper$/ })).not.toBeInTheDocument();
     expect(screen.getAllByText('keeper-side').length).toBeGreaterThan(0);
-    // Реальный soul остаётся ссылкой как раньше.
+    // A real soul remains a link as before.
     const soulLink = screen.getByRole('link', { name: 'host-a.local' });
     expect(soulLink).toHaveAttribute('href', '/souls/host-a.local');
   });
@@ -170,7 +170,7 @@ describe('RunDetail', () => {
     await waitFor(() => {
       expect(screen.getAllByText('__run__').length).toBeGreaterThan(0);
     });
-    // sid="__run__" не кликабелен как soul — нет ссылки на /souls/__run__.
+    // sid="__run__" is not clickable as a soul -- no link to /souls/__run__.
     expect(screen.queryByRole('link', { name: '__run__' })).not.toBeInTheDocument();
     expect(screen.getAllByText('no host').length).toBeGreaterThan(0);
   });

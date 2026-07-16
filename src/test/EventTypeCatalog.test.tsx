@@ -129,10 +129,10 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
     const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
 
-    // Форма открылась — нет краша
+    // Form opened - no crash
     expect(dialog).toBeInTheDocument();
 
-    // Кастомный ввод доступен
+    // Custom input is available
     expect(within(dialog).getByTestId('tiding-custom-event-type-input')).toBeInTheDocument();
   });
 
@@ -163,7 +163,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
     const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
 
-    // Чип должен называться точно «scenario_run.*», не «scenario_run»
+    // The chip must be labeled exactly "scenario_run.*", not "scenario_run"
     await waitFor(() => {
       const chip = within(dialog).getByTestId('event-type-chip-scenario_run.*');
       expect(chip).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
       expect(postCall).toBeDefined();
       const bodyStr = postCall!.replace(/.*BODY:/, '');
       const parsed = JSON.parse(bodyStr) as { event_types: string[] };
-      // Должно быть «scenario_run.*», не «scenario_run»
+      // Should be "scenario_run.*", not "scenario_run"
       expect(parsed.event_types).toContain('scenario_run.*');
       expect(parsed.event_types).not.toContain('scenario_run');
     });
@@ -218,7 +218,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
 
-    // Дождаться чипов из backend
+    // Wait for chips from the backend
     await waitFor(() => expect(within(dialog).getByTestId('event-type-chip-voyage.*')).toBeInTheDocument());
     await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));
 

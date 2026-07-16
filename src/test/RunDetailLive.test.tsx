@@ -5,8 +5,8 @@ import { renderWithProviders } from './renderWithProviders';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-// Мокаем SSE-транспорт: тест руками драйвит onEvent/onError. В новой модели (NIM-37
-// Схема-2) SSE — nudge: task.executed инвалидирует ['run-tasks'] → refetch /tasks.
+// Mock the SSE transport: the test manually drives onEvent/onError. In the new model (NIM-37
+// Schema-2) SSE is a nudge: task.executed invalidates ['run-tasks'] -> refetch /tasks.
 const hoisted = vi.hoisted(() => ({ opts: null as null | Record<string, (arg: unknown) => void>, calls: 0 }));
 vi.mock('../api/runEvents', () => ({
   subscribeRunEvents: (_name: string, _applyId: string, opts: Record<string, (arg: unknown) => void>) => {
@@ -83,9 +83,9 @@ describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
     await waitFor(() => expect(screen.getByTestId('run-tasks-md')).toBeInTheDocument());
     expect(screen.getByTestId('run-task-item-0')).toHaveTextContent('Install redis package');
     expect(screen.getByTestId('run-task-detail')).toBeInTheDocument();
-    // Терминальный прогон → SSE не подписан.
+    // Terminal run -> SSE not subscribed.
     expect(hoisted.calls).toBe(0);
-    // Fallback-таймлайн (audit) НЕ рендерится, пока /tasks доступен.
+    // Fallback timeline (audit) does NOT render while /tasks is available.
     expect(screen.queryByTestId('run-task-timeline-table')).not.toBeInTheDocument();
   });
 
@@ -128,12 +128,12 @@ describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
 
     await waitFor(() => expect(screen.getByTestId('run-task-detail')).toBeInTheDocument());
     expect(screen.getByText('TASK_STATUS_CHANGED')).toBeInTheDocument();
-    // status=applying → SSE-подписка открыта.
+    // status=applying -> SSE subscription is open.
     await waitFor(() => expect(hoisted.opts).not.toBeNull());
 
     emit({ event: 'task.executed', data: '{}' });
 
-    // nudge инвалидировал ['run-tasks'] → refetch → новый статус в панели.
+    // nudge invalidated ['run-tasks'] -> refetch -> new status in the panel.
     await waitFor(() => expect(screen.getByText('TASK_STATUS_FAILED')).toBeInTheDocument());
     expect(tasksCall).toBeGreaterThanOrEqual(2);
   });
@@ -180,7 +180,7 @@ describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
     ]);
     renderRun();
 
-    // master-detail не рендерится, зато audit-таблица (fallback) и per-host итог на месте.
+    // master-detail does not render, but the audit table (fallback) and per-host summary are in place.
     await waitFor(() => expect(screen.getByTestId('run-task-row-h1.local|0|0')).toBeInTheDocument());
     expect(screen.getByText('TASK_STATUS_OK')).toBeInTheDocument();
     expect(screen.getByTestId('run-hosts-table')).toBeInTheDocument();

@@ -54,12 +54,12 @@ describe('ArchonsList', () => {
     ]);
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
-      // AID — это link в первой колонке; в других строках archon-bootstrap
-      // встречается как created_by (mono-text). Считаем только links.
+      // AID is a link in the first column; in other rows archon-bootstrap
+      // appears as created_by (mono-text). Count only links.
       expect(screen.getByRole('link', { name: 'archon-bootstrap' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    // Badge initial для bootstrap-Архонта.
+    // Badge initial for the bootstrap Archon.
     expect(screen.getByText('initial')).toBeInTheDocument();
   });
 
@@ -87,8 +87,8 @@ describe('ArchonsList', () => {
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText(/Метод аутентификации/i), 'jwt');
-    // Default: Hide revoked = ON → revoked param НЕ передаётся (server-default
-    // = только активные). Снимаем чекбокс — должен появиться revoked=true.
+    // Default: Hide revoked = ON -> revoked param is NOT passed (server-default
+    // = active only). Uncheck the checkbox -> revoked=true should appear.
     await user.click(screen.getByLabelText(/Скрыть отозванных/i));
     await waitFor(() => {
       expect(lastUrl).toMatch(/auth_method=jwt/);
@@ -104,9 +104,9 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    // archon-old (revoked_at != null) — скрыт по умолчанию.
+    // archon-old (revoked_at != null) is hidden by default.
     expect(screen.queryByRole('link', { name: 'archon-old' })).not.toBeInTheDocument();
-    // Counter: видимых 2, всего 3.
+    // Counter: 2 visible, 3 total.
     expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/2.*3/);
   });
 
@@ -123,10 +123,10 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
     });
-    // Chip «revoked» рядом с aid.
+    // Chip "revoked" next to the aid.
     expect(screen.getByText('revoked')).toBeInTheDocument();
-    // Revoke и Issue token для archon-old (последний в таблице) — disabled.
-    // testid устойчив к locale (button-label зависит от выбранного языка).
+    // Revoke and Issue token for archon-old (last row in the table) - disabled.
+    // testid is locale-stable (button label depends on the selected language).
     expect(screen.getByTestId('revoke-archon-old')).toBeDisabled();
     expect(screen.getByTestId('issue-token-archon-old')).toBeDisabled();
     // Counter: 3 of 3.
@@ -154,23 +154,23 @@ describe('ArchonsList', () => {
 
     renderWithProviders(<ArchonsList />, '/archons');
     await waitFor(() => {
-      // Hide revoked default ON → archon-old отфильтрован, видимы 2 строки.
+      // Hide revoked default ON -> archon-old is filtered out, 2 rows visible.
       expect(screen.getByTestId('revoke-archon-alice')).toBeInTheDocument();
     });
     const user = userEvent.setup();
     await user.click(screen.getByTestId('revoke-archon-alice'));
-    // Modal должен открыться с заголовком, содержащим AID.
+    // Modal should open with a title containing the AID.
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
     });
-    // Внутри Modal вводим reason и submit.
+    // Inside the Modal enter reason and submit.
     const textarea = screen.getByPlaceholderText(/уход сотрудника/i);
     await user.type(textarea, 'компрометация ключа');
     await user.click(screen.getByTestId('revoke-submit'));
     await waitFor(() => {
       expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
     });
-    // Body содержит reason без поля aid (path-param — авторитет).
+    // Body contains reason without the aid field (path-param is the authority).
     const revokeCall = calls.find((c) => c.url === '/v1/operators/archon-alice/revoke');
     expect(revokeCall?.body).toContain('компрометация ключа');
   });

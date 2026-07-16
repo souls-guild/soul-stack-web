@@ -42,7 +42,7 @@ describe('PluginsList', () => {
     await waitFor(() => {
       expect(screen.getByText(/Sigil/i)).toBeInTheDocument();
     });
-    // Убеждаемся, что не сырая ошибка, а дружелюбное сообщение
+    // Make sure it is not a raw error, but a friendly message
     expect(screen.queryByText(/HTTP 404/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/no such endpoint/i)).not.toBeInTheDocument();
   });
@@ -55,7 +55,7 @@ describe('PluginsList', () => {
     await waitFor(() => {
       expect(screen.getByText(/500/)).toBeInTheDocument();
     });
-    // Не показывает «не включён» при 500
+    // Does not show "not enabled" on 500
     expect(screen.queryByText(/pluginSigilDisabledTitle/i)).not.toBeInTheDocument();
   });
 
@@ -67,7 +67,7 @@ describe('PluginsList', () => {
       expect(screen.getByText('soul-mod-acme')).toBeInTheDocument();
       expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
     });
-    // SHA-256 показывается префиксом, не полным значением.
+    // SHA-256 is shown as a prefix, not the full value.
     expect(screen.getByTitle(SAMPLE.items[0].sha256)).toBeInTheDocument();
   });
 
@@ -101,7 +101,7 @@ describe('PluginsList', () => {
     expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ─────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------
 
   it('[LINKS] allowed_by_aid рендерится ссылкой на /archons/:aid', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
@@ -109,11 +109,11 @@ describe('PluginsList', () => {
 
     await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
 
-    // archon-alice разрешила soul-mod-acme
+    // archon-alice allowed soul-mod-acme
     const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
     expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
 
-    // archon-bob разрешил soul-cloud-aws
+    // archon-bob allowed soul-cloud-aws
     const linkBob = screen.getByRole('link', { name: 'archon-bob' });
     expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
   });

@@ -102,7 +102,7 @@ function renderVoyage(id: string) {
 describe('VoyageDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
-    // @ts-expect-error — EventSource нет в jsdom.
+    // @ts-expect-error -- EventSource is not present in jsdom.
     globalThis.EventSource = class {
       readyState = 0;
       close() { /* noop */ }
@@ -113,7 +113,7 @@ describe('VoyageDetail', () => {
   });
 
   it('рендерит scenario-voyage с метаданными и summary', async () => {
-    // ВАЖНО: /targets должен идти ДО /voyages/{id} — fetchMock матчит по startsWith.
+    // IMPORTANT: /targets must come BEFORE /voyages/{id} -- fetchMock matches by startsWith.
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -124,7 +124,7 @@ describe('VoyageDetail', () => {
     });
     expect(screen.getByText('rolling-restart')).toBeInTheDocument();
     expect(screen.getByText('archon-alice')).toBeInTheDocument();
-    // Incarnation-ссылки.
+    // Incarnation links.
     expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
     // Summary counts.
@@ -143,7 +143,7 @@ describe('VoyageDetail', () => {
     });
     expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
     expect(screen.getByText(/host-a\.example\.com/)).toBeInTheDocument();
-    // Нет summary → pending-сообщение.
+    // No summary -> pending message.
     expect(screen.getByText(/Summary появится по мере выполнения/)).toBeInTheDocument();
   });
 
@@ -171,7 +171,7 @@ describe('VoyageDetail', () => {
   });
 
   // ──────────────────────────────────────────────
-  // ФИКС 1: Batch N/M — barrier vs window
+  // FIX 1: Batch N/M -- barrier vs window
   // ──────────────────────────────────────────────
 
   it('barrier: текущий_батч/тотал рендерится (3/10)', async () => {
@@ -182,7 +182,7 @@ describe('VoyageDetail', () => {
     ]);
     renderVoyage(vid);
     await waitFor(() => expect(screen.getByLabelText('progress')).toBeInTheDocument());
-    // заголовок прогресса должен показывать «Batch 3 / 10»
+    // progress heading must show "Batch 3 / 10"
     expect(screen.getByText(/Batch 3\s*\/\s*10/)).toBeInTheDocument();
   });
 
@@ -217,14 +217,14 @@ describe('VoyageDetail', () => {
     ]);
     renderVoyage(vid);
     await waitFor(() => expect(screen.getByLabelText('progress')).toBeInTheDocument());
-    // НЕ должно быть «Batch N/M»
+    // Must NOT show "Batch N/M"
     expect(screen.queryByText(/Batch\s+\d+\s*\/\s*\d+/)).toBeNull();
-    // Должен быть прогресс по хостам: succeeded+failed+cancelled=5, scope_size=5 → 5/5
+    // Progress by hosts must show: succeeded+failed+cancelled=5, scope_size=5 -> 5/5
     expect(screen.getByText(/5\s*\/\s*5/)).toBeInTheDocument();
   });
 
   // ──────────────────────────────────────────────
-  // ФИКС 2: кликабельный фильтр summary → targets
+  // FIX 2: clickable summary filter -> targets
   // ──────────────────────────────────────────────
 
   it('клик «succeeded» → видны только succeeded targets', async () => {
@@ -242,7 +242,7 @@ describe('VoyageDetail', () => {
     expect(succeededBadge).not.toBeNull();
     await user.click(succeededBadge!);
 
-    // После фильтра host-a и host-c (succeeded) видны, host-b (failed) — нет
+    // After the filter, host-a and host-c (succeeded) are visible, host-b (failed) is not
     await waitFor(() => {
       expect(screen.queryByText('host-b')).toBeNull();
     });
@@ -282,10 +282,10 @@ describe('VoyageDetail', () => {
     const user = userEvent.setup();
     const summaryBox = screen.getByTestId('voyage-summary-counts');
     const failedBadge = summaryBox.querySelector('[data-filter="failed"]');
-    // Клик 1: фильтр
+    // Click 1: filter
     await user.click(failedBadge!);
     await waitFor(() => expect(screen.queryByText('host-a')).toBeNull());
-    // Клик 2: сброс
+    // Click 2: reset
     await user.click(failedBadge!);
     await waitFor(() => {
       expect(screen.getByText('host-a')).toBeInTheDocument();
@@ -312,7 +312,7 @@ describe('VoyageDetail', () => {
   });
 
   // ──────────────────────────────────────────────
-  // [LINKS] кликабельные ссылки
+  // [LINKS] clickable links
   // ──────────────────────────────────────────────
 
   it('[LINKS] started_by_aid рендерится ссылкой на /archons/:aid', async () => {
@@ -352,9 +352,9 @@ describe('VoyageDetail', () => {
     renderVoyage(cmdId);
     await waitFor(() => expect(screen.getByText('running')).toBeInTheDocument());
 
-    // Оба SID-элемента присутствуют как ссылки, значит визуальный разделитель отработал.
+    // Both SID elements are present as links, so the visual separator worked.
     expect(screen.getAllByRole('link', { name: /host-[ab]\.example\.com/ })).toHaveLength(2);
-    // Текстовое содержимое ячейки содержит запятую-разделитель.
+    // The cell's text content contains a comma separator.
     const sidCell = screen.getByRole('link', { name: 'host-a.example.com' }).closest('span')!.parentElement!;
     expect(sidCell.textContent).toContain(',');
   });
@@ -370,12 +370,12 @@ describe('VoyageDetail', () => {
     renderVoyage(cmdId);
     await waitFor(() => expect(screen.getByText('running')).toBeInTheDocument());
 
-    // Нет ссылок на /souls/... и нет текста target.sids.
+    // No links to /souls/... and no target.sids text.
     expect(screen.queryByRole('link', { name: /host-/ })).not.toBeInTheDocument();
   });
 
   // ──────────────────────────────────────────────
-  // Секция «Уведомления» прогона
+  // Voyage "Notifications" section
   // ──────────────────────────────────────────────
 
   it('уведомления пусты → empty-state', async () => {
@@ -419,20 +419,20 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('voyage-notifications-table')).toBeInTheDocument());
 
-    // Обе строки присутствуют.
+    // Both rows are present.
     expect(screen.getByTestId(`notif-row-${deliveredEv.id}`)).toBeInTheDocument();
     expect(screen.getByTestId(`notif-row-${failedEv.id}`)).toBeInTheDocument();
 
-    // Herald-ссылка.
+    // Herald link.
     const heraldLinks = screen.getAllByRole('link', { name: 'ops-webhook' });
     expect(heraldLinks.length).toBeGreaterThanOrEqual(1);
     expect(heraldLinks[0]).toHaveAttribute('href', '/notifications/heralds/ops-webhook');
 
-    // Статусы: delivered → «доставлено», failed → «ошибка».
+    // Statuses: delivered -> "delivered", failed -> "error".
     expect(screen.getByText('доставлено')).toBeInTheDocument();
     expect(screen.getByText('ошибка')).toBeInTheDocument();
 
-    // Код ответа.
+    // Response code.
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('503')).toBeInTheDocument();
   });
@@ -461,7 +461,7 @@ describe('VoyageDetail', () => {
   });
 
   // ──────────────────────────────────────────────
-  // Секция «Что изменилось» (VoyageChangedTasks)
+  // "What changed" section (VoyageChangedTasks)
   // ──────────────────────────────────────────────
 
   const RUN_COMPLETED_EVENT = {
@@ -530,13 +530,13 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('voyage-changed-section')).toBeInTheDocument());
 
-    // Фетч содержит payload_voyage
+    // Fetch contains payload_voyage
     const changedCall = calls.find((u) => u.includes('payload_voyage'));
     expect(changedCall).toBeDefined();
     expect(changedCall).toContain(`payload_voyage=${VOYAGE_ID}`);
     expect(changedCall).toContain('type=incarnation.run_completed');
 
-    // Секция отрендерилась с данными
+    // Section rendered with data
     expect(screen.getByTestId('voyage-changed-tasks')).toBeInTheDocument();
   });
 
@@ -553,16 +553,16 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('changed-tasks-table-0')).toBeInTheDocument());
 
-    // Инкарнация
+    // Incarnation
     expect(screen.getByTestId('changed-run-0').textContent).toContain('redis-prod');
 
-    // Задача 1: register=svc_restart (register-first), module=core.service, 2 из 3
+    // Task 1: register=svc_restart (register-first), module=core.service, 2 of 3
     expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('svc_restart');
     expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('core.service');
     expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('2');
     expect(screen.getByTestId('changed-task-row-0-0').textContent).toContain('3');
 
-    // Задача 2: id=task-conf (нет register), module=core.file, 1 из 3
+    // Task 2: id=task-conf (no register), module=core.file, 1 of 3
     expect(screen.getByTestId('changed-task-row-0-1').textContent).toContain('task-conf');
     expect(screen.getByTestId('changed-task-row-0-1').textContent).toContain('core.file');
   });
@@ -580,9 +580,9 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
 
-    // changed_tasks пустой → «без изменений»
+    // changed_tasks empty -> "no changes"
     expect(screen.getByText(/без изменений/)).toBeInTheDocument();
-    // Таблица задач не рендерится
+    // Task table does not render
     expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
   });
 
@@ -590,13 +590,13 @@ describe('VoyageDetail', () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
-      // payload_voyage-запрос → событие с success
+      // payload_voyage request -> event with success
       {
         method: 'GET',
         url: /\/v1\/audit.*payload_voyage/,
         body: { items: [RUN_COMPLETED_EVENT], offset: 0, limit: 200, total: 1 },
       },
-      // correlation_id-запрос (уведомления) → пустой
+      // correlation_id request (notifications) -> empty
       {
         method: 'GET',
         url: '/v1/audit',
@@ -613,13 +613,13 @@ describe('VoyageDetail', () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
-      // payload_voyage-запрос → событие с failed
+      // payload_voyage request -> event with failed
       {
         method: 'GET',
         url: /\/v1\/audit.*payload_voyage/,
         body: { items: [RUN_COMPLETED_FAILED], offset: 0, limit: 200, total: 1 },
       },
-      // correlation_id-запрос (уведомления) → пустой
+      // correlation_id request (notifications) -> empty
       {
         method: 'GET',
         url: '/v1/audit',
@@ -650,7 +650,7 @@ describe('VoyageDetail', () => {
   });
 
   // ──────────────────────────────────────────────
-  // GUARD: type-safety инварианты parseRunCompletedPayload / isChangedTask
+  // GUARD: type-safety invariants of parseRunCompletedPayload / isChangedTask
   // ──────────────────────────────────────────────
 
   it('[guard] грязный payload: changed_tasks не массив → секция не падает, «без изменений»', async () => {
@@ -663,7 +663,7 @@ describe('VoyageDetail', () => {
       payload: {
         incarnation: 'dirty-inc',
         status: 'success',
-        // changed_tasks намеренно не массив — объект
+        // changed_tasks intentionally not an array -- an object
         changed_tasks: { corrupted: true },
       },
     };
@@ -679,9 +679,9 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
 
-    // Не упало, инкарнация видна
+    // Did not crash, incarnation visible
     expect(screen.getByTestId('changed-run-0').textContent).toContain('dirty-inc');
-    // Нет таблицы задач — показывается «без изменений»
+    // No task table -- "no changes" is shown
     expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
     expect(screen.getByText(/без изменений/)).toBeInTheDocument();
   });
@@ -697,11 +697,11 @@ describe('VoyageDetail', () => {
         incarnation: 'bad-tasks-inc',
         status: 'success',
         changed_tasks: [
-          // числа строкой — не проходят isChangedTask
+          // numbers as strings -- do not pass isChangedTask
           { id: 'task-a', module: 'core.pkg', changed_hosts: '2', total_hosts: '3' },
-          // нет полей вообще
+          // no fields at all
           { id: 'task-b', module: 'core.file' },
-          // null-значения
+          // null values
           { id: 'task-c', changed_hosts: null, total_hosts: null },
         ],
       },
@@ -718,9 +718,9 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
 
-    // Инкарнация видна, компонент жив
+    // Incarnation visible, component alive
     expect(screen.getByTestId('changed-run-0').textContent).toContain('bad-tasks-inc');
-    // Все элементы отфильтрованы — «без изменений»
+    // All items filtered out -- "no changes"
     expect(screen.getByText(/без изменений/)).toBeInTheDocument();
     expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
   });
@@ -764,13 +764,13 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
 
-    // Оба блока присутствуют
+    // Both blocks are present
     expect(screen.getByTestId('changed-run-0').textContent).toContain('inc-alpha');
     expect(screen.getByTestId('changed-run-1').textContent).toContain('inc-beta');
 
-    // Первый блок: есть таблица задач
+    // First block: has a task table
     expect(screen.getByTestId('changed-tasks-table-0')).toBeInTheDocument();
-    // Второй блок: «без изменений»
+    // Second block: "no changes"
     expect(screen.getByTestId('changed-run-1').textContent).toContain('без изменений');
   });
 
@@ -783,12 +783,12 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('voyage-repeat-btn')).toBeInTheDocument());
 
-    // Кнопка есть (scenario-voyage), кликаем — черновика нет → navigate
+    // Button is present (scenario-voyage), we click -- no draft -> navigate
     const user = userEvent.setup();
-    // sessionStorage пустой → нет confirm-диалога
+    // sessionStorage empty -> no confirm dialog
     sessionStorage.clear();
     await user.click(screen.getByTestId('voyage-repeat-btn'));
-    // После navigate — компонент пытается unmount/remount; проверяем что confirm не появился.
+    // After navigate -- the component tries to unmount/remount; check that confirm did not appear.
     expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
   });
 
@@ -798,16 +798,16 @@ describe('VoyageDetail', () => {
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
       { method: 'GET', url: '/v1/audit', body: { items: [], offset: 0, limit: 200, total: 0 } },
     ]);
-    // Имитируем черновик
+    // Simulate a draft
     sessionStorage.setItem('run-wizard-draft', JSON.stringify({ v: 10 }));
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('voyage-repeat-btn')).toBeInTheDocument());
 
     const user = userEvent.setup();
     await user.click(screen.getByTestId('voyage-repeat-btn'));
-    // Диалог должен появиться
+    // Dialog must appear
     expect(screen.getByTestId('voyage-repeat-confirm-dialog')).toBeInTheDocument();
-    // Cancel → диалог закрывается (кнопка «Закрыть» — ru-locale по умолчанию в тестах)
+    // Cancel -> dialog closes ("Закрыть" button -- ru locale is default in tests)
     await user.click(screen.getByRole('button', { name: /Закрыть/i }));
     expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
     sessionStorage.clear();
@@ -822,7 +822,7 @@ describe('VoyageDetail', () => {
       created_at: new Date().toISOString(),
       payload: {
         incarnation: 'no-status-inc',
-        // status намеренно отсутствует
+        // status intentionally absent
         changed_tasks: [],
       },
     };
@@ -838,7 +838,7 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('run-status-badge-0')).toBeInTheDocument());
 
-    // Лейбл «—» — не упало
+    // "--" label -- did not crash
     expect(screen.getByTestId('run-status-badge-0').textContent).toBe('—');
   });
 });

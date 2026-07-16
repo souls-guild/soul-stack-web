@@ -46,7 +46,7 @@ describe('SearchMultiSelect', () => {
 
     const input = screen.getByTestId('ms-search');
     expect(input).toBeInTheDocument();
-    // Пока не сфокусировали — dropdown закрыт.
+    // Not focused yet — dropdown is closed.
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 
     await user.click(input);
@@ -93,9 +93,9 @@ describe('SearchMultiSelect', () => {
 
     expect(screen.getByTestId('ms-chip-apple')).toBeInTheDocument();
     expect(screen.getByTestId('ms-chip-cherry')).toBeInTheDocument();
-    // banana не выбран.
+    // banana is not selected.
     expect(screen.queryByTestId('ms-chip-banana')).not.toBeInTheDocument();
-    // Опция apple помечена выбранной.
+    // Option apple is marked as selected.
     expect(screen.getByTestId('ms-option-apple')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('ms-option-banana')).toHaveAttribute('aria-selected', 'false');
   });
@@ -104,13 +104,13 @@ describe('SearchMultiSelect', () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} initial={['apple', 'banana']} />);
 
-    // Чипы уже есть из initial.
+    // Chips already exist from initial.
     expect(screen.getByTestId('ms-chip-apple')).toBeInTheDocument();
     const chipApple = screen.getByTestId('ms-chip-apple');
     await user.click(within(chipApple).getByRole('button'));
     expect(screen.queryByTestId('ms-chip-apple')).not.toBeInTheDocument();
 
-    // Повторный клик по опции banana снимает выбор (toggle off).
+    // Clicking option banana again deselects it (toggle off).
     await user.click(screen.getByTestId('ms-search'));
     await user.click(screen.getByTestId('ms-option-banana'));
     expect(screen.queryByTestId('ms-chip-banana')).not.toBeInTheDocument();
@@ -124,7 +124,7 @@ describe('SearchMultiSelect', () => {
     renderWithProviders(<Harness search={search} />);
 
     await user.click(screen.getByTestId('ms-search'));
-    // Пустой запрос → search('') → все элементы.
+    // Empty query -> search('') -> all items.
     await waitFor(() => expect(screen.getByTestId('ms-option-apple')).toBeInTheDocument());
 
     await user.type(screen.getByTestId('ms-search'), 'cher');

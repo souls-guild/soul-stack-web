@@ -31,7 +31,7 @@ const VOYAGE_BASE = {
   summary: { total: 3, succeeded: 3, failed: 0, cancelled: 0 },
 };
 
-/** barrier-режим: 2 батча с разными batch_index */
+/** barrier mode: 2 batches with different batch_index */
 const TARGETS_BARRIER = {
   voyage_id: VOYAGE_ID,
   targets: [
@@ -61,7 +61,7 @@ const TARGETS_BARRIER = {
   ],
 };
 
-/** window-режим: все target с batch_index=0 */
+/** window mode: all targets with batch_index=0 */
 const TARGETS_WINDOW = {
   voyage_id: VOYAGE_ID,
   targets: [
@@ -102,7 +102,7 @@ function renderVoyage(voyageId: string) {
 describe('VoyageTargets (через VoyageDetail)', () => {
   beforeEach(() => {
     tokenStore.clear();
-    // @ts-expect-error — EventSource нет в jsdom.
+    // @ts-expect-error — EventSource not present in jsdom.
     globalThis.EventSource = class {
       readyState = 0;
       close() { /* noop */ }
@@ -113,7 +113,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
   });
 
   it('barrier-режим: 2 батча → 2 заголовка групп, targets распределены правильно', async () => {
-    // ВАЖНО: /targets должен идти ДО /voyages/{id} — fetchMock матчит по startsWith.
+    // IMPORTANT: /targets must come BEFORE /voyages/{id} — fetchMock matches by startsWith.
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: VOYAGE_BASE },
@@ -121,25 +121,25 @@ describe('VoyageTargets (через VoyageDetail)', () => {
 
     renderVoyage(VOYAGE_ID);
 
-    // Ждём загрузки voyage
+    // Wait for voyage to load
     await waitFor(() => {
       expect(screen.getByText('succeeded')).toBeInTheDocument();
     });
 
-    // Два заголовка батчей
+    // Two batch headings
     await waitFor(() => {
       expect(screen.getByTestId('batch-heading-0')).toBeInTheDocument();
       expect(screen.getByTestId('batch-heading-1')).toBeInTheDocument();
     });
 
-    // pg-prod-1 в батче 0
+    // pg-prod-1 in batch 0
     expect(screen.getByText('pg-prod-1')).toBeInTheDocument();
 
-    // pg-prod-2 и pg-prod-3 в батче 1
+    // pg-prod-2 and pg-prod-3 in batch 1
     expect(screen.getByText('pg-prod-2')).toBeInTheDocument();
     expect(screen.getByText('pg-prod-3')).toBeInTheDocument();
 
-    // Статусы отображаются как бейджи
+    // Statuses render as badges
     const allSucceeded = screen.getAllByText('succeeded');
     expect(allSucceeded.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('failed')).toBeInTheDocument();
@@ -162,15 +162,15 @@ describe('VoyageTargets (через VoyageDetail)', () => {
       expect(screen.getByTestId('batch-heading-0')).toBeInTheDocument();
     });
 
-    // Ровно один batch-heading (нет batch-heading-1)
+    // Exactly one batch-heading (no batch-heading-1)
     expect(screen.queryByTestId('batch-heading-1')).toBeNull();
 
-    // Все три target видны
+    // All three targets are visible
     expect(screen.getByText('redis-a')).toBeInTheDocument();
     expect(screen.getByText('redis-b')).toBeInTheDocument();
     expect(screen.getByText('redis-c')).toBeInTheDocument();
 
-    // running-статус отображается
+    // running status renders
     expect(screen.getByText('running')).toBeInTheDocument();
   });
 
@@ -200,10 +200,10 @@ describe('VoyageTargets (через VoyageDetail)', () => {
       <VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} statusFilter="succeeded" />,
     );
 
-    // Только succeeded target виден
+    // Only the succeeded target is visible
     await waitFor(() => expect(screen.getByText('pg-prod-1')).toBeInTheDocument());
 
-    // failed и cancelled отсеяны
+    // failed and cancelled are filtered out
     expect(screen.queryByText('pg-prod-2')).toBeNull();
     expect(screen.queryByText('pg-prod-3')).toBeNull();
   });
@@ -226,7 +226,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
           status: 'failed',
           batch_index: 0,
           finished_at: '2026-06-30T10:06:00Z',
-          // Нет apply_id → должен показать «—»
+          // No apply_id -> should show "-"
         },
       ],
     };
@@ -239,11 +239,11 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     );
 
     await waitFor(() => expect(screen.getByText('redis-prod')).toBeInTheDocument());
-    // Ссылка на voyage по apply_id
+    // Link to the voyage by apply_id
     const link = screen.getByTestId('target-apply-link-redis-prod');
     expect(link).toBeInTheDocument();
     expect((link as HTMLAnchorElement).href).toContain('/voyages/01APPLYID00000000000001');
-    // Без apply_id — «—»
+    // No apply_id - "-"
     expect(screen.queryByTestId('target-apply-link-redis-stage')).not.toBeInTheDocument();
   });
 
@@ -260,7 +260,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
       expect(screen.getByText(/awaiting/)).toBeInTheDocument(),
     );
 
-    // Таблицы нет
+    // No table
     expect(screen.queryByText('pg-prod-1')).toBeNull();
   });
 });

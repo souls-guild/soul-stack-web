@@ -53,12 +53,12 @@ describe('ErrandsList', () => {
       expect(screen.getByText('host01')).toBeInTheDocument();
       expect(screen.getByText('host02')).toBeInTheDocument();
     });
-    // Link на detail (берём первый из двух).
+    // Link to detail (take the first of two).
     const links = screen.getAllByText(/01HZAA0000/);
     expect(links[0].closest('a')?.getAttribute('href')).toMatch(/\/errands\/01HZAA/);
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------------
 
   it('[LINKS] sid в строке таблицы — ссылка на /souls/:sid', async () => {
     installFetchMock([

@@ -58,7 +58,7 @@ describe('AddHostModal', () => {
     await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
     await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
     await user.type(screen.getByPlaceholderText('master / replica / …'), 'master');
-    // Force-add требует подтверждения опасной операции.
+    // Force-add requires confirming the dangerous operation.
     await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
     await user.click(screen.getByTestId('force-add-confirm'));
 
@@ -104,7 +104,7 @@ describe('AddHostModal', () => {
     );
     const user = userEvent.setup();
     await waitFor(() => screen.getByLabelText('SID хоста'));
-    // Подтверждаем (иначе кнопка disabled), затем submit без SID.
+    // Confirm (otherwise the button is disabled), then submit without SID.
     await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
     await user.click(screen.getByTestId('force-add-confirm'));
     expect(screen.getByText('Выберите SID хоста.')).toBeInTheDocument();
@@ -118,17 +118,17 @@ describe('AddHostModal', () => {
     const user = userEvent.setup();
     await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
 
-    // Warning-блок виден.
+    // Warning block is visible.
     expect(screen.getByTestId('force-add-warning')).toBeInTheDocument();
     expect(screen.getByTestId('force-add-warning').textContent).toMatch(/несогласованному состоянию/);
 
-    // Кнопка disabled до подтверждения.
+    // Button is disabled before confirmation.
     const addBtn = screen.getByTestId('force-add-confirm');
     expect(addBtn).toBeDisabled();
     await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
     expect(addBtn).toBeDisabled();
 
-    // После подтверждения — enabled.
+    // After confirmation -- enabled.
     await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
     expect(addBtn).not.toBeDisabled();
   });

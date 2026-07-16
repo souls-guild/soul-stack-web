@@ -93,7 +93,7 @@ function setupNotifMock(opts: { tidingDetail?: Tiding } = {}) {
       return new Response(JSON.stringify({ items: [HERALD], offset: 0, limit: 200, total: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.startsWith('/v1/event-types') && method === 'GET') {
-      // Возвращаем каталог с incarnation.run_completed в point_events.
+      // Return a catalog with incarnation.run_completed in point_events.
       return new Response(JSON.stringify({
         areas: [
           { name: 'scenario_run.*' },
@@ -130,7 +130,7 @@ beforeEach(() => {
   tokenStore.clear();
 });
 
-// ── 1. incarnation.run_completed в списке eventTypes ─────────────────────────
+// -- 1. incarnation.run_completed in the eventTypes list -----------------------------
 
 describe('eventTypes — incarnation.run_completed', () => {
   it('присутствует в KNOWN_EVENT_TYPE_AREAS', () => {
@@ -152,7 +152,7 @@ describe('eventTypes — incarnation.run_completed', () => {
   });
 });
 
-// ── 2. TidingModal — поле task ───────────────────────────────────────────────
+// -- 2. TidingModal -- task field ------------------------------------------------------
 
 describe('TidingModal — поле task', () => {
   it('рендерит поле task при создании', async () => {
@@ -207,15 +207,15 @@ describe('TidingModal — поле task', () => {
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));
-    // task не заполняем
+    // do not fill task
     await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/tidings' && c.method === 'POST');
       expect(post).toBeDefined();
       const parsed = JSON.parse(post!.body ?? '{}');
-      // PUT/POST replace-семантика: пустое поле → отсутствует в JSON (undefined omit),
-      // backend трактует отсутствие как "очистить" (комментарий в спеке: "отсутствие очищает").
+      // PUT/POST replace semantics: empty field -> absent from JSON (undefined omit),
+      // backend treats absence as "clear" (spec comment: "absence clears").
       expect(Object.prototype.hasOwnProperty.call(parsed, 'task')).toBe(false);
     });
   });
@@ -272,13 +272,13 @@ describe('TidingModal — поле task', () => {
       const put = calls.find((c) => /^\/v1\/tidings\/run-failures$/.test(c.url) && c.method === 'PUT');
       expect(put).toBeDefined();
       const parsed = JSON.parse(put!.body ?? '{}');
-      // PUT replace-семантика: пустое поле → отсутствует в JSON (backend: "отсутствие очищает").
+      // PUT replace semantics: empty field -> absent from JSON (backend: "absence clears").
       expect(Object.prototype.hasOwnProperty.call(parsed, 'task')).toBe(false);
     });
   });
 });
 
-// ── 3. Cadence-навигация на Notifications с ?cadence=<name> ─────────────────
+// -- 3. Cadence navigation to Notifications with ?cadence=<name> ----------------------
 
 describe('CadenceDetail — навигация на Notifications', () => {
   beforeEach(() => {
@@ -309,7 +309,7 @@ describe('CadenceDetail — навигация на Notifications', () => {
   });
 });
 
-// ── 4. TidingModal — prefillCadence при навигации из CadenceDetail ───────────
+// -- 4. TidingModal -- prefillCadence when navigating from CadenceDetail --------------
 
 describe('TidingsTab — prefillCadence из URL', () => {
   beforeEach(() => {
@@ -320,7 +320,7 @@ describe('TidingsTab — prefillCadence из URL', () => {
     setupNotifMock();
     renderNotif('/notifications?tab=tidings&cadence=redis-hourly');
 
-    // Modal должен открыться автоматически.
+    // Modal must open automatically.
     const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
     await waitFor(() => {
       const cadenceInput = within(dialog).getByTestId('tiding-cadence-input');

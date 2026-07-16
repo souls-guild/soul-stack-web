@@ -1,5 +1,5 @@
-// Тесты ScenarioInputFields с form-секциями (Slice B).
-// Проверяем: секционный рендер, label-override, collapsed, residual-секция.
+// Tests for ScenarioInputFields with form sections (Slice B).
+// Checks: sectioned render, label-override, collapsed, residual section.
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -9,7 +9,7 @@ import type { ScenarioForm } from '../api/keeper';
 import type { ScenarioInputSchema } from '../api/keeper';
 import type { ScenarioFieldsState } from '../pages/incarnations/scenarioInputFields.helpers';
 
-// Stub keeperApi для SidPicker (не используется в тестах ниже).
+// Stub keeperApi for SidPicker (not used in the tests below).
 vi.mock('../api/keeper', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../api/keeper')>();
   return {
@@ -51,9 +51,9 @@ const SCHEMA: ScenarioInputSchema = {
 describe('ScenarioInputFields с form-секциями', () => {
   it('при отсутствии form рендерит плоский layout (обратная совместимость)', () => {
     render(<Wrapper schema={SCHEMA} />);
-    // Нет секций — нет testid form-section-*
+    // No sections — no testid form-section-*
     expect(screen.queryByTestId('form-section-auth')).toBeNull();
-    // Поля присутствуют
+    // Fields are present
     expect(screen.getByTestId('field-text-username')).toBeInTheDocument();
   });
 
@@ -82,7 +82,7 @@ describe('ScenarioInputFields с form-секциями', () => {
       ],
     };
     render(<Wrapper schema={SCHEMA} form={form} />);
-    // label-override должен присутствовать в DOM
+    // label-override should be present in the DOM
     expect(screen.getByText(/Login name/)).toBeInTheDocument();
   });
 
@@ -95,10 +95,10 @@ describe('ScenarioInputFields с form-секциями', () => {
         },
       ],
     };
-    // password и comment не в секции auth → default секция
+    // password and comment are not in the auth section -> default section
     render(<Wrapper schema={SCHEMA} form={form} />);
     expect(screen.getByTestId('form-section-__default')).toBeInTheDocument();
-    // В дефолтной секции должны быть password и comment
+    // The default section should contain password and comment
     expect(screen.getByTestId('field-text-password')).toBeInTheDocument();
   });
 

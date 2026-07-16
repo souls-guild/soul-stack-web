@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { DynamicInputBuilder } from '../components/input/DynamicInputBuilder';
 
-// Тестовая обёртка с controlled state + последняя версия value на эл-те для
-// удобной проверки emit-объекта.
+// Test wrapper with controlled state + the latest value on an element for
+// convenient checking of the emitted object.
 function Harness({
   initial,
   allowRawJsonToggle = true,
@@ -35,7 +35,7 @@ describe('DynamicInputBuilder', () => {
   it('TestAddField: добавление строки и ввод key/value emit-ит правильный объект', async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    // Пустое состояние — кнопка "Add first field".
+    // Empty state - "Add first field" button.
     await user.click(screen.getByRole('button', { name: /Add first field/i }));
     const keyInputs = screen.getAllByRole('textbox', { name: /field key/i });
     expect(keyInputs).toHaveLength(1);
@@ -53,7 +53,7 @@ describe('DynamicInputBuilder', () => {
     const keyInputs = screen.getAllByRole('textbox', { name: /field key/i });
     expect(keyInputs).toHaveLength(2);
 
-    // Удаляем первую строку.
+    // Delete the first row.
     const deleteBtns = screen.getAllByRole('button', { name: /delete field/i });
     await user.click(deleteBtns[0]);
 
@@ -76,7 +76,7 @@ describe('DynamicInputBuilder', () => {
     await user.click(screen.getByRole('button', { name: /Add first field/i }));
     await user.type(screen.getByRole('textbox', { name: /field key/i }), 'enabled');
     await user.selectOptions(screen.getByRole('combobox', { name: /field type/i }), 'boolean');
-    // После смены типа value-input стал checkbox.
+    // After the type change, the value-input became a checkbox.
     const checkbox = screen.getByRole('checkbox', { name: /field value/i });
     await user.click(checkbox);
     expect(snapshot()).toEqual({ enabled: true });
@@ -86,22 +86,22 @@ describe('DynamicInputBuilder', () => {
     const user = userEvent.setup();
     render(<Harness initial={{ greeting: 'hello' }} />);
 
-    // Переключаемся в raw.
+    // Switch to raw.
     await user.click(screen.getByRole('button', { name: /raw JSON/i }));
     const rawArea = screen.getByRole('textbox', { name: /Raw JSON input/i });
     expect((rawArea as HTMLTextAreaElement).value).toContain('"greeting"');
 
-    // Заменяем содержимое целиком на новое.
+    // Replace the whole content with new content.
     await user.clear(rawArea);
-    // userEvent.type интерпретирует { как special, поэтому подменяем через fireEvent.
+    // userEvent.type interprets { as special, so substitute via fireEvent.
     fireEvent.change(rawArea, { target: { value: '{"a": 1, "b": true}' } });
     expect(snapshot()).toEqual({ a: 1, b: true });
 
-    // Обратно в form-режим.
+    // Back to form mode.
     await user.click(screen.getByRole('button', { name: /^form/i }));
     const keyInputs = screen.getAllByRole('textbox', { name: /field key/i });
     expect(keyInputs).toHaveLength(2);
-    // a — integer, b — boolean (определяется по типу в parseRawJsonToFields).
+    // a - integer, b - boolean (determined by type in parseRawJsonToFields).
     const types = screen.getAllByRole('combobox', { name: /field type/i });
     expect((types[0] as HTMLSelectElement).value).toBe('integer');
     expect((types[1] as HTMLSelectElement).value).toBe('boolean');
@@ -114,7 +114,7 @@ describe('DynamicInputBuilder', () => {
     const rawArea = screen.getByRole('textbox', { name: /Raw JSON input/i });
     fireEvent.change(rawArea, { target: { value: '{ broken' } });
     expect(screen.getByText(/JSON:/i)).toBeInTheDocument();
-    // value не должен измениться.
+    // value should not change.
     expect(snapshot()).toEqual({ x: 1 });
   });
 
@@ -122,14 +122,14 @@ describe('DynamicInputBuilder', () => {
     const user = userEvent.setup();
     render(<Harness initial={{ host: 'example.com', port: 443 }} />);
 
-    // Преконфигурация — типы определились по значениям (port → integer).
+    // Preconfiguration - types are determined by values (port -> integer).
     expect(snapshot()).toEqual({ host: 'example.com', port: 443 });
 
-    // Добавляем третью строку с тем же ключом `host` — дубликат → не emit-ится,
-    // прежний валидный объект сохраняется.
+    // Add a third row with the same key `host` - a duplicate -> not emitted,
+    // the previous valid object is preserved.
     await user.click(screen.getByRole('button', { name: /^Add field$/i }));
     const keys = screen.getAllByRole('textbox', { name: /field key/i });
-    // Через fireEvent — атомарно, без промежуточных «hos» / «ho» состояний.
+    // Via fireEvent - atomic, without intermediate "hos" / "ho" states.
     fireEvent.change(keys[2], { target: { value: 'host' } });
 
     expect(screen.getAllByText(/дубликат ключа/i).length).toBeGreaterThan(0);

@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { useTheme, ThemeProvider } from '../hooks/useTheme';
 
-// ThemeProvider — обязательная обёртка.
+// ThemeProvider — required wrapper.
 function wrapper({ children }: { children: ReactNode }) {
   return <ThemeProvider>{children}</ThemeProvider>;
 }
@@ -12,7 +12,7 @@ describe('useTheme (context-based)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
-    // jsdom по умолчанию matchMedia не реализует — мокаем.
+    // jsdom does not implement matchMedia by default — we mock it.
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       configurable: true,
@@ -68,7 +68,7 @@ describe('useTheme (context-based)', () => {
   });
 
   it('useTheme без провайдера бросает ошибку', () => {
-    // useTheme вне ThemeProvider должен выбросить.
+    // useTheme outside ThemeProvider should throw.
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => renderHook(() => useTheme())).toThrow('useTheme must be used inside <ThemeProvider>');
     consoleError.mockRestore();

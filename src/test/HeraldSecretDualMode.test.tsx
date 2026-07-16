@@ -99,7 +99,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
 
-    // Переключаем секрет-поле bot_token на режим «значение».
+    // Switch secret field bot_token to "value" mode.
     await user.click(within(dialog).getByTestId('herald-secret-bot_token-mode-value'));
     await user.type(within(dialog).getByTestId('herald-secret-bot_token-value'), '123456:ABC-PLAINTEXT');
     await user.type(within(dialog).getByTestId('herald-field-chat_id'), '777');
@@ -146,7 +146,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
     await user.type(within(dialog).getByTestId('herald-field-url'), 'https://example.com/hook');
 
-    // Top-level signing secret: переключаем на «значение».
+    // Top-level signing secret: switch to "value" mode.
     await user.click(within(dialog).getByTestId('herald-secret-mode-value'));
     await user.type(within(dialog).getByTestId('herald-secret-value'), 'plain-signing-token');
 

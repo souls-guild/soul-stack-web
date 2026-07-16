@@ -13,17 +13,17 @@ export function installFetchMock(routes: FetchRoute[]): void {
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      // Строковые роуты матчатся по префиксу (startsWith).
-      // Более специфичные пути (напр. /v1/voyages/{id}/targets) должны идти РАНЬШЕ
-      // общего префикса (/v1/voyages/{id}), иначе первый матч будет неверным.
+      // String routes match by prefix (startsWith).
+      // More specific paths (e.g. /v1/voyages/{id}/targets) must come BEFORE
+      // the general prefix (/v1/voyages/{id}), otherwise the first match would be wrong.
       const route = routes.find((r) => {
         if (r.method && r.method.toUpperCase() !== method) return false;
         if (r.url instanceof RegExp) return r.url.test(urlStr);
         return urlStr.startsWith(r.url);
       });
       if (!route) {
-        // Graceful fallback для audit — не роняем тесты компонентов, которые
-        // добавили секцию уведомлений (VoyageDetail, HeraldDetail).
+        // Graceful fallback for audit — don't break tests of components that
+        // added a notifications section (VoyageDetail, HeraldDetail).
         if (method === 'GET' && urlStr.startsWith('/v1/audit')) {
           return new Response(
             JSON.stringify({ items: [], offset: 0, limit: 50, total: 0 }),

@@ -8,8 +8,8 @@ import type { ReactNode } from 'react';
 import { ErrandNewForm } from '../pages/errands/ErrandNewForm';
 import { tokenStore } from '../api/tokenStore';
 
-// Кастомный render: помимо стандартного renderWithProviders ставим Routes,
-// чтобы после submit redirect /errands/:id рендерил видимый маркер.
+// Custom render: on top of the standard renderWithProviders we set up Routes,
+// so that after submit the /errands/:id redirect renders a visible marker.
 function renderWithRoutes(initialPath: string) {
   const qc = new QueryClient({
     defaultOptions: {
@@ -33,7 +33,7 @@ function renderWithRoutes(initialPath: string) {
   );
 }
 
-// Каталог errand-safe модулей — отдаёт backend, UI фетчит.
+// Catalog of errand-safe modules - served by the backend, fetched by the UI.
 const ERRAND_SAFE_CATALOG = {
   items: [
     {
@@ -73,7 +73,7 @@ const SYNC_RESULT = {
   finished_at: '2026-05-26T10:00:00Z',
 };
 
-// Базовый fetch-мок: каталог модулей + список souls (пустой).
+// Base fetch mock: module catalog + souls list (empty).
 function makeBaseFetch(overrides?: (url: string, method: string, init?: RequestInit) => Response | null) {
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -107,7 +107,7 @@ describe('ErrandNewForm', () => {
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
 
-    // Ждём загрузки каталога (select должен отрендерить опции из фетча)
+    // Wait for the catalog to load (select should render options from the fetch)
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'core.cmd.shell' })).toBeInTheDocument();
     });
@@ -135,7 +135,7 @@ describe('ErrandNewForm', () => {
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
 
-    // Ждём загрузки каталога
+    // Wait for the catalog to load
     await waitFor(() => {
       expect(screen.getByRole('option', { name: 'core.cmd.shell' })).toBeInTheDocument();
     });
@@ -162,14 +162,14 @@ describe('ErrandNewForm', () => {
       expect(screen.getByRole('option', { name: 'core.http.probe' })).toBeInTheDocument();
     });
 
-    // Выбираем core.http.probe → должна открыться CustomForm.
-    // CustomForm монтируется с kind==='custom', рендерит JSON-textarea (params_json).
+    // Select core.http.probe -> CustomForm should open.
+    // CustomForm mounts with kind==='custom', renders a JSON-textarea (params_json).
     await user.selectOptions(screen.getByLabelText(/Module kind/i), '__m:core.http.probe');
     await waitFor(() => {
-      // CustomForm рендерит aria-label="Custom module"
+      // CustomForm renders aria-label="Custom module"
       expect(screen.getByRole('form', { name: /Custom module/i })).toBeInTheDocument();
     });
-    // Поле модуля содержит prefill из каталога
+    // Module field contains the prefill from the catalog
     const moduleInput = screen.getByLabelText(/module name/i);
     expect(moduleInput).toHaveValue('core.http.probe');
   });
@@ -187,7 +187,7 @@ describe('ErrandNewForm', () => {
     await user.type(screen.getByPlaceholderText(/host01.example.com/i), 'host01');
     const ta = screen.getByPlaceholderText(/url.*example/i);
     await user.clear(ta);
-    // userEvent.type интерпретирует `{` как special, экранируем: `{{`.
+    // userEvent.type interprets `{` as special, escape it: `{{`.
     await user.type(ta, '{{not-json');
     await user.click(screen.getByRole('button', { name: /Run Errand/i }));
     await waitFor(() => {

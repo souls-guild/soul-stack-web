@@ -64,7 +64,7 @@ describe('VigilNewForm', () => {
     await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
     await user.clear(screen.getByLabelText(/Interval/i));
     await user.type(screen.getByLabelText(/Interval/i), '15s');
-    // typed-режим уже выбран по дефолту — заполняем path.
+    // typed mode is already selected by default -- fill in path.
     await user.type(screen.getByLabelText(/^path$/i), '/etc/redis.conf');
 
     await user.click(screen.getByRole('button', { name: /Create Vigil/i }));
@@ -98,9 +98,9 @@ describe('VigilNewForm', () => {
     );
 
     const user = userEvent.setup();
-    // submit без заполнения name
+    // submit without filling in name
     await user.click(screen.getByRole('button', { name: /Create Vigil/i }));
-    // Должен показаться error inline, fetch НЕ должен быть вызван
+    // Inline error must appear, fetch must NOT be called
     await waitFor(() => {
       expect(screen.getByText(/имя обязательно/i)).toBeInTheDocument();
     });

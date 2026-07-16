@@ -6,13 +6,13 @@ import { useMyPermissions } from '../hooks/useMyPermissions';
 import { tokenStore } from '../api/tokenStore';
 
 /**
- * Guard-тест инварианта: при ошибке /v1/me/permissions (403/500)
- * hasPermission возвращает true (optimistic/graceful-degradation).
+ * Guard test for the invariant: on /v1/me/permissions error (403/500)
+ * hasPermission returns true (optimistic/graceful-degradation).
  *
- * Осознанный инвариант: кнопки остаются enabled при недоступном эндпоинте.
- * Авторизация — ответственность backend (он даст 403 при фактическом вызове).
- * Регресс на `return false` приведёт к тому, что все кнопки молча скрываются/
- * дизейблятся при любом сбое прав — UX-хуже-чем-сейчас без явного сообщения об ошибке.
+ * Deliberate invariant: buttons stay enabled when the endpoint is unavailable.
+ * Authorization is the backend's responsibility (it returns 403 on the actual call).
+ * A regression to `return false` would silently hide/disable all buttons on any
+ * permission-check failure — worse UX than now, with no explicit error message.
  */
 
 function wrapper(qc: QueryClient) {
@@ -43,10 +43,10 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
     const qc = makeQC();
     const { result } = renderHook(() => useMyPermissions(), { wrapper: wrapper(qc) });
 
-    // Пока грузим — тоже true (optimistic).
+    // While loading — also true (optimistic).
     expect(result.current.hasPermission('synod.create')).toBe(true);
 
-    // После получения ошибки — по-прежнему true.
+    // After getting the error — still true.
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.hasPermission('synod.create')).toBe(true);
     expect(result.current.hasPermission('soul.list')).toBe(true);

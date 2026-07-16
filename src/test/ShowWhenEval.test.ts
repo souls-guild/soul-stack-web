@@ -1,6 +1,6 @@
-// Тесты мини-CEL-эвалуатора evalShowWhen.
-// Покрывает: операторы ==, !=, &&, ||, in, литералы, input.<field>, скобки,
-// graceful fallback при синтаксической ошибке.
+// Tests for the mini-CEL evaluator evalShowWhen.
+// Covers: operators ==, !=, &&, ||, in, literals, input.<field>, parentheses,
+// graceful fallback on syntax error.
 
 import { describe, it, expect } from 'vitest';
 import { evalShowWhen } from '../pages/incarnations/scenarioInputFields.helpers';
@@ -52,7 +52,7 @@ describe('evalShowWhen', () => {
   });
 
   it('скобки меняют приоритет', () => {
-    // без скобок: false && true || true → (false && true) || true → true
+    // without parens: false && true || true -> (false && true) || true -> true
     expect(evalShowWhen('(input.mode == "cluster" && input.count == "3") || input.mode == "sentinel"', INPUT)).toBe(true);
   });
 
@@ -66,11 +66,11 @@ describe('evalShowWhen', () => {
   });
 
   it('graceful fallback на синтаксическую ошибку → true (нет краша)', () => {
-    // Функция не должна бросать исключение — просто возвращает что-то.
-    // Точное значение зависит от парсера, но страница не должна падать.
+    // The function must not throw an exception — just returns something.
+    // The exact value depends on the parser, but the page must not crash.
     expect(() => evalShowWhen('has(input.mode)', INPUT)).not.toThrow();
-    // В частном случае has() — bare identifier → null → false;
-    // контракт: нет краша, значение определено.
+    // In this particular case has() — bare identifier -> null -> false;
+    // contract: no crash, value is defined.
     const result = evalShowWhen('has(input.mode)', INPUT);
     expect(typeof result).toBe('boolean');
   });

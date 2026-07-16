@@ -79,7 +79,7 @@ describe('ErrandDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Events/i }));
     await waitFor(() => {
-      // Badge-тоны started/finished содержатся в timeline.
+      // started/finished badge tones are contained in the timeline.
       expect(screen.getByText('started')).toBeInTheDocument();
       expect(screen.getByText('finished')).toBeInTheDocument();
     });

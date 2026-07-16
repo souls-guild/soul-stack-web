@@ -65,9 +65,9 @@ interface FetchStubOpts {
   scenarios?: ScenarioStubEntry[];
   incarnationNames?: string[];
   souls?: SoulStub[];
-  // soulprint typed_facts по SID (для soulprint-фильтра).
+  // soulprint typed_facts by SID (for the soulprint filter).
   soulprints?: Record<string, unknown>;
-  // Каталог модулей (GET /v1/modules). undefined → дефолтные core cmd/exec.
+  // Module catalog (GET /v1/modules). undefined -> default core cmd/exec.
   modules?: ModuleStub[];
 }
 
@@ -95,8 +95,8 @@ interface CapturedPost {
   body: unknown;
 }
 
-// Универсальный fetch-stub: накапливает ВСЕ POST в `posts` (для fan-out проверки),
-// `posted` — последний. GET-ы возвращают services/scenarios/incarnations/souls/soulprint.
+// Generic fetch stub: accumulates ALL POSTs in `posts` (for fan-out checks),
+// `posted` is the last one. GETs return services/scenarios/incarnations/souls/soulprint.
 function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null; posts: CapturedPost[] } {
   const serviceName = opts.serviceName ?? 'redis';
   const scenarios: ScenarioStubEntry[] = opts.scenarios ?? [
@@ -231,7 +231,7 @@ describe('RunWizard', () => {
   beforeEach(() => {
     tokenStore.clear();
     sessionStorage.clear();
-    // @ts-expect-error — EventSource нет в jsdom, минимальный stub.
+    // @ts-expect-error — EventSource not in jsdom, minimal stub.
     globalThis.EventSource = class {
       readyState = 0;
       close() {
@@ -255,26 +255,26 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Step 1 → 2 (scenario select).
+    // Step 1 -> 2 (scenario select).
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    // Step 2 → 3. Regex пуст.
+    // Step 2 -> 3. Regex is empty.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
 
-    // Пустая regex → matched=[], «Далее» disabled, подсказка видна.
+    // Empty regex -> matched=[], "Next" disabled, hint visible.
     expect(screen.getByLabelText('Incarnation regex')).toHaveValue('');
     expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
-    // Подсказка "укажите regex или * для всех" должна присутствовать на экране.
+    // Hint "specify a regex or * for all" must be present on screen.
     await waitFor(() => expect(screen.getByText(/укажите regex или \* для всех/)).toBeInTheDocument());
   });
 
-  // NIM-73 A2: ведущий абзац описания сценария → заметный info-callout НАД полями
-  // (оператор видит предусловие до запуска); остаток описания — тускло вне callout.
+  // NIM-73 A2: leading paragraph of scenario description -> prominent info callout ABOVE fields
+  // (operator sees the precondition before running); rest of description is dim outside the callout.
   it('Scenario: ведущий абзац описания рендерится заметным callout над полями', async () => {
     setupFetchStub({
       scenarios: [
@@ -290,19 +290,19 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Step 1 → 2 → выбор сервиса и сценария.
+    // Step 1 -> 2 -> select service and scenario.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /add_user/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'add_user');
 
-    // Step 2 → 3: рендерятся input-поля сценария + заметка.
+    // Step 2 -> 3: scenario input fields + note are rendered.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
     const note = await screen.findByTestId('scenario-note');
     expect(note).toHaveTextContent(/Перед запуском засей пароль юзера в Vault/);
-    // В callout — ТОЛЬКО ведущий абзац; остаток описания рендерится отдельно.
+    // Callout contains ONLY the leading paragraph; rest of the description renders separately.
     expect(note).not.toHaveTextContent(/добавить ACL-пользователя/);
     expect(screen.getByText(/Day-2: добавить ACL-пользователя без рестарта/)).toBeInTheDocument();
   });
@@ -312,14 +312,14 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Step 1 → 2 (scenario select).
+    // Step 1 -> 2 (scenario select).
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    // Step 2 → 3. Вводим * → совпадают ВСЕ incarnations.
+    // Step 2 -> 3. Type * -> ALL incarnations match.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
@@ -330,12 +330,12 @@ describe('RunWizard', () => {
     });
     expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
 
-    // Step 3 → 4 → submit → POST /v1/voyages с incarnations=[redis-prod, redis-staging].
+    // Step 3 -> 4 -> submit -> POST /v1/voyages with incarnations=[redis-prod, redis-staging].
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    // Один POST на /v1/voyages (не fan-out).
+    // A single POST to /v1/voyages (no fan-out).
     const voyagePosts = stub.posts.filter((p) => p.url.includes('/v1/voyages'));
     expect(voyagePosts).toHaveLength(1);
     const vBody = voyagePosts[0].body as { kind: string; scenario_name: string; target: { incarnations: string[] } };
@@ -356,7 +356,7 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // regex ^redis- → только redis-a / redis-b (pg-1 не совпадает).
+    // regex ^redis- -> only redis-a / redis-b (pg-1 doesn't match).
     await user.type(screen.getByLabelText('Incarnation regex'), '^redis-');
     await waitFor(() => {
       const list = screen.getByLabelText('Matched incarnations').textContent ?? '';
@@ -369,7 +369,7 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
-    // Один POST /v1/voyages с только совпавшими incarnations (redis-a, redis-b).
+    // A single POST /v1/voyages with only the matched incarnations (redis-a, redis-b).
     const voyagePosts = stub.posts.filter((p) => p.url.includes('/v1/voyages'));
     expect(voyagePosts).toHaveLength(1);
     const vBody = voyagePosts[0].body as { target: { incarnations: string[] } };
@@ -389,12 +389,12 @@ describe('RunWizard', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Незакрытая группа — невалидная regex.
+    // Unclosed group — invalid regex.
     await user.type(screen.getByLabelText('Incarnation regex'), '(redis');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toMatch(/нет совпадений/),
     );
-    // 0 совпадений → «Далее» disabled (нет incarnations для fan-out).
+    // 0 matches -> "Next" disabled (no incarnations for fan-out).
     expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
   });
 
@@ -420,7 +420,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
-    // Step 2 → 3 (incarnations + input). * → совпадает hello-prod.
+    // Step 2 -> 3 (incarnations + input). * -> matches hello-prod.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
@@ -478,8 +478,8 @@ describe('RunWizard', () => {
   });
 
   it('Scenario смешанная schema (simple + array): типизированные поля, не raw-JSON fallback', async () => {
-    // Регрессия: раньше один составной тип (array/object) ронял ВСЮ форму в
-    // DynamicInputBuilder, пряча простые типизированные поля. Теперь — per-field.
+    // Regression: previously a single composite type (array/object) dropped the WHOLE form into
+    // DynamicInputBuilder, hiding simple typed fields. Now — per-field.
     const stub = setupFetchStub({
       serviceName: 'redis',
       incarnationNames: ['redis-prod'],
@@ -510,20 +510,20 @@ describe('RunWizard', () => {
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    // Простое поле — типизированный input (НЕ raw-JSON-textarea формы).
+    // Simple field — typed input (NOT a raw-JSON-textarea form).
     await waitFor(() => expect(screen.getByText(/^redis_maxmemory$/)).toBeInTheDocument());
-    // Составное поле — per-field JSON-textarea.
+    // Composite field — per-field JSON-textarea.
     const composite = screen.getByTestId('field-composite-replicas') as HTMLTextAreaElement;
     expect(composite).toBeInTheDocument();
-    // НЕ деградировали в общий DynamicInputBuilder.
+    // Did NOT degrade into the generic DynamicInputBuilder.
     expect(screen.queryByLabelText('Scenario input fields')).not.toBeInTheDocument();
 
-    // Невалидный JSON в составном поле → submit заблокирован + inline-ошибка.
+    // Invalid JSON in the composite field -> submit blocked + inline error.
     fireEvent.change(composite, { target: { value: '[broken' } });
     await waitFor(() => expect(screen.getByTestId('field-json-error-replicas')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
 
-    // Валидный JSON-массив → разблокировка; значение доходит до submit.input.
+    // Valid JSON array -> unblocked; value reaches submit.input.
     fireEvent.change(composite, { target: { value: '["r1.example.com","r2.example.com"]' } });
     await waitFor(() => expect(screen.queryByTestId('field-json-error-replicas')).not.toBeInTheDocument());
 
@@ -542,16 +542,16 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // На Step 1 шаги 2/3/4 ещё недостижимы (scenario не выбран) → их кнопки disabled.
+    // On Step 1, steps 2/3/4 are not yet reachable (scenario not selected) -> their buttons are disabled.
     const stepButtons = screen.getByLabelText('Wizard steps').querySelectorAll('button');
-    // [0]=Step1 (текущий), [1]=Step2, [2]=Step3, [3]=Step4.
+    // [0]=Step1 (current), [1]=Step2, [2]=Step3, [3]=Step4.
     expect(stepButtons[3]).toBeDisabled();
     expect(stepButtons[2]).toBeDisabled();
 
-    // Клик по «4» не переводит на Step 4 (остаёмся на Step 1).
+    // Clicking "4" doesn't move to Step 4 (we stay on Step 1).
     await user.click(stepButtons[3]);
     expect(screen.getByLabelText('Scenario apply')).toBeInTheDocument();
-    // Ни один шаг не помечен done (stepDone) — белым ничего не подсветилось.
+    // No step is marked done (stepDone) — nothing is highlighted white.
     const doneCount = Array.from(screen.getByLabelText('Wizard steps').querySelectorAll('button')).filter(
       (b) => /stepDone/.test(b.className),
     ).length;
@@ -572,7 +572,7 @@ describe('RunWizard', () => {
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // Step 2 — host selector. Фильтруем по coven=db.
+    // Step 2 — host selector. Filter by coven=db.
     const covenChip = await screen.findByLabelText('Coven labels');
     const covenInput = covenChip.querySelector('input') as HTMLInputElement;
     await user.type(covenInput, 'db ');
@@ -580,12 +580,12 @@ describe('RunWizard', () => {
     // Preview: 2 hosts match.
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
-    // Step 2 → 3 (module/params). Дефолтный модуль core.cmd.shell → params-форма с textarea cmd.
+    // Step 2 -> 3 (module/params). Default module core.cmd.shell -> params form with textarea cmd.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
-    // Step 3 → 4 → submit.
+    // Step 3 -> 4 -> submit.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
@@ -622,7 +622,7 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
-    // Вводим строку «3» — шлём сырой string, не парсим на клиенте.
+    // Enter the string "3" — send a raw string, don't parse client-side.
     await user.type(screen.getByLabelText('Batch'), '3');
 
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
@@ -630,7 +630,7 @@ describe('RunWizard', () => {
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.kind).toBe('command');
-    // batch — строка, НЕ число; batch_size/batch_percent отсутствуют.
+    // batch — string, NOT a number; batch_size/batch_percent are absent.
     expect(body.batch).toBe('3');
     expect('batch_size' in body).toBe(false);
     expect('batch_percent' in body).toBe(false);
@@ -655,7 +655,7 @@ describe('RunWizard', () => {
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // batch не заполняем.
+    // don't fill in batch.
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
@@ -712,7 +712,7 @@ describe('RunWizard', () => {
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // dry_run чекбокс не должен быть на шаге 4 для command-workload.
+    // dry_run checkbox should not be on step 4 for command-workload.
     expect(screen.queryByLabelText('dry_run')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
@@ -735,8 +735,8 @@ describe('RunWizard', () => {
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // Full-match (anchored): для префикса нужен `.*`, иначе `db-` совпало бы
-    // только с точной строкой «db-».
+    // Full-match (anchored): a prefix needs `.*`, otherwise `db-` would match
+    // only the exact string "db-".
     await user.type(screen.getByLabelText('SID regex'), 'db-.*');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
@@ -775,19 +775,19 @@ describe('RunWizard', () => {
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // Host selector: coven=prod → 1 host.
+    // Host selector: coven=prod -> 1 host.
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // Params step: открываем module-picker, ищем и выбираем plugin-модуль из каталога.
+    // Params step: open the module picker, search and select a plugin module from the catalog.
     await waitFor(() => expect(screen.getByTestId('module-picker-control')).toBeInTheDocument());
     await user.click(screen.getByTestId('module-picker-control'));
     await user.type(screen.getByTestId('module-picker-search'), 'http');
     await user.click(await screen.findByTestId('module-option-official.http'));
 
-    // Params-форма по params[]: типизированное поле url (required) + timeout.
+    // Params form from params[]: typed field url (required) + timeout.
     await waitFor(() => expect(screen.getByTestId('module-params-form')).toBeInTheDocument());
     const urlField = await screen.findByTestId('field-text-url') as HTMLInputElement;
     await user.type(urlField, 'https://example.com');
@@ -798,7 +798,7 @@ describe('RunWizard', () => {
 
     const body = stub.posted?.body as { kind: string; module: string; input: Record<string, unknown>; target: { sids: string[] } };
     expect(body.kind).toBe('command');
-    // Полный адрес модуля — name.state.
+    // Full module address — name.state.
     expect(body.module).toBe('official.http.probe');
     expect(body.input).toEqual({ url: 'https://example.com' });
     expect(body.target.sids).toEqual(['host-a.example.com']);
@@ -807,9 +807,9 @@ describe('RunWizard', () => {
   it('Command module-search: каталог недоступен (404) → free-text имя + DynamicInputBuilder', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'host-a.example.com', covens: ['prod'] }],
-      modules: [], // list вернёт {items:[]}; для 404 подменим ниже
+      modules: [], // list will return {items:[]}; overridden with 404 below
     });
-    // Переопределяем /v1/modules на 404 (graceful-fallback path).
+    // Override /v1/modules with 404 (graceful-fallback path).
     const baseFetch = globalThis.fetch;
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -829,7 +829,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
-    // Free-text fallback: вводим имя модуля вручную + dynamic input.
+    // Free-text fallback: enter the module name manually + dynamic input.
     const freeText = await screen.findByTestId('module-freetext');
     await user.clear(freeText);
     await user.type(freeText, 'core.http.probe');
@@ -844,7 +844,7 @@ describe('RunWizard', () => {
 
     const body = stub.posted?.body as { kind: string; module: string; input: Record<string, unknown> };
     expect(body.kind).toBe('command');
-    // free-text без state-сегмента → имя как есть (core.http.probe).
+    // free-text without a state segment -> name as-is (core.http.probe).
     expect(body.module).toBe('core.http.probe');
     expect(body.input).toEqual({ url: 'https://example.com' });
   });
@@ -854,7 +854,7 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Command → Step2 host → Step3 params, заполняем cmd-поле.
+    // Command -> Step2 host -> Step3 params, fill in the cmd field.
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
@@ -864,13 +864,13 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
-    // Назад на Step1, переключаемся на Scenario и обратно на Command.
+    // Back to Step1, switch to Scenario and back to Command.
     await user.click(screen.getByRole('button', { name: /Назад/ }));
     await user.click(screen.getByRole('button', { name: /Назад/ }));
     await user.click(screen.getByLabelText('Scenario apply'));
     await user.click(screen.getByLabelText('Command'));
 
-    // Идём вперёд до Step3 — значение paramFields.cmd сохранилось через черновик.
+    // Go forward to Step3 — paramFields.cmd value persisted via the draft.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
     await user.click(screen.getByRole('button', { name: /Далее/ }));
@@ -907,11 +907,11 @@ describe('RunWizard', () => {
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('hello-prod'),
     );
 
-    // required greeting пустой → inline-ошибка + кнопка Далее disabled.
+    // required greeting is empty -> inline error + Next button disabled.
     await waitFor(() => expect(screen.getByTestId('field-required-greeting')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
 
-    // Заполняем → ошибка уходит, можно дальше.
+    // Fill in -> error clears, can proceed.
     const greetingField = await screen.findByTestId('field-text-greeting') as HTMLInputElement;
     await user.type(greetingField, 'hi');
     await waitFor(() => expect(screen.queryByTestId('field-required-greeting')).not.toBeInTheDocument());
@@ -937,7 +937,7 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Поле Batch присутствует, вводим значение.
+    // Batch field is present, enter a value.
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Batch'), '5');
 
@@ -955,7 +955,7 @@ describe('RunWizard', () => {
     };
     expect(body.kind).toBe('scenario');
     expect(body.scenario_name).toBe('restart');
-    // batch — строка, НЕ число.
+    // batch — string, NOT a number.
     expect(body.batch).toBe('5');
     expect('batch_size' in body).toBe(false);
     expect(body.on_failure).toBe('abort');
@@ -981,14 +981,14 @@ describe('RunWizard', () => {
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    // Batch пуст по умолчанию — не заполняем.
+    // Batch is empty by default — don't fill in.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    // Пустой batch → не шлём поле.
+    // Empty batch -> don't send the field.
     expect('batch' in body).toBe(false);
     expect('batch_size' in body).toBe(false);
     expect((body.target as { incarnations: string[] }).incarnations).toContain('redis-prod');
@@ -1067,7 +1067,7 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
-    // datetime-local input — меняем через fireEvent.
+    // datetime-local input — change via fireEvent.
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2099-12-31T23:59' } });
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
@@ -1095,7 +1095,7 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // schedule_at пуст — не заполняем.
+    // schedule_at is empty — don't fill in.
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
@@ -1123,7 +1123,7 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
-    // Время в прошлом — должно заблокировать submit и показать ошибку.
+    // Time in the past — should block submit and show an error.
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2000-01-01T00:00' } });
 
     const submitBtn = screen.getByRole('button', { name: /Запустить/ });
@@ -1164,8 +1164,8 @@ describe('RunWizard', () => {
 
   it('Stale-черновик старой формы (без v / без incarnations) → визард грузится на дефолтах без краша', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
-    // Черновик предыдущей версии формы: нет поля `v`, scenarioState без
-    // `incarnations` (массив добавлен недавно), options без Tide-полей.
+    // Draft of the previous form version: no `v` field, scenarioState without
+    // `incarnations` (array added recently), options without Tide fields.
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
@@ -1181,24 +1181,24 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Не упали белым экраном: Step 1 отрендерился, дефолт workload=scenario.
+    // Didn't crash with a white screen: Step 1 rendered, default workload=scenario.
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
 
-    // Дефолты применились — проходим визард с нуля без ошибок.
+    // Defaults applied — walk through the wizard from scratch without errors.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Пустая regex → matched=[] (шаг заблокирован) — тест только проверяет отсутствие краша.
+    // Empty regex -> matched=[] (step blocked) — the test only checks there's no crash.
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
   });
 
   it('Stale-черновик прошлой версии (v отличается) → отбрасывается, дефолты без краша', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
-    // Прошлая версия формы (v=3, scenarioState без incarnationRegex). loadDraft
-    // отбрасывает по несовпадению версии → визард стартует с дефолтов, без краша.
+    // Previous form version (v=3, scenarioState without incarnationRegex). loadDraft
+    // discards it on version mismatch -> the wizard starts from defaults, no crash.
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
@@ -1213,7 +1213,7 @@ describe('RunWizard', () => {
     );
 
     renderWizardWithRoutes();
-    // Версия не совпала → стартуем на Step 1 с дефолтным workload=scenario.
+    // Version mismatch -> start on Step 1 with default workload=scenario.
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
@@ -1264,7 +1264,7 @@ describe('RunWizard', () => {
     );
 
     renderWizardWithRoutes();
-    // Восстановлен на Step 3; regex сохранён → матчится только redis-prod (не staging).
+    // Restored on Step 3; regex preserved -> matches only redis-prod (not staging).
     expect((screen.getByLabelText('Incarnation regex') as HTMLInputElement).value).toBe('^redis-prod$');
     await waitFor(() => {
       const list = screen.getByLabelText('Matched incarnations').textContent ?? '';
@@ -1293,16 +1293,16 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
-    // Невалидный формат (буквы — не N|N%).
+    // Invalid format (letters — not N|N%).
     await user.type(screen.getByLabelText('Batch'), 'abc');
 
-    // Inline-ошибка появилась.
+    // Inline error appeared.
     await waitFor(() =>
       expect(
         screen.getByText(/Формат: целое число|Format: integer/),
       ).toBeInTheDocument(),
     );
-    // Submit заблокирован.
+    // Submit blocked.
     expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
   });
 
@@ -1382,7 +1382,7 @@ describe('RunWizard', () => {
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
-    // Не вводим ничего — поле пустое.
+    // Don't enter anything — field is empty.
 
     expect(
       screen.queryByText(/Формат: целое число|Format: integer/),
@@ -1393,16 +1393,16 @@ describe('RunWizard', () => {
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
     setupFetchStub({ souls: [{ sid: 'host-a.example.com', covens: ['prod'] }] });
     renderWizardWithRoutes('/run?workload=command&target_coven=prod');
-    // Workload=command выбран.
+    // Workload=command selected.
     expect(screen.getByLabelText('Command')).toBeChecked();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Coven-критерий pre-filled (chip 'prod').
+    // Coven criterion pre-filled (chip 'prod').
     await waitFor(() => expect(screen.getByLabelText('Coven labels').textContent).toContain('prod'));
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
   });
 
-  // --- Тесты S-W5 (обновлены под S6): batch_mode / max_failures / require_alive ---
+  // --- Tests S-W5 (updated for S6): batch_mode / max_failures / require_alive ---
 
   async function reachStep4Command() {
     const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
@@ -1423,14 +1423,14 @@ describe('RunWizard', () => {
 
   it('batch_mode=window → поле Batch скрыто, concurrency-hint изменён', async () => {
     await reachStep4Command();
-    // Дефолт barrier — Batch виден.
+    // Default barrier — Batch visible.
     expect(screen.getByLabelText('Batch')).toBeInTheDocument();
 
-    // Переключаем на window.
+    // Switch to window.
     await userEvent.setup().click(screen.getByLabelText('batch_mode_window'));
-    // Batch поле скрыто.
+    // Batch field hidden.
     expect(screen.queryByLabelText('Batch')).not.toBeInTheDocument();
-    // concurrency hint содержит описание sliding window.
+    // concurrency hint contains a sliding window description.
     await waitFor(() => {
       const hint = document.querySelector('[aria-label="Concurrency"]')?.closest('label')?.textContent ?? '';
       expect(hint).toMatch(/окн|window/i);
@@ -1451,7 +1451,7 @@ describe('RunWizard', () => {
 
   it('batch_mode=barrier (дефолт) → batch_mode=barrier в POST, без лишних полей', async () => {
     const { stub, user } = await reachStep4Command();
-    // Дефолт barrier, ничего не трогаем.
+    // Default barrier, don't touch anything.
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
@@ -1468,7 +1468,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
-    // Строка «20%» — не конвертируется в число 20; batch_percent отсутствует.
+    // String "20%" — not converted to number 20; batch_percent is absent.
     expect(body.batch).toBe('20%');
     expect('batch_size' in body).toBe(false);
     expect('batch_percent' in body).toBe(false);
@@ -1513,15 +1513,15 @@ describe('RunWizard', () => {
 
   it('inter_unit_interval_ms поле виден только в window, уходит в POST', async () => {
     const { stub, user } = await reachStep4Command();
-    // Дефолт barrier — inter_unit не виден.
+    // Default barrier — inter_unit not visible.
     expect(screen.queryByLabelText('Inter-unit interval ms')).not.toBeInTheDocument();
-    // inter_batch виден.
+    // inter_batch visible.
     expect(screen.getByLabelText('Inter-batch interval ms')).toBeInTheDocument();
 
-    // Переключаем на window.
+    // Switch to window.
     await user.click(screen.getByLabelText('batch_mode_window'));
     expect(screen.getByLabelText('Inter-unit interval ms')).toBeInTheDocument();
-    // inter_batch скрыт при window.
+    // inter_batch hidden in window.
     expect(screen.queryByLabelText('Inter-batch interval ms')).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Inter-unit interval ms'), '500');
@@ -1533,26 +1533,26 @@ describe('RunWizard', () => {
     expect('inter_batch_interval_ms' in body).toBe(false);
   });
 
-  // --- Guard-тесты: Cadence interval floor (ADR-046/048) ---
-  // Инвариант: минимальный period = CONSTRAINTS.cadenceIntervalSecondsMin (30s из OpenAPI).
-  // Тесты ловят регресс «зашили 60» и «floor разъехался со спекой».
-  // Cadence radio находится на Step 4 (Options). Путь: Step1→2→3→4, там включаем Cadence.
+  // --- Guard tests: Cadence interval floor (ADR-046/048) ---
+  // Invariant: minimum period = CONSTRAINTS.cadenceIntervalSecondsMin (30s from OpenAPI).
+  // Tests catch the regression "hardcoded 60" and "floor drifted from the spec".
+  // Cadence radio is on Step 4 (Options). Path: Step1->2->3->4, enable Cadence there.
 
   async function reachStep4Cadence() {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    // Step 1: run_mode radio находится здесь; включаем cadence до перехода дальше.
+    // Step 1: run_mode radio is here; enable cadence before moving further.
     await waitFor(() =>
       expect(document.querySelector('input[name="run_mode"][value="cadence"]')).toBeInTheDocument(),
     );
     const cadenceRadioInput = document.querySelector('input[name="run_mode"][value="cadence"]') as HTMLInputElement;
     await user.click(cadenceRadioInput);
 
-    // Step 1 → Step 2: workload=scenario (дефолт), жмём Далее.
+    // Step 1 -> Step 2: workload=scenario (default), click Next.
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Step 2 → выбираем сервис и scenario.
+    // Step 2 -> select service and scenario.
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
@@ -1565,7 +1565,7 @@ describe('RunWizard', () => {
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Step 4 → cadence-блок появляется в Options (runMode='cadence' = уже установлен).
+    // Step 4 -> cadence block appears in Options (runMode='cadence' is already set).
     await waitFor(() => expect(screen.getByTestId('cadence-interval')).toBeInTheDocument());
 
     return { user };
@@ -1581,36 +1581,36 @@ describe('RunWizard', () => {
   it('Cadence: submit-валидация отвергает значение ниже floor', async () => {
     const { user } = await reachStep4Cadence();
 
-    // Заполняем имя Cadence (обязательное поле) и вводим значение ниже floor.
+    // Fill in the Cadence name (required field) and enter a value below the floor.
     const nameInput = screen.getByTestId('cadence-name') as HTMLInputElement;
     await user.type(nameInput, 'test-cadence');
 
     const intervalInput = screen.getByTestId('cadence-interval');
     fireEvent.change(intervalInput, { target: { value: String(CONSTRAINTS.cadenceIntervalSecondsMin - 1) } });
 
-    // Submit должен быть заблокирован (ниже floor).
+    // Submit should be blocked (below floor).
     expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).toBeDisabled();
   });
 
   it('Cadence: submit-валидация принимает значение точно на floor', async () => {
     const { user } = await reachStep4Cadence();
 
-    // Заполняем имя Cadence и вводим значение точно на floor.
+    // Fill in the Cadence name and enter a value exactly at the floor.
     const nameInput = screen.getByTestId('cadence-name') as HTMLInputElement;
     await user.type(nameInput, 'test-cadence');
 
     const intervalInput = screen.getByTestId('cadence-interval');
     fireEvent.change(intervalInput, { target: { value: String(CONSTRAINTS.cadenceIntervalSecondsMin) } });
 
-    // Submit должен быть разблокирован (точно на floor).
+    // Submit should be unblocked (exactly at floor).
     expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).not.toBeDisabled();
   });
 
-  // --- Guard-тесты S6: batch / max_failures / preview ---
+  // --- Guard tests S6: batch / max_failures / preview ---
 
   it('S6: max_failures tooltip присутствует (aria-label)', async () => {
     await reachStep4Command();
-    // Тултип должен быть в разметке.
+    // Tooltip should be in the markup.
     await waitFor(() => expect(screen.getByLabelText(/Threshold is counted|Порог считается/)).toBeInTheDocument());
   });
 
@@ -1626,7 +1626,7 @@ describe('RunWizard', () => {
   });
 
   it('S6: snapshot target (regex/sids) → batch-preview клиентский, preview-endpoint НЕ вызывается', async () => {
-    // Command с sidRegex — snapshot-target. Preview-эндпоинт не должен дёргаться.
+    // Command with sidRegex — snapshot-target. Preview endpoint should not be hit.
     const previewCalls: string[] = [];
     const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: [] }] });
     const baseFetch = globalThis.fetch;
@@ -1649,18 +1649,18 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
 
-    // Вводим batch — preview не должен дёргаться (snapshot-target).
+    // Enter batch — preview should not be hit (snapshot-target).
     await user.type(screen.getByLabelText('Batch'), '1');
     await waitFor(() => expect(screen.getByLabelText('Batch')).toHaveValue('1'));
 
-    // preview не вызывался.
+    // preview was not called.
     expect(previewCalls).toHaveLength(0);
 
     void stub; // Suppress unused var warning.
   });
 
   it('S6: late-binding coven target → preview-endpoint вызывается (debounced)', async () => {
-    // Command с coven-only → late-binding → preview вызывается.
+    // Command with coven-only -> late-binding -> preview is called.
     const previewReplies: unknown[] = [];
     setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
     const baseFetch = globalThis.fetch;
@@ -1692,13 +1692,13 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
 
-    // Preview должен вызваться (после debounce).
+    // Preview should be called (after debounce).
     await waitFor(() => expect(previewReplies.length).toBeGreaterThan(0), { timeout: 2000 });
     expect(previewReplies.length).toBeGreaterThan(0);
   });
 
   it('S6: window batch_mode → batch-preview показывает window-сообщение (не null)', async () => {
-    // Для snapshot-target с 1 инкарнацией, window режим.
+    // For a snapshot-target with 1 incarnation, window mode.
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -1717,12 +1717,12 @@ describe('RunWizard', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /Далее/ }));
-    // Переключаем на window — поле batch скрыто, batch-preview не показывается.
+    // Switch to window — batch field hidden, batch-preview not shown.
     await waitFor(() => expect(screen.getByLabelText('batch_mode_window')).toBeInTheDocument());
     await user.click(screen.getByLabelText('batch_mode_window'));
-    // Поле batch скрыто.
+    // batch field hidden.
     expect(screen.queryByLabelText('Batch')).not.toBeInTheDocument();
-    // batch-preview под batch-полем не показывается (isWindow=true скрывает блок).
+    // batch-preview under the batch field is not shown (isWindow=true hides the block).
     expect(screen.queryByTestId('batch-preview')).not.toBeInTheDocument();
   });
 
@@ -1748,7 +1748,7 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Batch'), '2');
 
-    // Scope=1 инкарнация, batch=2 → ceil(1/2)=1 батч. batch-preview появился.
+    // Scope=1 incarnation, batch=2 -> ceil(1/2)=1 batch. batch-preview appeared.
     await waitFor(() => expect(screen.getByTestId('batch-preview')).toBeInTheDocument());
     expect(screen.getByTestId('batch-preview').textContent).toMatch(/1/);
   });
@@ -1781,14 +1781,14 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Далее/ }));
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
 
-    // Ошибка 422 от keeper показана в submitError.
+    // 422 error from keeper shown in submitError.
     await waitFor(() =>
       expect(screen.getByText(/422|batch spec conflict/)).toBeInTheDocument(),
     );
   });
 });
 
-// --- Notify-блок RunWizard (ADR-052(g) amendment N2) ---
+// --- Notify block RunWizard (ADR-052(g) amendment N2) ---
 
 describe('RunWizard — notify-блок Step 4', () => {
   beforeEach(() => {
@@ -1797,8 +1797,8 @@ describe('RunWizard — notify-блок Step 4', () => {
   });
 
   /**
-   * Вспомогательная функция: проходит шаги wizard Scenario до Step 4 (Options).
-   * Возвращает stub для проверки posts.
+   * Helper function: walks the wizard Scenario steps up to Step 4 (Options).
+   * Returns a stub for checking posts.
    */
   async function reachStep4Scenario(user: ReturnType<typeof userEvent.setup>) {
     const stub = setupFetchStubWithHeralds(['ops-webhook']);
@@ -1845,7 +1845,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     const user = userEvent.setup();
     const stub = await reachStep4Scenario(user);
 
-    // Добавить notify-элемент.
+    // Add a notify item.
     await user.click(screen.getByTestId('notify-add-btn'));
     await waitFor(() => expect(screen.getByTestId('notify-herald-select-0')).toBeInTheDocument());
     await user.selectOptions(screen.getByTestId('notify-herald-select-0'), 'ops-webhook');
@@ -1865,18 +1865,18 @@ describe('RunWizard — notify-блок Step 4', () => {
     const user = userEvent.setup();
     const stub = await reachStep4Scenario(user);
 
-    // Добавить notify-элемент, но не выбрать Herald.
+    // Add a notify item, but don't select Herald.
     await user.click(screen.getByTestId('notify-add-btn'));
     await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
 
-    // Submit без Herald.
+    // Submit without Herald.
     await user.click(screen.getByRole('button', { name: /Запустить/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
     expect(voyagePost).toBeDefined();
     const body = voyagePost!.body as { notify?: unknown };
-    // Пустой herald → notify не шлём.
+    // Empty herald -> don't send notify.
     expect(body.notify).toBeUndefined();
   });
 
@@ -1891,43 +1891,43 @@ describe('RunWizard — notify-блок Step 4', () => {
     await waitFor(() => expect(screen.queryByTestId('notify-item-0')).not.toBeInTheDocument());
   });
 
-  // Guard: регрессия — кнопка «добавить» annotation не добавляла строку
-  // (kvToAnnotations отбрасывала пустой ключ → annotations: undefined → строка исчезала).
+  // Guard: regression — the "add" annotation button didn't add a row
+  // (kvToAnnotations dropped an empty key -> annotations: undefined -> the row disappeared).
   it('GUARD: кнопка добавления annotations добавляет редактируемую строку (key+value)', async () => {
     const user = userEvent.setup();
     await reachStep4Scenario(user);
 
-    // Добавляем notify-элемент.
+    // Add a notify item.
     await user.click(screen.getByTestId('notify-add-btn'));
     await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
 
-    // Открываем расширенные поля.
+    // Open advanced fields.
     await user.click(screen.getByTestId('notify-advanced-toggle-0'));
 
-    // Нажимаем «добавить annotation».
+    // Click "add annotation".
     await user.click(screen.getByTestId('notify-annotation-add'));
 
-    // Строка должна появиться (поле key и value).
+    // The row should appear (key and value fields).
     await waitFor(() => {
       expect(screen.getByLabelText('annotation key 0')).toBeInTheDocument();
       expect(screen.getByLabelText('annotation value 0')).toBeInTheDocument();
     });
   });
 
-  // Guard: annotations заполненные попадают в POST /v1/voyages.
+  // Guard: filled-in annotations end up in POST /v1/voyages.
   it('GUARD: заполненные annotations попадают в POST body', async () => {
     const user = userEvent.setup();
     const stub = await reachStep4Scenario(user);
 
-    // Добавить notify-элемент с Herald.
+    // Add a notify item with Herald.
     await user.click(screen.getByTestId('notify-add-btn'));
     await waitFor(() => expect(screen.getByTestId('notify-herald-select-0')).toBeInTheDocument());
     await user.selectOptions(screen.getByTestId('notify-herald-select-0'), 'ops-webhook');
 
-    // Открываем расширенные поля.
+    // Open advanced fields.
     await user.click(screen.getByTestId('notify-advanced-toggle-0'));
 
-    // Добавляем annotation.
+    // Add an annotation.
     await user.click(screen.getByTestId('notify-annotation-add'));
     await waitFor(() => expect(screen.getByLabelText('annotation key 0')).toBeInTheDocument());
     await user.type(screen.getByLabelText('annotation key 0'), 'env');
@@ -1947,7 +1947,7 @@ describe('RunWizard — notify-блок Step 4', () => {
 });
 
 /**
- * Вариант setupFetchStub с поддержкой heralds-запроса (для notify-блока).
+ * Variant of setupFetchStub with heralds-request support (for the notify block).
  */
 function setupFetchStubWithHeralds(heraldNames: string[]) {
   const base = setupFetchStub({ incarnationNames: ['redis-prod'] });

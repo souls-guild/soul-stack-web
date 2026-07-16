@@ -47,12 +47,12 @@ describe('AuditLog', () => {
       expect(screen.getByText('scenario.applied')).toBeInTheDocument();
       expect(screen.getByText('errand.invoked')).toBeInTheDocument();
     });
-    // source-badge видны (в карточках, не в toggle-кнопках).
-    // 6 toggle-кнопок source + 2 badge → каждое source-имя присутствует ≥2 раз
-    // для api/mcp в этом ответе (1 в toggle + 1 в badge). Достаточно подсчёта.
+    // source-badges are visible (in cards, not toggle buttons).
+    // 6 source toggle buttons + 2 badges -> each source name appears >=2 times
+    // for api/mcp in this response (1 in toggle + 1 in badge). Counting is enough.
     expect(screen.getAllByText('api').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('mcp').length).toBeGreaterThanOrEqual(2);
-    // Pagination footer показывает total.
+    // Pagination footer shows total.
     expect(screen.getByText(/1–2 of 2/)).toBeInTheDocument();
   });
 
@@ -81,7 +81,7 @@ describe('AuditLog', () => {
     await user.type(screen.getByPlaceholderText('archon-alice'), 'archon-alice');
 
     await waitFor(() => {
-      // Multi-value type — два повторения параметра.
+      // Multi-value type - two repetitions of the parameter.
       expect(lastUrl).toMatch(/type=scenario\.applied/);
       expect(lastUrl).toMatch(/type=push\.applied/);
       expect(lastUrl).toMatch(/source=api/);
@@ -126,19 +126,19 @@ describe('AuditLog', () => {
   });
 
   it('[guard] copy-link кнопка присутствует для событий с correlation_id', async () => {
-    // Мокируем clipboard.writeText перед render через Object.assign на window.
+    // Mock clipboard.writeText before render via Object.assign on window.
     const writeMock = vi.fn().mockResolvedValue(undefined);
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(window, 'navigator');
     const originalClipboard = (window.navigator as { clipboard?: unknown }).clipboard;
     try {
-      // jsdom: clipboard undefined — внедряем напрямую.
+      // jsdom: clipboard undefined - inject directly.
       Object.defineProperty(window.navigator, 'clipboard', {
         value: { writeText: writeMock },
         configurable: true,
         writable: true,
       });
     } catch {
-      // в некоторых средах defineProperty на navigator не работает — тест проверяет только наличие кнопки.
+      // in some environments defineProperty on navigator doesn't work - the test only checks the button exists.
     }
     installFetchMock([
       {
@@ -166,10 +166,10 @@ describe('AuditLog', () => {
     await waitFor(() => {
       expect(screen.getByTestId('audit-copy-link-ev-copy-1')).toBeInTheDocument();
     });
-    // Кнопка кликабельна (не бросает исключений).
+    // Button is clickable (doesn't throw).
     const user = userEvent.setup();
     await user.click(screen.getByTestId('audit-copy-link-ev-copy-1'));
-    // Восстанавливаем clipboard.
+    // Restore clipboard.
     try {
       if (originalClipboard !== undefined) {
         Object.defineProperty(window.navigator, 'clipboard', {
@@ -179,8 +179,8 @@ describe('AuditLog', () => {
         });
       }
     } catch { /* ignore */ }
-    // Проверяем что кнопка рендерится только для событий с correlation_id.
-    // Сам вызов clipboard.writeText проверяется вручную (jsdom ограничения).
+    // Verify the button renders only for events with correlation_id.
+    // The clipboard.writeText call itself is checked manually (jsdom limitations).
     expect(screen.getByTestId('audit-copy-link-ev-copy-1')).toBeInTheDocument();
     void clipboardDescriptor; // suppress unused warning
   });
@@ -198,7 +198,7 @@ describe('AuditLog', () => {
     await waitFor(() => {
       expect(lastUrl).toMatch(/archon_aid=archon-bootstrap/);
     });
-    // Поле в форме тоже заполнено.
+    // The form field is filled in too.
     expect(screen.getByDisplayValue('archon-bootstrap')).toBeInTheDocument();
   });
 });

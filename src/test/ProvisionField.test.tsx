@@ -1,12 +1,12 @@
-// Guard-тесты: UX-clarity provision-поля в create-форме.
+// Guard tests: UX-clarity of the provision field in the create form.
 //
-// Покрывает:
-//  1. ProvisionField рендерится как toggle, не как JSON-textarea.
-//  2. Включение toggle показывает под-поля (provider/profile/await_timeout).
-//  3. Выключение toggle показывает подсказку existing-souls.
-//  4. Pre-submit warning появляется когда provision=disabled + replicas_per_master задан.
-//  5. Pre-submit warning НЕ появляется когда provision=enabled.
-//  6. Pre-submit warning НЕ появляется если нет replicas_per_master в схеме.
+// Covers:
+//  1. ProvisionField renders as a toggle, not a JSON textarea.
+//  2. Enabling the toggle shows sub-fields (provider/profile/await_timeout).
+//  3. Disabling the toggle shows the existing-souls hint.
+//  4. Pre-submit warning appears when provision=disabled + replicas_per_master is set.
+//  5. Pre-submit warning does NOT appear when provision=enabled.
+//  6. Pre-submit warning does NOT appear if replicas_per_master is absent from the schema.
 //  7. computeRequiredHostCount: sentinel = 1+replicas, cluster = shards*(1+replicas).
 
 import { describe, it, expect, vi } from 'vitest';
@@ -100,7 +100,7 @@ describe('computeRequiredHostCount', () => {
 
 // ─── ScenarioInputFields: ProvisionField render ───────────────────────────
 
-// Stub keeperApi.modules.formPrep для SidPicker (не нужен в этих тестах).
+// Stub keeperApi.modules.formPrep for SidPicker (not needed in these tests).
 vi.mock('../api/keeper', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../api/keeper')>();
   return {
@@ -144,9 +144,9 @@ function ProvisionWrapper({ schema, incarnationName }: { schema: ScenarioInputSc
 describe('ScenarioInputFields: ProvisionField', () => {
   it('рендерит toggle вместо JSON-textarea', () => {
     render(<ProvisionWrapper schema={PROVISION_SCHEMA} />);
-    // Toggle присутствует.
+    // Toggle is present.
     expect(screen.getByTestId('field-provision-toggle-provision')).toBeInTheDocument();
-    // JSON-textarea НЕ рендерится.
+    // JSON textarea does NOT render.
     expect(screen.queryByTestId('field-composite-provision')).not.toBeInTheDocument();
   });
 
@@ -162,9 +162,9 @@ describe('ScenarioInputFields: ProvisionField', () => {
     const toggle = screen.getByTestId('field-provision-enabled-provision');
     await user.click(toggle);
 
-    // Подсказка скрыта.
+    // Hint is hidden.
     expect(screen.queryByTestId('field-provision-disabled-hint-provision')).not.toBeInTheDocument();
-    // Sub-поля появились.
+    // Sub-fields appeared.
     expect(screen.getByTestId('field-provision-sub-provision-provider')).toBeInTheDocument();
     expect(screen.getByTestId('field-provision-sub-provision-profile')).toBeInTheDocument();
   });
@@ -226,8 +226,8 @@ function mockRedisScenarios(scenario: any = PROVISION_CREATE_SCENARIO) {
   ]);
 }
 
-// Pre-submit warning логика — тестируем через computeRequiredHostCount + readProvisionEnabled
-// (unit-уровень). Integration-тест — через IncarnationNewForm с мок-данными.
+// Pre-submit warning logic — tested via computeRequiredHostCount + readProvisionEnabled
+// (unit level). Integration test — via IncarnationNewForm with mock data.
 
 describe('IncarnationNewForm: provision host warning', () => {
   it('warning НЕ появляется по умолчанию (provision disabled, replicas пустые)', async () => {
@@ -246,7 +246,7 @@ describe('IncarnationNewForm: provision host warning', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // replicas_per_master не заполнен → computeRequiredHostCount=null → warning нет.
+    // replicas_per_master not filled → computeRequiredHostCount=null → no warning.
     expect(screen.queryByTestId('provision-host-warning')).not.toBeInTheDocument();
   });
 
@@ -266,16 +266,16 @@ describe('IncarnationNewForm: provision host warning', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // Ищем number-spinbutton replicas_per_master (нет testid на нём — используем роль).
+    // Look up the number-spinbutton replicas_per_master (no testid on it — use role).
     const replicasField = screen.queryByRole('spinbutton') as HTMLInputElement | null;
     if (!replicasField) {
-      // Если spinbutton не найден — поле не рендерится в текущей схеме, пропускаем.
+      // If spinbutton not found — the field doesn't render in the current schema, skip.
       return;
     }
     await user.clear(replicasField);
     await user.type(replicasField, '2');
 
-    // Provision остаётся disabled → warning должен появиться.
+    // Provision stays disabled → warning should appear.
     expect(await screen.findByTestId('provision-host-warning')).toBeInTheDocument();
   });
 
@@ -295,11 +295,11 @@ describe('IncarnationNewForm: provision host warning', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // Включаем provision.
+    // Enable provision.
     const provisionToggle = await screen.findByTestId('field-provision-enabled-provision');
     await user.click(provisionToggle);
 
-    // Warning не должен появиться (provision enabled → roster будет создан).
+    // Warning should not appear (provision enabled → roster will be created).
     expect(screen.queryByTestId('provision-host-warning')).not.toBeInTheDocument();
   });
 
@@ -334,7 +334,7 @@ describe('IncarnationNewForm: provision host warning', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // Нет replicas_per_master → computeRequiredHostCount=null → warning нет.
+    // No replicas_per_master → computeRequiredHostCount=null → no warning.
     expect(screen.queryByTestId('provision-host-warning')).not.toBeInTheDocument();
   });
 });

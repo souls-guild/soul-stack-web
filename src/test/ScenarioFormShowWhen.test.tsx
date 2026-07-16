@@ -1,5 +1,5 @@
-// Тесты show_when + placeholder + hint в ScenarioInputFields.
-// Проверяем: условную видимость полей/секций, placeholder в input, hint под полем.
+// Tests for show_when + placeholder + hint in ScenarioInputFields.
+// Checks: conditional field/section visibility, placeholder in input, hint under a field.
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -60,16 +60,16 @@ describe('show_when поля', () => {
           key: 'main',
           fields: [
             { name: 'mode' },
-            // show_when=false статично → никогда не видно
+            // show_when=false statically -> never visible
             { name: 'sentinels', show_when: 'false' },
           ],
         },
       ],
     };
     render(<Wrapper schema={SCHEMA} form={form} />);
-    // mode рендерится
+    // mode renders
     expect(screen.getByTestId('field-enum-mode')).toBeInTheDocument();
-    // sentinels скрыт
+    // sentinels hidden
     expect(screen.queryByTestId('field-text-sentinels')).toBeNull();
   });
 
@@ -87,13 +87,13 @@ describe('show_when поля', () => {
     };
     render(<Wrapper schema={SCHEMA} form={form} />);
 
-    // Начальное состояние: sentinels скрыт (mode пустой, не 'sentinel')
+    // Initial state: sentinels hidden (mode empty, not 'sentinel')
     expect(screen.queryByTestId('field-text-sentinels')).toBeNull();
 
-    // Меняем mode → sentinel
+    // Change mode -> sentinel
     fireEvent.change(screen.getByTestId('field-enum-mode'), { target: { value: 'sentinel' } });
 
-    // Теперь sentinels виден
+    // Now sentinels is visible
     expect(screen.getByTestId('field-text-sentinels')).toBeInTheDocument();
   });
 
@@ -109,11 +109,11 @@ describe('show_when поля', () => {
         },
       ],
     };
-    // Стартуем с mode=cluster → sentinels виден
+    // Start with mode=cluster -> sentinels visible
     render(<Wrapper schema={SCHEMA} form={form} initialState={{ mode: 'cluster' }} />);
     expect(screen.getByTestId('field-text-sentinels')).toBeInTheDocument();
 
-    // Меняем на standalone → sentinels скрывается
+    // Change to standalone -> sentinels hides
     fireEvent.change(screen.getByTestId('field-enum-mode'), { target: { value: 'standalone' } });
     expect(screen.queryByTestId('field-text-sentinels')).toBeNull();
   });
@@ -136,12 +136,12 @@ describe('show_when секции', () => {
     };
     render(<Wrapper schema={SCHEMA} form={form} />);
 
-    // advanced секция скрыта (mode пустой)
+    // advanced section hidden (mode empty)
     expect(screen.queryByTestId('form-section-advanced')).toBeNull();
     expect(screen.queryByTestId('field-text-sentinels')).toBeNull();
     expect(screen.queryByTestId('field-text-replicas')).toBeNull();
 
-    // mode → cluster → секция появляется
+    // mode -> cluster -> section appears
     fireEvent.change(screen.getByTestId('field-enum-mode'), { target: { value: 'cluster' } });
     expect(screen.getByTestId('form-section-advanced')).toBeInTheDocument();
   });
@@ -242,12 +242,12 @@ describe('computeVisibleFields интеграция', () => {
         },
       ],
     };
-    // mode = standalone, host скрыт → host не должен попасть в missing
+    // mode = standalone, host hidden -> host should not end up in missing
     const state: ScenarioFieldsState = { mode: 'standalone' };
     const visible = computeVisibleFields(form, state);
     const missing = missingRequiredFields(schema, state, visible);
     expect(missing).not.toContain('host');
-    // mode пустой → должен быть в missing
+    // mode empty -> should be in missing
     expect(missing).not.toContain('mode'); // mode = 'standalone' — не пустое
 
     const state2: ScenarioFieldsState = {};

@@ -1,4 +1,4 @@
-// Тесты ADR-045 S4: pattern-валидация, enum-dropdown, format:sid → SidPicker.
+// Tests for ADR-045 S4: pattern validation, enum dropdown, format:sid -> SidPicker.
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -8,7 +8,7 @@ import type { ModuleParam } from '../api/keeper';
 import type { ScenarioInputSchema } from '../api/keeper';
 import type { ScenarioFieldsState } from '../pages/incarnations/scenarioInputFields.helpers';
 
-// Stub keeperApi.modules.formPrep для SidPicker.
+// Stub keeperApi.modules.formPrep for SidPicker.
 vi.mock('../api/keeper', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../api/keeper')>();
   return {
@@ -23,7 +23,7 @@ vi.mock('../api/keeper', async (importOriginal) => {
   };
 });
 
-// Stateful wrapper для корректного re-render при onChange.
+// Stateful wrapper for correct re-render on onChange.
 import { useState } from 'react';
 
 function StatefulFields({
@@ -144,7 +144,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
       },
     };
     renderFields(schema, { incarnationContext: 'redis-prod', moduleName: 'official.redis' });
-    // SidPicker рендерит поле внутри field-sid-single-target_sid
+    // SidPicker renders the field inside field-sid-single-target_sid
     expect(screen.getByTestId('field-sid-single-target_sid')).toBeTruthy();
   });
 
@@ -175,7 +175,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     const hint = wrapper.querySelector('[data-testid="sid-picker-no-context"]');
     expect(hint).toBeTruthy();
     expect(wrapper.querySelector('input')).toBeNull();
-    // Должен быть именно incarnation_hosts-текст (содержит «инкарнации», НЕ «choir»).
+    // Must be exactly incarnation_hosts text (contains "incarnations", NOT "choir").
     expect(hint!.textContent).toMatch(/инкарнаци/i);
     expect(hint!.textContent).not.toMatch(/choir/i);
   });
@@ -194,22 +194,22 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     const hint = wrapper.querySelector('[data-testid="sid-picker-no-context"]');
     expect(hint).toBeTruthy();
     expect(wrapper.querySelector('input')).toBeNull();
-    // Должен быть choir-специфичный текст («choir»), а НЕ incarnation_hosts-текст.
+    // Must be choir-specific text ("choir"), NOT incarnation_hosts text.
     expect(hint!.textContent).toMatch(/choir/i);
   });
 
   it('source не задан + нет incarnationContext → легитимный text-input (не трогаем)', () => {
-    // format:sid без source не попадает в SidPicker-ветку — рендерится как обычный text-input.
+    // format:sid without source doesn't fall into the SidPicker branch — renders as a regular text input.
     const schema: ScenarioInputSchema = {
       plain_sid: {
         type: 'string',
         required: false,
         format: 'sid',
-        // source не задан → ScenarioInputFields рендерит field-text-*, не field-sid-single-*
+        // source not set -> ScenarioInputFields renders field-text-*, not field-sid-single-*
       },
     };
     renderFields(schema, { incarnationContext: undefined, moduleName: 'official.redis' });
-    // Нет source → не SidPicker-ветка, рендерится обычный text input
+    // No source -> not the SidPicker branch, renders a regular text input
     const input = screen.getByTestId('field-text-plain_sid');
     expect(input).toBeTruthy();
     expect(screen.queryByTestId('sid-picker-no-context')).toBeNull();
@@ -316,7 +316,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(screen.getByTestId('field-typedlist-status_codes')).toBeTruthy();
     const addBtn = screen.getByTestId('field-typedlist-add-status_codes');
     expect(addBtn).toBeTruthy();
-    // Добавляем элемент
+    // Add an item
     fireEvent.click(addBtn);
     expect(screen.getByTestId('field-typedlist-item-status_codes-0')).toBeTruthy();
   });
@@ -336,9 +336,9 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
       tags: { type: 'array', required: false, items: { type: 'string' } },
     };
     renderFields(schema);
-    // Не должно быть JSON-textarea
+    // Should not be a JSON textarea
     expect(screen.queryByTestId('field-composite-tags')).toBeNull();
-    // Должен быть typed list
+    // Should be a typed list
     expect(screen.getByTestId('field-typedlist-tags')).toBeTruthy();
   });
 
@@ -385,7 +385,7 @@ describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeh
     renderFields(schema);
     expect(screen.getByTestId('field-multiline-script')).toBeTruthy();
     expect(screen.getByTestId('field-multiline-script').tagName).toBe('TEXTAREA');
-    // НЕ должно быть text-input
+    // Should NOT be a text input
     expect(screen.queryByTestId('field-text-script')).toBeNull();
   });
 
@@ -444,7 +444,7 @@ import {
   serializeFields,
 } from '../pages/incarnations/scenarioInputFields.helpers';
 
-describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs fix)', () => {
+describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', () => {
   const mapSchema: ScenarioInputSchema = {
     env: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
   };
@@ -452,24 +452,24 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs 
   it('дубль-ключ → показан field-map-error + onInvalidMapChange сигнализирует об ошибке', async () => {
     const invalidMapFields: string[] = [];
     renderFields(mapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
-    // Добавляем две пары
+    // Add two pairs
     fireEvent.click(screen.getByTestId('field-map-add-env'));
     fireEvent.click(screen.getByTestId('field-map-add-env'));
-    // Вводим одинаковые ключи
+    // Enter identical keys
     fireEvent.change(screen.getByTestId('field-map-key-env-0'), { target: { value: 'FOO' } });
     fireEvent.change(screen.getByTestId('field-map-val-env-0'), { target: { value: '1' } });
     fireEvent.change(screen.getByTestId('field-map-key-env-1'), { target: { value: 'FOO' } });
     fireEvent.change(screen.getByTestId('field-map-val-env-1'), { target: { value: '2' } });
-    // Должен появиться inline-error
+    // An inline error should appear
     await waitFor(() => {
       expect(screen.getAllByTestId('field-map-error-env').length).toBeGreaterThan(0);
     });
-    // onInvalidMapChange сигнализирует об ошибке через отдельный канал (не sentinel-строка).
+    // onInvalidMapChange signals the error through a separate channel (not a sentinel string).
     expect(invalidMapFields).toContain('env');
   });
 
   it('дубль-ключ: внешнее value — валидный JSON (last-wins, не sentinel)', async () => {
-    // Проверяем что значение НЕ портится в 'invalid-map': черновик переживает re-mount.
+    // Check that the value is NOT corrupted into 'invalid-map': the draft survives re-mount.
     const values: Array<string | number | boolean | undefined> = [];
     const schema: ScenarioInputSchema = {
       env: { type: 'object', required: false, isMap: true, items: { type: 'string' } },
@@ -496,11 +496,11 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs 
     fireEvent.change(screen.getByTestId('field-map-val-env-0'), { target: { value: '1' } });
     fireEvent.change(screen.getByTestId('field-map-key-env-1'), { target: { value: 'A' } });
     fireEvent.change(screen.getByTestId('field-map-val-env-1'), { target: { value: '2' } });
-    // Последнее записанное значение должно быть валидным JSON (last-wins дубля), не 'invalid-map'.
+    // The last recorded value should be valid JSON (last-wins on duplicate), not 'invalid-map'.
     await waitFor(() => expect(values.length).toBeGreaterThan(0));
     const lastVal = values[values.length - 1];
     expect(lastVal).not.toBe('invalid-map');
-    // last-wins: A→2 (второй ключ выигрывает).
+    // last-wins: A->2 (the second key wins).
     if (typeof lastVal === 'string' && lastVal !== '') {
       const parsed = JSON.parse(lastVal);
       expect(parsed).toMatchObject({ A: '2' });
@@ -511,7 +511,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs 
     const invalidMapFields: string[] = [];
     renderFields(mapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
     fireEvent.click(screen.getByTestId('field-map-add-env'));
-    // key оставляем пустым, value заполняем
+    // leave key empty, fill in value
     fireEvent.change(screen.getByTestId('field-map-val-env-0'), { target: { value: 'bar' } });
     await waitFor(() => {
       expect(screen.getAllByTestId('field-map-error-env').length).toBeGreaterThan(0);
@@ -528,16 +528,16 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs 
     fireEvent.click(screen.getByTestId('field-map-add-scores'));
     fireEvent.change(screen.getByTestId('field-map-key-scores-0'), { target: { value: 'foo' } });
     fireEvent.change(screen.getByTestId('field-map-val-scores-0'), { target: { value: 'abc' } });
-    // Должен появиться inline-error (field-map-error-scores).
+    // An inline error should appear (field-map-error-scores).
     await waitFor(() => {
       expect(screen.getAllByTestId('field-map-error-scores').length).toBeGreaterThan(0);
     });
-    // onInvalidMapChange сигнализирует об ошибке bad-int.
+    // onInvalidMapChange signals the bad-int error.
     expect(invalidMapFields).toContain('scores');
   });
 
   it('полностью пустая пара (key=\'\', value=\'\') — НЕ ошибка, NOT сигнализирует', () => {
-    // Полностью пустые пары — affordance, не ошибка.
+    // Fully empty pairs are an affordance, not an error.
     const blockedFields = invalidCompositeFields(mapSchema, { env: '' });
     expect(blockedFields).not.toContain('env');
   });
@@ -571,7 +571,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor валидация (bugs 
     const input = screen.getByTestId('field-text-host');
     fireEvent.change(input, { target: { value: 'INVALID_123' } });
     await waitFor(() => expect(patternErrors).toContain('host'));
-    // После исправления — ошибка снимается.
+    // After the fix — the error clears.
     fireEvent.change(input, { target: { value: 'valid' } });
     await waitFor(() => expect(patternErrors).not.toContain('host'));
   });
@@ -584,12 +584,12 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     };
     renderFields(schema);
     expect(screen.getByTestId('field-map-labels')).toBeTruthy();
-    // Не JSON-textarea
+    // Not a JSON textarea
     expect(screen.queryByTestId('field-composite-labels')).toBeNull();
   });
 
   it('map+items.string: добавить пару → появляются key/value инпуты', () => {
-    // required=true чтобы не попасть в details (advanced collapse)
+    // required=true so it doesn't fall into details (advanced collapse)
     const schema: ScenarioInputSchema = {
       env_vars: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
     };
@@ -600,7 +600,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
   });
 
   it('map+items.string: удалить пару', () => {
-    // required=true чтобы не попасть в details (advanced collapse)
+    // required=true so it doesn't fall into details (advanced collapse)
     const schema: ScenarioInputSchema = {
       tags: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
     };
@@ -609,7 +609,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     fireEvent.click(screen.getByTestId('field-map-add-tags'));
     expect(screen.getByTestId('field-map-key-tags-0')).toBeTruthy();
     fireEvent.click(screen.getByTestId('field-map-remove-tags-0'));
-    // После удаления 0-й пары из двух остаётся одна, индекс 0 (не 1)
+    // After removing pair 0 of two, one remains, at index 0 (not 1)
     expect(screen.queryByTestId('field-map-key-tags-1')).toBeNull();
     expect(screen.getByTestId('field-map-key-tags-0')).toBeTruthy();
   });
@@ -619,7 +619,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
       profile: { type: 'object', required: false, isMap: true },
     };
     renderFields(schema);
-    // нет isMap+scalarItems → composite JSON-textarea
+    // no isMap+scalarItems -> composite JSON-textarea
     expect(screen.getByTestId('field-composite-profile')).toBeTruthy();
     expect(screen.queryByTestId('field-map-profile')).toBeNull();
   });

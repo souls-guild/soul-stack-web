@@ -67,14 +67,14 @@ interface Call {
   body: string | null;
 }
 
-// Гибкий fetch-mock с записью вызовов для CRUD-проверок. installFetchMock
-// удобнее для чистого read, но здесь нужно отделять GET/POST/PATCH/DELETE
-// на одних и тех же путях и логировать body.
+// Flexible fetch-mock recording calls for CRUD checks. installFetchMock
+// is more convenient for plain reads, but here we need to separate GET/POST/PATCH/DELETE
+// on the same paths and log the body.
 function recordingFetch(opts: {
   rolesList: typeof SAMPLE;
   operators?: typeof OPERATORS_SAMPLE;
   permissions?: typeof PERMISSIONS_SAMPLE;
-  // Конфликт-симулятор: если url == path и method == method — отдадим status и detail.
+  // Conflict simulator: if url == path and method == method -- return status and detail.
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
   const calls: Call[] = [];
@@ -101,7 +101,7 @@ function recordingFetch(opts: {
         status: 200, headers: { 'Content-Type': 'application/json' },
       });
     }
-    // Autocomplete endpoints для scope-builder (graceful empty если не нужно).
+    // Autocomplete endpoints for scope-builder (graceful empty if not needed).
     if (url.startsWith('/v1/incarnations') && method === 'GET') {
       return new Response(JSON.stringify({ items: [], offset: 0, limit: 20, total: 0 }), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -127,7 +127,7 @@ function recordingFetch(opts: {
         status: 200, headers: { 'Content-Type': 'application/json' },
       });
     }
-    // CRUD на ролях — все 204 без тела.
+    // CRUD on roles -- all 204 with no body.
     if (url === '/v1/roles' && method === 'POST') return new Response('', { status: 201 });
     if (/^\/v1\/roles\/[^/]+$/.test(url) && method === 'DELETE') return new Response('', { status: 204 });
     if (/^\/v1\/roles\/[^/]+\/permissions$/.test(url) && method === 'PATCH') return new Response('', { status: 204 });
@@ -198,7 +198,7 @@ describe('RbacPage', () => {
     const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
     const nameInput = within(dialog).getByPlaceholderText('soul-operator');
     await user.type(nameInput, 'log-reader');
-    // Каталог permissions подгружается из GET /v1/permissions — отмечаем audit.read.
+    // Permissions catalog is loaded from GET /v1/permissions -- check audit.read.
     const auditRead = await within(dialog).findByRole('checkbox', { name: 'audit.read' });
     await user.click(auditRead);
     await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
@@ -212,9 +212,9 @@ describe('RbacPage', () => {
   });
 
   it('Create role: 201 с пустым телом не падает на .json() и закрывает модалку', async () => {
-    // Регрессия: role.create отдаёт 201 без тела (контракт backend).
-    // Клиент не должен звать .json() на пустом потоке («Unexpected end of
-    // JSON input»). Успех = mutation отрабатывает onSuccess → модалка закрыта.
+    // Regression: role.create returns 201 with no body (backend contract).
+    // The client must not call .json() on an empty stream ("Unexpected end of
+    // JSON input"). Success = mutation runs onSuccess -> modal closes.
     recordingFetch({ rolesList: SAMPLE });
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
@@ -225,7 +225,7 @@ describe('RbacPage', () => {
     await user.type(within(dialog).getByPlaceholderText('soul-operator'), 'log-reader');
     await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
 
-    // onSuccess закрывает модалку; ошибки парсинга тела нет.
+    // onSuccess closes the modal; no body-parsing error.
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /Создать роль/i })).not.toBeInTheDocument();
     });
@@ -253,7 +253,7 @@ describe('RbacPage', () => {
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent(/уже существует|already exists/i);
-    // Модалка остаётся открытой — оператор видит ошибку.
+    // Modal stays open -- the operator sees the error.
     expect(screen.getByRole('dialog', { name: /Создать роль/i })).toBeInTheDocument();
   });
 
@@ -263,13 +263,13 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
-    // Edit-кнопка соседствует с soul-operator (вторая строка таблицы).
+    // Edit button is next to soul-operator (second table row).
     const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
-    // soul-operator — вторая роль; editButtons[1] соответствует ей.
+    // soul-operator -- second role; editButtons[1] corresponds to it.
     await user.click(editButtons[1]);
 
     const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
-    // Каталог из GET /v1/permissions: снимаем soul.exec, отмечаем incarnation.read.
+    // Catalog from GET /v1/permissions: uncheck soul.exec, check incarnation.read.
     const soulExec = await within(dialog).findByRole('checkbox', { name: 'soul.exec' });
     expect(soulExec).toBeChecked();
     await user.click(soulExec);
@@ -280,7 +280,7 @@ describe('RbacPage', () => {
       const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
       expect(patch).toBeDefined();
       expect(patch!.url).toBe('/v1/roles/soul-operator/permissions');
-      // soul.exec удалён, incarnation.read добавлен.
+      // soul.exec removed, incarnation.read added.
       expect(patch!.body).toContain('incarnation.read');
       expect(patch!.body).not.toContain('soul.exec');
     });
@@ -301,14 +301,14 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
 
-    // Edit на cluster-admin (первая роль). Кнопка disabled-у нас не выставлена
-    // на builtin (заблокирован сабмит внутри), так что попадаем в Modal.
+    // Edit on cluster-admin (first role). The button is not set disabled
+    // for builtin (submit is blocked internally instead), so we land in Modal.
     const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
     await user.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: cluster-admin/i });
-    // Сабмит-кнопка disabled для builtin — проверим явно.
+    // Submit button is disabled for builtin -- verify explicitly.
     expect(within(dialog).getByRole('button', { name: /Сохранить/i })).toBeDisabled();
-    // И warning «редактирование заблокировано» виден.
+    // And the "editing blocked" warning is visible.
     expect(within(dialog).getByText(/Редактирование заблокировано/i)).toBeInTheDocument();
   });
 
@@ -318,14 +318,14 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
-    // Delete у soul-operator (не-builtin); cluster-admin disabled.
+    // Delete on soul-operator (non-builtin); cluster-admin disabled.
     const deleteButtons = screen.getAllByRole('button', { name: /удалить роль/i });
     // deleteButtons[0] — cluster-admin (builtin, disabled), [1] — soul-operator.
     expect(deleteButtons[0]).toBeDisabled();
     await user.click(deleteButtons[1]);
 
     const dialog = await screen.findByRole('dialog', { name: /Удалить роль: soul-operator/i });
-    // Видны операторы, которые потеряют permissions.
+    // Operators who will lose permissions are visible.
     expect(within(dialog).getByText(/потеряет/i)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: /^Удалить$/ }));
 
@@ -357,7 +357,7 @@ describe('RbacPage', () => {
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent(/lock-?out|self-lockout|админ/i);
-    // Модалка не закрывается — diaolog ещё в DOM.
+    // Modal doesn't close -- dialog is still in DOM.
     expect(screen.getByRole('dialog', { name: /Удалить роль: soul-operator/i })).toBeInTheDocument();
   });
 
@@ -367,11 +367,11 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
     await user.click(screen.getByRole('tab', { name: /Archon assignments/i }));
-    // Дожидаемся, пока появится archon-bob (у которого ролей нет).
+    // Wait for archon-bob (who has no roles) to appear.
     await waitFor(() => expect(screen.getByText('archon-bob')).toBeInTheDocument());
 
     const assignButtons = screen.getAllByRole('button', { name: /назначить роль/i });
-    // archon-alice, archon-bob, archon-bootstrap — кнопок 3; выбираем archon-bob.
+    // archon-alice, archon-bob, archon-bootstrap -- 3 buttons; pick archon-bob.
     const bobBtn = assignButtons.find((b) => b.getAttribute('aria-label') === 'назначить роль archon-bob');
     await user.click(bobBtn!);
 
@@ -396,8 +396,8 @@ describe('RbacPage', () => {
     await user.click(screen.getByRole('tab', { name: /Archon assignments/i }));
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
 
-    // Снимаем archon-alice с soul-operator. Чип с × имеет aria-label
-    // «снять archon-alice с роли soul-operator».
+    // Remove archon-alice from soul-operator. The chip with x has aria-label
+    // "remove archon-alice from role soul-operator".
     const x = screen.getByRole('button', { name: /снять archon-alice с роли soul-operator/i });
     await user.click(x);
 
@@ -417,17 +417,17 @@ describe('RbacPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Создать роль/i }));
     const dialog = await screen.findByRole('dialog', { name: /Создать роль/i });
-    // Чекбоксы из каталога: resource.action как полное право.
+    // Checkboxes from catalog: resource.action as full permission.
     expect(await within(dialog).findByRole('checkbox', { name: 'soul.list' })).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'soul.read' })).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'incarnation.run' })).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'audit.read' })).toBeInTheDocument();
-    // resource-группы видны как legend.
+    // resource groups are visible as legend.
     expect(within(dialog).getByText('incarnation')).toBeInTheDocument();
   });
 
   it('Permissions-picker: каталог недоступен (404) → graceful, права роли сохраняются', async () => {
-    // /v1/permissions отдаёт 599 (нет хэндлера) — recordingFetch с пустым каталогом.
+    // /v1/permissions returns 599 (no handler) -- recordingFetch with an empty catalog.
     const calls = recordingFetch({ rolesList: SAMPLE, permissions: { items: [] } });
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
@@ -436,10 +436,10 @@ describe('RbacPage', () => {
     const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
     await user.click(editButtons[1]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
-    // Каталог пуст — hint виден, существующие права как preserved-чипы.
+    // Catalog is empty -- hint is visible, existing permissions shown as preserved chips.
     expect(within(dialog).getByText(/Каталог permissions недоступен/i)).toBeInTheDocument();
     expect(within(dialog).getByText('soul.exec')).toBeInTheDocument();
-    // Save без каталога не дропает существующие права (replace-семантика).
+    // Save without a catalog doesn't drop existing permissions (replace semantics).
     await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
     await waitFor(() => {
       const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
@@ -449,7 +449,7 @@ describe('RbacPage', () => {
   });
 
   it('Scope-builder: отмечает incarnation.run без scope → голый "incarnation.run"', async () => {
-    // incarnation.run имеет selector_keys: [] → scope-пикер не показывается.
+    // incarnation.run has selector_keys: [] -> scope-picker doesn't show.
     const calls = recordingFetch({
       rolesList: { items: [{ name: 'test-role', description: '', builtin: false, permissions: [], operators: [] }] },
     });
@@ -468,14 +468,14 @@ describe('RbacPage', () => {
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
       expect(post).toBeDefined();
-      // Должен быть голый пермишн без " on ..."
+      // Should be a bare permission without " on ..."
       expect(post!.body).toContain('"incarnation.run"');
       expect(post!.body).not.toContain(' on ');
     });
   });
 
   it('Scope-builder: soul.list + scope coven=ops → "soul.list on coven=ops"', async () => {
-    // soul.list имеет selector_keys: ['coven', 'sid'] → scope-пикер появляется.
+    // soul.list has selector_keys: ['coven', 'sid'] -> scope-picker appears.
     const calls = recordingFetch({
       rolesList: { items: [{ name: 'scoped-role', description: '', builtin: false, permissions: [], operators: [] }] },
     });
@@ -490,11 +490,11 @@ describe('RbacPage', () => {
     const cb = await within(dialog).findByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
 
-    // Выбрать scope-ключ = coven (scope-пикер появляется после checked)
+    // Select scope key = coven (scope-picker appears after checked)
     const keySelect = await within(dialog).findByRole('combobox', { name: /ключ селектора scope/i });
     await user.selectOptions(keySelect, 'coven');
 
-    // Ввести значение (input появляется после выбора ключа)
+    // Enter a value (input appears after key selection)
     const valueInput = await within(dialog).findByRole('textbox', { name: /значение coven/i });
     await user.type(valueInput, 'ops');
 
@@ -508,7 +508,7 @@ describe('RbacPage', () => {
   });
 
   it('Scope-builder: парсинг существующего scoped-права роли → checked чекбокс', async () => {
-    // Роль имеет scoped-право — base soul.list есть в каталоге → checked чекбокс.
+    // Role has a scoped permission -- base soul.list is in the catalog -> checked checkbox.
     const sample = {
       items: [
         {
@@ -529,17 +529,17 @@ describe('RbacPage', () => {
     await user.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: scoped-role/i });
 
-    // Дожидаемся загрузки каталога — incarnation.run как индикатор (findByRole с timeout).
+    // Wait for the catalog to load -- incarnation.run as indicator (findByRole with timeout).
     const incRun = await within(dialog).findByRole('checkbox', { name: 'incarnation.run' });
     expect(incRun).toBeChecked();
 
-    // soul.list on coven=ops — base в каталоге → checked чекбокс.
-    // Accessible name включает scope-badge текст ("soul.list coven=ops"), ищем по regex.
+    // soul.list on coven=ops -- base is in the catalog -> checked checkbox.
+    // Accessible name includes the scope-badge text ("soul.list coven=ops"), match by regex.
     const soulList = await within(dialog).findByRole('checkbox', { name: /soul\.list/ });
     expect(soulList).toBeChecked();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links --------------------------------------------
 
   it('[LINKS] AID в Archon assignments рендерятся ссылками на /archons/:aid', async () => {
     installFetchMock([
@@ -549,14 +549,14 @@ describe('RbacPage', () => {
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
 
-    // Переходим на таб Archon assignments.
+    // Switch to the Archon assignments tab.
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
     await user.click(screen.getByRole('tab', { name: /Archon assignments/i }));
 
-    // Ждём появления архонтов.
+    // Wait for archons to appear.
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
 
-    // Каждый AID — ссылка с правильным href.
+    // Each AID is a link with the correct href.
     const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
     expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
 
@@ -568,7 +568,7 @@ describe('RbacPage', () => {
   });
 
   it('[LINKS] AID с спецсимволами корректно URL-кодируется', async () => {
-    // AID c «+» или пробелом — encodeURIComponent не даёт сломанный href.
+    // AID with "+" or a space -- encodeURIComponent prevents a broken href.
     const specialSample = {
       items: [
         {

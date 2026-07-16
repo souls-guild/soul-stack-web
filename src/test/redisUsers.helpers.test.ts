@@ -1,7 +1,7 @@
 /**
- * NIM-74 guard: normalizeRedisUsers нормализует ОБЕ формы state.redis_users
- * (typed-массив v14 и legacy-map) и никогда не падает на мусоре. Пустые/не-строковые
- * имена отсеиваются в обеих ветках (иначе в таблице появилась бы строка-призрак).
+ * NIM-74 guard: normalizeRedisUsers normalizes BOTH forms of state.redis_users
+ * (typed array v14 and legacy map) and never throws on garbage. Empty/non-string
+ * names are filtered out in both branches (otherwise a ghost row would appear in the table).
  */
 import { describe, it, expect } from 'vitest';
 import { normalizeRedisUsers } from '../pages/incarnations/redisUsers.helpers';
@@ -47,10 +47,10 @@ describe('normalizeRedisUsers', () => {
     const raw = [
       null,
       'str',
-      { perms: 'x' },            // нет name → отсев
-      { name: '', perms: 'y' },  // пустое имя → отсев
-      { name: 42 },              // не-строка → отсев
-      { name: {}, perms: 'q' },  // не-строка (объект) → отсев (не «[object Object]»)
+      { perms: 'x' },            // no name -> filtered out
+      { name: '', perms: 'y' },  // empty name -> filtered out
+      { name: 42 },              // not a string -> filtered out
+      { name: {}, perms: 'q' },  // not a string (object) -> filtered out (not "[object Object]")
       { name: 'ok', perms: 'z' },
     ];
     expect(normalizeRedisUsers(raw)).toEqual([

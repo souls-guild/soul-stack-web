@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { useFont, FontProvider } from '../hooks/useFont';
 
-// FontProvider — обязательная обёртка.
+// FontProvider — required wrapper.
 function wrapper({ children }: { children: ReactNode }) {
   return <FontProvider>{children}</FontProvider>;
 }

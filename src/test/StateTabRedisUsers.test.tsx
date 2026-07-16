@@ -35,17 +35,17 @@ describe('StateTab — graceful discovery redis_users', () => {
       <StateTab state={STATE} stateSchemaVersion={14} incarnationName="redis-prod" />,
     );
 
-    // discovery вызван (state.redis_users есть → query enabled).
+    // discovery was called (state.redis_users present -> query enabled).
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
 
-    // Спец-таблица НЕ рендерится, глазов нет.
+    // The special table does NOT render, no reveal eyes.
     expect(screen.queryByTestId('redis-users-table')).not.toBeInTheDocument();
     expect(screen.queryByTestId('reveal-eye-alice')).not.toBeInTheDocument();
     expect(screen.queryByTestId('reveal-eye-bob')).not.toBeInTheDocument();
 
-    // redis_users остаётся доступным как обычный top-level ключ (JsonKeyFilter).
+    // redis_users remains accessible as a regular top-level key (JsonKeyFilter).
     expect(screen.getByText('redis_users')).toBeInTheDocument();
-    // UI жив.
+    // UI is alive.
     expect(screen.getByText('Runtime State')).toBeInTheDocument();
   });
 

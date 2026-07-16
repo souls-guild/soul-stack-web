@@ -20,7 +20,7 @@ describe('Sidebar navigation', () => {
 
   it('standalone «Errands» убран из верхней History-навигации', () => {
     renderSidebar();
-    // Нет nav-ссылки именно «Errands» (per-host log доступен только drill-down/route).
+    // No nav link specifically "Errands" (per-host log is only available via drill-down/route).
     expect(screen.queryByRole('link', { name: /^Errands$/ })).not.toBeInTheDocument();
   });
 

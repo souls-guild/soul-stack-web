@@ -38,7 +38,7 @@ function renderModal() {
   );
 }
 
-// Выбор целевой версии в дропдауне → срабатывает upgrade-paths-фетч.
+// Selecting the target version in the dropdown -> triggers the upgrade-paths fetch.
 async function pickTarget() {
   const user = userEvent.setup();
   await waitFor(() => screen.getByRole('option', { name: /v2\.0\.0/ }));
@@ -108,7 +108,7 @@ describe('UpgradeModal — upgrade-paths preview (NIM-34)', () => {
     await pickTarget();
 
     await waitFor(() => expect(screen.getByTestId('upgrade-mode-badge')).toHaveTextContent('legacy'));
-    // Пустая цепочка миграций → строка «миграций нет».
+    // Empty migration chain -> "no migrations" string.
     expect(screen.getByTestId('upgrade-migrations')).toBeInTheDocument();
     expect(screen.getByTestId('upgrade-submit')).not.toBeDisabled();
   });
@@ -155,18 +155,18 @@ describe('UpgradeModal — upgrade-paths preview (NIM-34)', () => {
     renderModal();
     await pickTarget();
 
-    // Даём фетчу отработать (ошибка), затем убеждаемся, что превью-контента нет.
+    // Let the fetch run (error), then make sure there's no preview content.
     await waitFor(() => {
       expect(screen.queryByTestId('upgrade-direction')).not.toBeInTheDocument();
     });
     expect(screen.queryByTestId('upgrade-mode-badge')).not.toBeInTheDocument();
     expect(screen.queryByTestId('upgrade-unreachable')).not.toBeInTheDocument();
-    // Submit доступен — модалка функционирует как раньше.
+    // Submit is available -- the modal functions as before.
     expect(screen.getByTestId('upgrade-submit')).not.toBeDisabled();
   });
 });
 
-// upgrade-paths для found/legacy — чтобы submit был разблокирован (reachable=true).
+// upgrade-paths for found/legacy -- so submit is unblocked (reachable=true).
 const FOUND_PATHS = {
   current_version: 'v1.0.0',
   current_state_schema_version: 1,
@@ -186,7 +186,7 @@ const LEGACY_PATHS = {
   target: { ...FOUND_PATHS.target, target_state_schema_version: 1, direction: 'same-schema', mode: 'legacy', state_migrations: [] },
 };
 
-// Прогоняет apply: выбор цели → submit → ждём success-футер (кнопка Close).
+// Runs apply: pick target -> submit -> wait for success footer (Close button).
 async function runUpgrade(pathsBody: unknown, reply: Record<string, unknown>) {
   installFetchMock([
     REFS,

@@ -66,7 +66,7 @@ describe('CreateSoulModal', () => {
       },
     ]);
 
-    // Перехватываем fetch для проверки body
+    // Intercept fetch to check the body
     const baseFetch = globalThis.fetch;
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -87,7 +87,7 @@ describe('CreateSoulModal', () => {
     await waitFor(() => expect(registerBtn).not.toBeDisabled());
     await user.click(registerBtn);
 
-    // success-state показывает токен и warning
+    // success-state shows the token and warning
     await waitFor(() => {
       expect(screen.getByText('btoken-super-secret-abc123')).toBeInTheDocument();
     });
@@ -116,7 +116,7 @@ describe('CreateSoulModal', () => {
     const sidInput = screen.getByLabelText('SID нового хоста');
     await user.type(sidInput, 'host02.example.com');
 
-    // переключаем transport на ssh
+    // switch transport to ssh
     const transportSelect = screen.getByRole('combobox');
     await user.selectOptions(transportSelect, 'ssh');
 
@@ -127,7 +127,7 @@ describe('CreateSoulModal', () => {
     await waitFor(() => {
       expect(screen.getByText(/SSH Soul зарегистрирован/i)).toBeInTheDocument();
     });
-    // токен не показывается
+    // token is not shown
     expect(screen.queryByText(/Токен отображается ОДИН РАЗ/i)).not.toBeInTheDocument();
   });
 

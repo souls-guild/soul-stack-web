@@ -24,7 +24,7 @@ import {
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-// Хелпер с маршрутами для bulk-run тестов: SoulsList + landing-stub /run.
+// Helper with routes for bulk-run tests: SoulsList + landing-stub /run.
 function renderSoulsListWithRun() {
   const qc = new QueryClient({
     defaultOptions: {
@@ -80,8 +80,8 @@ describe('SoulsList', () => {
     await waitFor(() => {
       expect(screen.getByText('host01.example.com')).toBeInTheDocument();
     });
-    // 'connected' встречается и в <option> select-фильтра, и в Badge —
-    // поэтому матчим все вхождения и убеждаемся, что Badge отрендерился.
+    // 'connected' appears both in the <option> of the select-filter and in the Badge —
+    // so we match all occurrences and make sure the Badge rendered.
     expect(screen.getAllByText('connected').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -121,15 +121,15 @@ describe('SoulsList', () => {
       expect(screen.getByText('host02.example.com')).toBeInTheDocument();
     });
 
-    // Bulk Run кнопка должна быть disabled до выбора.
+    // Bulk Run button must be disabled until selection.
     const runBtn = screen.getByRole('button', { name: /Bulk Run on selected/ });
     expect(runBtn).toBeDisabled();
 
-    // Выбираем оба host-а через row-checkbox.
+    // Select both hosts via row-checkbox.
     await user.click(screen.getByLabelText('выбрать host01.example.com'));
     await user.click(screen.getByLabelText('выбрать host02.example.com'));
 
-    // Counter в кнопке.
+    // Counter in the button.
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Bulk Run on selected/ })).not.toBeDisabled(),
     );
@@ -142,7 +142,7 @@ describe('SoulsList', () => {
     const search = screen.getByTestId('run-search').textContent ?? '';
     expect(search).toContain('workload=command');
     expect(search).toContain('target_sids=');
-    // CSV допускает как `host01,host02`, так и URL-encoded запятую.
+    // CSV allows both `host01,host02` and a URL-encoded comma.
     expect(decodeURIComponent(search)).toMatch(/target_sids=host0[12]\.example\.com,host0[12]\.example\.com/);
   });
 
@@ -223,8 +223,8 @@ describe('SoulsList — keyset pagination', () => {
     tokenStore.clear();
   });
 
-  // Guard: при наличии next_cursor в ответе — кнопка «Загрузить ещё» рендерится;
-  // по клику — следующий запрос несёт cursor= в URL.
+  // Guard: when next_cursor is present in the response — "Load more" button renders;
+  // on click — the next request carries cursor= in the URL.
   it('показывает кнопку «Загрузить ещё» при наличии next_cursor, передаёт cursor в следующий запрос', async () => {
     const page1Items = [
       { sid: 'host01.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
@@ -234,7 +234,7 @@ describe('SoulsList — keyset pagination', () => {
       { sid: 'host03.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
     ];
 
-    // fetchMock: первый запрос без cursor= → page1; с cursor=tok1 → page2.
+    // fetchMock: first request without cursor= -> page1; with cursor=tok1 -> page2.
     const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       if (url.includes('cursor=tok1')) {
@@ -244,7 +244,7 @@ describe('SoulsList — keyset pagination', () => {
           limit: 100,
           total: 0,
           total_approximate: true,
-          // next_cursor отсутствует → последняя страница
+          // next_cursor absent -> last page
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
       return new Response(JSON.stringify({
@@ -261,32 +261,32 @@ describe('SoulsList — keyset pagination', () => {
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
 
-    // Ждём первую страницу.
+    // Wait for the first page.
     await waitFor(() => {
       expect(screen.getByText('host01.example.com')).toBeInTheDocument();
       expect(screen.getByText('host02.example.com')).toBeInTheDocument();
     });
 
-    // Кнопка «Загрузить ещё» должна быть видна (есть next_cursor).
+    // "Load more" button must be visible (next_cursor present).
     const btn = screen.getByTestId('load-more-btn');
     expect(btn).toBeInTheDocument();
 
-    // Кликаем «Загрузить ещё».
+    // Click "Load more".
     await user.click(btn);
 
-    // Второй запрос должен содержать cursor=tok1 в URL.
+    // Second request must contain cursor=tok1 in the URL.
     await waitFor(() => {
       expect(screen.getByText('host03.example.com')).toBeInTheDocument();
     });
 
-    // Первая страница тоже должна присутствовать (аккумуляция).
+    // First page must also be present (accumulation).
     expect(screen.getByText('host01.example.com')).toBeInTheDocument();
     expect(screen.getByText('host02.example.com')).toBeInTheDocument();
 
-    // Кнопки «Загрузить ещё» больше нет (next_cursor исчез).
+    // "Load more" button is gone (next_cursor disappeared).
     expect(screen.queryByTestId('load-more-btn')).not.toBeInTheDocument();
 
-    // Проверяем, что второй fetch-вызов содержал cursor= в URL.
+    // Check that the second fetch call contained cursor= in the URL.
     const calls = fetchSpy.mock.calls;
     const cursorCall = calls.find(([input]) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
@@ -295,7 +295,7 @@ describe('SoulsList — keyset pagination', () => {
     expect(cursorCall).toBeDefined();
   });
 
-  // Guard: total_approximate=true → рендерится элемент с маркером приблизительности.
+  // Guard: total_approximate=true -> renders an element with an approximate marker.
   it('total_approximate=true → показывает приблизительный маркер счётчика', async () => {
     installFetchMock([
       {
@@ -319,15 +319,15 @@ describe('SoulsList — keyset pagination', () => {
       expect(screen.getByText('host01.example.com')).toBeInTheDocument();
     });
 
-    // Элемент с приблизительным счётчиком должен быть в DOM.
+    // The element with the approximate counter must be in the DOM.
     const countEl = screen.getByTestId('count-approximate');
     expect(countEl).toBeInTheDocument();
-    // Должен содержать маркер ≈.
+    // Must contain the ≈ marker.
     expect(countEl.textContent).toContain('≈');
   });
 
-  // Guard: total_approximate=false (offset-режим, нет next_cursor) → кнопки «ещё» нет,
-  // маркера приблизительности нет (регресс coven-режима).
+  // Guard: total_approximate=false (offset mode, no next_cursor) -> no "more" button,
+  // no approximation marker (regression of coven mode).
   it('offset-режим (нет next_cursor, total_approximate=false) → нет кнопки «ещё» и нет ≈', async () => {
     installFetchMock([
       {
@@ -340,7 +340,7 @@ describe('SoulsList — keyset pagination', () => {
           offset: 0,
           limit: 100,
           total: 1,
-          // total_approximate отсутствует (false по умолчанию), next_cursor отсутствует.
+          // total_approximate absent (false by default), next_cursor absent.
         },
       },
     ]);
@@ -350,18 +350,18 @@ describe('SoulsList — keyset pagination', () => {
       expect(screen.getByText('host01.example.com')).toBeInTheDocument();
     });
 
-    // Кнопки «Загрузить ещё» не должно быть.
+    // "Load more" button must not be present.
     expect(screen.queryByTestId('load-more-btn')).not.toBeInTheDocument();
-    // Маркера приблизительности не должно быть.
+    // Approximation marker must not be present.
     expect(screen.queryByTestId('count-approximate')).not.toBeInTheDocument();
   });
 
-  // Guard: race-condition — смена фильтра во время in-flight loadMore.
-  // Без фикса: in-flight ответ фильтра A подмешивался в набор фильтра B.
-  // С фиксом: in-flight результат отбрасывается, набор B остаётся чистым.
+  // Guard: race-condition — changing the filter during an in-flight loadMore.
+  // Without the fix: the in-flight response of filter A got mixed into filter B's set.
+  // With the fix: the in-flight result is discarded, filter B's set stays clean.
   it('loadMore in-flight: смена фильтра отбрасывает старый ответ, набор нового фильтра чист', async () => {
-    // Deferred-промис для второго запроса фильтра A (страница 2).
-    // Резолвим вручную ПОСЛЕ смены фильтра.
+    // Deferred promise for the second request of filter A (page 2).
+    // Resolved manually AFTER the filter change.
     let resolveLoadMoreA!: (r: Response) => void;
     const loadMoreAPromise = new Promise<Response>((res) => { resolveLoadMoreA = res; });
 
@@ -379,7 +379,7 @@ describe('SoulsList — keyset pagination', () => {
     const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       callCount++;
-      // Запрос 1: фильтр A, страница 1 (без cursor, без status-param → filterA).
+      // Request 1: filter A, page 1 (no cursor, no status param -> filterA).
       if (callCount === 1) {
         return new Response(JSON.stringify({
           items: filterAPage1Items,
@@ -387,11 +387,11 @@ describe('SoulsList — keyset pagination', () => {
           next_cursor: 'cursor-a1',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-      // Запрос 2: loadMore фильтра A (cursor=cursor-a1) — задерживаем.
+      // Request 2: loadMore of filter A (cursor=cursor-a1) — delayed.
       if (url.includes('cursor=cursor-a1')) {
         return loadMoreAPromise;
       }
-      // Запрос 3: фильтр B, страница 1 (status=disconnected).
+      // Request 3: filter B, page 1 (status=disconnected).
       if (url.includes('status=disconnected')) {
         return new Response(JSON.stringify({
           items: filterBPage1Items,
@@ -408,54 +408,54 @@ describe('SoulsList — keyset pagination', () => {
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
 
-    // Ждём первую страницу фильтра A.
+    // Wait for the first page of filter A.
     await waitFor(() => {
       expect(screen.getByText('filter-a-host01.example.com')).toBeInTheDocument();
     });
 
-    // Кликаем «Загрузить ещё» — второй запрос (cursor-a1) уходит и зависает.
+    // Click "Load more" — the second request (cursor-a1) goes out and hangs.
     const btn = screen.getByTestId('load-more-btn');
     await user.click(btn);
 
-    // Меняем фильтр на «disconnected» — useQuery запускает запрос 3,
-    // аккумулятор сбрасывается на filterB, cursor обнуляется.
+    // Change the filter to "disconnected" — useQuery fires request 3,
+    // the accumulator resets to filterB, cursor is cleared.
     const statusSelect = screen.getByRole('combobox', { name: /Status/i });
     await user.selectOptions(statusSelect, 'disconnected');
 
-    // Ждём пока фильтр B отрендерится.
+    // Wait for filter B to render.
     await waitFor(() => {
       expect(screen.getByText('filter-b-host01.example.com')).toBeInTheDocument();
     });
 
-    // Теперь резолвим задержанный ответ фильтра A — с фиксом он должен быть отброшен.
+    // Now resolve the delayed response of filter A — with the fix it must be discarded.
     resolveLoadMoreA(new Response(JSON.stringify({
       items: filterAPage2Items,
       offset: 0, limit: 100, total: 0, total_approximate: true,
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
-    // Даём React время на обработку.
+    // Give React time to process.
     await waitFor(() => {
-      // filter-b-host01 должен присутствовать.
+      // filter-b-host01 must be present.
       expect(screen.getByText('filter-b-host01.example.com')).toBeInTheDocument();
     });
 
-    // Критические ассерты: элементы фильтра A НЕ должны присутствовать.
+    // Critical assertions: filter A elements must NOT be present.
     expect(screen.queryByText('filter-a-host01.example.com')).not.toBeInTheDocument();
     expect(screen.queryByText('filter-a-host02.example.com')).not.toBeInTheDocument();
 
-    // Кнопки «Загрузить ещё» нет — у фильтра B нет next_cursor.
+    // No "Load more" button — filter B has no next_cursor.
     expect(screen.queryByTestId('load-more-btn')).not.toBeInTheDocument();
   });
 
-  // Guard: дедупликация по sid при ПЕРЕСЕКАЮЩИХСЯ страницах.
-  // Страница A: host-a, host-b (next_cursor=tok). Страница B (cursor=tok): host-b (дубль!), host-c.
-  // Инвариант: host-b рендерится РОВНО один раз; итоговых строк = 3, не 4.
+  // Guard: dedup by sid on OVERLAPPING pages.
+  // Page A: host-a, host-b (next_cursor=tok). Page B (cursor=tok): host-b (duplicate!), host-c.
+  // Invariant: host-b renders EXACTLY once; total rows = 3, not 4.
   it('дедуп: перекрывающиеся страницы — дубль sid рендерится ровно один раз', async () => {
     const page1Items = [
       { sid: 'host-a.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
       { sid: 'host-b.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
     ];
-    // Страница 2 намеренно содержит host-b (дубль) и новый host-c.
+    // Page 2 intentionally contains host-b (duplicate) and new host-c.
     const page2Items = [
       { sid: 'host-b.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
       { sid: 'host-c.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
@@ -480,62 +480,62 @@ describe('SoulsList — keyset pagination', () => {
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
 
-    // Ждём первую страницу.
+    // Wait for the first page.
     await waitFor(() => {
       expect(screen.getByText('host-a.example.com')).toBeInTheDocument();
       expect(screen.getByText('host-b.example.com')).toBeInTheDocument();
     });
 
-    // Кликаем «Загрузить ещё» — придёт страница 2 с дублем host-b.
+    // Click "Load more" — page 2 with host-b duplicate arrives.
     await user.click(screen.getByTestId('load-more-btn'));
 
-    // Ждём host-c из страницы 2.
+    // Wait for host-c from page 2.
     await waitFor(() => {
       expect(screen.getByText('host-c.example.com')).toBeInTheDocument();
     });
 
-    // Все три уникальных sid присутствуют.
+    // All three unique sids are present.
     expect(screen.getByText('host-a.example.com')).toBeInTheDocument();
     expect(screen.getByText('host-b.example.com')).toBeInTheDocument();
     expect(screen.getByText('host-c.example.com')).toBeInTheDocument();
 
-    // Инвариант: host-b рендерится РОВНО ОДИН раз (дедуп работает).
+    // Invariant: host-b renders EXACTLY ONCE (dedup works).
     const hostBElements = screen.getAllByText('host-b.example.com');
     expect(hostBElements).toHaveLength(1);
 
-    // Итоговое число строк таблицы с данными = 3 (не 4).
+    // Final number of data table rows = 3 (not 4).
     const rows = document.querySelectorAll('tbody tr');
     expect(rows).toHaveLength(3);
   });
 
-  // Guard: пустой список souls в keyset-режиме (scoped-оператор с нулевым покрытием).
-  // Инвариант: кнопка «Загрузить ещё» отсутствует; рендерится empty-state; приложение не падает.
+  // Guard: empty souls list in keyset mode (scoped operator with zero coverage).
+  // Invariant: no "Load more" button; empty-state renders; app does not crash.
   it('пустой список (keyset, items=[]): нет кнопки «ещё», рендерится empty-state', async () => {
     const fetchSpy = vi.fn(async () => {
       return new Response(JSON.stringify({
         items: [],
         offset: 0, limit: 100, total: 0, total_approximate: true,
-        // next_cursor отсутствует — scoped-ответ с нулевым покрытием
+        // next_cursor absent — scoped response with zero coverage
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
     vi.stubGlobal('fetch', fetchSpy);
 
     renderWithProviders(<SoulsList />, '/souls');
 
-    // Ждём завершения загрузки.
-    // При items=[] компонент показывает empty-state с кнопкой «Подключить Soul»
-    // (souls:registerSoul = "Подключить Soul" из ru-бандла).
+    // Wait for loading to finish.
+    // With items=[] the component shows an empty-state with a "Connect Soul" button
+    // (souls:registerSoul = "Подключить Soul" from the ru bundle).
     await screen.findByRole('button', { name: /Подключить Soul/i });
 
-    // Кнопки «Загрузить ещё» не должно быть (нет next_cursor).
+    // "Load more" button must not be present (no next_cursor).
     expect(screen.queryByTestId('load-more-btn')).not.toBeInTheDocument();
 
-    // Таблицы с данными нет.
+    // No data table.
     expect(document.querySelector('tbody')).not.toBeInTheDocument();
   });
 
-  // Guard: бейдж при активном поиске показывает visible.length, НЕ серверный/загруженный total.
-  // Инвариант: бейдж «не врёт» — счётчик = число видимых строк.
+  // Guard: the badge while search is active shows visible.length, NOT the server/loaded total.
+  // Invariant: the badge "doesn't lie" — counter = number of visible rows.
   it('search: бейдж показывает visible.length (найдено), не серверный total', async () => {
     const fetchSpy = vi.fn(async () => {
       return new Response(JSON.stringify({
@@ -553,20 +553,20 @@ describe('SoulsList — keyset pagination', () => {
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
 
-    // Ждём загрузки всех трёх записей.
+    // Wait for all three records to load.
     await waitFor(() => {
       expect(screen.getByText('host-alpha.example.com')).toBeInTheDocument();
       expect(screen.getByText('host-beta.example.com')).toBeInTheDocument();
       expect(screen.getByText('host-gamma.example.com')).toBeInTheDocument();
     });
 
-    // Без поиска: бейдж ≈ (total_approximate=true) присутствует, count-filtered отсутствует.
+    // Without search: the ≈ badge (total_approximate=true) is present, count-filtered is absent.
     const approxBefore = screen.getByTestId('count-approximate');
     expect(approxBefore).toBeInTheDocument();
     expect(approxBefore.textContent).toContain('≈');
     expect(screen.queryByTestId('count-filtered')).not.toBeInTheDocument();
 
-    // Вводим поиск «alpha» — таблица сужается до 1 строки.
+    // Type search "alpha" — the table narrows to 1 row.
     const searchInput = screen.getByLabelText('search SID');
     await user.type(searchInput, 'alpha');
 
@@ -576,17 +576,17 @@ describe('SoulsList — keyset pagination', () => {
     });
     expect(screen.getByText('host-alpha.example.com')).toBeInTheDocument();
 
-    // Бейдж должен переключиться на count-filtered с visible.length=1.
+    // Badge must switch to count-filtered with visible.length=1.
     const filteredBadge = screen.getByTestId('count-filtered');
     expect(filteredBadge).toBeInTheDocument();
-    // Текст = «Найдено: 1», НЕ содержит ≈ и НЕ содержит «42».
+    // Text = "Найдено: 1", does NOT contain ≈ and does NOT contain "42".
     expect(filteredBadge.textContent).toContain('1');
     expect(filteredBadge.textContent).not.toContain('≈');
     expect(filteredBadge.textContent).not.toContain('42');
-    // count-approximate скрыт при активном поиске.
+    // count-approximate is hidden while search is active.
     expect(screen.queryByTestId('count-approximate')).not.toBeInTheDocument();
 
-    // Очищаем поиск — бейдж возвращается к ≈-форме.
+    // Clear the search — the badge returns to the ≈ form.
     await user.clear(searchInput);
 
     await waitFor(() => {
@@ -601,13 +601,13 @@ describe('SoulsList — keyset pagination', () => {
     expect(approxAfter.textContent).toContain('≈');
   });
 
-  // Guard: когда souls.list при «Загрузить ещё» реджектит — рендерится inline-ошибка,
-  // кнопка снова доступна для повтора (FIX 2).
+  // Guard: when souls.list rejects on "Load more" — an inline error renders,
+  // the button becomes available again for retry (FIX 2).
   it('loadMore error: реджект показывает inline-ошибку, кнопка снова активна', async () => {
     let callCount = 0;
     const fetchSpy = vi.fn(async () => {
       callCount++;
-      // Первый запрос (без cursor) — успешный, возвращает next_cursor.
+      // First request (no cursor) — successful, returns next_cursor.
       if (callCount === 1) {
         return new Response(JSON.stringify({
           items: [
@@ -620,7 +620,7 @@ describe('SoulsList — keyset pagination', () => {
           next_cursor: 'tok1',
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-      // Второй запрос (cursor=tok1) — 500.
+      // Second request (cursor=tok1) — 500.
       return new Response(JSON.stringify({ error: 'internal server error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
@@ -631,27 +631,27 @@ describe('SoulsList — keyset pagination', () => {
     const user = userEvent.setup();
     renderWithProviders(<SoulsList />, '/souls');
 
-    // Ждём первую страницу.
+    // Wait for the first page.
     await waitFor(() => {
       expect(screen.getByText('host01.example.com')).toBeInTheDocument();
     });
 
-    // Кнопка «Загрузить ещё» должна быть видна.
+    // "Load more" button must be visible.
     const btn = screen.getByTestId('load-more-btn');
     expect(btn).not.toBeDisabled();
 
-    // Кликаем — второй запрос вернёт 500.
+    // Click — the second request returns 500.
     await user.click(btn);
 
-    // Inline-ошибка должна появиться.
+    // Inline error must appear.
     await waitFor(() => {
       expect(screen.getByTestId('load-more-error')).toBeInTheDocument();
     });
 
-    // Кнопка снова активна (не disabled) — оператор может повторить.
+    // Button is active again (not disabled) — the operator can retry.
     expect(screen.getByTestId('load-more-btn')).not.toBeDisabled();
 
-    // Первая страница по-прежнему отображается (аккумулятор не сброшен).
+    // First page is still displayed (accumulator not reset).
     expect(screen.getByText('host01.example.com')).toBeInTheDocument();
   });
 });

@@ -17,7 +17,7 @@ describe('compileSidRegex — anchored full-match', () => {
     expect(error).toBeNull();
     expect(re).not.toBeNull();
     expect(re!.test('soul-aws-01')).toBe(false);
-    // `x*` = ноль-или-более x → матчит только строки из x (вкл. пустую).
+    // `x*` = zero-or-more x -> matches only strings made of x (incl. empty).
     expect(re!.test('xxx')).toBe(true);
     expect(re!.test('')).toBe(true);
   });
@@ -39,7 +39,7 @@ describe('compileSidRegex — anchored full-match', () => {
     const { re } = compileSidRegex('host-a|host-b');
     expect(re!.test('host-a')).toBe(true);
     expect(re!.test('host-b')).toBe(true);
-    // Без non-capturing-group `^host-a|host-b$` ложно матчил бы 'host-a-extra'.
+    // Without a non-capturing group, `^host-a|host-b$` would falsely match 'host-a-extra'.
     expect(re!.test('host-a-extra')).toBe(false);
     expect(re!.test('prefix-host-b')).toBe(false);
   });
@@ -72,8 +72,8 @@ describe('matchStableCriteria — sidRegex применяется через com
     const c = { ...EMPTY_HOST_CRITERIA, sidRegex: '[' };
     const { re } = compileSidRegex(c.sidRegex);
     expect(re).toBeNull();
-    // re=null → regex-критерий не применяется; но caller блокирует submit по
-    // regexError, так что «все хосты» оператору не отправятся.
+    // re=null -> the regex criterion is not applied; but the caller blocks submit on
+    // regexError, so "all hosts" never gets sent to the operator.
     const matched = souls.filter((s) => matchStableCriteria(s, c, re));
     expect(matched).toHaveLength(souls.length);
   });

@@ -37,7 +37,7 @@ const INCS = {
   total: 1,
 };
 
-// Инкарнации со state для проверки динамических колонок версий.
+// Incarnations with state to check dynamic version columns.
 const INCS_WITH_STATE = {
   items: [
     {
@@ -68,7 +68,7 @@ const INCS_WITH_STATE = {
       updated_at: '2026-05-20T00:00:00Z',
       state: {
         redis_version: '7.0.0',
-        // node_exporter_version отсутствует → «—»
+        // node_exporter_version missing -> "—"
         redis_users: [],
       },
     },
@@ -78,7 +78,7 @@ const INCS_WITH_STATE = {
   total: 2,
 };
 
-// state_schema с двумя скалярными полями (string) и одним составным (array).
+// state_schema with two scalar fields (string) and one composite (array).
 const STATE_SCHEMA_WITH_FIELDS = {
   service: 'redis',
   ref: 'v2.0.0',
@@ -113,7 +113,7 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument();
     });
-    // git-url появляется в нескольких местах (meta + overview-блок) — проверяем >=1.
+    // git-url appears in multiple places (meta + overview block) — check >=1.
     expect(
       screen.getAllByText((_, el) =>
         el?.textContent === 'https://git.example.com/services/redis.git',
@@ -123,7 +123,7 @@ describe('ServiceDetail', () => {
 
   it('таб Scenarios рендерит flat-map input_schema (новая backend-shape)', async () => {
     installFetchMock([
-      // Более специфичный URL — первым (fetchMock берёт первый startsWith-match).
+      // More specific URL first (fetchMock takes the first startsWith match).
       {
         method: 'GET',
         url: '/v1/services/redis/scenarios',
@@ -165,7 +165,7 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('create')).toBeInTheDocument();
     });
-    // input fields summary — имена полей через запятую.
+    // input fields summary — field names comma-separated.
     expect(screen.getByText(/greeting, replicas/)).toBeInTheDocument();
     expect(screen.getByText('Создаёт redis incarnation')).toBeInTheDocument();
   });
@@ -310,7 +310,7 @@ describe('ServiceDetail', () => {
 
   it('таб Incarnations: динамические колонки из state_schema (скалярные)', async () => {
     installFetchMock([
-      // state-schema специфичнее /v1/services/redis → первым
+      // state-schema more specific than /v1/services/redis -> first
       { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_WITH_FIELDS },
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
       { method: 'GET', url: '/v1/incarnations', body: INCS_WITH_STATE },
@@ -327,13 +327,13 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByTestId('svc-inc-table')).toBeInTheDocument();
     });
-    // Заголовки динамических колонок — из schema, не хардкод.
+    // Dynamic column headers — from schema, not hardcoded.
     expect(screen.getByRole('columnheader', { name: 'redis_version' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'node_exporter_version' })).toBeInTheDocument();
-    // Значение redis_version из state.
+    // redis_version value from state.
     expect(screen.getByText('7.2.4')).toBeInTheDocument();
     expect(screen.getByText('7.0.0')).toBeInTheDocument();
-    // node_exporter_version отсутствует в redis-staging → «—».
+    // node_exporter_version missing in redis-staging -> "—".
     const cells = screen.getAllByRole('cell', { name: '—' });
     expect(cells.length).toBeGreaterThan(0);
   });
@@ -356,9 +356,9 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByTestId('svc-inc-table')).toBeInTheDocument();
     });
-    // redis_users — array, не должно быть отдельным columnheader.
+    // redis_users — array, should not be a separate columnheader.
     expect(screen.queryByRole('columnheader', { name: 'redis_users' })).not.toBeInTheDocument();
-    // Но показывается как «N items» в составной колонке.
+    // But shows up as "N items" in the composite column.
     expect(screen.getByText(/2 items/)).toBeInTheDocument();
   });
 
@@ -384,7 +384,7 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByTestId('svc-inc-table')).toBeInTheDocument();
     });
-    // Колонки есть, значения — «—».
+    // Columns are present, values are "—".
     expect(screen.getByRole('columnheader', { name: 'redis_version' })).toBeInTheDocument();
     const dashCells = screen.getAllByRole('cell', { name: '—' });
     expect(dashCells.length).toBeGreaterThan(0);
@@ -408,13 +408,13 @@ describe('ServiceDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('redis-prod')).toBeInTheDocument();
     });
-    // Без динамических колонок — нет redis_version в заголовках.
+    // Without dynamic columns — no redis_version in headers.
     expect(screen.queryByRole('columnheader', { name: 'redis_version' })).not.toBeInTheDocument();
   });
 
   it('таб Dependencies рендерит destiny с ref', async () => {
     installFetchMock([
-      // /dependencies — специфичнее /v1/services/redis → первым
+      // /dependencies — more specific than /v1/services/redis -> first
       {
         method: 'GET',
         url: '/v1/services/redis/dependencies',
@@ -473,7 +473,7 @@ describe('ServiceDetail', () => {
     expect(screen.getByText(/Нет custom-модулей|No custom/i)).toBeInTheDocument();
   });
 
-  // ── Guard-тесты: кликабельные ссылки ──────────────────────────────────────
+  // -- Guard tests: clickable links -----------------------------------------
 
   it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
     installFetchMock([
@@ -487,7 +487,7 @@ describe('ServiceDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
 
-    // created_by_aid — ссылка с правильным href.
+    // created_by_aid — link with the correct href.
     const createdLink = screen.getByRole('link', { name: 'archon-bootstrap' });
     expect(createdLink).toHaveAttribute('href', '/archons/archon-bootstrap');
   });
@@ -504,7 +504,7 @@ describe('ServiceDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
 
-    // updated_by_aid — ссылка с правильным href.
+    // updated_by_aid — link with the correct href.
     const updatedLink = screen.getByRole('link', { name: 'archon-alice' });
     expect(updatedLink).toHaveAttribute('href', '/archons/archon-alice');
   });
@@ -525,7 +525,7 @@ describe('ServiceDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
 
-    // Нет ссылок на архонтов.
+    // No links to archons.
     expect(screen.queryByRole('link', { name: /archon-/i })).not.toBeInTheDocument();
   });
 });

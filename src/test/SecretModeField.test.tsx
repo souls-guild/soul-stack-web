@@ -1,8 +1,8 @@
 /**
- * Guard-тест XOR-инварианта dual-mode секрета (ADR-064, NIM-11):
- *   - pickSecretField НИКОГДА не возвращает оба поля — только активного режима.
- *   - SecretModeField рендерит ровно один инпут (значение XOR путь) — XOR
- *     структурно гарантирован переключателем, оба поля одновременно недоступны.
+ * Guard test for the dual-mode secret XOR invariant (ADR-064, NIM-11):
+ *   - pickSecretField NEVER returns both fields — only the active mode's.
+ *   - SecretModeField renders exactly one input (value XOR path) — XOR
+ *     is structurally guaranteed by the toggle, both fields are never available at once.
  */
 import { useState } from 'react';
 import { describe, it, expect } from 'vitest';

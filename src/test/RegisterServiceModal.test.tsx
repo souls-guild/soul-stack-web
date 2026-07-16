@@ -11,7 +11,7 @@ interface Captured {
   body: unknown;
 }
 
-// fetch-mock с захватом request body (стандартный installFetchMock тело не пишет).
+// fetch-mock capturing the request body (standard installFetchMock doesn't record the body).
 function installCapturingMock(status: number, responseBody: unknown): Captured[] {
   const calls: Captured[] = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -55,7 +55,7 @@ describe('RegisterServiceModal', () => {
       screen.getByPlaceholderText(/git\.example\.com\/service-redis/i),
       'https://git.example.com/service-redis.git',
     );
-    // ref уже = 'main' по defaultValues.
+    // ref already = 'main' via defaultValues.
 
     const submit = screen.getByRole('button', { name: /^Register$/ });
     await waitFor(() => expect(submit).not.toBeDisabled());

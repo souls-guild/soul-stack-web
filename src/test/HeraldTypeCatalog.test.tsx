@@ -162,7 +162,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(within(dialog).getByTestId('herald-field-bot_token_ref')).toBeInTheDocument();
     expect(within(dialog).getByTestId('herald-field-chat_id')).toBeInTheDocument();
     expect(within(dialog).getByTestId('herald-field-parse_mode')).toBeInTheDocument();
-    // webhook-специфичные поля отсутствуют.
+    // webhook-specific fields are absent.
     expect(within(dialog).queryByTestId('herald-field-url')).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId('herald-field-headers')).not.toBeInTheDocument();
   });
@@ -215,7 +215,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(parseMode.tagName).toBe('SELECT');
     expect(within(parseMode).getByRole('option', { name: 'MarkdownV2' })).toBeInTheDocument();
     expect(within(parseMode).getByRole('option', { name: 'HTML' })).toBeInTheDocument();
-    // Пустая строка в enum_values — читаемая "не задано"-опция, не голый "" в списке.
+    // Empty string in enum_values - readable "not set" option, not a bare "" in the list.
     expect(within(parseMode).getByRole('option', { name: '— не задано —' })).toBeInTheDocument();
 
     await user.selectOptions(parseMode, 'HTML');
@@ -270,11 +270,11 @@ describe('HeraldModal — динамический рендер по катал�
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
     await user.type(within(dialog).getByTestId('herald-field-url'), 'https://example.com/hook');
 
-    // Переключаемся на telegram — webhook-поля пропадают вместе со значением.
+    // Switch to telegram - webhook fields disappear along with the value.
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
     expect(within(dialog).queryByTestId('herald-field-url')).not.toBeInTheDocument();
 
-    // Возврат на webhook — url снова пуст (не сохранил старое значение).
+    // Switch back to webhook - url is empty again (did not keep the old value).
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
     expect(within(dialog).getByTestId('herald-field-url')).toHaveValue('');
   });
@@ -319,7 +319,7 @@ describe('HeraldModal — динамический рендер по катал�
       expect(parsed.name).toBe('my-telegram');
       expect(parsed.type).toBe('telegram');
       expect(parsed.config).toMatchObject({ bot_token_ref: 'vault:secret/tg-token', chat_id: '98765' });
-      // telegram — secret_required=false в каталоге — не должно быть в body.
+      // telegram - secret_required=false in the catalog - should not be in body.
       expect(parsed.secret_ref).toBeUndefined();
     });
   });
@@ -338,8 +338,8 @@ describe('HeraldModal — динамический рендер по катал�
   });
 
   it('secret_ref-поле driven от entry.secret_required каталога, не от хардкода type==="webhook"', async () => {
-    // Второй (гипотетический) тип с secret_required=true, отличный от webhook —
-    // доказывает, что показ поля читается из каталога, а не завязан на имя типа.
+    // A second (hypothetical) type with secret_required=true, other than webhook -
+    // proves that field display is read from the catalog, not tied to the type name.
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       if (url.startsWith('/v1/me/permissions')) {
@@ -381,7 +381,7 @@ describe('HeraldModal — динамический рендер по катал�
     await waitFor(() => {
       expect(within(dialog).getByTestId('herald-type-catalog-error')).toBeInTheDocument();
     });
-    // Без каталога типов селектор не предлагает вариантов кроме placeholder.
+    // Without a type catalog the selector offers no options other than placeholder.
     const select = within(dialog).getByTestId('herald-type-select');
     expect(within(select).queryAllByRole('option')).toHaveLength(1);
   });

@@ -46,14 +46,14 @@ describe('PushRunsList', () => {
       { method: 'GET', url: '/v1/push-runs', body: SAMPLE_PAGE },
     ]);
     renderWithProviders(<PushRunsList />, '/push-runs');
-    // 'routing' — fallback при пустом ssh_provider, появляется только в cell-е
-    // (не в chip-фильтрах) → надёжный маркер того, что table отрендерился.
+    // 'routing' -- fallback for empty ssh_provider, appears only in the cell
+    // (not in the chip filters) -> a reliable marker that the table rendered.
     await waitFor(() => {
       expect(screen.getByText('routing')).toBeInTheDocument();
     });
     expect(screen.getByText('redis-cluster@v2.0.0')).toBeInTheDocument();
     expect(screen.getByText('kafka@main')).toBeInTheDocument();
-    // status встречается и в chip-кнопках, и в badge-ах cell-а → берём all.
+    // status appears both in chip buttons and cell badges -> use all.
     expect(screen.getAllByText('success').length).toBeGreaterThan(1);
     expect(screen.getAllByText('failed').length).toBeGreaterThan(1);
   });

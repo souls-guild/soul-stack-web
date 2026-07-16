@@ -1,5 +1,5 @@
-// Тесты на маркер обязательности (*) в ScenarioInputFields.
-// Покрывает: required:true, required_when (истинно/ложно), обычное поле.
+// Tests for the required marker (*) in ScenarioInputFields.
+// Covers: required:true, required_when (true/false), a regular field.
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -9,7 +9,7 @@ import type { ScenarioInputSchema } from '../api/keeper';
 import type { ScenarioFieldsState } from '../pages/incarnations/scenarioInputFields.helpers';
 import { isFieldRequired } from '../pages/incarnations/scenarioInputFields.helpers';
 
-// Stub keeperApi.modules.formPrep для SidPicker (не используется в этих тестах, но нужен mock).
+// Stub keeperApi.modules.formPrep for SidPicker (not used in these tests, but a mock is needed).
 vi.mock('../api/keeper', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../api/keeper')>();
   return {
@@ -24,7 +24,7 @@ vi.mock('../api/keeper', async (importOriginal) => {
   };
 });
 
-// Stateful wrapper с полным re-render при onChange.
+// Stateful wrapper with a full re-render on onChange.
 function StatefulFields({
   schema,
   initialState,
@@ -42,7 +42,7 @@ function StatefulFields({
   );
 }
 
-// --- isFieldRequired unit-тесты ---
+// --- isFieldRequired unit tests ---
 
 describe('isFieldRequired — хелпер', () => {
   it('required:true → true', () => {
@@ -76,7 +76,7 @@ describe('isFieldRequired — хелпер', () => {
   });
 });
 
-// --- Визуальный маркер в ScenarioInputFields ---
+// --- Visual marker in ScenarioInputFields ---
 
 describe('ScenarioInputFields — маркер обязательности (*)', () => {
   it('required:true → маркер присутствует', () => {
@@ -112,7 +112,7 @@ describe('ScenarioInputFields — маркер обязательности (*)'
         required_when: 'input.mode == "sentinel"',
       },
     };
-    // mode пустое → required_when ложно
+    // mode is empty -> required_when is false
     render(<StatefulFields schema={schema} initialState={{ mode: 'standalone', sentinel_addr: '' }} />);
     expect(screen.queryByTestId('field-required-marker-sentinel_addr')).toBeNull();
   });
@@ -138,17 +138,17 @@ describe('ScenarioInputFields — маркер обязательности (*)'
       },
     };
     render(<StatefulFields schema={schema} initialState={{ mode: 'standalone', sentinel_addr: '' }} />);
-    // Изначально маркера нет
+    // No marker initially
     expect(screen.queryByTestId('field-required-marker-sentinel_addr')).toBeNull();
 
-    // Меняем mode → sentinel
+    // Change mode -> sentinel
     const modeInput = screen.getByTestId('field-text-mode');
     fireEvent.change(modeInput, { target: { value: 'sentinel' } });
 
-    // Маркер появился
+    // Marker appeared
     expect(screen.getByTestId('field-required-marker-sentinel_addr')).toBeTruthy();
 
-    // Возвращаем обратно
+    // Revert back
     fireEvent.change(modeInput, { target: { value: 'standalone' } });
     expect(screen.queryByTestId('field-required-marker-sentinel_addr')).toBeNull();
   });

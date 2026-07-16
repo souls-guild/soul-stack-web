@@ -21,7 +21,7 @@ const USERS: RedisUser[] = [
   { name: 'bob', perms: '~app:* +@read', state: 'present' },
   { name: 'default', perms: 'off', state: 'system' },
 ];
-const REVEALABLE = ['alice', 'bob']; // default — системный, не раскрывается
+const REVEALABLE = ['alice', 'bob']; // default -- system account, not revealable
 
 function renderTable() {
   return renderWithProviders(
@@ -36,7 +36,7 @@ function renderTable() {
 
 describe('RedisUsersTable — reveal password', () => {
   beforeEach(() => {
-    // Право-гейт глаза детерминирован: cluster-admin (wildcard).
+    // Permission gate for the eye is deterministic: cluster-admin (wildcard).
     vi.spyOn(keeperApi.permissions, 'listMy').mockResolvedValue({
       permissions: [{ wildcard: true }],
     } as Awaited<ReturnType<typeof keeperApi.permissions.listMy>>);
@@ -50,7 +50,7 @@ describe('RedisUsersTable — reveal password', () => {
     renderTable();
     expect(await screen.findByTestId('reveal-eye-alice')).toBeInTheDocument();
     expect(screen.getByTestId('reveal-eye-bob')).toBeInTheDocument();
-    // default не в revealableKeys → глаза нет.
+    // default not in revealableKeys -> no eye.
     expect(screen.queryByTestId('reveal-eye-default')).not.toBeInTheDocument();
   });
 
@@ -66,10 +66,10 @@ describe('RedisUsersTable — reveal password', () => {
     const field = await screen.findByTestId('reveal-value-alice');
     expect(field).toHaveValue('s3cr3t-alice');
     expect(spy).toHaveBeenCalledWith('redis-prod', { secret_id: 'user_password', key: 'alice' });
-    // Пароль запрошен ровно один раз (lazy, без префетча).
+    // Password requested exactly once (lazy, no prefetch).
     expect(spy).toHaveBeenCalledTimes(1);
 
-    // copy → clipboard-стаб userEvent резолвится → тост «Скопировано».
+    // copy -> clipboard-stub userEvent resolves -> "Copied" toast.
     await user.click(screen.getByTestId('reveal-copy-alice'));
     expect(await screen.findByTestId('state-toast')).toHaveTextContent('Скопировано');
     expect(await navigator.clipboard.readText()).toBe('s3cr3t-alice');
@@ -106,13 +106,13 @@ describe('RedisUsersTable — reveal password', () => {
   });
 
   it('[ГЕЙТ] без права incarnation.view-secrets глаз не рендерится', async () => {
-    // Право, не покрывающее incarnation.view-secrets → canView=false после резолва.
+    // Permission not covering incarnation.view-secrets -> canView=false after resolve.
     vi.spyOn(keeperApi.permissions, 'listMy').mockResolvedValue({
       permissions: [{ wildcard: false, resource: 'soul', action: 'list' }],
     } as Awaited<ReturnType<typeof keeperApi.permissions.listMy>>);
     renderTable();
 
-    // Оптимистично глаз может мелькнуть на время загрузки прав, но после резолва — исчезает.
+    // Optimistically the eye may flash while permissions load, but disappears after resolve.
     await waitFor(() => {
       expect(screen.queryByTestId('reveal-eye-alice')).not.toBeInTheDocument();
     });
@@ -125,15 +125,15 @@ describe('RedisUsersTable — reveal password', () => {
       vi.spyOn(keeperApi.incarnations, 'revealSecret').mockResolvedValue({ value: 's3cr3t-alice' });
       renderTable();
 
-      // Глаз виден оптимистично (право грузится) — кликаем сразу.
+      // Eye is optimistically visible (permission loading) -- click right away.
       await act(async () => {
         fireEvent.click(screen.getByTestId('reveal-eye-alice'));
       });
-      await act(async () => {}); // добить микротаски reveal-промиса
+      await act(async () => {}); // flush microtasks of the reveal promise
 
       expect(screen.getByTestId('reveal-value-alice')).toHaveValue('s3cr3t-alice');
 
-      // Секрет не живёт вечно: 30с → значение стёрто.
+      // Secret doesn't live forever: 30s -> value cleared.
       act(() => {
         vi.advanceTimersByTime(30_000);
       });

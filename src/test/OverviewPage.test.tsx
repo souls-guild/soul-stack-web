@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from './renderWithProviders';
 import { OverviewPage } from '../pages/overview/OverviewPage';
 
-// Хелпер: строит mock-fetch который диспатчит по URL+params.
+// Helper: builds a mock-fetch that dispatches by URL+params.
 function mockFetch(handlers: Record<string, unknown | { status: number; body: unknown }>) {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -77,29 +77,29 @@ describe('OverviewPage', () => {
     await waitFor(() => {
       expect(screen.getByText('5 / 1')).toBeInTheDocument();
     });
-    // Covens count: 2 ключа в by_coven.
+    // Covens count: 2 keys in by_coven.
     expect(screen.getByText('2')).toBeInTheDocument();
     // Incarnations total: 7.
     expect(screen.getByText('7')).toBeInTheDocument();
     // Stale count: 9.
     expect(screen.getByText('9')).toBeInTheDocument();
 
-    // Donut статуса — 3 slice (connected/pending/disconnected), центр = total souls (6).
+    // Status donut - 3 slices (connected/pending/disconnected), center = total souls (6).
     await waitFor(() => {
       expect(screen.getByTestId('donut-slice-connected')).toBeInTheDocument();
     });
     expect(screen.getByTestId('donut-slice-pending')).toBeInTheDocument();
     expect(screen.getByTestId('donut-slice-disconnected')).toBeInTheDocument();
 
-    // Donut coven — 2 slice по имени coven.
+    // Coven donut - 2 slices by coven name.
     expect(screen.getByTestId('donut-slice-redis-prod')).toBeInTheDocument();
     expect(screen.getByTestId('donut-slice-redis-stage')).toBeInTheDocument();
 
-    // Легенда donut показывает labels/значения.
+    // Donut legend shows labels/values.
     expect(screen.getAllByText('connected').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('redis-prod').length).toBeGreaterThanOrEqual(1);
 
-    // Последние прогоны остаются (не тронуты этой задачей).
+    // Recent runs remain (untouched by this task).
     await waitFor(() => {
       expect(screen.getByText('scenario')).toBeInTheDocument();
     });
@@ -120,17 +120,17 @@ describe('OverviewPage', () => {
     });
     expect(screen.getByText('kid-b')).toBeInTheDocument();
 
-    // self_kid=kid-a → маркер «(вы)» рядом.
+    // self_kid=kid-a -> "(you)" marker next to it.
     expect(screen.getByText('(вы)')).toBeInTheDocument();
 
-    // is_reaper_leader=true только у kid-a.
+    // is_reaper_leader=true only for kid-a.
     expect(screen.getByText('Reaper-лидер')).toBeInTheDocument();
 
-    // alive/dead индикаторы.
+    // alive/dead indicators.
     expect(screen.getByText('alive')).toBeInTheDocument();
     expect(screen.getByText('недоступен')).toBeInTheDocument();
 
-    // self_health: postgres/redis=ok (✓), vault=не-ok (✗).
+    // self_health: postgres/redis=ok (check), vault=not-ok (cross).
     expect(screen.getByText(/postgres: ✓/)).toBeInTheDocument();
     expect(screen.getByText(/redis: ✓/)).toBeInTheDocument();
     expect(screen.getByText(/vault: ✗/)).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe('OverviewPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
-    // Cluster-секция независима от souls.stats — рендерится нормально несмотря на fail souls.
+    // Cluster section is independent of souls.stats - renders fine despite souls failing.
     expect(await screen.findByText('kid-a')).toBeInTheDocument();
   });
 
@@ -180,7 +180,7 @@ describe('OverviewPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('donut-slice-connected')).toBeInTheDocument();
     });
-    // Cluster-секция деградирует в error-box, не крашит страницу.
+    // Cluster section degrades into an error-box, does not crash the page.
     const clusterSection = screen.getByLabelText('SelfCheck: Keeper-кластер');
     expect(within(clusterSection).getByText(/forbidden|no soul.list|403/i)).toBeInTheDocument();
   });

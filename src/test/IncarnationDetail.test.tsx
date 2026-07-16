@@ -38,7 +38,7 @@ describe('IncarnationDetail', () => {
           last_drift_check_at: '2026-05-25T11:30:00Z',
         },
       },
-      // Connected souls для Overview Hosts-карточки (реальный count online).
+      // Connected souls for Overview Hosts card (real online count).
       {
         method: 'GET',
         url: '/v1/souls',
@@ -65,15 +65,15 @@ describe('IncarnationDetail', () => {
       expect(screen.getByRole('heading', { name: 'redis-prod' })).toBeInTheDocument();
     });
 
-    // Default tab — Overview, видим Data summary.
+    // Default tab - Overview, we see Data summary.
     expect(screen.getByRole('heading', { name: 'Data summary' })).toBeInTheDocument();
-    // Hosts-карточка: 2 online (из souls API) + 1 declared (из spec.hosts).
+    // Hosts card: 2 online (from souls API) + 1 declared (from spec.hosts).
     await waitFor(() => {
       expect(screen.getByText(/2 online/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/1 declared/i)).toBeInTheDocument();
 
-    // Action-bar для status=ready.
+    // Action-bar for status=ready.
     expect(screen.getByRole('button', { name: /Run Scenario/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Destroy/i })).toBeInTheDocument();
 
@@ -82,7 +82,7 @@ describe('IncarnationDetail', () => {
     // Tab «Spec» — declared.
     await user.click(screen.getByRole('tab', { name: /Spec/i }));
     expect(screen.getByRole('heading', { name: /Spec \(declared\)/i })).toBeInTheDocument();
-    // Top-level keys в JsonKeyFilter (replicas, hosts).
+    // Top-level keys in JsonKeyFilter (replicas, hosts).
     expect(screen.getByText('replicas')).toBeInTheDocument();
     expect(screen.getAllByText('hosts').length).toBeGreaterThan(0);
 
@@ -90,7 +90,7 @@ describe('IncarnationDetail', () => {
     await user.click(screen.getByRole('tab', { name: /^State/i }));
     expect(screen.getByRole('heading', { name: /Runtime State/i })).toBeInTheDocument();
     expect(screen.getByText(/state_schema_version:/i)).toBeInTheDocument();
-    // Per-host data секция показывает 2 хоста.
+    // Per-host data section shows 2 hosts.
     expect(screen.getByRole('heading', { name: /Per-host data/i })).toBeInTheDocument();
     expect(screen.getByText('agent-04.local')).toBeInTheDocument();
     expect(screen.getByText('soul-debian-01.local')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('IncarnationDetail', () => {
     // Tab «Schema».
     await user.click(screen.getByRole('tab', { name: /Schema/i }));
     expect(screen.getByRole('heading', { name: /State Schema/i })).toBeInTheDocument();
-    // service@version фигурируют и в meta-блоке Schema-tab, и в шапке incarnation.
+    // service@version appears both in Schema-tab meta block and in incarnation header.
     expect(screen.getAllByText('v2.0.0').length).toBeGreaterThan(0);
   });
 
@@ -141,15 +141,15 @@ describe('IncarnationDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /^State/i }));
 
-    // Все три ключа видны. JsonKeyFilter рендерит ключи как кнопки-headers
-    // с aria-expanded — стабильное опознавательное свойство.
+    // All three keys are visible. JsonKeyFilter renders keys as button-headers
+    // with aria-expanded - a stable identifying property.
     const allKeyButtons = screen.getAllByRole('button', { expanded: false });
     const keyTexts = allKeyButtons.map((b) => b.textContent ?? '');
     expect(keyTexts.some((t) => t.includes('alpha'))).toBe(true);
     expect(keyTexts.some((t) => t.includes('beta'))).toBe(true);
     expect(keyTexts.some((t) => t.includes('gamma'))).toBe(true);
 
-    // Фильтр по «alp» — оставляет только alpha.
+    // Filter by "alp" - leaves only alpha.
     const input = screen.getByLabelText('Фильтр по top-level ключам');
     await user.type(input, 'alp');
 
@@ -213,12 +213,12 @@ describe('IncarnationDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Hosts/i }));
 
-    // Клик по Trash2 — открывает модалку, PATCH ещё не уходит.
+    // Click on Trash2 - opens modal, PATCH not sent yet.
     await user.click(screen.getByRole('button', { name: /Remove host agent-04.local/i }));
     expect(screen.getByTestId('remove-host-warning')).toBeInTheDocument();
     expect(patchCount).toBe(0);
 
-    // Подтверждение чекбоксом → confirm.
+    // Confirmation via checkbox -> confirm.
     await user.click(screen.getByLabelText('Подтвердить удаление хоста'));
     await user.click(screen.getByTestId('remove-host-confirm'));
 
@@ -271,20 +271,20 @@ describe('IncarnationDetail', () => {
     });
 
     const user = userEvent.setup();
-    // Кликаем по summary-карточке «Hosts» (фильтруем по button-у summary, не по tab-у).
+    // Click summary card "Hosts" (filter by summary button, not by tab).
     const summarySection = screen.getByRole('heading', { name: 'Data summary' }).parentElement!;
     const buttons = within(summarySection).getAllByRole('button');
     const hostsCard = buttons.find((b) => /Hosts/.test(b.textContent ?? ''))!;
     expect(hostsCard).toBeDefined();
     await user.click(hostsCard);
 
-    // На вкладке Hosts видим Per-host runtime data секцию с host-a.
+    // On the Hosts tab we see Per-host runtime data section with host-a.
     expect(screen.getByRole('heading', { name: /Per-host runtime data/i })).toBeInTheDocument();
     expect(screen.getByText('host-a')).toBeInTheDocument();
   });
 
   it('History tab: apply_id рендерится ссылкой на /incarnations/:name/runs/:apply_id (НЕ /voyages/)', async () => {
-    // Более специфичные пути идут ПЕРВЫМИ (fetchMock матчит первый совпавший).
+    // More specific paths come FIRST (fetchMock matches the first match).
     installFetchMock([
       {
         method: 'GET',
@@ -340,14 +340,14 @@ describe('IncarnationDetail', () => {
     });
 
     const user = userEvent.setup();
-    // Ищем таб по role=tab + aria-selected=false, матчим по тексту History
+    // Find tab by role=tab + aria-selected=false, match by text History
     const tabs = screen.getAllByRole('tab');
     const historyTab = tabs.find((t) => /History/i.test(t.textContent ?? ''))!;
     expect(historyTab).toBeDefined();
     await user.click(historyTab);
 
-    // apply_id — apply_run (create/rerun-last/day-2 scenario), НЕ Voyage:
-    // ссылка ведёт на run-view инкарнации, не на /voyages/:id.
+    // apply_id - apply_run (create/rerun-last/operational scenario), NOT Voyage:
+    // link leads to run-view of the incarnation, not to /voyages/:id.
     await waitFor(() => {
       const link = screen.getByTestId('history-apply-link-hid-1');
       expect(link).toBeInTheDocument();
@@ -390,9 +390,9 @@ describe('IncarnationDetail', () => {
       expect(screen.getByRole('heading', { name: 'redis-traits' })).toBeInTheDocument();
     });
 
-    // scalar-trait — chip team=platform.
+    // scalar-trait - chip team=platform.
     expect(screen.getByText('team=platform')).toBeInTheDocument();
-    // list-trait — раскрыт через запятую в одном чипе.
+    // list-trait - expanded via comma in one chip.
     expect(screen.getByText('tier=gold, critical')).toBeInTheDocument();
   });
 
@@ -429,7 +429,7 @@ describe('IncarnationDetail', () => {
       expect(screen.getByRole('heading', { name: 'no-traits' })).toBeInTheDocument();
     });
 
-    // Секция Traits присутствует, значение — em-dash fallback, страница не падает.
+    // Traits section present, value is em-dash fallback, page does not crash.
     expect(screen.getByText('Traits')).toBeInTheDocument();
   });
 });

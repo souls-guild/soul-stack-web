@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { splitScenarioNote } from '../pages/run/scenarioNote';
 
-// NIM-73 A2: описание сценария делится на ВЕДУЩИЙ абзац (заметный info-callout над
-// полями — для day-2 add_user/update_users это предусловие про пред-сид пароля) и
-// остаток (тускло под полями). Абзацы folded-YAML разделены \n.
+// NIM-73 A2: scenario description splits into a LEADING paragraph (a prominent
+// info-callout above the fields — for add_user/update_users this is the precondition
+// about pre-seeding the password) and the rest (muted, below the fields). folded-YAML
+// paragraphs are separated by \n.
 describe('splitScenarioNote', () => {
   it('делит описание на ведущий абзац (callout) и остаток (тускло)', () => {
     const { lead, rest } = splitScenarioNote(

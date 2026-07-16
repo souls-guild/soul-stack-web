@@ -110,7 +110,7 @@ describe('Provider create dual-mode credentials (NIM-11)', () => {
     expect(submit).toBeDisabled();
 
     await fillBase(dialog, user);
-    // Без credentials — всё ещё disabled.
+    // Without credentials - still disabled.
     expect(submit).toBeDisabled();
 
     await user.type(within(dialog).getByTestId('provider-credentials-ref'), 'vault:secret/x');

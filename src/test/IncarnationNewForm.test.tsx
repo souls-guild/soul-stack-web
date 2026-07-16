@@ -74,14 +74,14 @@ describe('IncarnationNewForm', () => {
     });
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
-    // Dropdown выбора create-сценария появился.
+    // Create-scenario select dropdown appeared.
     expect(await screen.findByTestId('create-scenario-select-wrapper')).toBeInTheDocument();
 
-    // Типизированное поле из create.input_schema появилось.
+    // Typed field from create.input_schema appeared.
     expect(await screen.findByTestId('create-input-fields')).toBeInTheDocument();
     expect(screen.getByTestId('field-text-maxmemory')).toBeInTheDocument();
 
-    // converge / restart не предлагаются как поля input и нет generic-билдера.
+    // converge / restart are not offered as input fields and there is no generic builder.
     expect(screen.queryByText(/^converge/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Scenario create input fields')).not.toBeInTheDocument();
   });
@@ -125,17 +125,17 @@ describe('IncarnationNewForm', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // Submit disabled пока required maxmemory пуст.
+    // Submit disabled while required maxmemory is empty.
     const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
     expect(submitBtn).toBeDisabled();
 
-    // Заполняем required → submit разблокирован.
+    // Fill required -> submit unblocked.
     const field = screen.getByTestId('field-text-maxmemory') as HTMLInputElement;
     await user.type(field, '512mb');
     expect(submitBtn).not.toBeDisabled();
   });
 
-  // Guard: скрытое required-поле (show_when=false) НЕ блокирует submit.
+  // Guard: hidden required field (show_when=false) does NOT block submit.
   it('submit-gate: скрытое required-поле (show_when=false) не блокирует кнопку', async () => {
     installFetchMock([
       {
@@ -150,8 +150,8 @@ describe('IncarnationNewForm', () => {
               kind: 'lifecycle',
               path: 'scenario/create/main.yml',
               create: true,
-              // mode — обычное поле; slave_of — required, но видим только когда mode=sentinel.
-              // С пустым mode show_when=false → поле скрыто → не блокирует submit.
+              // mode - a regular field; slave_of - required, but shown only when mode=sentinel.
+              // With empty mode show_when=false -> field hidden -> does not block submit.
               input_schema: {
                 mode: { type: 'string', required: false, description: 'режим' },
                 slave_of: {
@@ -194,12 +194,12 @@ describe('IncarnationNewForm', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // slave_of required но скрыт (mode != "sentinel") → submit НЕ заблокирован.
+    // slave_of required but hidden (mode != "sentinel") -> submit NOT blocked.
     const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
     expect(submitBtn).not.toBeDisabled();
   });
 
-  // Guard: required_when-предикат истинен → поле блокирует submit.
+  // Guard: required_when predicate is true -> field blocks submit.
   it('submit-gate: required_when=true блокирует кнопку', async () => {
     installFetchMock([
       {
@@ -215,7 +215,7 @@ describe('IncarnationNewForm', () => {
               path: 'scenario/create/main.yml',
               create: true,
               input_schema: {
-                // required_when с предикатом который всегда true (true == true)
+                // required_when with a predicate that is always true (true == true)
                 sentinel_host: {
                   type: 'string',
                   required_when: 'true == true',
@@ -246,11 +246,11 @@ describe('IncarnationNewForm', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     await screen.findByTestId('create-input-fields');
 
-    // sentinel_host required_when=true и поле пустое → submit ЗАБЛОКИРОВАН.
+    // sentinel_host required_when=true and field is empty -> submit BLOCKED.
     const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
     expect(submitBtn).toBeDisabled();
 
-    // Заполняем поле → submit разблокирован.
+    // Fill field -> submit unblocked.
     const field = screen.getByTestId('field-text-sentinel_host') as HTMLInputElement;
     await user.type(field, 'sentinel.example.com');
     expect(submitBtn).not.toBeDisabled();
@@ -307,14 +307,14 @@ describe('IncarnationNewForm', () => {
     );
 
     const user = userEvent.setup();
-    // Дожидаемся services.
+    // Wait for services.
     await waitFor(() => {
       expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument();
     });
 
     await user.type(screen.getByPlaceholderText('redis-prod'), 'redis-prod');
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
-    // Ждём dropdown create-сценария.
+    // Wait for create-scenario dropdown.
     await screen.findByTestId('create-scenario-select-wrapper');
     await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
 
@@ -325,12 +325,12 @@ describe('IncarnationNewForm', () => {
       expect(parsed.name).toBe('redis-prod');
       expect(parsed.service).toBe('redis');
       expect(parsed.input).toEqual({});
-      // create_scenario должен присутствовать в теле.
+      // create_scenario must be present in the body.
       expect(parsed.create_scenario).toBe('create');
     });
   });
 
-  // Guard: сервис без create-сценариев → bare-инкарнация, POST без create_scenario.
+  // Guard: service without create-scenarios -> bare incarnation, POST without create_scenario.
   it('bare-инкарнация: нет create-сценариев — показывается инфо-блок, POST без create_scenario', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -380,13 +380,13 @@ describe('IncarnationNewForm', () => {
     await user.type(screen.getByPlaceholderText('redis-prod'), 'svc-prod');
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
 
-    // Инфо-блок про bare появился.
+    // Info block about bare appeared.
     expect(await screen.findByTestId('create-bare-info')).toBeInTheDocument();
 
-    // Dropdown выбора create-сценария НЕ отображается.
+    // Create-scenario select dropdown is NOT displayed.
     expect(screen.queryByTestId('create-scenario-select-wrapper')).not.toBeInTheDocument();
 
-    // Submit не заблокирован.
+    // Submit not blocked.
     const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
     expect(submitBtn).not.toBeDisabled();
 
@@ -397,12 +397,12 @@ describe('IncarnationNewForm', () => {
       expect(post).toBeTruthy();
       const parsed = JSON.parse(post!.body);
       expect(parsed.name).toBe('svc-prod');
-      // create_scenario не должен присутствовать для bare-инкарнации.
+      // create_scenario must not be present for a bare incarnation.
       expect(parsed.create_scenario).toBeUndefined();
     });
   });
 
-  // Guard: два create-сценария → dropdown, выбор переключает input_schema.
+  // Guard: two create scenarios -> dropdown, selection switches input_schema.
   it('multi-create: dropdown переключает input_schema между сценариями', async () => {
     installFetchMock([
       {
@@ -449,23 +449,23 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
-    // Dropdown создания появился.
+    // Create dropdown appeared.
     const scenarioSelect = await screen.findByTestId('create-scenario-select');
     expect(scenarioSelect).toBeInTheDocument();
 
-    // Первый сценарий пред-выбран → подсказка поля port видна.
+    // First scenario pre-selected -> port field hint is visible.
     expect(await screen.findByTestId('field-hint-port')).toBeInTheDocument();
     expect(screen.queryByTestId('field-hint-sentinel_port')).not.toBeInTheDocument();
 
-    // Переключаем на create_sentinel.
+    // Switch to create_sentinel.
     await user.selectOptions(scenarioSelect, 'create_sentinel');
 
-    // Теперь видна подсказка поля sentinel_port.
+    // Now the sentinel_port field hint is visible.
     expect(await screen.findByTestId('field-hint-sentinel_port')).toBeInTheDocument();
     expect(screen.queryByTestId('field-hint-port')).not.toBeInTheDocument();
   });
 
-  // Guard: create_from_souls сценарий → показывается хелп-блок с ссылкой на Souls.
+  // Guard: create_from_souls scenario -> help block with a link to Souls is shown.
   it('create_from_souls сценарий — отображает хелп-блок с подсказкой онбординга', async () => {
     installFetchMock([
       {
@@ -504,11 +504,11 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
-    // Хелп-блок появляется при create_from_souls сценарии.
+    // Help block appears for the create_from_souls scenario.
     expect(await screen.findByTestId('create-from-souls-hint')).toBeInTheDocument();
   });
 
-  // Guard: обычный create сценарий (не from_souls) → хелп-блок НЕ показывается.
+  // Guard: regular create scenario (not from_souls) -> help block is NOT shown.
   it('обычный create сценарий — хелп-блок from_souls НЕ показывается', async () => {
     installFetchMock([
       {

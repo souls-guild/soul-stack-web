@@ -36,13 +36,13 @@ describe('SchemaTab', () => {
       '/incarnations/x',
     );
     await waitFor(() => {
-      // поля схемы
+      // schema fields
       expect(screen.getByText('redis_version')).toBeInTheDocument();
       expect(screen.getByText('maxmemory')).toBeInTheDocument();
     });
-    // required-флаг
+    // required flag
     expect(screen.getByText('да')).toBeInTheDocument();
-    // миграция from→to
+    // from->to migration
     expect(screen.getByText('migrations/001_to_002.yml')).toBeInTheDocument();
     expect(screen.getByText('v1')).toBeInTheDocument();
   });
