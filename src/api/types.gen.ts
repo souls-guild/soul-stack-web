@@ -828,6 +828,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{name}/telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Host-vitals хостов инкарнации
+         * @description Агрегат последних снимков утилизации по хостам инкарнации (latest+stale на хост, без окна) из Redis (NIM-86). Permission incarnation.get; видимость хостов — soul-read-scope. Пустой флот / вне scope → hosts:[]. Read-only, без audit.
+         */
+        get: operations["getIncarnationTelemetry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations/{name}/traits": {
         parameters: {
             query?: never;
@@ -1913,6 +1933,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/souls/{sid}/telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Host-vitals Soul-а
+         * @description Последний снимок утилизации хоста (CPU/load/mem/disk) + окно для спарклайнов из Redis (NIM-86, ADR-006), со scope-гейтом. Permission soul.list. stale=true если снимок протух или данных нет (старый агент → graceful). Read-only, без audit.
+         */
+        get: operations["getSoulTelemetry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/synods": {
         parameters: {
             query?: never;
@@ -2749,6 +2789,13 @@ export interface components {
              */
             type: "custom" | "discord" | "email" | "mattermost" | "slack" | "telegram" | "webhook";
         };
+        HostTelemetry: {
+            /** Format: date-time */
+            collected_at?: string;
+            latest?: components["schemas"]["UtilizationLatest"];
+            sid: string;
+            stale: boolean;
+        };
         HumaProblemError: {
             detail?: string;
             instance?: string;
@@ -2923,6 +2970,12 @@ export interface components {
          * @enum {string}
          */
         IncarnationStatus: "provisioning" | "ready" | "applying" | "error_locked" | "migration_failed" | "drift" | "destroying" | "destroy_failed";
+        IncarnationTelemetryReply: {
+            hosts: components["schemas"]["HostTelemetry"][] | null;
+            incarnation: string;
+            /** @description true если флот ковена превысил cap и список хостов усечён (обзорный glance) */
+            truncated: boolean;
+        };
         IncarnationUnlockReply: {
             name: string;
             previous_status: components["schemas"]["IncarnationStatus"];
@@ -3842,6 +3895,26 @@ export interface components {
          * @enum {string}
          */
         SoulStatus: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
+        SoulTelemetryReply: {
+            /**
+             * Format: date-time
+             * @description Soul-side момент сбора
+             */
+            collected_at?: string;
+            /** @description последний снимок (nil если данных нет) */
+            latest?: components["schemas"]["UtilizationLatest"];
+            /**
+             * Format: date-time
+             * @description Keeper-side момент приёма
+             */
+            received_at?: string;
+            /** @description SID (FQDN) Soul-а */
+            sid: string;
+            /** @description true если снимок протух (возраст > TTL) или данных нет */
+            stale: boolean;
+            /** @description окно точек для спарклайнов, newest-first */
+            window?: components["schemas"]["UtilizationWindowPoint"][] | null;
+        };
         SoulTraitsAssignReply: {
             /**
              * Format: int32
@@ -4012,6 +4085,13 @@ export interface components {
             operators: string[] | null;
             roles: string[] | null;
         };
+        TelemetryDisk: {
+            mount: string;
+            /** Format: int64 */
+            total_mb: number;
+            /** Format: int64 */
+            used_mb: number;
+        };
         Tiding: {
             annotations?: {
                 [key: string]: unknown;
@@ -4111,6 +4191,37 @@ export interface components {
             target_state_schema_version: number;
             to: string;
             unreachable_reason?: string;
+        };
+        UtilizationLatest: {
+            /** Format: double */
+            cpu_pct: number;
+            disks?: components["schemas"]["TelemetryDisk"][] | null;
+            /** Format: double */
+            load1: number;
+            /** Format: double */
+            load15: number;
+            /** Format: double */
+            load5: number;
+            /** Format: int64 */
+            mem_total_mb: number;
+            /** Format: int64 */
+            mem_used_mb: number;
+            /** Format: int64 */
+            swap_used_mb: number;
+            /** Format: int64 */
+            uptime_sec: number;
+        };
+        UtilizationWindowPoint: {
+            /** Format: date-time */
+            collected_at: string;
+            /** Format: double */
+            cpu_pct: number;
+            /** Format: double */
+            load1: number;
+            /** Format: int64 */
+            mem_total_mb: number;
+            /** Format: int64 */
+            mem_used_mb: number;
         };
         VigilCreateRequest: {
             /** @description адрес core-beacon (напр. 'core.beacon.file_changed') */
@@ -7777,6 +7888,56 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getIncarnationTelemetry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description имя инкарнации (корневой Coven-label хостов) */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationTelemetryReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11981,6 +12142,65 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getSoulTelemetry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description SID (FQDN) Soul-а */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulTelemetryReply"];
                 };
             };
             /** @description Forbidden */

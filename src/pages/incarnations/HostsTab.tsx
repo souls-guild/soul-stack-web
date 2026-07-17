@@ -11,6 +11,7 @@ import { soulDot, soulTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { AddHostModal } from './AddHostModal';
 import { RemoveHostModal } from './RemoveHostModal';
+import { HostUtilizationPanel } from './HostUtilizationPanel';
 import styles from '../common.module.css';
 
 // Hosts tab for IncarnationDetail.
@@ -279,6 +280,8 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
           </tbody>
         </table>
       ) : null}
+
+      <HostUtilizationPanel incarnationName={incarnationName} />
 
       <h2 className={styles.sectionTitle} style={{ marginTop: 16 }}>
         <Server size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />
