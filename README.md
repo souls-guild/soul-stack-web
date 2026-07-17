@@ -302,3 +302,16 @@ ui/
 - `scenario` — операция над state (create / restart / upgrade / ...),
   не «pipeline».
 - `Scry` — drift-scan (ADR-031), не «monitor».
+
+## Лицензия
+
+Soul Stack Web распространяется под **Business Source License 1.1** (BSL 1.1,
+fair-code) — той же лицензией, что и ядро Soul Stack: исходники открыты,
+production-использование разрешено широко (внутренняя эксплуатация, разработка,
+managed-услуги клиентам), кроме перепродажи как hosted/managed-сервиса третьим
+лицам. Через **2 года** каждая версия автоматически становится **Apache 2.0**.
+SDK и плагины — **Apache 2.0**.
+
+Практическое пояснение — [`LICENSING.md`](LICENSING.md); юридический текст —
+[`LICENSE`](LICENSE). Формулировки финализируются с юристом; полное решение —
+[ADR-016](https://github.com/co-cy/soul-stack/blob/main/docs/adr/0016-parity-license.md).
