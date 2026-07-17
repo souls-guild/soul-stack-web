@@ -282,7 +282,7 @@ describe('RunWizard', () => {
           name: 'add_user',
           kind: 'operational',
           description:
-            '★ Перед запуском засей пароль юзера в Vault (secret/redis/…/users/<name>#password)\n\nDay-2: добавить ACL-пользователя без рестарта.',
+            '★ Перед запуском засей пароль добавляемого юзера в Vault по пути secret/redis/<incarnation>/users/<name>#password\n\nДобавить или переопределить одного ACL-пользователя на работающем Redis без рестарта.',
           input_schema: { username: { type: 'string' } },
         },
       ],
@@ -301,10 +301,10 @@ describe('RunWizard', () => {
     await user.click(screen.getByRole('button', { name: /Далее/ }));
 
     const note = await screen.findByTestId('scenario-note');
-    expect(note).toHaveTextContent(/Перед запуском засей пароль юзера в Vault/);
+    expect(note).toHaveTextContent(/Перед запуском засей пароль добавляемого юзера в Vault/);
     // Callout contains ONLY the leading paragraph; rest of the description renders separately.
-    expect(note).not.toHaveTextContent(/добавить ACL-пользователя/);
-    expect(screen.getByText(/Day-2: добавить ACL-пользователя без рестарта/)).toBeInTheDocument();
+    expect(note).not.toHaveTextContent(/Добавить или переопределить одного ACL-пользователя/);
+    expect(screen.getByText(/Добавить или переопределить одного ACL-пользователя на работающем Redis без рестарта/)).toBeInTheDocument();
   });
 
   it('Scenario: regex * → все incarnations → submit', async () => {
