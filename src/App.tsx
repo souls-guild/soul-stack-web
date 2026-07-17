@@ -21,6 +21,7 @@ import { ErrandsList } from './pages/errands/ErrandsList';
 import { ErrandNewForm } from './pages/errands/ErrandNewForm';
 import { ErrandDetail } from './pages/errands/ErrandDetail';
 import { RbacPage } from './pages/rbac/RbacPage';
+import { CreateRolePage } from './pages/rbac/CreateRolePage';
 import { ServicesList } from './pages/services/ServicesList';
 import { ServiceDetail } from './pages/services/ServiceDetail';
 import { PluginsList } from './pages/plugins/PluginsList';
@@ -111,6 +112,7 @@ export function App() {
             <Route path="/errand/exec" element={<Navigate to="/errands/new" replace />} />
             <Route path="/errand/history" element={<Navigate to="/errands" replace />} />
             <Route path="/rbac" element={<Protected><RbacPage /></Protected>} />
+            <Route path="/rbac/roles/new" element={<Protected><CreateRolePage /></Protected>} />
             <Route path="/services" element={<Protected><ServicesList /></Protected>} />
             <Route path="/services/:name" element={<Protected><ServiceDetail /></Protected>} />
             <Route path="/plugins" element={<Protected><PluginsList /></Protected>} />

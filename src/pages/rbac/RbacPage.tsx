@@ -1,12 +1,11 @@
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, ShieldPlus, Trash2, UserPlus, X } from 'lucide-react';
 import { keeperApi, type RoleView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
-import { CreateRoleModal } from './CreateRoleModal';
 import { DeleteRoleModal } from './DeleteRoleModal';
 import { EditPermissionsModal } from './EditPermissionsModal';
 import { AssignRoleModal } from './AssignRoleModal';
@@ -277,8 +276,8 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
 
 export function RbacPage() {
   const { t } = useTranslation();
+  const nav = useNavigate();
   const [tab, setTab] = useState<Tab>('roles');
-  const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<RoleView | null>(null);
   const [deleting, setDeleting] = useState<RoleView | null>(null);
   const [assigningAid, setAssigningAid] = useState<string | null>(null);
@@ -319,7 +318,7 @@ export function RbacPage() {
           <div className={styles.crumbs}>{t('pages:rbacCrumbs')}</div>
         </div>
         {tab === 'roles' ? (
-          <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
+          <Button type="button" variant="primary" onClick={() => nav('/rbac/roles/new')}>
             <ShieldPlus size={14} style={{ marginRight: 6 }} />
             {t('createRole')}
           </Button>
@@ -383,11 +382,6 @@ export function RbacPage() {
         </>
       ) : null}
 
-      <CreateRoleModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        catalog={catalog}
-      />
       {editing ? (
         <EditPermissionsModal
           open={true}
