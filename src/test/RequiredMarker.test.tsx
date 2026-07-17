@@ -44,7 +44,7 @@ function StatefulFields({
 
 // --- isFieldRequired unit tests ---
 
-describe('isFieldRequired — хелпер', () => {
+describe('isFieldRequired — helper', () => {
   it('required:true → true', () => {
     expect(isFieldRequired({ type: 'string', required: true }, {})).toBe(true);
   });
@@ -53,33 +53,33 @@ describe('isFieldRequired — хелпер', () => {
     expect(isFieldRequired({ type: 'string', required: false }, {})).toBe(false);
   });
 
-  it('required:true + type:boolean → false (boolean-исключение)', () => {
+  it('required:true + type:boolean → false (boolean exception)', () => {
     expect(isFieldRequired({ type: 'boolean', required: true }, {})).toBe(false);
   });
 
-  it('required_when истинно → true', () => {
+  it('required_when true → true', () => {
     expect(isFieldRequired(
       { type: 'string', required_when: 'input.mode == "sentinel"' },
       { mode: 'sentinel' },
     )).toBe(true);
   });
 
-  it('required_when ложно → false', () => {
+  it('required_when false → false', () => {
     expect(isFieldRequired(
       { type: 'string', required_when: 'input.mode == "sentinel"' },
       { mode: 'standalone' },
     )).toBe(false);
   });
 
-  it('ни required ни required_when → false', () => {
+  it('neither required nor required_when → false', () => {
     expect(isFieldRequired({ type: 'string' }, {})).toBe(false);
   });
 });
 
 // --- Visual marker in ScenarioInputFields ---
 
-describe('ScenarioInputFields — маркер обязательности (*)', () => {
-  it('required:true → маркер присутствует', () => {
+describe('ScenarioInputFields — required marker (*)', () => {
+  it('required:true → marker present', () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: true },
     };
@@ -88,7 +88,7 @@ describe('ScenarioInputFields — маркер обязательности (*)'
     expect(screen.getByTestId('field-required-marker-host').textContent).toBe('*');
   });
 
-  it('required:false → маркер отсутствует', () => {
+  it('required:false → marker absent', () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: false },
     };
@@ -96,7 +96,7 @@ describe('ScenarioInputFields — маркер обязательности (*)'
     expect(screen.queryByTestId('field-required-marker-host')).toBeNull();
   });
 
-  it('поле без required → маркер отсутствует', () => {
+  it('field without required → marker absent', () => {
     const schema: ScenarioInputSchema = {
       comment: { type: 'string' },
     };
@@ -104,7 +104,7 @@ describe('ScenarioInputFields — маркер обязательности (*)'
     expect(screen.queryByTestId('field-required-marker-comment')).toBeNull();
   });
 
-  it('required_when ложно при начальном state → маркер отсутствует', () => {
+  it('required_when false at initial state → marker absent', () => {
     const schema: ScenarioInputSchema = {
       mode: { type: 'string' },
       sentinel_addr: {
@@ -117,7 +117,7 @@ describe('ScenarioInputFields — маркер обязательности (*)'
     expect(screen.queryByTestId('field-required-marker-sentinel_addr')).toBeNull();
   });
 
-  it('required_when истинно → маркер присутствует', () => {
+  it('required_when true → marker present', () => {
     const schema: ScenarioInputSchema = {
       mode: { type: 'string' },
       sentinel_addr: {
@@ -129,7 +129,7 @@ describe('ScenarioInputFields — маркер обязательности (*)'
     expect(screen.getByTestId('field-required-marker-sentinel_addr')).toBeTruthy();
   });
 
-  it('required_when реактивен — маркер появляется при смене input', () => {
+  it('required_when is reactive — marker appears when input changes', () => {
     const schema: ScenarioInputSchema = {
       mode: { type: 'string' },
       sentinel_addr: {

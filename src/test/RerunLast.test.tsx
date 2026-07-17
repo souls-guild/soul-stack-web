@@ -1,10 +1,10 @@
 /**
- * Тесты для rerun-last (перезапуск последнего упавшего сценария из error_locked):
- * 1. runnableScenarios фильтрует по полю `runnable` (create виден, destroy нет, converge виден)
- * 2. Кнопка «Перезапустить последний упавший» видна только на error_locked
- * 3. Модалка требует reason (пустой = ошибка валидации)
- * 4. Happy-path: вызов с правильным телом → 202 (incl. scenario) → тост с именем сценария
- * 5. Обработка 409: не-error_locked и ErrRerunInputUnavailable — разные сообщения
+ * Tests for rerun-last (rerunning the last failed scenario from error_locked):
+ * 1. runnableScenarios filters by the `runnable` field (create visible, destroy not, converge visible)
+ * 2. The "Rerun last failed" button is visible only in error_locked
+ * 3. The modal requires a reason (empty = validation error)
+ * 4. Happy-path: call with the correct body → 202 (incl. scenario) → toast with the scenario name
+ * 5. Handling 409: non-error_locked and ErrRerunInputUnavailable — different messages
  */
 import { describe, it, expect, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -60,7 +60,7 @@ function mockFetch(incBody: unknown, overrides?: Record<string, { status: number
 // ────────────────────────────────────────────────────────────
 // 1. Filtering runnableScenarios by the runnable field
 // ────────────────────────────────────────────────────────────
-describe('runnableScenarios — фильтр по полю runnable', () => {
+describe('runnableScenarios — filter by the runnable field', () => {
   const scenarios: ServiceScenarioInfo[] = [
     { name: 'create',   path: 'scenario/create/main.yml',   kind: 'lifecycle',    runnable: true },
     { name: 'destroy',  path: 'scenario/destroy/main.yml',  kind: 'lifecycle',    runnable: false },
@@ -68,32 +68,32 @@ describe('runnableScenarios — фильтр по полю runnable', () => {
     { name: 'restart',  path: 'scenario/restart/main.yml',  kind: 'operational',  runnable: true },
   ];
 
-  it('create (runnable=true) виден', () => {
+  it('create (runnable=true) is visible', () => {
     const res = runnableScenarios(scenarios);
     expect(res.map((s) => s.name)).toContain('create');
   });
 
-  it('destroy (runnable=false) скрыт', () => {
+  it('destroy (runnable=false) is hidden', () => {
     const res = runnableScenarios(scenarios);
     expect(res.map((s) => s.name)).not.toContain('destroy');
   });
 
-  it('converge (runnable=true) виден', () => {
+  it('converge (runnable=true) is visible', () => {
     const res = runnableScenarios(scenarios);
     expect(res.map((s) => s.name)).toContain('converge');
   });
 
-  it('operational (runnable=true) виден', () => {
+  it('operational (runnable=true) is visible', () => {
     const res = runnableScenarios(scenarios);
     expect(res.map((s) => s.name)).toContain('restart');
   });
 
-  it('итог: только 3 (create, converge, restart)', () => {
+  it('result: only 3 (create, converge, restart)', () => {
     const res = runnableScenarios(scenarios);
     expect(res).toHaveLength(3);
   });
 
-  it('fallback: если runnable отсутствует — lifecycle скрыт, operational виден (обратная совместимость)', () => {
+  it('fallback: when runnable is absent — lifecycle hidden, operational visible (backward compatibility)', () => {
     // Old backend doesn't return runnable -- simulate a missing field.
     const legacy = [
       { name: 'create',  kind: 'lifecycle' as const, path: '' },
@@ -109,7 +109,7 @@ describe('runnableScenarios — фильтр по полю runnable', () => {
 // ────────────────────────────────────────────────────────────
 // 2. "Rerun last failed" button -- visibility by status
 // ────────────────────────────────────────────────────────────
-describe('IncarnationDetail — кнопка rerunLast', () => {
+describe('IncarnationDetail — rerunLast button', () => {
   function renderDetail(status: string) {
     mockFetch(makeIncarnation(status));
     return renderWithProviders(
@@ -120,36 +120,36 @@ describe('IncarnationDetail — кнопка rerunLast', () => {
     );
   }
 
-  it('видна при status=error_locked', async () => {
+  it('visible when status=error_locked', async () => {
     tokenStore.clear();
     renderDetail('error_locked');
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
     });
     expect(
-      screen.getByRole('button', { name: /перезапустить последний упавший/i }),
+      screen.getByRole('button', { name: /rerun last failed/i }),
     ).toBeInTheDocument();
   });
 
-  it('НЕ видна при status=ready', async () => {
+  it('NOT visible when status=ready', async () => {
     tokenStore.clear();
     renderDetail('ready');
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
     });
     expect(
-      screen.queryByRole('button', { name: /перезапустить последний упавший/i }),
+      screen.queryByRole('button', { name: /rerun last failed/i }),
     ).not.toBeInTheDocument();
   });
 
-  it('НЕ видна при status=migration_failed (только Unlock)', async () => {
+  it('NOT visible when status=migration_failed (Unlock only)', async () => {
     tokenStore.clear();
     renderDetail('migration_failed');
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'test-inc' })).toBeInTheDocument();
     });
     expect(
-      screen.queryByRole('button', { name: /перезапустить последний упавший/i }),
+      screen.queryByRole('button', { name: /rerun last failed/i }),
     ).not.toBeInTheDocument();
     // Unlock button is present regardless (isLocked=true).
     expect(screen.getByRole('button', { name: /unlock/i })).toBeInTheDocument();
@@ -159,8 +159,8 @@ describe('IncarnationDetail — кнопка rerunLast', () => {
 // ────────────────────────────────────────────────────────────
 // 3. Modal requires reason
 // ────────────────────────────────────────────────────────────
-describe('RerunLastModal — валидация reason', () => {
-  it('не отправляет запрос при пустом reason', async () => {
+describe('RerunLastModal — reason validation', () => {
+  it('does not send a request when reason is empty', async () => {
     tokenStore.clear();
     let postCount = 0;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -187,7 +187,7 @@ describe('RerunLastModal — валидация reason', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
+    await user.click(screen.getByRole('button', { name: /rerun last failed/i }));
 
     // Modal opened -- title is present.
     await waitFor(() => {
@@ -196,14 +196,14 @@ describe('RerunLastModal — валидация reason', () => {
 
     // Click confirm without filling reason (button inside dialog -- last of the matches).
     const dialog = screen.getByRole('dialog');
-    const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
+    const btns = within(dialog).getAllByRole('button', { name: /rerun last failed/i });
     await user.click(btns[0]);
 
     // POST was not sent.
     expect(postCount).toBe(0);
     // Validation message (minimum 5 characters).
     await waitFor(() => {
-      expect(screen.getByText(/минимум 5 символов/i)).toBeInTheDocument();
+      expect(screen.getByText(/minimum 5 characters/i)).toBeInTheDocument();
     });
   });
 });
@@ -212,7 +212,7 @@ describe('RerunLastModal — валидация reason', () => {
 // 4. Happy-path: POST with reason -> 202 (incl. scenario) -> toast with scenario name
 // ────────────────────────────────────────────────────────────
 describe('RerunLastModal — happy-path', () => {
-  it('POST уходит с {reason}, 202 → тост с именем сценария и apply_id', async () => {
+  it('POST goes out with {reason}, 202 → toast with scenario name and apply_id', async () => {
     tokenStore.clear();
     let capturedBody: unknown = null;
     let postUrl = '';
@@ -251,24 +251,24 @@ describe('RerunLastModal — happy-path', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
+    await user.click(screen.getByRole('button', { name: /rerun last failed/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
     const textarea = screen.getByRole('textbox');
-    await user.type(textarea, 'исправлен конфиг вручную');
+    await user.type(textarea, 'fixed the config manually');
 
-    await user.click(screen.getAllByRole('button', { name: /перезапустить последний упавший/i }).find(
+    await user.click(screen.getAllByRole('button', { name: /rerun last failed/i }).find(
       (b) => !b.hasAttribute('title'), // button inside the modal, without a title tooltip
-    ) ?? screen.getAllByRole('button', { name: /перезапустить последний упавший/i })[0]);
+    ) ?? screen.getAllByRole('button', { name: /rerun last failed/i })[0]);
 
     // POST was sent to the correct URL.
     await waitFor(() => {
       expect(postUrl).toMatch(/\/v1\/incarnations\/test-inc\/rerun-last/);
     });
-    expect(capturedBody).toEqual({ reason: 'исправлен конфиг вручную' });
+    expect(capturedBody).toEqual({ reason: 'fixed the config manually' });
 
     // Toast with the scenario name and apply_id appeared.
     await waitFor(() => {
@@ -283,8 +283,8 @@ describe('RerunLastModal — happy-path', () => {
 // ────────────────────────────────────────────────────────────
 // 4b. reasonMax: >500 characters -- client-side error, POST is not sent
 // ────────────────────────────────────────────────────────────
-describe('RerunLastModal — reasonMax 500 символов', () => {
-  it('reason длиннее 500 символов — показывает ошибку, POST не уходит', async () => {
+describe('RerunLastModal — reasonMax 500 characters', () => {
+  it('reason longer than 500 characters — shows an error, POST is not sent', async () => {
     tokenStore.clear();
     let postCount = 0;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -309,7 +309,7 @@ describe('RerunLastModal — reasonMax 500 символов', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
+    await user.click(screen.getByRole('button', { name: /rerun last failed/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -323,14 +323,14 @@ describe('RerunLastModal — reasonMax 500 символов', () => {
     fireEvent.change(textarea, { target: { value: 'a'.repeat(501) } });
 
     const dialog = screen.getByRole('dialog');
-    const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
+    const btns = within(dialog).getAllByRole('button', { name: /rerun last failed/i });
     await user.click(btns[0]);
 
     // POST was not sent
     expect(postCount).toBe(0);
     // Client-side error message shown
     await waitFor(() => {
-      expect(screen.getByText(/максимум 500 символов/i)).toBeInTheDocument();
+      expect(screen.getByText(/maximum 500 characters/i)).toBeInTheDocument();
     });
   });
 });
@@ -370,7 +370,7 @@ describe('RerunLastModal — 409 conflict', () => {
     });
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /перезапустить последний упавший/i }));
+    await user.click(screen.getByRole('button', { name: /rerun last failed/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -378,13 +378,13 @@ describe('RerunLastModal — 409 conflict', () => {
 
     const dialog = screen.getByRole('dialog');
     const textarea = within(dialog).getByRole('textbox');
-    await user.type(textarea, 'причина тестового 409');
+    await user.type(textarea, 'test 409 reason');
 
-    const btns = within(dialog).getAllByRole('button', { name: /перезапустить последний упавший/i });
+    const btns = within(dialog).getAllByRole('button', { name: /rerun last failed/i });
     await user.click(btns[0]);
   }
 
-  it('type=incarnation-locked (не-error_locked) — показывает generic conflict-сообщение', async () => {
+  it('type=incarnation-locked (non-error_locked) — shows a generic conflict message', async () => {
     await submit409(
       'https://soul-stack.io/errors/incarnation-locked',
       'incarnation test-inc is not error_locked — rerun-last requires error_locked',
@@ -392,22 +392,22 @@ describe('RerunLastModal — 409 conflict', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/инкарнация не в статусе error_locked/i),
+        screen.getByText(/the incarnation is not in error_locked status/i),
       ).toBeInTheDocument();
     });
   });
 
-  it('type=rerun-input-unavailable — показывает сообщение про unlock + ручной запуск', async () => {
+  it('type=rerun-input-unavailable — shows a message about unlock + manual run', async () => {
     await submit409(
       'https://soul-stack.io/errors/rerun-input-unavailable',
-      'incarnation test-inc rerun-last неприменим: input упавшего прогона недоступен ' +
-      '(рецепт вычищен ретеншном либо legacy-прогон без рецепта) — сними блок обычным unlock ' +
-      'и запусти нужный сценарий вручную с явным input',
+      'incarnation test-inc rerun-last is not applicable: the failed run input is unavailable ' +
+      '(recipe cleaned up by retention or a legacy run without a recipe) — remove the lock with a regular unlock ' +
+      'and run the desired scenario manually with an explicit input',
     );
 
     await waitFor(() => {
       expect(
-        screen.getByText(/снимите блок обычным unlock и запустите сценарий вручную/i),
+        screen.getByText(/remove the lock with a regular Unlock and run the scenario manually/i),
       ).toBeInTheDocument();
     });
   });

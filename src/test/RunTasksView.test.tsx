@@ -42,8 +42,8 @@ const TASKS: RunTaskView[] = [
   },
 ];
 
-describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
-  it('рендерит список всех задач + панель деталей; дефолт-выбор = упавшая задача с error', () => {
+describe('RunTasks (Schema-2 master-detail, NIM-37)', () => {
+  it('renders the list of all tasks + detail panel; default selection = the failed task with error', () => {
     renderWithProviders(<RunTasks tasks={TASKS} />, '/');
 
     // List: both tasks as string options.
@@ -60,7 +60,7 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     expect(within(detail).getByText('TASK_STATUS_FAILED')).toBeInTheDocument();
   });
 
-  it('клик по задаче меняет панель: name/module + params key/value + per-host строки', async () => {
+  it('clicking a task swaps the panel: name/module + params key/value + per-host rows', async () => {
     const user = userEvent.setup();
     renderWithProviders(<RunTasks tasks={TASKS} />, '/');
 
@@ -79,7 +79,7 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     expect(screen.getByTestId('run-task-host-redis-2.local')).toBeInTheDocument();
   });
 
-  it('no_log-задача: вход + per-host output + error.message скрыты (утечки нет), code/module видны', () => {
+  it('no_log task: input + per-host output + error.message are hidden (no leak), code/module visible', () => {
     const noLog: RunTaskView[] = [
       {
         plan_index: 0,
@@ -102,23 +102,23 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     renderWithProviders(<RunTasks tasks={noLog} />, '/');
 
     // Input is hidden, secret value does not leak into the params block.
-    expect(screen.getByTestId('run-task-params')).toHaveTextContent('скрыто (no_log)');
+    expect(screen.getByTestId('run-task-params')).toHaveTextContent('hidden (no_log)');
     expect(screen.queryByText('db_password')).not.toBeInTheDocument();
 
     // Per-host output is hidden for both hosts; register_data/stderr not in DOM.
-    expect(screen.getByTestId('run-task-output-h1.local')).toHaveTextContent('скрыто (no_log)');
-    expect(screen.getByTestId('run-task-output-h2.local')).toHaveTextContent('скрыто (no_log)');
+    expect(screen.getByTestId('run-task-output-h1.local')).toHaveTextContent('hidden (no_log)');
+    expect(screen.getByTestId('run-task-output-h2.local')).toHaveTextContent('hidden (no_log)');
     expect(screen.queryByText(/SUPERSECRET/)).not.toBeInTheDocument();
     expect(screen.queryByText(/LEAKED-STDERR/)).not.toBeInTheDocument();
 
-    // Error: code + module visible, message (may carry a secret) — hidden.
+    // Error: code + module visible, message (may carry a secret) is hidden.
     const err = screen.getByTestId('run-task-error-h2.local');
     expect(err).toHaveTextContent('render_failed');
     expect(err).toHaveTextContent('core.secret.written');
     expect(screen.queryByText(/hunter2/)).not.toBeInTheDocument();
   });
 
-  it('output-объект: per-host output рендерится как key→value (exit_code виден), пустые поля скрыты', async () => {
+  it('output object: per-host output renders as key→value (exit_code visible), empty fields hidden', async () => {
     const user = userEvent.setup();
     renderWithProviders(<RunTasks tasks={TASKS} />, '/');
 
@@ -133,7 +133,7 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     expect(within(out).queryByText('stderr')).not.toBeInTheDocument();
   });
 
-  it('задача без hosts (null) не роняет рендер', () => {
+  it('task with no hosts (null) does not crash rendering', () => {
     const noHosts: RunTaskView[] = [
       { plan_index: 0, passage: 0, name: 'No hosts task', module: 'core.noop', no_log: false, hosts: null },
     ];
@@ -142,15 +142,15 @@ describe('RunTasks (Схема-2 master-detail, NIM-37)', () => {
     expect(screen.getByTestId('run-task-item-0')).toHaveTextContent('No hosts task');
   });
 
-  it('задача без params → «нет данных»', () => {
+  it('task with no params → «no data»', () => {
     const noParams: RunTaskView[] = [
       { plan_index: 0, passage: 0, name: 'Noop', module: 'core.noop', no_log: false, hosts: [{ sid: 'h1.local', status: 'TASK_STATUS_OK' }] },
     ];
     renderWithProviders(<RunTasks tasks={noParams} />, '/');
-    expect(screen.getByTestId('run-task-params')).toHaveTextContent('нет данных');
+    expect(screen.getByTestId('run-task-params')).toHaveTextContent('no data');
   });
 
-  it('пустой список задач → empty-state', () => {
+  it('empty task list → empty-state', () => {
     renderWithProviders(<RunTasks tasks={[]} />, '/');
     expect(screen.getByTestId('run-tasks-empty')).toBeInTheDocument();
   });

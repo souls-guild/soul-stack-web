@@ -100,42 +100,42 @@ beforeEach(() => {
     static CLOSED = 2;
   };
 });
-describe('RunWizard — режим Cadence (recurrence)', () => {
-  it('Step 1 показывает кнопки выбора режима Разово/Регулярно', () => {
+describe('RunWizard — Cadence mode (recurrence)', () => {
+  it('Step 1 shows run mode toggle One-time/Recurring', () => {
     setupFetch();
     renderWizard();
 
-    expect(screen.getByLabelText('Разово')).toBeInTheDocument();
-    expect(screen.getByLabelText('Регулярно')).toBeInTheDocument();
+    expect(screen.getByLabelText('One-time')).toBeInTheDocument();
+    expect(screen.getByLabelText('Recurring')).toBeInTheDocument();
     // Default — Once
-    expect(screen.getByLabelText('Разово')).toBeChecked();
+    expect(screen.getByLabelText('One-time')).toBeChecked();
   });
 
-  it('?recurrence=true → дефолтный выбор «Регулярно»', () => {
+  it('?recurrence=true → defaults to "Recurring"', () => {
     setupFetch();
     renderWizard('/run?recurrence=true');
 
-    expect(screen.getByLabelText('Регулярно')).toBeChecked();
+    expect(screen.getByLabelText('Recurring')).toBeChecked();
   });
 
-  it('Scenario + Cadence (interval): submit → POST /v1/cadences с schedule_kind=interval', async () => {
+  it('Scenario + Cadence (interval): submit → POST /v1/cadences with schedule_kind=interval', async () => {
     const posts = setupFetch();
     renderWizard();
     const user = userEvent.setup();
 
     // Step 1: switch to "Regular"
-    await user.click(screen.getByLabelText('Регулярно'));
-    expect(screen.getByLabelText('Регулярно')).toBeChecked();
+    await user.click(screen.getByLabelText('Recurring'));
+    expect(screen.getByLabelText('Recurring')).toBeChecked();
 
     // Next: Step 2 — select service+scenario
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     // Step 3 — incarnation regex
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -143,7 +143,7 @@ describe('RunWizard — режим Cadence (recurrence)', () => {
     );
 
     // Step 4 — cadence fields should appear
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
 
     // Fill in the Cadence name
@@ -158,7 +158,7 @@ describe('RunWizard — режим Cadence (recurrence)', () => {
     expect(screen.getByLabelText('Overlap policy')).toHaveValue('skip');
 
     // Submit
-    await user.click(screen.getByRole('button', { name: /Создать расписание/ }));
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
 
     // Check the request body
@@ -174,23 +174,23 @@ describe('RunWizard — режим Cadence (recurrence)', () => {
     expect(body.scenario_name).toBe('restart');
   });
 
-  it('Scenario + Cadence (cron): submit → POST /v1/cadences с schedule_kind=cron', async () => {
+  it('Scenario + Cadence (cron): submit → POST /v1/cadences with schedule_kind=cron', async () => {
     const posts = setupFetch();
     renderWizard();
     const user = userEvent.setup();
 
     // Step 1: "Regular"
-    await user.click(screen.getByLabelText('Регулярно'));
+    await user.click(screen.getByLabelText('Recurring'));
 
     // Step 2: scenario
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     // Step 3: regex
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -198,7 +198,7 @@ describe('RunWizard — режим Cadence (recurrence)', () => {
     );
 
     // Step 4: switch to cron
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('schedule_kind_cron')).toBeInTheDocument());
 
     await user.click(screen.getByLabelText('schedule_kind_cron'));
@@ -211,7 +211,7 @@ describe('RunWizard — режим Cadence (recurrence)', () => {
     // overlap: queue
     await user.selectOptions(screen.getByLabelText('Overlap policy'), 'queue');
 
-    await user.click(screen.getByRole('button', { name: /Создать расписание/ }));
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
 
     const cadencePosts = posts.filter((p) => (p.url as string).includes('/v1/cadences'));
@@ -223,28 +223,28 @@ describe('RunWizard — режим Cadence (recurrence)', () => {
     expect(body.overlap_policy).toBe('queue');
   });
 
-  it('Cadence: незаполненное имя → submit заблокирован', async () => {
+  it('Cadence: empty name → submit disabled', async () => {
     setupFetch();
     renderWizard();
     const user = userEvent.setup();
 
-    await user.click(screen.getByLabelText('Регулярно'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByLabelText('Recurring'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
 
     // Name is empty -> submit disabled
-    expect(screen.getByRole('button', { name: /Создать расписание/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Create schedule/ })).toBeDisabled();
   });
 });

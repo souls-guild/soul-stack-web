@@ -29,13 +29,13 @@ describe('useTheme (context-based)', () => {
     });
   });
 
-  it('initial mode = system, data-theme не выставлен (system→light в моке)', () => {
+  it('initial mode = system, data-theme not set (system→light in the mock)', () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.mode).toBe('system');
     expect(document.documentElement.getAttribute('data-theme')).toBeNull();
   });
 
-  it('setMode("dark") выставляет data-theme="dark" и пишет в localStorage', () => {
+  it('setMode("dark") sets data-theme="dark" and writes to localStorage', () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setMode('dark'));
     expect(result.current.mode).toBe('dark');
@@ -43,7 +43,7 @@ describe('useTheme (context-based)', () => {
     expect(window.localStorage.getItem('theme')).toBe('dark');
   });
 
-  it('setMode("light") выставляет data-theme="light"', () => {
+  it('setMode("light") sets data-theme="light"', () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setMode('dark'));
     act(() => result.current.setMode('light'));
@@ -51,7 +51,7 @@ describe('useTheme (context-based)', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
-  it('setMode("warm") выставляет data-theme="warm"', () => {
+  it('setMode("warm") sets data-theme="warm"', () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setMode('warm'));
     expect(result.current.mode).toBe('warm');
@@ -59,7 +59,7 @@ describe('useTheme (context-based)', () => {
     expect(window.localStorage.getItem('theme')).toBe('warm');
   });
 
-  it('setMode("deep") выставляет data-theme="deep"', () => {
+  it('setMode("deep") sets data-theme="deep"', () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setMode('deep'));
     expect(result.current.mode).toBe('deep');
@@ -67,14 +67,14 @@ describe('useTheme (context-based)', () => {
     expect(window.localStorage.getItem('theme')).toBe('deep');
   });
 
-  it('useTheme без провайдера бросает ошибку', () => {
+  it('useTheme without a provider throws an error', () => {
     // useTheme outside ThemeProvider should throw.
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => renderHook(() => useTheme())).toThrow('useTheme must be used inside <ThemeProvider>');
     consoleError.mockRestore();
   });
 
-  it('при localStorage="dark" инициализируется как dark', () => {
+  it('initializes as dark when localStorage="dark"', () => {
     window.localStorage.setItem('theme', 'dark');
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.mode).toBe('dark');

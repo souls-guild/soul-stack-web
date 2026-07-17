@@ -3,38 +3,38 @@ import { initReactI18next } from 'react-i18next';
 import HttpBackend from 'i18next-http-backend';
 
 // i18n Soul Stack UI — hybrid lazy-load.
-// Default-язык ru — bundled inline (мгновенный первый рендер, без мигания):
-// eager-glob грузит только locales/ru/<ns>.json в JS-бандл.
-// Остальные языки (en + будущие) — static-файлы public/locales/<lang>/<ns>.json,
-// фетчатся через i18next-http-backend ТОЛЬКО при переключении на язык; в бандл
-// не попадают. Добавить язык: положить public/locales/<lang>/*.json + код в
-// SUPPORTED_LANGS. Добавить ключ: ru в src/i18n/locales/ru/<ns>.json + en в
-// public/locales/en/<ns>.json (оба обязательны, ns-key-sync тест проверяет).
-// Список namespace выводится из ru-файлов — добавление ns не требует правки тут.
+// Default language en — bundled inline (instant first render, no flash):
+// eager-glob loads only locales/en/<ns>.json into the JS bundle.
+// Other languages (ru + future) are static files public/locales/<lang>/<ns>.json,
+// fetched via i18next-http-backend ONLY when switching to that language; they
+// never enter the bundle. Add a language: drop public/locales/<lang>/*.json + a
+// code in SUPPORTED_LANGS. Add a key: en in src/i18n/locales/en/<ns>.json + ru in
+// public/locales/ru/<ns>.json (both required, the ns-key-sync test checks it).
+// The namespace list is derived from the en files — adding an ns needs no edit here.
 
-export const SUPPORTED_LANGS = ['ru', 'en'] as const;
+export const SUPPORTED_LANGS = ['en', 'ru'] as const;
 export type Lang = (typeof SUPPORTED_LANGS)[number];
 
-export const DEFAULT_LANG: Lang = 'ru';
+export const DEFAULT_LANG: Lang = 'en';
 export const LANG_STORAGE_KEY = 'lang';
 
-// Inline-ресурсы default-языка (только ru) — bundled.
-const ruModules = import.meta.glob('./locales/ru/*.json', { eager: true });
+// Inline resources for the default language (en only) — bundled.
+const enModules = import.meta.glob('./locales/en/*.json', { eager: true });
 
 type NsBundle = Record<string, object>;
 
-function buildRuInline(): { ruBundle: NsBundle; namespaces: string[] } {
-  const ruBundle: NsBundle = {};
-  for (const [path, mod] of Object.entries(ruModules)) {
-    const m = path.match(/\.\/locales\/ru\/([^/]+)\.json$/);
+function buildEnInline(): { enBundle: NsBundle; namespaces: string[] } {
+  const enBundle: NsBundle = {};
+  for (const [path, mod] of Object.entries(enModules)) {
+    const m = path.match(/\.\/locales\/en\/([^/]+)\.json$/);
     if (!m) continue;
     const [, ns] = m;
-    ruBundle[ns] = (mod as { default?: object }).default ?? (mod as object);
+    enBundle[ns] = (mod as { default?: object }).default ?? (mod as object);
   }
-  return { ruBundle, namespaces: Object.keys(ruBundle).sort() };
+  return { enBundle, namespaces: Object.keys(enBundle).sort() };
 }
 
-const { ruBundle, namespaces } = buildRuInline();
+const { enBundle, namespaces } = buildEnInline();
 
 function detectLang(): Lang {
   if (typeof window === 'undefined') return DEFAULT_LANG;
@@ -42,7 +42,7 @@ function detectLang(): Lang {
     const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
     if (stored === 'ru' || stored === 'en') return stored;
   } catch {
-    // localStorage недоступен (private mode / quota) — fallback на default.
+    // localStorage unavailable (private mode / quota) — fall back to default.
   }
   return DEFAULT_LANG;
 }
@@ -51,27 +51,27 @@ i18n
   .use(HttpBackend)
   .use(initReactI18next)
   .init({
-    resources: { ru: ruBundle }, // default inline, остальные языки — backend.
-    partialBundledLanguages: true, // позволяет миксовать inline + http-backend.
+    resources: { en: enBundle }, // default inline, other languages via backend.
+    partialBundledLanguages: true, // allows mixing inline + http-backend.
     lng: detectLang(),
     fallbackLng: DEFAULT_LANG,
     ns: namespaces,
     defaultNS: 'common',
     backend: {
-      // import.meta.env.BASE_URL = '/ui/' при сборке (base: '/ui/' в vite.config.ts).
-      // Абсолютный путь /locales/... даёт 404 когда UI встроен под /ui/ в Keeper.
-      // BASE_URL гарантирует корректный prefix и в dev (/ui/) и в prod.
+      // import.meta.env.BASE_URL = '/ui/' at build time (base: '/ui/' in vite.config.ts).
+      // An absolute path /locales/... 404s when the UI is embedded under /ui/ in Keeper.
+      // BASE_URL keeps the prefix correct both in dev (/ui/) and in prod.
       loadPath: `${import.meta.env.BASE_URL}locales/{{lng}}/{{ns}}.json`,
     },
     interpolation: {
-      escapeValue: false, // React сам экранирует.
+      escapeValue: false, // React escapes on its own.
     },
     returnNull: false,
   });
 
-// Переключение языка. Для non-default (en+) i18next-http-backend async-загрузит
-// namespace по HTTP; до резолва i18next держит текущие строки (мигания/краша нет).
-// Возвращает промис загрузки — LangToggle использует его для disabled-состояния.
+// Language switch. For non-default (ru+) i18next-http-backend async-loads the
+// namespace over HTTP; until it resolves i18next keeps the current strings (no
+// flash/crash). Returns the load promise — LangToggle uses it for the disabled state.
 export function changeLang(lng: Lang): Promise<unknown> {
   try {
     window.localStorage.setItem(LANG_STORAGE_KEY, lng);

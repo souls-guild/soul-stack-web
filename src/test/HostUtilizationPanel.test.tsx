@@ -25,7 +25,7 @@ function render() {
 }
 
 describe('HostUtilizationPanel', () => {
-  it('happy: latest → CPU/mem/disk/load/uptime + свежесть', async () => {
+  it('happy: latest → CPU/mem/disk/load/uptime + freshness', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -49,7 +49,7 @@ describe('HostUtilizationPanel', () => {
     expect(screen.queryByTestId('freshness-stale')).not.toBeInTheDocument();
   });
 
-  it('протух TTL: stale=true → «устарело», не выдаётся за свежее', async () => {
+  it('TTL expired: stale=true → "stale", not shown as fresh', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -65,11 +65,11 @@ describe('HostUtilizationPanel', () => {
     ]);
     render();
     await waitFor(() => expect(screen.getByTestId('freshness-stale')).toBeInTheDocument());
-    expect(screen.getByText('устарело')).toBeInTheDocument();
+    expect(screen.getByText('stale')).toBeInTheDocument();
     expect(screen.queryByTestId('freshness-fresh')).not.toBeInTheDocument();
   });
 
-  it('нет vitals (старый агент): latest отсутствует → graceful «нет данных», без краха', async () => {
+  it('no vitals (legacy agent): latest missing → graceful "no data", no crash', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -83,13 +83,13 @@ describe('HostUtilizationPanel', () => {
     ]);
     render();
     await waitFor(() => expect(screen.getByTestId('freshness-nodata')).toBeInTheDocument());
-    expect(screen.getByText('нет данных')).toBeInTheDocument();
-    // Таблица отрисована, панель не сломалась.
+    expect(screen.getByText('no data')).toBeInTheDocument();
+    // Table rendered, panel did not break.
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.queryByTestId('freshness-fresh')).not.toBeInTheDocument();
   });
 
-  it('пустой флот: hosts=[] → empty-state', async () => {
+  it('empty souls: hosts=[] → empty-state', async () => {
     installFetchMock([
       { method: 'GET', url: AGG, body: { incarnation: 'redis-prod', truncated: false, hosts: [] } },
     ]);
@@ -98,7 +98,7 @@ describe('HostUtilizationPanel', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('nullable-массив: hosts=null → empty-state, без краха', async () => {
+  it('nullable array: hosts=null → empty-state, no crash', async () => {
     installFetchMock([
       { method: 'GET', url: AGG, body: { incarnation: 'redis-prod', truncated: false, hosts: null } },
     ]);
@@ -106,22 +106,22 @@ describe('HostUtilizationPanel', () => {
     await waitFor(() => expect(screen.getByTestId('util-empty')).toBeInTheDocument());
   });
 
-  it('403: недостаточно прав → graceful degrade, без таблицы', async () => {
+  it('403: insufficient permissions → graceful degrade, no table', async () => {
     installFetchMock([{ method: 'GET', url: AGG, status: 403, body: { title: 'forbidden', status: 403 } }]);
     render();
     await waitFor(() => expect(screen.getByTestId('util-forbidden')).toBeInTheDocument());
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('404 (старый Keeper без telemetry): мягкая «недоступно», не error-box', async () => {
+  it('404 (old Keeper without telemetry): soft "unavailable", not an error-box', async () => {
     installFetchMock([{ method: 'GET', url: AGG, status: 404, body: { title: 'not found', status: 404 } }]);
     render();
     await waitFor(() => expect(screen.getByTestId('util-unavailable')).toBeInTheDocument());
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Не удалось загрузить телеметрию/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Failed to load telemetry/)).not.toBeInTheDocument();
   });
 
-  it('частичный latest (нет load): панель не падает, load → «—»', async () => {
+  it('partial latest (no load): panel does not crash, load → "—"', async () => {
     const partial = {
       cpu_pct: 42.3,
       mem_used_mb: 3200,
@@ -144,10 +144,10 @@ describe('HostUtilizationPanel', () => {
     render();
     await waitFor(() => expect(screen.getByText('42%')).toBeInTheDocument());
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0); // load-ячейка деградировала
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0); // load cell degraded
   });
 
-  it('раскрытие хоста → спарклайны из window (newest-first, развёрнутого)', async () => {
+  it('expand host → sparklines from window (newest-first, expanded)', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -176,7 +176,7 @@ describe('HostUtilizationPanel', () => {
       },
     ]);
     render();
-    const btn = await screen.findByLabelText(/Показать спарклайны хоста/);
+    const btn = await screen.findByLabelText(/Show sparklines for host/);
     await userEvent.click(btn);
     const cpu = await screen.findByTestId('spark-cpu');
     expect(cpu).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe('HostUtilizationPanel', () => {
     expect(screen.getByTestId('spark-load')).toBeInTheDocument();
   });
 
-  it('раскрытие: window=null → «окно пусто», без краха', async () => {
+  it('expand: window=null → "window empty", no crash', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -205,7 +205,7 @@ describe('HostUtilizationPanel', () => {
       },
     ]);
     render();
-    const btn = await screen.findByLabelText(/Показать спарклайны хоста/);
+    const btn = await screen.findByLabelText(/Show sparklines for host/);
     await userEvent.click(btn);
     expect(await screen.findByTestId('spark-empty')).toBeInTheDocument();
   });

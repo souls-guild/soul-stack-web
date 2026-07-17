@@ -12,35 +12,35 @@ function renderSidebar() {
 }
 
 describe('Sidebar navigation', () => {
-  it('Tides и Command runs убраны из навигации (Voyage-only cutover)', () => {
+  it('Tides and Command runs removed from navigation (Voyage-only cutover)', () => {
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Tides/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Command runs/ })).not.toBeInTheDocument();
   });
 
-  it('standalone «Errands» убран из верхней History-навигации', () => {
+  it('standalone «Errands» removed from the top History navigation', () => {
     renderSidebar();
     // No nav link specifically "Errands" (per-host log is only available via drill-down/route).
     expect(screen.queryByRole('link', { name: /^Errands$/ })).not.toBeInTheDocument();
   });
 
-  it('All runs (unified feed) присутствует', () => {
+  it('All runs (unified feed) is present', () => {
     renderSidebar();
     expect(screen.getByRole('link', { name: /All runs/ })).toHaveAttribute('href', '/runs');
   });
 
-  it('Incarnation runs дедуплицирован — свёрнут в единый /runs (NIM-38), отдельного пункта нет', () => {
+  it('Incarnation runs deduplicated — collapsed into a single /runs (NIM-38), no separate item', () => {
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Incarnation runs/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /incarnation-runs/ })).not.toBeInTheDocument();
   });
 
-  it('Provisioning Policy убран из REGISTRY — нет прямой ссылки на /provisioning-policy', () => {
+  it('Provisioning Policy removed from REGISTRY — no direct link to /provisioning-policy', () => {
     renderSidebar();
     expect(screen.queryByRole('link', { name: /Provisioning Policy/ })).not.toBeInTheDocument();
   });
 
-  it('Settings присутствует и ведёт на /settings', () => {
+  it('Settings is present and links to /settings', () => {
     renderSidebar();
     expect(screen.getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/settings');
   });

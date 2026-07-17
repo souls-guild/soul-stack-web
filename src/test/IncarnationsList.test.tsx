@@ -10,7 +10,7 @@ describe('IncarnationsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит заголовок и список из /v1/incarnations', async () => {
+  it('renders the heading and list from /v1/incarnations', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -57,7 +57,7 @@ describe('IncarnationsList', () => {
     });
   });
 
-  it('показывает empty-state при пустом списке', async () => {
+  it('shows empty-state when the list is empty', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -67,11 +67,11 @@ describe('IncarnationsList', () => {
     ]);
     renderWithProviders(<IncarnationsList />, '/incarnations');
     await waitFor(() => {
-      expect(screen.getByText(/не найдено/i)).toBeInTheDocument();
+      expect(screen.getByText(/matched the filter/i)).toBeInTheDocument();
     });
   });
 
-  it('передаёт server-side coven=<x> в запрос /v1/incarnations', async () => {
+  it('passes server-side coven=<x> to the /v1/incarnations request', async () => {
     const calls: string[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -93,7 +93,7 @@ describe('IncarnationsList', () => {
     });
   });
 
-  it('inline-error на невалидной coven-метке (не отправляет запрос)', async () => {
+  it('inline-error on an invalid coven label (does not send a request)', async () => {
     let called = 0;
     vi.stubGlobal('fetch', async () => {
       called += 1;
@@ -111,14 +111,14 @@ describe('IncarnationsList', () => {
     await waitFor(() => expect(called).toBeGreaterThanOrEqual(1));
     const initial = called;
     await user.type(covenInput, 'Prod-Bad!');
-    expect(await screen.findByText(/Не валидная coven-метка/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Invalid coven label/i)).toBeInTheDocument();
     // No re-request with an invalid value was made.
     expect(called).toBe(initial);
   });
 
   // -- Guard tests: clickable links --------------------------------------
 
-  it('[LINKS] имя сервиса рендерится ссылкой на /services/:name', async () => {
+  it('[LINKS] service name renders as a link to /services/:name', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -168,7 +168,7 @@ describe('IncarnationsList', () => {
     expect(postgresLink).toHaveAttribute('href', '/services/postgres');
   });
 
-  it('[LINKS] version-суффикс (@v2.0.0) остаётся текстом, не ссылкой', async () => {
+  it('[LINKS] version suffix (@v2.0.0) stays text, not a link', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -203,7 +203,7 @@ describe('IncarnationsList', () => {
     expect(screen.queryByRole('link', { name: /@v2\.0\.0/ })).not.toBeInTheDocument();
   });
 
-  it('[LINKS] пустой список — нет ссылок на сервисы', async () => {
+  it('[LINKS] empty list — no service links', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -213,13 +213,13 @@ describe('IncarnationsList', () => {
     ]);
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
-    await waitFor(() => expect(screen.getByText(/не найдено/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/matched the filter/i)).toBeInTheDocument());
 
     // No links to /services/*.
     expect(screen.queryByRole('link', { name: /redis|postgres/i })).not.toBeInTheDocument();
   });
 
-  it('колонка Traits рендерит chips и graceful "—" при отсутствии traits', async () => {
+  it('Traits column renders chips and a graceful "—" when traits are absent', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -269,7 +269,7 @@ describe('IncarnationsList', () => {
     expect(within(table).getAllByText('—').length).toBeGreaterThan(0);
   });
 
-  it('мультиселект coven+traits фильтрует client-side по AND', async () => {
+  it('coven+traits multiselect filters client-side by AND', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -344,7 +344,7 @@ describe('IncarnationsList', () => {
     expect(screen.getByRole('link', { name: 'redis-stage' })).toBeInTheDocument();
 
     // Reset filter - returns all three.
-    await user.click(screen.getByText('Сбросить фильтр'));
+    await user.click(screen.getByText('Clear filter'));
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();
     });

@@ -5,7 +5,7 @@ interface Props {
   emptyLabel?: string;
 }
 
-export function JsonViewer({ value, emptyLabel = 'пусто' }: Props) {
+export function JsonViewer({ value, emptyLabel = 'empty' }: Props) {
   if (value === null || value === undefined) {
     return <div className={styles.viewer}><span className={styles.empty}>{emptyLabel}</span></div>;
   }

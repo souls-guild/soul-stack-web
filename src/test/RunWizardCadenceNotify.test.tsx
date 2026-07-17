@@ -93,19 +93,19 @@ function setupFetch() {
 
 /** Transition to Step 4 in cadence mode (Scenario). */
 async function navigateToStep4Cadence(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByLabelText('Регулярно'));
-  await user.click(screen.getByRole('button', { name: /Далее/ }));
+  await user.click(screen.getByLabelText('Recurring'));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
   await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
   await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
   await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
   await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
-  await user.click(screen.getByRole('button', { name: /Далее/ }));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
   await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
   await user.type(screen.getByLabelText('Incarnation regex'), '*');
   await waitFor(() =>
     expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
   );
-  await user.click(screen.getByRole('button', { name: /Далее/ }));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
   await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
 }
 
@@ -122,8 +122,8 @@ beforeEach(() => {
   };
 });
 
-describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
-  it('notify-block виден в cadence-режиме (permanent mode)', async () => {
+describe('RunWizard — notify block in cadence mode (C-N4)', () => {
+  it('notify-block is visible in cadence mode (permanent mode)', async () => {
     setupFetch();
     renderWizard();
     const user = userEvent.setup();
@@ -134,30 +134,30 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     expect(screen.getByTestId('notify-block')).toBeInTheDocument();
   });
 
-  it('notify-block виден в voyage-режиме (ephemeral mode)', async () => {
+  it('notify-block is visible in voyage mode (ephemeral mode)', async () => {
     setupFetch();
     renderWizard();
     const user = userEvent.setup();
 
     // Voyage (default)
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('notify-block')).toBeInTheDocument());
 
     expect(screen.getByTestId('notify-block')).toBeInTheDocument();
   });
 
-  it('submitCadence шлёт notify в теле POST /v1/cadences', async () => {
+  it('submitCadence sends notify in the POST /v1/cadences body', async () => {
     const posts = setupFetch();
     renderWizard();
     const user = userEvent.setup();
@@ -179,7 +179,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     await user.selectOptions(heraldSelects[0], 'ops-webhook');
 
     // Submit
-    await user.click(screen.getByRole('button', { name: /Создать расписание/ }));
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
 
     const cadencePosts = posts.filter((p) => (p.url as string).includes('/v1/cadences'));
@@ -193,7 +193,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     expect(notifyArr[0].herald).toBe('ops-webhook');
   });
 
-  it('submitCadence без notify — поле notify отсутствует в body', async () => {
+  it('submitCadence without notify — no notify field in the body', async () => {
     const posts = setupFetch();
     renderWizard();
     const user = userEvent.setup();
@@ -204,7 +204,7 @@ describe('RunWizard — notify-блок в cadence-режиме (C-N4)', () => {
     await user.type(screen.getByTestId('cadence-name'), 'redis-hourly');
 
     // don't add notify
-    await user.click(screen.getByRole('button', { name: /Создать расписание/ }));
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
 
     const cadencePosts = posts.filter((p) => (p.url as string).includes('/v1/cadences'));

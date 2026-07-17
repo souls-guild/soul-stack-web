@@ -34,7 +34,7 @@ describe('PluginsList', () => {
     tokenStore.clear();
   });
 
-  it('404 от /v1/plugins/sigils → «Sigil не включён» без краша', async () => {
+  it('404 from /v1/plugins/sigils → "Sigil not enabled" without crash', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/plugins/sigils', status: 404, body: { title: 'not found', detail: 'no such endpoint' } },
     ]);
@@ -47,7 +47,7 @@ describe('PluginsList', () => {
     expect(screen.queryByText(/no such endpoint/i)).not.toBeInTheDocument();
   });
 
-  it('500 от /v1/plugins/sigils → обычная error-обработка (не «не включён»)', async () => {
+  it('500 from /v1/plugins/sigils → regular error handling (not "not enabled")', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/plugins/sigils', status: 500, body: { title: 'internal error', detail: 'db down' } },
     ]);
@@ -59,7 +59,7 @@ describe('PluginsList', () => {
     expect(screen.queryByText(/pluginSigilDisabledTitle/i)).not.toBeInTheDocument();
   });
 
-  it('рендерит таблицу из /v1/plugins/sigils', async () => {
+  it('renders table from /v1/plugins/sigils', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
     expect(screen.getByRole('heading', { name: /Plugins/i })).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('PluginsList', () => {
     expect(screen.getByTitle(SAMPLE.items[0].sha256)).toBeInTheDocument();
   });
 
-  it('namespace-чип сужает выдачу', async () => {
+  it('namespace chip narrows the results', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
     await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
@@ -81,7 +81,7 @@ describe('PluginsList', () => {
     expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
   });
 
-  it('status select фильтрует active vs revoked', async () => {
+  it('status select filters active vs revoked', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
     await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
@@ -91,7 +91,7 @@ describe('PluginsList', () => {
     expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
   });
 
-  it('search по name — case-insensitive contains', async () => {
+  it('search by name — case-insensitive contains', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
     await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
@@ -103,7 +103,7 @@ describe('PluginsList', () => {
 
   // -- Guard tests: clickable links --------------------------------------
 
-  it('[LINKS] allowed_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] allowed_by_aid renders as a link to /archons/:aid', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
 
@@ -118,7 +118,7 @@ describe('PluginsList', () => {
     expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
   });
 
-  it('[LINKS] allowed_by_aid с спецсимволами корректно URL-кодируется', async () => {
+  it('[LINKS] allowed_by_aid with special characters is URL-encoded correctly', async () => {
     const specialSample = {
       items: [
         {
@@ -141,7 +141,7 @@ describe('PluginsList', () => {
     expect(link).toHaveAttribute('href', `/archons/${encodeURIComponent('archon-special+one')}`);
   });
 
-  it('[LINKS] при пустом списке ссылок на архонтов нет', async () => {
+  it('[LINKS] no archon links when the list is empty', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: { items: [] } }]);
     renderWithProviders(<PluginsList />, '/plugins');
 

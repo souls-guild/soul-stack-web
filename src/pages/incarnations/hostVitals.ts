@@ -1,13 +1,13 @@
 import type { TelemetryDisk } from '../../api/keeper';
 
-// Чистые форматтеры/пороги host-vitals (NIM-88). Без React/i18n — тестируются юнитом.
+// Pure host-vitals formatters/thresholds (NIM-88). No React/i18n — unit-tested.
 
 export type VitalsTone = 'ok' | 'warn' | 'danger';
 
-// Skew collected_at↔received_at (ADR-018): > 10 мин → возможен NTP-дрейф.
+// Skew collected_at↔received_at (ADR-018): > 10 min → possible NTP drift.
 const SKEW_WARN_MS = 10 * 60 * 1000;
 
-// Окраска утилизации: < 70% ok, < 90% warn, иначе danger.
+// Utilization coloring: < 70% ok, < 90% warn, otherwise danger.
 export function utilTone(pct: number | null | undefined): VitalsTone {
   if (pct == null || Number.isNaN(pct)) return 'ok';
   if (pct >= 90) return 'danger';
@@ -25,20 +25,20 @@ export function formatPct(v: number | null | undefined): string {
   return `${Math.round(v)}%`;
 }
 
-// load-average → 2 знака; прочерк на nil/NaN (защита от частичного latest старого агента).
+// load-average → 2 decimals; dash on nil/NaN (guards against a partial latest from an old agent).
 export function formatLoad(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return '—';
   return v.toFixed(2);
 }
 
-// МБ → человекочитаемо: < 1024 МБ как MB, иначе GB с 1 знаком.
+// MB → human-readable: < 1024 MB as MB, otherwise GB with 1 decimal.
 export function formatMb(mb: number | null | undefined): string {
   if (mb == null || !Number.isFinite(mb)) return '—';
   if (mb < 1024) return `${Math.round(mb)} MB`;
   return `${(mb / 1024).toFixed(1)} GB`;
 }
 
-// uptime сек → компактно d/h/m/s (единицы технические, не локализуются).
+// uptime sec → compact d/h/m/s (units are technical, not localized).
 export function formatUptime(sec: number | null | undefined): string {
   if (sec == null || !Number.isFinite(sec) || sec < 0) return '—';
   const s = Math.floor(sec);
@@ -51,7 +51,7 @@ export function formatUptime(sec: number | null | undefined): string {
   return `${d}d ${h % 24}h`;
 }
 
-// Самый загруженный диск (max used%). null если дисков нет/все невалидны.
+// Busiest disk (max used%). null if there are no disks / all are invalid.
 export function busiestDisk(
   disks: TelemetryDisk[] | null | undefined,
 ): { mount: string; pct: number } | null {
@@ -65,7 +65,7 @@ export function busiestDisk(
   return top;
 }
 
-// Skew в минутах, если > порога; иначе null. Зеркалит SoulDetail.skewWarning.
+// Skew in minutes if > threshold; otherwise null. Mirrors SoulDetail.skewWarning.
 export function skewMinutes(collectedAt?: string, receivedAt?: string): number | null {
   if (!collectedAt || !receivedAt) return null;
   const a = new Date(collectedAt).getTime();
@@ -76,7 +76,7 @@ export function skewMinutes(collectedAt?: string, receivedAt?: string): number |
   return Math.floor(diff / 60000);
 }
 
-// Возраст снимка в секундах (>= 0) от nowMs. null если метки нет/битая.
+// Snapshot age in seconds (>= 0) from nowMs. null if the timestamp is missing/broken.
 export function ageSeconds(iso: string | undefined, nowMs: number): number | null {
   if (!iso) return null;
   const t = new Date(iso).getTime();

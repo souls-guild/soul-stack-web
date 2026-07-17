@@ -79,7 +79,7 @@ function renderFields(
 }
 
 describe('ScenarioInputFields ADR-045 — enum dropdown', () => {
-  it('рендерит select для поля с enum', () => {
+  it('renders a select for a field with enum', () => {
     const schema: ScenarioInputSchema = {
       env: { type: 'string', required: true, enum: ['prod', 'stage', 'dev'] },
     };
@@ -92,7 +92,7 @@ describe('ScenarioInputFields ADR-045 — enum dropdown', () => {
     expect(options).toContain('dev');
   });
 
-  it('обновляет значение при выборе из enum', () => {
+  it('updates the value on enum selection', () => {
     const schema: ScenarioInputSchema = {
       env: { type: 'string', required: false, enum: ['prod', 'stage'] },
     };
@@ -104,7 +104,7 @@ describe('ScenarioInputFields ADR-045 — enum dropdown', () => {
 });
 
 describe('ScenarioInputFields ADR-045 — pattern validation', () => {
-  it('показывает ошибку при несовпадении с паттерном', () => {
+  it('shows an error when the pattern does not match', () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: false, pattern: '^[a-z]+$' },
     };
@@ -114,7 +114,7 @@ describe('ScenarioInputFields ADR-045 — pattern validation', () => {
     expect(screen.getByTestId('field-pattern-error-host')).toBeTruthy();
   });
 
-  it('не показывает ошибку при совпадении с паттерном', () => {
+  it('does not show an error when the pattern matches', () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: false, pattern: '^[a-z]+$' },
     };
@@ -124,7 +124,7 @@ describe('ScenarioInputFields ADR-045 — pattern validation', () => {
     expect(screen.queryByTestId('field-pattern-error-host')).toBeNull();
   });
 
-  it('не показывает ошибку для пустого значения (пустое поле не валидируется)', () => {
+  it('does not show an error for an empty value (empty field is not validated)', () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: false, pattern: '^[a-z]+$' },
     };
@@ -134,7 +134,7 @@ describe('ScenarioInputFields ADR-045 — pattern validation', () => {
 });
 
 describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
-  it('рендерит SidPicker (single) для format:sid + source', () => {
+  it('renders SidPicker (single) for format:sid + source', () => {
     const schema: ScenarioInputSchema = {
       target_sid: {
         type: 'string',
@@ -148,7 +148,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     expect(screen.getByTestId('field-sid-single-target_sid')).toBeTruthy();
   });
 
-  it('рендерит SidPicker (multi) для type:array + format:sid + source', () => {
+  it('renders SidPicker (multi) for type:array + format:sid + source', () => {
     const schema: ScenarioInputSchema = {
       target_sids: {
         type: 'array',
@@ -161,7 +161,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     expect(screen.getByTestId('field-sid-multi-target_sids')).toBeTruthy();
   });
 
-  it('source:incarnation_hosts без incarnationContext → показана подсказка incarnation_hosts (не choir)', () => {
+  it('source:incarnation_hosts without incarnationContext → shows the incarnation_hosts hint (not choir)', () => {
     const schema: ScenarioInputSchema = {
       target_sid: {
         type: 'string',
@@ -175,12 +175,12 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     const hint = wrapper.querySelector('[data-testid="sid-picker-no-context"]');
     expect(hint).toBeTruthy();
     expect(wrapper.querySelector('input')).toBeNull();
-    // Must be exactly incarnation_hosts text (contains "incarnations", NOT "choir").
-    expect(hint!.textContent).toMatch(/инкарнаци/i);
+    // Must be exactly incarnation_hosts text (contains "incarnation", NOT "choir").
+    expect(hint!.textContent).toMatch(/incarnation/i);
     expect(hint!.textContent).not.toMatch(/choir/i);
   });
 
-  it('source:choir без incarnationContext → показана подсказка choir (не incarnation_hosts-текст)', () => {
+  it('source:choir without incarnationContext → shows the choir hint (not incarnation_hosts text)', () => {
     const schema: ScenarioInputSchema = {
       target_sid: {
         type: 'string',
@@ -198,7 +198,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     expect(hint!.textContent).toMatch(/choir/i);
   });
 
-  it('source не задан + нет incarnationContext → легитимный text-input (не трогаем)', () => {
+  it('source not set + no incarnationContext → legitimate text input (leave as is)', () => {
     // format:sid without source doesn't fall into the SidPicker branch — renders as a regular text input.
     const schema: ScenarioInputSchema = {
       plain_sid: {
@@ -215,7 +215,7 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
     expect(screen.queryByTestId('sid-picker-no-context')).toBeNull();
   });
 
-  it('загружает подсказки при фокусе (с incarnationContext)', async () => {
+  it('loads suggestions on focus (with incarnationContext)', async () => {
     const { keeperApi } = await import('../api/keeper');
     const schema: ScenarioInputSchema = {
       sid: {
@@ -234,46 +234,46 @@ describe('ScenarioInputFields ADR-045 — format:sid SidPicker', () => {
   });
 });
 
-describe('paramsToInputSchema — нормализация типов ADR-045', () => {
-  it('нормализует list → array', () => {
+describe('paramsToInputSchema — type normalization ADR-045', () => {
+  it('normalizes list → array', () => {
     const params: ModuleParam[] = [{ name: 'hosts', type: 'list', required: false }];
     const schema = paramsToInputSchema(params);
     expect(schema.hosts.type).toBe('array');
   });
 
-  it('нормализует map → object + isMap=true', () => {
+  it('normalizes map → object + isMap=true', () => {
     const params: ModuleParam[] = [{ name: 'tags', type: 'map', required: false }];
     const schema = paramsToInputSchema(params);
     expect(schema.tags.type).toBe('object');
     expect(schema.tags.isMap).toBe(true);
   });
 
-  it('object без map: isMap отсутствует', () => {
+  it('object without map: isMap is absent', () => {
     const params: ModuleParam[] = [{ name: 'cfg', type: 'object', required: false }];
     const schema = paramsToInputSchema(params);
     expect(schema.cfg.type).toBe('object');
     expect(schema.cfg.isMap).toBeFalsy();
   });
 
-  it('пробрасывает enum', () => {
+  it('passes through enum', () => {
     const params: ModuleParam[] = [{ name: 'env', type: 'string', required: true, enum: ['prod', 'dev'] }];
     const schema = paramsToInputSchema(params);
     expect(schema.env.enum).toEqual(['prod', 'dev']);
   });
 
-  it('пробрасывает pattern', () => {
+  it('passes through pattern', () => {
     const params: ModuleParam[] = [{ name: 'host', type: 'string', required: false, pattern: '^[a-z]+$' }];
     const schema = paramsToInputSchema(params);
     expect(schema.host.pattern).toBe('^[a-z]+$');
   });
 
-  it('пробрасывает format', () => {
+  it('passes through format', () => {
     const params: ModuleParam[] = [{ name: 'sid', type: 'string', required: false, format: 'sid' }];
     const schema = paramsToInputSchema(params);
     expect(schema.sid.format).toBe('sid');
   });
 
-  it('пробрасывает source', () => {
+  it('passes through source', () => {
     const params: ModuleParam[] = [
       { name: 'target', type: 'string', required: false, source: { incarnation_hosts: true } },
     ];
@@ -281,7 +281,7 @@ describe('paramsToInputSchema — нормализация типов ADR-045', 
     expect(schema.target.source).toEqual({ incarnation_hosts: true });
   });
 
-  it('S8b: пробрасывает items с нормализацией типа int → integer', () => {
+  it('S8b: passes through items with type normalization int → integer', () => {
     const params: ModuleParam[] = [
       { name: 'codes', type: 'list', required: false, items: { name: '', required: false, type: 'int' } },
     ];
@@ -290,7 +290,7 @@ describe('paramsToInputSchema — нормализация типов ADR-045', 
     expect(schema.codes.items?.type).toBe('integer');
   });
 
-  it('S8b: пробрасывает items.format=sid для list[sid]', () => {
+  it('S8b: passes through items.format=sid for list[sid]', () => {
     const params: ModuleParam[] = [
       {
         name: 'sids', type: 'list', required: false,
@@ -304,7 +304,7 @@ describe('paramsToInputSchema — нормализация типов ADR-045', 
 });
 
 describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
-  it('list[int]: рендерит числовой список с кнопками +/-', () => {
+  it('list[int]: renders a numeric list with +/- buttons', () => {
     const schema: ScenarioInputSchema = {
       status_codes: {
         type: 'array',
@@ -321,7 +321,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(screen.getByTestId('field-typedlist-item-status_codes-0')).toBeTruthy();
   });
 
-  it('list[int]: число вводится корректно, невалидная строка показывает ошибку', () => {
+  it('list[int]: number is entered correctly, invalid string shows an error', () => {
     const schema: ScenarioInputSchema = {
       codes: { type: 'array', required: false, items: { type: 'integer' } },
     };
@@ -331,7 +331,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(input.type).toBe('number');
   });
 
-  it('list[string]: рендерит строковый список, не JSON-textarea', () => {
+  it('list[string]: renders a string list, not a JSON textarea', () => {
     const schema: ScenarioInputSchema = {
       tags: { type: 'array', required: false, items: { type: 'string' } },
     };
@@ -342,7 +342,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(screen.getByTestId('field-typedlist-tags')).toBeTruthy();
   });
 
-  it('list[sid] via items: рендерит SidPicker multi (items.format=sid + items.source)', () => {
+  it('list[sid] via items: renders SidPicker multi (items.format=sid + items.source)', () => {
     const schema: ScenarioInputSchema = {
       sids: {
         type: 'array',
@@ -354,7 +354,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(screen.getByTestId('field-sid-multi-sids')).toBeTruthy();
   });
 
-  it('list без items: fallback на JSON-textarea', () => {
+  it('list without items: falls back to JSON textarea', () => {
     const schema: ScenarioInputSchema = {
       raw: { type: 'array', required: false },
     };
@@ -363,7 +363,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
     expect(screen.queryByTestId('field-typedlist-raw')).toBeNull();
   });
 
-  it('кнопка удалить убирает элемент', () => {
+  it('remove button removes the item', () => {
     const schema: ScenarioInputSchema = {
       nums: { type: 'array', required: false, items: { type: 'integer' } },
     };
@@ -378,7 +378,7 @@ describe('ScenarioInputFields ADR-045 S8b — typed list rendering', () => {
 });
 
 describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeholder', () => {
-  it('multiline=true → рендерит textarea с data-testid field-multiline', () => {
+  it('multiline=true → renders textarea with data-testid field-multiline', () => {
     const schema: ScenarioInputSchema = {
       script: { type: 'string', required: false, multiline: true },
     };
@@ -389,7 +389,7 @@ describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeh
     expect(screen.queryByTestId('field-text-script')).toBeNull();
   });
 
-  it('multiline=true: ввод обновляет значение', () => {
+  it('multiline=true: input updates the value', () => {
     const schema: ScenarioInputSchema = {
       body: { type: 'string', required: false, multiline: true },
     };
@@ -399,7 +399,7 @@ describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeh
     expect(ta.value).toBe('hello\nworld');
   });
 
-  it('example → placeholder на text input', () => {
+  it('example → placeholder on text input', () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: false, example: 'db-01.example.com' },
     };
@@ -408,7 +408,7 @@ describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeh
     expect(input.placeholder).toBe('db-01.example.com');
   });
 
-  it('example → placeholder на multiline textarea', () => {
+  it('example → placeholder on multiline textarea', () => {
     const schema: ScenarioInputSchema = {
       cmd: { type: 'string', required: false, multiline: true, example: 'apt-get update' },
     };
@@ -417,7 +417,7 @@ describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeh
     expect(ta.placeholder).toBe('apt-get update');
   });
 
-  it('multiline=true: pattern-валидация продолжает работать', () => {
+  it('multiline=true: pattern validation still works', () => {
     const schema: ScenarioInputSchema = {
       slug: { type: 'string', required: false, multiline: true, pattern: '^[a-z-]+$' },
     };
@@ -429,7 +429,7 @@ describe('ScenarioInputFields ADR-045 B3 — multiline textarea + example placeh
     expect(screen.queryByTestId('field-pattern-error-slug')).toBeNull();
   });
 
-  it('paramsToInputSchema пробрасывает multiline и example', () => {
+  it('paramsToInputSchema passes through multiline and example', () => {
     const params: ModuleParam[] = [
       { name: 'cmd', type: 'string', required: true, multiline: true, example: 'uptime' },
     ];
@@ -449,7 +449,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
     env: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
   };
 
-  it('дубль-ключ → показан field-map-error + onInvalidMapChange сигнализирует об ошибке', async () => {
+  it('duplicate key → field-map-error shown + onInvalidMapChange signals the error', async () => {
     const invalidMapFields: string[] = [];
     renderFields(mapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
     // Add two pairs
@@ -468,7 +468,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
     expect(invalidMapFields).toContain('env');
   });
 
-  it('дубль-ключ: внешнее value — валидный JSON (last-wins, не sentinel)', async () => {
+  it('duplicate key: external value is valid JSON (last-wins, not sentinel)', async () => {
     // Check that the value is NOT corrupted into 'invalid-map': the draft survives re-mount.
     const values: Array<string | number | boolean | undefined> = [];
     const schema: ScenarioInputSchema = {
@@ -507,7 +507,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
     }
   });
 
-  it('пустой key + непустой value → warning + onInvalidMapChange сигнализирует об ошибке', async () => {
+  it('empty key + non-empty value → warning + onInvalidMapChange signals the error', async () => {
     const invalidMapFields: string[] = [];
     renderFields(mapSchema, { onInvalidMapChange: (f) => { invalidMapFields.length = 0; invalidMapFields.push(...f); } });
     fireEvent.click(screen.getByTestId('field-map-add-env'));
@@ -519,7 +519,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
     expect(invalidMapFields).toContain('env');
   });
 
-  it('bad-int value → warning + onInvalidMapChange сигнализирует об ошибке (major-2)', async () => {
+  it('bad-int value → warning + onInvalidMapChange signals the error (major-2)', async () => {
     const intMapSchema: ScenarioInputSchema = {
       scores: { type: 'object', required: false, isMap: true, items: { type: 'integer' } },
     };
@@ -536,24 +536,24 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
     expect(invalidMapFields).toContain('scores');
   });
 
-  it('полностью пустая пара (key=\'\', value=\'\') — НЕ ошибка, NOT сигнализирует', () => {
+  it('fully empty pair (key=\'\', value=\'\') — NOT an error, does NOT signal', () => {
     // Fully empty pairs are an affordance, not an error.
     const blockedFields = invalidCompositeFields(mapSchema, { env: '' });
     expect(blockedFields).not.toContain('env');
   });
 
-  it('сквозной: две валидные пары → корректный body (string values)', () => {
+  it('end-to-end: two valid pairs → correct body (string values)', () => {
     const state = { env: JSON.stringify({ FOO: 'bar', BAZ: 'qux' }) };
     const body = serializeFields(mapSchema, state);
     expect(body).toEqual({ env: { FOO: 'bar', BAZ: 'qux' } });
   });
 
-  it('сквозной: все пары удалены → env отсутствует в body (пустой map)', () => {
+  it('end-to-end: all pairs removed → env absent from body (empty map)', () => {
     const body = serializeFields(mapSchema, { env: '' });
     expect(body).not.toHaveProperty('env');
   });
 
-  it('сквозной: map[string]int — значения конвертируются в числа', () => {
+  it('end-to-end: map[string]int — values are converted to numbers', () => {
     const intMapSchema: ScenarioInputSchema = {
       scores: { type: 'object', required: false, isMap: true, items: { type: 'integer' } },
     };
@@ -562,7 +562,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
     expect(body).toEqual({ scores: { a: 1, b: 42 } });
   });
 
-  it('pattern-violation → onPatternErrorChange сигнализирует (nit gate)', async () => {
+  it('pattern violation → onPatternErrorChange signals (nit gate)', async () => {
     const schema: ScenarioInputSchema = {
       host: { type: 'string', required: false, pattern: '^[a-z]+$' },
     };
@@ -578,7 +578,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor validation (bugs fix)', (
 });
 
 describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
-  it('map+items.string → рендерит MapEditor (field-map-*)', () => {
+  it('map+items.string → renders MapEditor (field-map-*)', () => {
     const schema: ScenarioInputSchema = {
       labels: { type: 'object', required: false, isMap: true, items: { type: 'string' } },
     };
@@ -588,7 +588,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     expect(screen.queryByTestId('field-composite-labels')).toBeNull();
   });
 
-  it('map+items.string: добавить пару → появляются key/value инпуты', () => {
+  it('map+items.string: add pair → key/value inputs appear', () => {
     // required=true so it doesn't fall into details (advanced collapse)
     const schema: ScenarioInputSchema = {
       env_vars: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
@@ -599,7 +599,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     expect(screen.getByTestId('field-map-val-env_vars-0')).toBeTruthy();
   });
 
-  it('map+items.string: удалить пару', () => {
+  it('map+items.string: remove pair', () => {
     // required=true so it doesn't fall into details (advanced collapse)
     const schema: ScenarioInputSchema = {
       tags: { type: 'object', required: true, isMap: true, items: { type: 'string' } },
@@ -614,7 +614,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     expect(screen.getByTestId('field-map-key-tags-0')).toBeTruthy();
   });
 
-  it('map без items → JSON-textarea (деградация)', () => {
+  it('map without items → JSON textarea (degradation)', () => {
     const schema: ScenarioInputSchema = {
       profile: { type: 'object', required: false, isMap: true },
     };
@@ -624,7 +624,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     expect(screen.queryByTestId('field-map-profile')).toBeNull();
   });
 
-  it('object без isMap → JSON-textarea', () => {
+  it('object without isMap → JSON textarea', () => {
     const schema: ScenarioInputSchema = {
       config: { type: 'object', required: false },
     };
@@ -633,7 +633,7 @@ describe('ScenarioInputFields ADR-045 B2 — MapEditor KEY→VALUE', () => {
     expect(screen.queryByTestId('field-map-config')).toBeNull();
   });
 
-  it('paramsToInputSchema: type=map+items → isMap=true + items пробрасываются', () => {
+  it('paramsToInputSchema: type=map+items → isMap=true + items passed through', () => {
     const params: ModuleParam[] = [
       {
         name: 'labels',

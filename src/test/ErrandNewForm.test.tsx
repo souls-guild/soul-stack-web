@@ -102,7 +102,7 @@ describe('ErrandNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('shell: zod-валидация — пустой SID и команда блокируют submit', async () => {
+  it('shell: zod validation — empty SID and command block submit', async () => {
     vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
@@ -114,12 +114,12 @@ describe('ErrandNewForm', () => {
 
     await user.click(screen.getByRole('button', { name: /Run Errand/i }));
     await waitFor(() => {
-      expect(screen.getByText(/SID обязателен/i)).toBeInTheDocument();
-      expect(screen.getByText(/команда обязательна/i)).toBeInTheDocument();
+      expect(screen.getByText(/SID is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/command is required/i)).toBeInTheDocument();
     });
   });
 
-  it('shell: 200 sync → редирект на /errands/:id', async () => {
+  it('shell: 200 sync → redirect to /errands/:id', async () => {
     let postedBody: unknown = null;
     vi.stubGlobal('fetch', makeBaseFetch((url, method, init) => {
       if (method === 'POST' && url.includes('/v1/souls/') && url.includes('/exec')) {
@@ -153,7 +153,7 @@ describe('ErrandNewForm', () => {
     });
   });
 
-  it('каталог содержит core.http.probe — видим в select, клик → CustomForm (JSON-textarea)', async () => {
+  it('catalog contains core.http.probe — visible in select, click → CustomForm (JSON textarea)', async () => {
     vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
@@ -174,7 +174,7 @@ describe('ErrandNewForm', () => {
     expect(moduleInput).toHaveValue('core.http.probe');
   });
 
-  it('переключение на custom-module: невалидный JSON ловится zod-ом', async () => {
+  it('switching to custom module: invalid JSON is caught by zod', async () => {
     vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new');
     const user = userEvent.setup();
@@ -191,11 +191,11 @@ describe('ErrandNewForm', () => {
     await user.type(ta, '{{not-json');
     await user.click(screen.getByRole('button', { name: /Run Errand/i }));
     await waitFor(() => {
-      expect(screen.getByText(/невалидный JSON-object/i)).toBeInTheDocument();
+      expect(screen.getByText(/invalid JSON-object/i)).toBeInTheDocument();
     });
   });
 
-  it('?sid=… в query-параметре подставляет prefilled-SID', async () => {
+  it('?sid=… in the query param prefills the SID', async () => {
     vi.stubGlobal('fetch', makeBaseFetch());
     renderWithRoutes('/errands/new?sid=fixed.example.com');
     await waitFor(() => {

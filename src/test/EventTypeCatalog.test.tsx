@@ -1,11 +1,11 @@
 /**
- * Тесты для задачи A (ADR-042): event-types фетч в TidingModal.
+ * Tests for task A (ADR-042): event-types fetch in TidingModal.
  *
- * Проверяет:
- *   1. GET /v1/event-types фетчится при открытии TidingModal.
- *   2. Чипы рендерятся из ответа backend-а (areas + point_events).
- *   3. incarnation.run_completed (из point_events) присутствует в чипах.
- *   4. Fallback при ошибке фетча: форма показывается без краша, чипов нет.
+ * Verifies:
+ *   1. GET /v1/event-types is fetched when TidingModal opens.
+ *   2. Chips render from the backend response (areas + point_events).
+ *   3. incarnation.run_completed (from point_events) is present in the chips.
+ *   4. Fallback on fetch error: the form shows without a crash, no chips.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -75,29 +75,29 @@ beforeEach(() => {
   tokenStore.clear();
 });
 
-describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
-  it('GET /v1/event-types вызывается при открытии TidingModal', async () => {
+describe('EventTypeCatalog — fetch from backend (ADR-042)', () => {
+  it('GET /v1/event-types is called when TidingModal opens', async () => {
     const calls = setupMock();
     renderNotif('/notifications?tab=tidings');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByTestId('tiding-create-btn')).toBeInTheDocument());
     await user.click(screen.getByTestId('tiding-create-btn'));
-    await screen.findByRole('dialog', { name: /Создать Tiding/i });
+    await screen.findByRole('dialog', { name: /Create Tiding/i });
 
     await waitFor(() => {
       expect(calls.some((c) => c.includes('/v1/event-types'))).toBe(true);
     });
   });
 
-  it('чипы рендерятся из areas (backend-ответ)', async () => {
+  it('chips render from areas (backend response)', async () => {
     setupMock();
     renderNotif('/notifications?tab=tidings');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByTestId('tiding-create-btn')).toBeInTheDocument());
     await user.click(screen.getByTestId('tiding-create-btn'));
-    await screen.findByRole('dialog', { name: /Создать Tiding/i });
+    await screen.findByRole('dialog', { name: /Create Tiding/i });
 
     await waitFor(() => {
       expect(screen.getByTestId('event-type-chip-scenario_run.*')).toBeInTheDocument();
@@ -106,28 +106,28 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     });
   });
 
-  it('чип incarnation.run_completed присутствует (из point_events)', async () => {
+  it('incarnation.run_completed chip is present (from point_events)', async () => {
     setupMock();
     renderNotif('/notifications?tab=tidings');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByTestId('tiding-create-btn')).toBeInTheDocument());
     await user.click(screen.getByTestId('tiding-create-btn'));
-    await screen.findByRole('dialog', { name: /Создать Tiding/i });
+    await screen.findByRole('dialog', { name: /Create Tiding/i });
 
     await waitFor(() => {
       expect(screen.getByTestId('event-type-chip-incarnation.run_completed')).toBeInTheDocument();
     });
   });
 
-  it('fallback при ошибке фетча: форма без краша, кастомный ввод доступен', async () => {
+  it('fallback on fetch error: form without crash, custom input available', async () => {
     setupMock({ eventTypesFail: true });
     renderNotif('/notifications?tab=tidings');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByTestId('tiding-create-btn')).toBeInTheDocument());
     await user.click(screen.getByTestId('tiding-create-btn'));
-    const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
+    const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
     // Form opened - no crash
     expect(dialog).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     expect(within(dialog).getByTestId('tiding-custom-event-type-input')).toBeInTheDocument();
   });
 
-  it('area-chip имеет glob-форму scenario_run.* и submit body содержит именно её (регресс-guard)', async () => {
+  it('area chip has glob form scenario_run.* and the submit body contains exactly it (regression guard)', async () => {
     const calls = setupMock();
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
@@ -161,7 +161,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
 
     await waitFor(() => expect(screen.getByTestId('tiding-create-btn')).toBeInTheDocument());
     await user.click(screen.getByTestId('tiding-create-btn'));
-    const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
+    const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
     // The chip must be labeled exactly "scenario_run.*", not "scenario_run"
     await waitFor(() => {
@@ -174,7 +174,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-scenario_run.*'));
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const postCall = calls.find((c) => c.includes('/v1/tidings') && c.includes('BODY:'));
@@ -187,7 +187,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     });
   });
 
-  it('тип из backend выбирается кликом и попадает в body', async () => {
+  it('a type from the backend is selected by click and lands in the body', async () => {
     const calls = setupMock();
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
@@ -212,7 +212,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
 
     await waitFor(() => expect(screen.getByTestId('tiding-create-btn')).toBeInTheDocument());
     await user.click(screen.getByTestId('tiding-create-btn'));
-    const dialog = await screen.findByRole('dialog', { name: /Создать Tiding/i });
+    const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
     await user.type(within(dialog).getByTestId('tiding-name-input'), 'my-t');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
@@ -222,7 +222,7 @@ describe('EventTypeCatalog — фетч из backend (ADR-042)', () => {
     await waitFor(() => expect(within(dialog).getByTestId('event-type-chip-voyage.*')).toBeInTheDocument());
     await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));
 
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const postCall = calls.find((c) => c.includes('/v1/tidings') && c.includes('BODY:'));

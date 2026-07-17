@@ -13,7 +13,7 @@ describe('RunDetail', () => {
     tokenStore.clear();
   });
 
-  it('рендерит успешный прогон: scenario + per-host статусы, без блока упавшей задачи', async () => {
+  it('renders a successful run: scenario + per-host statuses, no failed-task block', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -47,10 +47,10 @@ describe('RunDetail', () => {
     expect(screen.getByText('host-a.local')).toBeInTheDocument();
     expect(screen.getByText('host-b.local')).toBeInTheDocument();
     // Successful run -- no "Failed task" section.
-    expect(screen.queryByText('Упавшая задача')).not.toBeInTheDocument();
+    expect(screen.queryByText('Failed task')).not.toBeInTheDocument();
   });
 
-  it('рендерит failed-прогон с блоком упавшей задачи (task_idx + error_summary)', async () => {
+  it('renders a failed run with the failed-task block (task_idx + error_summary)', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -86,14 +86,14 @@ describe('RunDetail', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Упавшая задача')).toBeInTheDocument();
+      expect(screen.getByText('Failed task')).toBeInTheDocument();
     });
     expect(screen.getByText('task_idx: 3')).toBeInTheDocument();
     expect(screen.getByText('plan_index: 7')).toBeInTheDocument();
     expect(screen.getByText('task 3 core.pkg.present: exit status 1')).toBeInTheDocument();
   });
 
-  it('keeper-side задача (sid="keeper") — бейдж без ссылки на /souls, реальный soul остаётся кликабельным', async () => {
+  it('keeper-side task (sid="keeper") — badge without a /souls link, real soul stays clickable', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -136,7 +136,7 @@ describe('RunDetail', () => {
     expect(soulLink).toHaveAttribute('href', '/souls/host-a.local');
   });
 
-  it('sentinel-прогон (sid="__run__") — бейдж без ссылки на /souls (NIM-36)', async () => {
+  it('sentinel run (sid="__run__") — badge without a /souls link (NIM-36)', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -175,7 +175,7 @@ describe('RunDetail', () => {
     expect(screen.getAllByText('no host').length).toBeGreaterThan(0);
   });
 
-  it('404 на GET runDetail — graceful error-state, не крашится', async () => {
+  it('404 on GET runDetail — graceful error state, does not crash', async () => {
     installFetchMock([
       {
         method: 'GET',

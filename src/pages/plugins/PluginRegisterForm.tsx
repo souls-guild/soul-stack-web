@@ -139,7 +139,7 @@ export function PluginRegisterForm() {
       {reply ? (
         <section
           className={styles.section}
-          aria-label="результат допуска"
+          aria-label="admission result"
           style={{
             background: 'color-mix(in srgb, var(--ok, #2e7d32) 6%, var(--surface))',
             border: '1px solid color-mix(in srgb, var(--ok, #2e7d32) 30%, var(--border))',

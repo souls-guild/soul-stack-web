@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithToken = useCallback(async (token: string) => {
     const trimmed = token.trim();
-    if (!trimmed) throw new Error('пустой токен');
+    if (!trimmed) throw new Error('empty token');
     tokenStore.set(trimmed);
     try {
       await keeperApi.ping();

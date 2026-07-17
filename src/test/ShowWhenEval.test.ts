@@ -8,64 +8,64 @@ import { evalShowWhen } from '../pages/incarnations/scenarioInputFields.helpers'
 const INPUT = { mode: 'sentinel', count: '3', enabled: 'true', name: '' };
 
 describe('evalShowWhen', () => {
-  it('undefined/empty → true (поле показывается по умолчанию)', () => {
+  it('undefined/empty → true (field is shown by default)', () => {
     expect(evalShowWhen(undefined, {})).toBe(true);
     expect(evalShowWhen('', {})).toBe(true);
     expect(evalShowWhen('   ', {})).toBe(true);
   });
 
-  it('== строковый литерал', () => {
+  it('== string literal', () => {
     expect(evalShowWhen('input.mode == "sentinel"', INPUT)).toBe(true);
     expect(evalShowWhen('input.mode == "cluster"', INPUT)).toBe(false);
   });
 
-  it("== строка в одинарных кавычках", () => {
+  it("== single-quoted string", () => {
     expect(evalShowWhen("input.mode == 'sentinel'", INPUT)).toBe(true);
     expect(evalShowWhen("input.mode == 'cluster'", INPUT)).toBe(false);
   });
 
-  it('!= оператор', () => {
+  it('!= operator', () => {
     expect(evalShowWhen('input.mode != "cluster"', INPUT)).toBe(true);
     expect(evalShowWhen('input.mode != "sentinel"', INPUT)).toBe(false);
   });
 
-  it('&& оба true', () => {
+  it('&& both true', () => {
     expect(evalShowWhen('input.mode == "sentinel" && input.count == "3"', INPUT)).toBe(true);
   });
 
-  it('&& одно false', () => {
+  it('&& one false', () => {
     expect(evalShowWhen('input.mode == "sentinel" && input.count == "10"', INPUT)).toBe(false);
   });
 
-  it('|| хотя бы одно true', () => {
+  it('|| at least one true', () => {
     expect(evalShowWhen('input.mode == "standalone" || input.mode == "sentinel"', INPUT)).toBe(true);
     expect(evalShowWhen('input.mode == "standalone" || input.mode == "cluster"', INPUT)).toBe(false);
   });
 
-  it('in оператор (через запятую)', () => {
+  it('in operator (comma-separated)', () => {
     expect(evalShowWhen('input.mode in "sentinel,cluster"', INPUT)).toBe(true);
     expect(evalShowWhen('input.mode in "standalone,cluster"', INPUT)).toBe(false);
   });
 
-  it('числовые литералы', () => {
+  it('numeric literals', () => {
     expect(evalShowWhen('input.count == "3"', INPUT)).toBe(true);
   });
 
-  it('скобки меняют приоритет', () => {
+  it('parentheses change precedence', () => {
     // without parens: false && true || true -> (false && true) || true -> true
     expect(evalShowWhen('(input.mode == "cluster" && input.count == "3") || input.mode == "sentinel"', INPUT)).toBe(true);
   });
 
-  it('несуществующее поле → null → false при сравнении', () => {
+  it('nonexistent field → null → false on comparison', () => {
     expect(evalShowWhen('input.nonexistent == "foo"', INPUT)).toBe(false);
   });
 
-  it('true/false литералы', () => {
+  it('true/false literals', () => {
     expect(evalShowWhen('true', {})).toBe(true);
     expect(evalShowWhen('false', {})).toBe(false);
   });
 
-  it('graceful fallback на синтаксическую ошибку → true (нет краша)', () => {
+  it('graceful fallback on syntax error → true (no crash)', () => {
     // The function must not throw an exception — just returns something.
     // The exact value depends on the parser, but the page must not crash.
     expect(() => evalShowWhen('has(input.mode)', INPUT)).not.toThrow();
@@ -75,12 +75,12 @@ describe('evalShowWhen', () => {
     expect(typeof result).toBe('boolean');
   });
 
-  it('пустое input.name (пустая строка) == "" → true', () => {
+  it('empty input.name (empty string) == "" → true', () => {
     expect(evalShowWhen('input.name == ""', INPUT)).toBe(true);
     expect(evalShowWhen('input.name == "foo"', INPUT)).toBe(false);
   });
 
-  it('вложенный && + ||', () => {
+  it('nested && + ||', () => {
     expect(evalShowWhen(
       'input.mode == "sentinel" && (input.count == "1" || input.count == "3")',
       INPUT,

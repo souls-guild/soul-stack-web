@@ -64,7 +64,7 @@ const COMMON_HANDLERS = {
 };
 
 describe('OverviewPage', () => {
-  it('рендерит донаты souls по статусу/coven из /v1/souls/stats + 4 счётчика', async () => {
+  it('renders souls donuts by status/coven from /v1/souls/stats + 4 counters', async () => {
     mockFetch({
       '/v1/souls/stats': SOUL_STATS,
       '/v1/cluster': CLUSTER_REPLY,
@@ -106,7 +106,7 @@ describe('OverviewPage', () => {
     expect(screen.getByText('succeeded')).toBeInTheDocument();
   });
 
-  it('SelfCheck рендерит инстансы кластера + self-маркер + Reaper-лидер + self_health бейджи', async () => {
+  it('SelfCheck renders cluster instances + self marker + Reaper leader + self_health badges', async () => {
     mockFetch({
       '/v1/souls/stats': SOUL_STATS,
       '/v1/cluster': CLUSTER_REPLY,
@@ -121,14 +121,14 @@ describe('OverviewPage', () => {
     expect(screen.getByText('kid-b')).toBeInTheDocument();
 
     // self_kid=kid-a -> "(you)" marker next to it.
-    expect(screen.getByText('(вы)')).toBeInTheDocument();
+    expect(screen.getByText('(you)')).toBeInTheDocument();
 
     // is_reaper_leader=true only for kid-a.
-    expect(screen.getByText('Reaper-лидер')).toBeInTheDocument();
+    expect(screen.getByText('Reaper leader')).toBeInTheDocument();
 
     // alive/dead indicators.
     expect(screen.getByText('alive')).toBeInTheDocument();
-    expect(screen.getByText('недоступен')).toBeInTheDocument();
+    expect(screen.getByText('unreachable')).toBeInTheDocument();
 
     // self_health: postgres/redis=ok (check), vault=not-ok (cross).
     expect(screen.getByText(/postgres: ✓/)).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('OverviewPage', () => {
     expect(screen.getByText(/vault: ✗/)).toBeInTheDocument();
   });
 
-  it('graceful empty — souls.stats пустые оси → empty-state доната, без краша', async () => {
+  it('graceful empty — souls.stats empty axes → donut empty-state, no crash', async () => {
     mockFetch({
       '/v1/souls/stats': { by_status: {}, by_transport: {}, by_coven: {}, total: 0, stale_count: 0 },
       '/v1/cluster': { instances: [], self_kid: 'kid-solo', self_health: {} },
@@ -146,13 +146,13 @@ describe('OverviewPage', () => {
 
     renderWithProviders(<OverviewPage />, '/overview');
 
-    expect(await screen.findByText('Souls в кластере нет.')).toBeInTheDocument();
-    expect(screen.getByText('Ни у одного Soul нет coven-метки.')).toBeInTheDocument();
-    expect(screen.getByText('Инстансов не найдено.')).toBeInTheDocument();
-    expect(await screen.findByText(/Прогонов пока не было/i)).toBeInTheDocument();
+    expect(await screen.findByText('No Souls in the cluster.')).toBeInTheDocument();
+    expect(screen.getByText('No Soul has a coven label.')).toBeInTheDocument();
+    expect(screen.getByText('No instances found.')).toBeInTheDocument();
+    expect(await screen.findByText(/No runs yet/i)).toBeInTheDocument();
   });
 
-  it('graceful degradation — 500 на /v1/souls/stats не валит страницу, показывает error-box', async () => {
+  it('graceful degradation — 500 on /v1/souls/stats does not break the page, shows error-box', async () => {
     mockFetch({
       '/v1/souls/stats': { status: 500, body: { title: 'internal error', detail: 'boom' } },
       '/v1/cluster': CLUSTER_REPLY,
@@ -168,7 +168,7 @@ describe('OverviewPage', () => {
     expect(await screen.findByText('kid-a')).toBeInTheDocument();
   });
 
-  it('graceful degradation — 403 на /v1/cluster не валит страницу, донаты souls рендерятся', async () => {
+  it('graceful degradation — 403 on /v1/cluster does not break the page, souls donuts render', async () => {
     mockFetch({
       '/v1/souls/stats': SOUL_STATS,
       '/v1/cluster': { status: 403, body: { title: 'forbidden', detail: 'no soul.list' } },
@@ -181,7 +181,7 @@ describe('OverviewPage', () => {
       expect(screen.getByTestId('donut-slice-connected')).toBeInTheDocument();
     });
     // Cluster section degrades into an error-box, does not crash the page.
-    const clusterSection = screen.getByLabelText('SelfCheck: Keeper-кластер');
+    const clusterSection = screen.getByLabelText('SelfCheck: Keeper cluster');
     expect(within(clusterSection).getByText(/forbidden|no soul.list|403/i)).toBeInTheDocument();
   });
 });

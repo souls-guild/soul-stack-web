@@ -201,7 +201,7 @@ describe('SynodsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит список Synod-групп из GET /v1/synods', async () => {
+  it('renders the Synod group list from GET /v1/synods', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => {
@@ -210,15 +210,15 @@ describe('SynodsList', () => {
     });
   });
 
-  it('empty-state при пустом ответе', async () => {
+  it('empty-state on empty response', async () => {
     recordingFetch({ synods: SYNODS_EMPTY });
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => {
-      expect(screen.getByText(/Synod-групп пока нет/i)).toBeInTheDocument();
+      expect(screen.getByText(/No Synod groups yet/i)).toBeInTheDocument();
     });
   });
 
-  it('кнопка «Создать Synod» задизейблена без synod.create', async () => {
+  it('«Create Synod» button disabled without synod.create', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_CREATE });
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
@@ -226,7 +226,7 @@ describe('SynodsList', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('Create POST /v1/synods — открывает модалку, отправляет запрос, закрывает', async () => {
+  it('Create POST /v1/synods — opens modal, sends request, closes', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -234,10 +234,10 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('create-synod-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Создать Synod-группу/i });
+    const dialog = await screen.findByRole('dialog', { name: /Create Synod group/i });
     const nameInput = within(dialog).getByTestId('synod-name-input');
     await user.type(nameInput, 'dev-team');
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
+    await user.click(within(dialog).getByRole('button', { name: /^Create$/ }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/synods' && c.method === 'POST');
@@ -246,11 +246,11 @@ describe('SynodsList', () => {
     });
     // Modal closed.
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /Создать Synod-группу/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: /Create Synod group/i })).not.toBeInTheDocument();
     });
   });
 
-  it('Create 409 already-exists → pretty-error в модалке', async () => {
+  it('Create 409 already-exists → pretty-error in modal', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods$/,
@@ -265,17 +265,17 @@ describe('SynodsList', () => {
 
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('create-synod-btn'));
-    const dialog = await screen.findByRole('dialog', { name: /Создать Synod-группу/i });
+    const dialog = await screen.findByRole('dialog', { name: /Create Synod group/i });
     await user.type(within(dialog).getByTestId('synod-name-input'), 'ops-team');
-    await user.click(within(dialog).getByRole('button', { name: /^Создать$/ }));
+    await user.click(within(dialog).getByRole('button', { name: /^Create$/ }));
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/уже существует/i);
+    expect(alert).toHaveTextContent(/already exists/i);
     // Modal stays open.
-    expect(screen.getByRole('dialog', { name: /Создать Synod-группу/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Create Synod group/i })).toBeInTheDocument();
   });
 
-  it('Delete: не-builtin → открывает confirm-модалку → DELETE /v1/synods/{name}', async () => {
+  it('Delete: non-builtin → opens confirm modal → DELETE /v1/synods/{name}', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -287,8 +287,8 @@ describe('SynodsList', () => {
     expect(delBtn).not.toBeDisabled();
     await user.click(delBtn);
 
-    const dialog = await screen.findByRole('dialog', { name: /Удалить Synod: ops-team/i });
-    await user.click(within(dialog).getByRole('button', { name: /^Удалить$/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Delete Synod: ops-team/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }));
 
     await waitFor(() => {
       const del = calls.find((c) => c.url === '/v1/synods/ops-team' && c.method === 'DELETE');
@@ -296,7 +296,7 @@ describe('SynodsList', () => {
     });
   });
 
-  it('Delete builtin → кнопка задизейблена', async () => {
+  it('Delete builtin → button disabled', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => expect(screen.getByText('readonly')).toBeInTheDocument());
@@ -304,7 +304,7 @@ describe('SynodsList', () => {
     expect(delBtn).toBeDisabled();
   });
 
-  it('Delete 409 builtin → pretty-error в confirm-модалке', async () => {
+  it('Delete 409 builtin → pretty-error in confirm modal', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team$/,
@@ -319,8 +319,8 @@ describe('SynodsList', () => {
 
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('delete-synod-ops-team'));
-    const dialog = await screen.findByRole('dialog', { name: /Удалить Synod: ops-team/i });
-    await user.click(within(dialog).getByRole('button', { name: /^Удалить$/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Delete Synod: ops-team/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }));
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent(/builtin/i);
@@ -341,14 +341,14 @@ describe('SynodsList', () => {
 
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('delete-synod-ops-team'));
-    const dialog = await screen.findByRole('dialog', { name: /Удалить Synod: ops-team/i });
-    await user.click(within(dialog).getByRole('button', { name: /^Удалить$/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Delete Synod: ops-team/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }));
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/lock-?out|администратора/i);
+    expect(alert).toHaveTextContent(/lock-?out|admin/i);
   });
 
-  it('Add-operator: POST /v1/synods/{name}/operators с {aid} (typeahead-выбор)', async () => {
+  it('Add-operator: POST /v1/synods/{name}/operators with {aid} (typeahead select)', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -356,7 +356,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     // archon-dave is in OPERATORS_SAMPLE and not in ops-team.operators.
     await user.click(within(dialog).getByTestId('add-operator-search'));
     await user.click(await within(dialog).findByTestId('add-operator-option-archon-dave'));
@@ -371,7 +371,7 @@ describe('SynodsList', () => {
     });
   });
 
-  it('[MULTI] AddOperatorModal: несколько выбранных → N POST-ов (fan-out)', async () => {
+  it('[MULTI] AddOperatorModal: multiple selected → N POSTs (fan-out)', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -379,7 +379,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     await user.click(within(dialog).getByTestId('add-operator-search'));
     await user.click(await within(dialog).findByTestId('add-operator-option-archon-charlie'));
     await user.click(within(dialog).getByTestId('add-operator-option-archon-dave'));
@@ -400,7 +400,7 @@ describe('SynodsList', () => {
     });
   });
 
-  it('[PARTIAL] AddOperatorModal: частичный провал — модалка открыта, показан упавший aid', async () => {
+  it('[PARTIAL] AddOperatorModal: partial failure — modal stays open, failed aid shown', async () => {
     const calls: Call[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url =
@@ -444,7 +444,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     await user.click(within(dialog).getByTestId('add-operator-search'));
     await user.click(await within(dialog).findByTestId('add-operator-option-archon-charlie'));
     await user.click(within(dialog).getByTestId('add-operator-option-archon-dave'));
@@ -454,11 +454,11 @@ describe('SynodsList', () => {
     expect(partial).toHaveTextContent('archon-dave');
     // Modal did not close after partial failure.
     expect(
-      screen.getByRole('dialog', { name: /Добавить архонта в ops-team/i }),
+      screen.getByRole('dialog', { name: /Add archon to ops-team/i }),
     ).toBeInTheDocument();
   });
 
-  it('[ФИЛЬТР] AddOperatorModal: текущие члены группы не появляются в опциях', async () => {
+  it('[FILTER] AddOperatorModal: current group members do not appear in options', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -467,7 +467,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     await user.click(within(dialog).getByTestId('add-operator-search'));
 
     // archon-charlie and archon-dave (not in the group) -- in the options.
@@ -483,7 +483,7 @@ describe('SynodsList', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('[EMPTY-STATE] AddOperatorModal: empty-state и submit disabled если все уже в группе', async () => {
+  it('[EMPTY-STATE] AddOperatorModal: empty-state and submit disabled when all already in group', async () => {
     // ops-team members: archon-alice, archon-bob.
     // Give only alice and bob as operators -- both already in the group.
     const twoOperators = {
@@ -499,7 +499,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     await user.click(within(dialog).getByTestId('add-operator-search'));
     // Both operators already in the group -> no options, empty-state shown.
     await waitFor(() =>
@@ -510,13 +510,13 @@ describe('SynodsList', () => {
     expect(within(dialog).getByTestId('add-operator-submit')).toBeDisabled();
   });
 
-  it('Remove-operator: DELETE /v1/synods/{name}/operators/{aid} при клике ×', async () => {
+  it('Remove-operator: DELETE /v1/synods/{name}/operators/{aid} on × click', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
-    const removeBtn = screen.getByRole('button', { name: /убрать archon-alice из группы/i });
+    const removeBtn = screen.getByRole('button', { name: /remove archon-alice from group/i });
     await user.click(removeBtn);
 
     await waitFor(() => {
@@ -527,7 +527,7 @@ describe('SynodsList', () => {
     });
   });
 
-  it('Grant-role: POST /v1/synods/{name}/roles с {role_name}', async () => {
+  it('Grant-role: POST /v1/synods/{name}/roles with {role_name}', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -535,7 +535,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('grant-role-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Bind role to ops-team/i });
     await user.click(within(dialog).getByTestId('grant-role-search'));
     await user.click(await within(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(within(dialog).getByTestId('grant-role-submit'));
@@ -549,13 +549,13 @@ describe('SynodsList', () => {
     });
   });
 
-  it('Revoke-role: DELETE /v1/synods/{name}/roles/{role_name} при клике ×', async () => {
+  it('Revoke-role: DELETE /v1/synods/{name}/roles/{role_name} on × click', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
-    const revokeBtn = screen.getByRole('button', { name: /отвязать роль cluster-admin от группы/i });
+    const revokeBtn = screen.getByRole('button', { name: /unbind role cluster-admin from group/i });
     await user.click(revokeBtn);
 
     await waitFor(() => {
@@ -568,7 +568,7 @@ describe('SynodsList', () => {
 
   // --- RBAC row-level guard tests ---
 
-  it('[RBAC] без synod.add-operator кнопка add-operator-<name> disabled + title с noPermAddOp', async () => {
+  it('[RBAC] without synod.add-operator add-operator-<name> button disabled + title with noPermAddOp', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_ADD_OP });
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
@@ -578,7 +578,7 @@ describe('SynodsList', () => {
     expect(btn).toHaveAttribute('title', expect.stringMatching(/synod\.add-operator/i));
   });
 
-  it('[RBAC] без synod.grant-role кнопка grant-role-<name> disabled + title с noPermGrantRole', async () => {
+  it('[RBAC] without synod.grant-role grant-role-<name> button disabled + title with noPermGrantRole', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_GRANT_ROLE });
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
@@ -588,27 +588,27 @@ describe('SynodsList', () => {
     expect(btn).toHaveAttribute('title', expect.stringMatching(/synod\.grant-role/i));
   });
 
-  it('[RBAC] без synod.remove-operator × на чипе архонта disabled + title с noPermRemoveOp', async () => {
+  it('[RBAC] without synod.remove-operator × on archon chip disabled + title with noPermRemoveOp', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_REMOVE_OP });
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
 
-    const removeBtn = screen.getByRole('button', { name: /убрать archon-alice из группы/i });
+    const removeBtn = screen.getByRole('button', { name: /remove archon-alice from group/i });
     expect(removeBtn).toBeDisabled();
     expect(removeBtn).toHaveAttribute('title', expect.stringMatching(/synod\.remove-operator/i));
   });
 
-  it('[RBAC] без synod.revoke-role × на чипе роли disabled + title с noPermRevokeRole', async () => {
+  it('[RBAC] without synod.revoke-role × on role chip disabled + title with noPermRevokeRole', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_REVOKE_ROLE });
     renderWithProviders(<SynodsList />, '/synods');
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
 
-    const revokeBtn = screen.getByRole('button', { name: /отвязать роль cluster-admin от группы/i });
+    const revokeBtn = screen.getByRole('button', { name: /unbind role cluster-admin from group/i });
     expect(revokeBtn).toBeDisabled();
     expect(revokeBtn).toHaveAttribute('title', expect.stringMatching(/synod\.revoke-role/i));
   });
 
-  it('403 subset-denied на grant-role → pretty-error', async () => {
+  it('403 subset-denied on grant-role → pretty-error', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team\/roles$/,
@@ -623,7 +623,7 @@ describe('SynodsList', () => {
 
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('grant-role-ops-team'));
-    const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Bind role to ops-team/i });
     await user.click(within(dialog).getByTestId('grant-role-search'));
     await user.click(await within(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(within(dialog).getByTestId('grant-role-submit'));
@@ -631,12 +631,12 @@ describe('SynodsList', () => {
     // All assignments failed -> partial-fail block with pretty-error (subset).
     const partial = await within(dialog).findByTestId('grant-role-partial');
     expect(partial).toHaveTextContent('soul-operator');
-    expect(partial).toHaveTextContent(/subset|эскалац|права/i);
+    expect(partial).toHaveTextContent(/subset|escalat|permission/i);
   });
 
   // --- #6 Tightening the grant-role contract ---
 
-  it('[КОНТРАКТ] grant-role body содержит именно "role":"soul-operator"', async () => {
+  it('[CONTRACT] grant-role body contains exactly "role":"soul-operator"', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -644,7 +644,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('grant-role-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Bind role to ops-team/i });
     await user.click(within(dialog).getByTestId('grant-role-search'));
     await user.click(await within(dialog).findByTestId('grant-role-option-soul-operator'));
     await user.click(within(dialog).getByTestId('grant-role-submit'));
@@ -662,7 +662,7 @@ describe('SynodsList', () => {
 
   // --- #3 GrantRoleModal availableRoles filter ---
 
-  it('[ФИЛЬТР] GrantRoleModal: уже привязанная роль cluster-admin не появляется в опциях', async () => {
+  it('[FILTER] GrantRoleModal: already bound role cluster-admin does not appear in options', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -671,7 +671,7 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('grant-role-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Bind role to ops-team/i });
     await user.click(within(dialog).getByTestId('grant-role-search'));
 
     // soul-operator (not assigned) -- present in the options.
@@ -682,7 +682,7 @@ describe('SynodsList', () => {
 
   // --- #4 Inline row-error for remove-operator / revoke-role ---
 
-  it('[ROW-ERROR] remove-operator 409 → ошибка в строке таблицы', async () => {
+  it('[ROW-ERROR] remove-operator 409 → error in table row', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team\/operators\/archon-alice$/,
@@ -696,14 +696,14 @@ describe('SynodsList', () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
-    const removeBtn = screen.getByRole('button', { name: /убрать archon-alice из группы/i });
+    const removeBtn = screen.getByRole('button', { name: /remove archon-alice from group/i });
     await user.click(removeBtn);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/lock-?out|администратора/i);
+    expect(alert).toHaveTextContent(/lock-?out|admin/i);
   });
 
-  it('[ROW-ERROR] revoke-role 403 → ошибка в строке таблицы', async () => {
+  it('[ROW-ERROR] revoke-role 403 → error in table row', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team\/roles\/cluster-admin$/,
@@ -717,16 +717,16 @@ describe('SynodsList', () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
-    const revokeBtn = screen.getByRole('button', { name: /отвязать роль cluster-admin от группы/i });
+    const revokeBtn = screen.getByRole('button', { name: /unbind role cluster-admin from group/i });
     await user.click(revokeBtn);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/subset|эскалац|права/i);
+    expect(alert).toHaveTextContent(/subset|escalat|permission/i);
   });
 
   // --- #5 SynodsList states: isLoading + synodsQ.error ---
 
-  it('[STATE] isLoading: показывает loading-индикатор пока данные грузятся', () => {
+  it('[STATE] isLoading: shows loading indicator while data loads', () => {
     let resolve: ((v: Response) => void) | undefined;
     vi.stubGlobal('fetch', () =>
       new Promise<Response>((r) => {
@@ -734,14 +734,14 @@ describe('SynodsList', () => {
       }));
 
     renderWithProviders(<SynodsList />, '/synods');
-    expect(screen.getByText(/Загрузка/i)).toBeInTheDocument();
+    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
 
     resolve!(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
   });
 
   // --- Edit Synod guard tests ---
 
-  it('[EDIT] кнопка edit-synod-ops-team открывает модалку с именем и описанием', async () => {
+  it('[EDIT] edit-synod-ops-team button opens modal with name and description', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -749,14 +749,14 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod: ops-team/i });
     // name shown as read-only
     expect(within(dialog).getByTestId('edit-synod-name-readonly')).toHaveValue('ops-team');
     // description pre-filled
     expect(within(dialog).getByTestId('edit-synod-description-input')).toHaveValue('Operations team');
   });
 
-  it('[EDIT] PATCH /v1/synods/{name} шлёт { description }', async () => {
+  it('[EDIT] PATCH /v1/synods/{name} sends { description }', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -764,11 +764,11 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod: ops-team/i });
     const textarea = within(dialog).getByTestId('edit-synod-description-input');
     await user.clear(textarea);
     await user.type(textarea, 'Updated description');
-    await user.click(within(dialog).getByRole('button', { name: /^Сохранить$/ }));
+    await user.click(within(dialog).getByRole('button', { name: /^Save$/ }));
 
     await waitFor(() => {
       const patch = calls.find((c) => c.url === '/v1/synods/ops-team' && c.method === 'PATCH');
@@ -779,13 +779,13 @@ describe('SynodsList', () => {
     // Modal closed after success.
     await waitFor(
       () => {
-        expect(screen.queryByRole('dialog', { name: /Редактировать Synod/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog', { name: /Edit Synod/i })).not.toBeInTheDocument();
       },
       { timeout: 3000 },
     );
   });
 
-  it('[EDIT][RBAC] без synod.update кнопка edit-synod disabled + title с noPermUpdate', async () => {
+  it('[EDIT][RBAC] without synod.update edit-synod button disabled + title with noPermUpdate', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_UPDATE });
     renderWithProviders(<SynodsList />, '/synods');
 
@@ -795,7 +795,7 @@ describe('SynodsList', () => {
     expect(btn).toHaveAttribute('title', expect.stringMatching(/synod\.update/i));
   });
 
-  it('[EDIT] 422 от PATCH показывается как ошибка в модалке', async () => {
+  it('[EDIT] 422 from PATCH shown as error in modal', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team$/,
@@ -810,16 +810,16 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
-    await user.click(within(dialog).getByRole('button', { name: /^Сохранить$/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod: ops-team/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Save$/ }));
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/description is too long|валид/i);
+    expect(alert).toHaveTextContent(/description is too long|valid/i);
     // Modal did not close.
-    expect(screen.getByRole('dialog', { name: /Редактировать Synod/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Edit Synod/i })).toBeInTheDocument();
   });
 
-  it('[EDIT] name read-only — хинт "имя нельзя изменить" отображается', async () => {
+  it('[EDIT] name read-only — hint "name cannot be changed" shown', async () => {
     recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');
     const user = userEvent.setup();
@@ -827,11 +827,11 @@ describe('SynodsList', () => {
     await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-ops-team'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod/i });
-    expect(within(dialog).getByTestId('edit-synod-name-hint')).toHaveTextContent(/имя нельзя изменить/i);
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod/i });
+    expect(within(dialog).getByTestId('edit-synod-name-hint')).toHaveTextContent(/name cannot be changed/i);
   });
 
-  it('[STATE] synodsQ.error: показывает errorBox при 500 от GET /v1/synods', async () => {
+  it('[STATE] synodsQ.error: shows errorBox on 500 from GET /v1/synods', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url =
         typeof input === 'string'

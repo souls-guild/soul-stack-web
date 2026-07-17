@@ -5,12 +5,12 @@ import { KeeperSidCell } from '../components/KeeperSidCell';
 import { isKeeperSid } from '../components/keeperSid';
 
 describe('isKeeperSid', () => {
-  it('матчит ТОЧНО синтетические keeper / __run__', () => {
+  it('matches EXACTLY the synthetic keeper / __run__', () => {
     expect(isKeeperSid('keeper')).toBe(true);
     expect(isKeeperSid('__run__')).toBe(true);
   });
 
-  it('НЕ матчит реальные soul-sid, включая keeper-подобные (NIM-36)', () => {
+  it('does NOT match real soul-sids, including keeper-like ones (NIM-36)', () => {
     for (const sid of ['soul-keeper-1', 'keeper-1', 'keeper.example.com', 'host-a.local', '']) {
       expect(isKeeperSid(sid)).toBe(false);
     }
@@ -18,19 +18,19 @@ describe('isKeeperSid', () => {
 });
 
 describe('KeeperSidCell', () => {
-  it('keeper — бейдж keeper-side без ссылки на /souls', () => {
+  it('keeper — keeper-side badge without a link to /souls', () => {
     renderWithProviders(<KeeperSidCell sid="keeper" />);
     expect(screen.queryByRole('link', { name: /^keeper$/ })).not.toBeInTheDocument();
     expect(screen.getByText('keeper-side')).toBeInTheDocument();
   });
 
-  it('__run__ (run-sentinel) — бейдж без ссылки', () => {
+  it('__run__ (run-sentinel) — badge without a link', () => {
     renderWithProviders(<KeeperSidCell sid="__run__" />);
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('no host')).toBeInTheDocument();
   });
 
-  it('реальный soul — кликабельная ссылка /souls/<sid>', () => {
+  it('real soul — clickable /souls/<sid> link', () => {
     renderWithProviders(<KeeperSidCell sid="host-a.local" />);
     expect(screen.getByRole('link', { name: 'host-a.local' })).toHaveAttribute(
       'href',
@@ -38,7 +38,7 @@ describe('KeeperSidCell', () => {
     );
   });
 
-  it('keeper-подобный реальный soul (soul-keeper-1) остаётся ссылкой, не бейджем', () => {
+  it('keeper-like real soul (soul-keeper-1) stays a link, not a badge', () => {
     renderWithProviders(<KeeperSidCell sid="soul-keeper-1" />);
     expect(screen.getByRole('link', { name: 'soul-keeper-1' })).toHaveAttribute(
       'href',

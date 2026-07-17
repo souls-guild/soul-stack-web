@@ -25,18 +25,18 @@ function renderForm() {
   );
 }
 
-describe('TraitsEditor в форме создания инкарнации', () => {
+describe('TraitsEditor in the incarnation create form', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
 
-  it('traits-секция рендерится в форме', async () => {
+  it('traits section renders in the form', async () => {
     installFetchMock([SERVICES_MOCK]);
     renderForm();
     expect(await screen.findByTestId('traits-editor')).toBeInTheDocument();
   });
 
-  it('добавление строки trait по кнопке', async () => {
+  it('adds a trait row via the button', async () => {
     installFetchMock([SERVICES_MOCK]);
     renderForm();
     const user = userEvent.setup();
@@ -48,7 +48,7 @@ describe('TraitsEditor в форме создания инкарнации', () 
     expect(screen.getAllByTestId('trait-row')).toHaveLength(1);
   });
 
-  it('удаление строки trait', async () => {
+  it('removes a trait row', async () => {
     installFetchMock([SERVICES_MOCK]);
     renderForm();
     const user = userEvent.setup();
@@ -57,11 +57,11 @@ describe('TraitsEditor в форме создания инкарнации', () 
     await user.click(screen.getByTestId('traits-add-row'));
     expect(screen.getAllByTestId('trait-row')).toHaveLength(1);
 
-    await user.click(screen.getByRole('button', { name: /Удалить trait/i }));
+    await user.click(screen.getByRole('button', { name: /Remove trait/i }));
     expect(screen.queryAllByTestId('trait-row')).toHaveLength(0);
   });
 
-  it('переключение режима string → list', async () => {
+  it('toggles mode string → list', async () => {
     installFetchMock([SERVICES_MOCK]);
     renderForm();
     const user = userEvent.setup();
@@ -78,7 +78,7 @@ describe('TraitsEditor в форме создания инкарнации', () 
     expect(toggleBtn).toHaveTextContent('"…"');
   });
 
-  it('traits с строковым значением уходят в POST create-request', async () => {
+  it('traits with a string value are sent in the POST create request', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -111,12 +111,12 @@ describe('TraitsEditor в форме создания инкарнации', () 
 
     // Add trait: key=env, value=prod
     await user.click(screen.getByTestId('traits-add-row'));
-    const [keyInput] = screen.getAllByRole('textbox', { name: /ключ trait/i });
+    const [keyInput] = screen.getAllByRole('textbox', { name: /trait key/i });
     await user.type(keyInput, 'env');
-    const [valInput] = screen.getAllByRole('textbox', { name: /значение trait/i });
+    const [valInput] = screen.getAllByRole('textbox', { name: /trait value/i });
     await user.type(valInput, 'prod');
 
-    await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
@@ -126,7 +126,7 @@ describe('TraitsEditor в форме создания инкарнации', () 
     });
   });
 
-  it('traits без ключей НЕ уходят в POST (пустые строки игнорируются)', async () => {
+  it('traits without keys are NOT sent in POST (empty rows are ignored)', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -158,7 +158,7 @@ describe('TraitsEditor в форме создания инкарнации', () 
     // Add a row, but do NOT fill in the key
     await user.click(screen.getByTestId('traits-add-row'));
 
-    await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));

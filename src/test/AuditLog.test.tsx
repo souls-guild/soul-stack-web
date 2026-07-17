@@ -10,7 +10,7 @@ describe('AuditLog', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит ленту audit-events с source-badge и expandable payload', async () => {
+  it('renders the audit-events feed with source badge and expandable payload', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -56,7 +56,7 @@ describe('AuditLog', () => {
     expect(screen.getByText(/1–2 of 2/)).toBeInTheDocument();
   });
 
-  it('применяет type / source / archon_aid фильтры в query', async () => {
+  it('applies type / source / archon_aid filters to the query', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -90,7 +90,7 @@ describe('AuditLog', () => {
     });
   });
 
-  it('expandable card раскрывает payload в JsonViewer', async () => {
+  it('expandable card reveals payload in JsonViewer', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -125,7 +125,7 @@ describe('AuditLog', () => {
     });
   });
 
-  it('[guard] copy-link кнопка присутствует для событий с correlation_id', async () => {
+  it('[guard] copy-link button is present for events with correlation_id', async () => {
     // Mock clipboard.writeText before render via Object.assign on window.
     const writeMock = vi.fn().mockResolvedValue(undefined);
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(window, 'navigator');
@@ -185,7 +185,7 @@ describe('AuditLog', () => {
     void clipboardDescriptor; // suppress unused warning
   });
 
-  it('подхватывает archon_aid из URL search params (deep-link из ArchonDetail)', async () => {
+  it('picks up archon_aid from URL search params (deep-link from ArchonDetail)', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;

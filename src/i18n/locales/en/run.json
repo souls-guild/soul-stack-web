@@ -44,7 +44,7 @@
   "covensLabel": "Covens (declared environment tags)",
   "covensPlaceholder": "prod, datacenter-1",
   "covenKebabError": "kebab-case: ^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
-  "scenarioInputFieldsLabel": "Input (поля scenario {{scenario}})",
+  "scenarioInputFieldsLabel": "Input (scenario {{scenario}} fields)",
   "scenarioInputDynamicLabel": "Input (dynamic form builder without input_schema)",
   "customModuleOption": "— custom module —",
   "moduleNameLabel": "Module name",

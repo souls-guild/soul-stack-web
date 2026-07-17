@@ -31,7 +31,7 @@ describe('DecreeDetail', () => {
     tokenStore.clear();
   });
 
-  it('рендерит детали Decree-а из /v1/decrees/{name}', async () => {
+  it('renders Decree details from /v1/decrees/{name}', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/decrees/restart-on-config', body: SAMPLE },
     ]);
@@ -55,7 +55,7 @@ describe('DecreeDetail', () => {
 
   // -- Guard tests: clickable links --------------------------------------------
 
-  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] created_by_aid renders as a link to /archons/:aid', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/decrees/restart-on-config', body: SAMPLE },
     ]);
@@ -71,7 +71,7 @@ describe('DecreeDetail', () => {
     expect(link).toHaveAttribute('href', '/archons/archon-alice');
   });
 
-  it('[LINKS] при отсутствии created_by_aid показывает «—», ссылок на архонтов нет', async () => {
+  it('[LINKS] shows «—» when created_by_aid is absent, no archon links', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/decrees/restart-on-config', body: SAMPLE_NO_AID },
     ]);

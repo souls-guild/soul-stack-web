@@ -34,7 +34,7 @@ export function useServiceScenarios(serviceName: string | undefined): ScenariosQ
         error: unavailable
           ? null
           : q.error instanceof ApiError
-            ? `Ошибка ${q.error.status}: ${q.error.message}`
+            ? `Error ${q.error.status}: ${q.error.message}`
             : String(q.error),
       };
     }

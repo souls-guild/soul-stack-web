@@ -3,10 +3,10 @@ import styles from './Sparkline.module.css';
 export type SparklineTone = 'ok' | 'warn' | 'danger' | 'accent' | 'muted';
 
 interface Props {
-  values: number[]; // хронологически (старые → новые)
+  values: number[]; // chronological (old → new)
   width?: number;
   height?: number;
-  min?: number; // фиксированный домен (напр. 0..100 для %); иначе по значениям
+  min?: number; // fixed domain (e.g. 0..100 for %); otherwise derived from values
   max?: number;
   tone?: SparklineTone;
   ariaLabel?: string;
@@ -21,8 +21,8 @@ const toneClass: Record<SparklineTone, string> = {
   muted: styles.muted,
 };
 
-// Спарклайн на чистом SVG (без chart-библиотеки, паттерн Donut). Точки вне домена
-// клампятся; 1 точка → маркер по центру; пусто → пустой svg (потребитель решает).
+// Pure-SVG sparkline (no chart library, Donut pattern). Points outside the domain
+// are clamped; 1 point → centered marker; empty → empty svg (consumer decides).
 export function Sparkline({
   values,
   width = 132,

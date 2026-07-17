@@ -12,22 +12,22 @@ import { pickSecretField, type SecretMode } from '../components/input/secretMode
 import { SecretModeField } from '../components/input/SecretModeField';
 
 describe('pickSecretField — XOR guard', () => {
-  it('mode=value → возвращает только value-поле (никогда ref)', () => {
+  it('mode=value → returns only the value field (never ref)', () => {
     const picked = pickSecretField('value', 'plaintext-secret', 'vault:secret/x');
     expect(picked).toEqual({ kind: 'value', value: 'plaintext-secret' });
   });
 
-  it('mode=ref → возвращает только ref-поле (никогда value)', () => {
+  it('mode=ref → returns only the ref field (never value)', () => {
     const picked = pickSecretField('ref', 'plaintext-secret', 'vault:secret/x');
     expect(picked).toEqual({ kind: 'ref', value: 'vault:secret/x' });
   });
 
-  it('активный ввод пуст (после trim) → null (поле не отправляется)', () => {
+  it('active input is empty (after trim) → null (field is not sent)', () => {
     expect(pickSecretField('value', '   ', 'vault:secret/x')).toBeNull();
     expect(pickSecretField('ref', 'plaintext', '  ')).toBeNull();
   });
 
-  it('никогда не отдаёт оба поля: для любого режима kind соответствует режиму', () => {
+  it('never returns both fields: for any mode kind matches the mode', () => {
     const modes: SecretMode[] = ['value', 'ref'];
     for (const m of modes) {
       const picked = pickSecretField(m, 'v', 'r');
@@ -47,8 +47,8 @@ function Harness() {
       mode={mode}
       onModeChange={setMode}
       testIdBase="sf"
-      valueModeLabel="Значение"
-      refModeLabel="Путь"
+      valueModeLabel="Value"
+      refModeLabel="Path"
       value={value}
       onValueChange={setValue}
       refValue={ref}
@@ -58,14 +58,14 @@ function Harness() {
   );
 }
 
-describe('SecretModeField — dual-mode переключение (XOR структурно)', () => {
-  it('default=ref: виден только ref-инпут, value-инпута нет', () => {
+describe('SecretModeField — dual-mode switching (XOR structural)', () => {
+  it('default=ref: only the ref input is visible, no value input', () => {
     render(<Harness />);
     expect(screen.getByTestId('sf-ref')).toBeInTheDocument();
     expect(screen.queryByTestId('sf-value')).not.toBeInTheDocument();
   });
 
-  it('переключение на «значение» показывает value-инпут и убирает ref-инпут', async () => {
+  it('switching to "value" shows the value input and removes the ref input', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByTestId('sf-mode-value'));
@@ -73,14 +73,14 @@ describe('SecretModeField — dual-mode переключение (XOR струк
     expect(screen.queryByTestId('sf-ref')).not.toBeInTheDocument();
   });
 
-  it('value-инпут маскируется (type=password) — секрет не виден на экране', async () => {
+  it('value input is masked (type=password) — the secret is not visible on screen', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByTestId('sf-mode-value'));
     expect(screen.getByTestId('sf-value')).toHaveAttribute('type', 'password');
   });
 
-  it('aria-checked отражает активный режим', async () => {
+  it('aria-checked reflects the active mode', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     expect(screen.getByTestId('sf-mode-ref')).toHaveAttribute('aria-checked', 'true');

@@ -16,7 +16,7 @@ describe('DecreeNewForm', () => {
     tokenStore.clear();
   });
 
-  it('default-deny: чекбокс enabled выключен по умолчанию', async () => {
+  it('default-deny: enabled checkbox is off by default', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/vigils', body: EMPTY_VIGILS },
       { method: 'GET', url: '/v1/incarnations', body: EMPTY_INCS },
@@ -26,7 +26,7 @@ describe('DecreeNewForm', () => {
     expect((enabled as HTMLInputElement).checked).toBe(false);
   });
 
-  it('POST с минимальными полями → redirect на detail', async () => {
+  it('POST with minimal fields → redirect to detail', async () => {
     const created = {
       name: 'restart-on-config',
       on_beacon: 'redis-config-changed',

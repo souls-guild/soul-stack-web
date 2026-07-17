@@ -12,7 +12,7 @@ describe('VigilNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('typed-форма для core.beacon.file_changed → POST /v1/vigils → redirect на detail', async () => {
+  it('typed form for core.beacon.file_changed → POST /v1/vigils → redirect to detail', async () => {
     const postSpy = vi.fn();
     installFetchMock([
       {
@@ -80,7 +80,7 @@ describe('VigilNewForm', () => {
     expect(payload.enabled).toBe(true);
   });
 
-  it('валидация: пустое имя блокирует submit (422 не отправляется)', async () => {
+  it('validation: empty name blocks submit (no 422 sent)', async () => {
     const postSpy = vi.fn();
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -102,7 +102,7 @@ describe('VigilNewForm', () => {
     await user.click(screen.getByRole('button', { name: /Create Vigil/i }));
     // Inline error must appear, fetch must NOT be called
     await waitFor(() => {
-      expect(screen.getByText(/имя обязательно/i)).toBeInTheDocument();
+      expect(screen.getByText(/name is required/i)).toBeInTheDocument();
     });
     expect(postSpy).not.toHaveBeenCalled();
   });

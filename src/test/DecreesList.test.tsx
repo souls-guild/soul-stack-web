@@ -31,7 +31,7 @@ describe('DecreesList', () => {
     tokenStore.clear();
   });
 
-  it('рендерит таблицу из /v1/decrees', async () => {
+  it('renders the table from /v1/decrees', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/decrees', body: SAMPLE }]);
     renderWithProviders(<DecreesList />, '/decrees');
     expect(screen.getByRole('heading', { name: /Decrees/i })).toBeInTheDocument();
@@ -45,13 +45,13 @@ describe('DecreesList', () => {
     expect(screen.getByText('enabled')).toBeInTheDocument();
   });
 
-  it('показывает empty-state без записей', async () => {
+  it('shows empty-state when there are no records', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/decrees', body: { items: [], offset: 0, limit: 50, total: 0 } },
     ]);
     renderWithProviders(<DecreesList />, '/decrees');
     await waitFor(() => {
-      expect(screen.getByText(/Decree-ов нет/i)).toBeInTheDocument();
+      expect(screen.getByText(/No Decrees/i)).toBeInTheDocument();
     });
   });
 });

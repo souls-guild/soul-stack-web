@@ -1,8 +1,8 @@
 /**
  * Provider create dual-mode credentials (ADR-064, NIM-11):
- *   1. credentials в режиме «значение» (KV) → POST несёт credentials-объект, без credentials_ref.
- *   2. credentials в режиме «путь» (default) → POST несёт credentials_ref, без credentials.
- *   3. submit disabled, пока не заполнены name/type/region + credentials (заполни ровно одно).
+ *   1. credentials in "value" mode (KV) → POST carries a credentials object, without credentials_ref.
+ *   2. credentials in "path" mode (default) → POST carries credentials_ref, without credentials.
+ *   3. submit disabled until name/type/region + credentials are filled (fill exactly one).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -49,7 +49,7 @@ async function openCreate() {
   const user = userEvent.setup();
   await waitFor(() => expect(screen.getByTestId('provider-create-btn')).not.toBeDisabled());
   await user.click(screen.getByTestId('provider-create-btn'));
-  const dialog = await screen.findByRole('dialog', { name: /Создать Cloud-Provider/i });
+  const dialog = await screen.findByRole('dialog', { name: /Create Cloud Provider/i });
   return { dialog, user };
 }
 
@@ -62,7 +62,7 @@ async function fillBase(dialog: HTMLElement, user: ReturnType<typeof userEvent.s
 beforeEach(() => { tokenStore.clear(); });
 
 describe('Provider create dual-mode credentials (NIM-11)', () => {
-  it('режим «значение» (KV) → POST несёт credentials-объект, без credentials_ref', async () => {
+  it('value mode (KV) → POST carries a credentials object, without credentials_ref', async () => {
     const calls = setupMock();
     renderList();
     const { dialog, user } = await openCreate();
@@ -72,7 +72,7 @@ describe('Provider create dual-mode credentials (NIM-11)', () => {
     const kv = within(dialog).getByTestId('provider-credentials-value');
     await user.type(kv, 'access_key: AKIA123{enter}secret_key: SEKRET');
 
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/providers' && c.method === 'POST');
@@ -83,7 +83,7 @@ describe('Provider create dual-mode credentials (NIM-11)', () => {
     });
   });
 
-  it('режим «путь» (default) → POST несёт credentials_ref, без credentials', async () => {
+  it('path mode (default) → POST carries credentials_ref, without credentials', async () => {
     const calls = setupMock();
     renderList();
     const { dialog, user } = await openCreate();
@@ -91,7 +91,7 @@ describe('Provider create dual-mode credentials (NIM-11)', () => {
     await fillBase(dialog, user);
     await user.type(within(dialog).getByTestId('provider-credentials-ref'), 'vault:secret/cloud/aws');
 
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/providers' && c.method === 'POST');
@@ -101,12 +101,12 @@ describe('Provider create dual-mode credentials (NIM-11)', () => {
     });
   });
 
-  it('submit disabled, пока не заполнены name/type/region + credentials', async () => {
+  it('submit disabled until name/type/region + credentials are filled', async () => {
     setupMock();
     renderList();
     const { dialog, user } = await openCreate();
 
-    const submit = within(dialog).getByRole('button', { name: /Создать/i });
+    const submit = within(dialog).getByRole('button', { name: /Create/i });
     expect(submit).toBeDisabled();
 
     await fillBase(dialog, user);

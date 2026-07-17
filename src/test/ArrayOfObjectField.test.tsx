@@ -57,8 +57,8 @@ function StatefulFields({
 }
 
 // --------------------------------------------------------------------------
-describe('isArrayOfObjectField хелпер', () => {
-  it('возвращает true для array+items.type=object+properties', () => {
+describe('isArrayOfObjectField helper', () => {
+  it('returns true for array+items.type=object+properties', () => {
     expect(
       isArrayOfObjectField({
         type: 'array',
@@ -67,26 +67,26 @@ describe('isArrayOfObjectField хелпер', () => {
     ).toBe(true);
   });
 
-  it('возвращает false для array+items.type=string', () => {
+  it('returns false for array+items.type=string', () => {
     expect(isArrayOfObjectField({ type: 'array', items: { type: 'string' } })).toBe(false);
   });
 
-  it('возвращает false для array без items', () => {
+  it('returns false for array without items', () => {
     expect(isArrayOfObjectField({ type: 'array' })).toBe(false);
   });
 
-  it('возвращает false для array+items.type=object без properties', () => {
+  it('returns false for array+items.type=object without properties', () => {
     expect(isArrayOfObjectField({ type: 'array', items: { type: 'object' } })).toBe(false);
   });
 });
 
 // --------------------------------------------------------------------------
-describe('isTypedListField не захватывает array-of-object', () => {
+describe('isTypedListField does not capture array-of-object', () => {
   it('array+items.type=string → true (TypedListField)', () => {
     expect(isTypedListField({ type: 'array', items: { type: 'string' } })).toBe(true);
   });
 
-  it('array+items.type=object+properties → false (не TypedListField)', () => {
+  it('array+items.type=object+properties → false (not TypedListField)', () => {
     expect(
       isTypedListField({
         type: 'array',
@@ -97,8 +97,8 @@ describe('isTypedListField не захватывает array-of-object', () => {
 });
 
 // --------------------------------------------------------------------------
-describe('isCompositeType не захватывает array-of-object', () => {
-  it('array+items.type=object+properties → false (не composite JSON-textarea)', () => {
+describe('isCompositeType does not capture array-of-object', () => {
+  it('array+items.type=object+properties → false (not composite JSON-textarea)', () => {
     expect(
       isCompositeType({
         type: 'array',
@@ -107,21 +107,21 @@ describe('isCompositeType не захватывает array-of-object', () => {
     ).toBe(false);
   });
 
-  it('array без items → true (JSON-textarea)', () => {
+  it('array without items → true (JSON-textarea)', () => {
     expect(isCompositeType({ type: 'array' })).toBe(true);
   });
 });
 
 // --------------------------------------------------------------------------
-describe('ArrayOfObjectField рендер', () => {
-  it('рендерит виджет field-arrayobj-*, не JSON-textarea и не TypedList', () => {
+describe('ArrayOfObjectField render', () => {
+  it('renders the field-arrayobj-* widget, not a JSON-textarea or TypedList', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.getByTestId('field-arrayobj-users')).toBeTruthy();
     expect(screen.queryByTestId('field-composite-users')).toBeNull();
     expect(screen.queryByTestId('field-typedlist-users')).toBeNull();
   });
 
-  it('кнопка добавить создаёт карточку с под-полями name/perms/state', () => {
+  it('add button creates a card with name/perms/state sub-fields', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     const addBtn = screen.getByTestId('field-arrayobj-add-users');
     fireEvent.click(addBtn);
@@ -132,7 +132,7 @@ describe('ArrayOfObjectField рендер', () => {
     expect(screen.getByTestId('field-arrayobj-subfield-users-0-state')).toBeTruthy();
   });
 
-  it('state → enum-select для поля с enum (on/off)', () => {
+  it('state → enum-select for a field with an enum (on/off)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     const select = screen.getByTestId('field-arrayobj-subfield-users-0-state');
@@ -142,7 +142,7 @@ describe('ArrayOfObjectField рендер', () => {
     expect(options).toContain('off');
   });
 
-  it('name/perms → text input (не enum)', () => {
+  it('name/perms → text input (not enum)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     const nameInput = screen.getByTestId('field-arrayobj-subfield-users-0-name');
@@ -150,7 +150,7 @@ describe('ArrayOfObjectField рендер', () => {
     expect((nameInput as HTMLInputElement).type).toBe('text');
   });
 
-  it('required-маркер * на обязательных под-полях (name, perms)', () => {
+  it('required marker * on required sub-fields (name, perms)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     expect(screen.getByTestId('field-arrayobj-subfield-required-users-0-name')).toBeTruthy();
@@ -159,14 +159,14 @@ describe('ArrayOfObjectField рендер', () => {
     expect(screen.queryByTestId('field-arrayobj-subfield-required-users-0-state')).toBeNull();
   });
 
-  it('x-type отображается как лейбл типа', () => {
+  it('x-type is shown as the type label', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     const card = screen.getByTestId('field-arrayobj-card-users-0');
     expect(card.textContent).toContain('AclUser');
   });
 
-  it('кнопка удалить убирает карточку', () => {
+  it('remove button removes the card', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
@@ -177,7 +177,7 @@ describe('ArrayOfObjectField рендер', () => {
     expect(screen.getByTestId('field-arrayobj-card-users-0')).toBeTruthy();
   });
 
-  it('значение = массив объектов (через onChange)', () => {
+  it('value = array of objects (via onChange)', () => {
     const captured: ScenarioFieldsState[] = [];
     render(<StatefulFields schema={aclUserSchema} onChangeSpy={(s) => captured.push(s)} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
@@ -202,7 +202,7 @@ describe('ArrayOfObjectField рендер', () => {
 
 // --------------------------------------------------------------------------
 describe('ArrayOfObjectField AclUser preset', () => {
-  it('при добавлении AclUser-элемента перms и state заполнены preset-значениями', () => {
+  it('adding an AclUser item pre-fills perms and state with preset values', () => {
     const captured: ScenarioFieldsState[] = [];
     render(<StatefulFields schema={aclUserSchema} onChangeSpy={(s) => captured.push(s)} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
@@ -217,21 +217,21 @@ describe('ArrayOfObjectField AclUser preset', () => {
     expect(parsed[0].name).toBe('');
   });
 
-  it('preset значение perms отображается в input после добавления', () => {
+  it('preset perms value is shown in the input after adding', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     const permsInput = screen.getByTestId('field-arrayobj-subfield-users-0-perms') as HTMLInputElement;
     expect(permsInput.value).toBe('allchannels allkeys +@all -@admin -@dangerous +info');
   });
 
-  it('preset state=on выбран в select после добавления', () => {
+  it('preset state=on is selected in the select after adding', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.click(screen.getByTestId('field-arrayobj-add-users'));
     const stateSelect = screen.getByTestId('field-arrayobj-subfield-users-0-state') as HTMLSelectElement;
     expect(stateSelect.value).toBe('on');
   });
 
-  it('non-AclUser array-of-object добавляет пустые значения (нет preset)', () => {
+  it('non-AclUser array-of-object adds empty values (no preset)', () => {
     const genericSchema: ScenarioInputSchema = {
       hosts: {
         type: 'array',
@@ -258,7 +258,7 @@ describe('ArrayOfObjectField AclUser preset', () => {
 
 // --------------------------------------------------------------------------
 describe('serializeFields array-of-object', () => {
-  it('сериализует в массив объектов (не строку)', () => {
+  it('serializes to an array of objects (not a string)', () => {
     const state: ScenarioFieldsState = {
       users: JSON.stringify([{ name: 'alice', perms: '+@read', state: 'on' }]),
     };
@@ -271,12 +271,12 @@ describe('serializeFields array-of-object', () => {
     });
   });
 
-  it('пустое значение → поле отсутствует в body', () => {
+  it('empty value → field is absent from the body', () => {
     const body = serializeFields(aclUserSchema, { users: '' });
     expect(body).not.toHaveProperty('users');
   });
 
-  it('два элемента → массив из двух объектов', () => {
+  it('two items → array of two objects', () => {
     const state: ScenarioFieldsState = {
       users: JSON.stringify([
         { name: 'alice', perms: '+@read', state: 'on' },

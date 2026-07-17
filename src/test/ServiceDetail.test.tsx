@@ -100,7 +100,7 @@ describe('ServiceDetail', () => {
     tokenStore.clear();
   });
 
-  it('рендерит детали из /v1/services/{name}', async () => {
+  it('renders details from /v1/services/{name}', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
     ]);
@@ -121,7 +121,7 @@ describe('ServiceDetail', () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
-  it('таб Scenarios рендерит flat-map input_schema (новая backend-shape)', async () => {
+  it('Scenarios tab renders flat-map input_schema (new backend shape)', async () => {
     installFetchMock([
       // More specific URL first (fetchMock takes the first startsWith match).
       {
@@ -135,16 +135,16 @@ describe('ServiceDetail', () => {
               name: 'create',
               kind: 'lifecycle',
               path: 'scenario/create/main.yml',
-              description: 'Создаёт redis incarnation',
+              description: 'Creates a redis incarnation',
               input_schema: {
                 greeting: {
                   type: 'string',
-                  description: 'Приветственная строка',
+                  description: 'Greeting string',
                   required: true,
                 },
                 replicas: {
                   type: 'integer',
-                  description: 'Кол-во реплик',
+                  description: 'Number of replicas',
                 },
               },
             },
@@ -167,10 +167,10 @@ describe('ServiceDetail', () => {
     });
     // input fields summary — field names comma-separated.
     expect(screen.getByText(/greeting, replicas/)).toBeInTheDocument();
-    expect(screen.getByText('Создаёт redis incarnation')).toBeInTheDocument();
+    expect(screen.getByText('Creates a redis incarnation')).toBeInTheDocument();
   });
 
-  it('таб Scenarios: пустой каталог → empty-state без crash', async () => {
+  it('Scenarios tab: empty catalog → empty-state without crash', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -189,11 +189,11 @@ describe('ServiceDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Scenarios/i }));
     await waitFor(() => {
-      expect(screen.getByText(/В каталоге пока нет сценариев/)).toBeInTheDocument();
+      expect(screen.getByText(/No scenarios in the catalog yet/)).toBeInTheDocument();
     });
   });
 
-  it('git-link: http(s) git-url кликабелен (href без .git-суффикса)', async () => {
+  it('git-link: http(s) git-url is clickable (href without .git suffix)', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
     ]);
@@ -209,7 +209,7 @@ describe('ServiceDetail', () => {
     expect(metaLink).toHaveAttribute('target', '_blank');
   });
 
-  it('git-link: non-http git (ssh) не кликабелен', async () => {
+  it('git-link: non-http git (ssh) is not clickable', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -227,7 +227,7 @@ describe('ServiceDetail', () => {
     expect(screen.queryByTestId('svc-git-link-meta')).not.toBeInTheDocument();
   });
 
-  it('таб Schema рендерит state_schema_version + поля + миграции', async () => {
+  it('Schema tab renders state_schema_version + fields + migrations', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -265,7 +265,7 @@ describe('ServiceDetail', () => {
     expect(screen.getByText('migrations/002_to_003.yml')).toBeInTheDocument();
   });
 
-  it('таб Schema: endpoint 404 → graceful degraded-плейсхолдер', async () => {
+  it('Schema tab: endpoint 404 → graceful degraded placeholder', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -289,7 +289,7 @@ describe('ServiceDetail', () => {
     });
   });
 
-  it('таб Incarnations подгружает /v1/incarnations?service=redis', async () => {
+  it('Incarnations tab loads /v1/incarnations?service=redis', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
       { method: 'GET', url: '/v1/incarnations', body: INCS },
@@ -308,7 +308,7 @@ describe('ServiceDetail', () => {
     });
   });
 
-  it('таб Incarnations: динамические колонки из state_schema (скалярные)', async () => {
+  it('Incarnations tab: dynamic columns from state_schema (scalar)', async () => {
     installFetchMock([
       // state-schema more specific than /v1/services/redis -> first
       { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_WITH_FIELDS },
@@ -338,7 +338,7 @@ describe('ServiceDetail', () => {
     expect(cells.length).toBeGreaterThan(0);
   });
 
-  it('таб Incarnations: составное поле (array) не создаёт отдельную колонку версии', async () => {
+  it('Incarnations tab: composite field (array) does not create a separate version column', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis/state-schema', body: STATE_SCHEMA_WITH_FIELDS },
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
@@ -362,7 +362,7 @@ describe('ServiceDetail', () => {
     expect(screen.getByText(/2 items/)).toBeInTheDocument();
   });
 
-  it('таб Incarnations: пустой state (инкарнация без применения) → «—» без краша', async () => {
+  it('Incarnations tab: empty state (incarnation without apply) → "—" without crash', async () => {
     const emptyStateIncs = {
       ...INCS_WITH_STATE,
       items: [{ ...INCS_WITH_STATE.items[0], state: undefined }],
@@ -390,7 +390,7 @@ describe('ServiceDetail', () => {
     expect(dashCells.length).toBeGreaterThan(0);
   });
 
-  it('таб Incarnations: state_schema 404 → базовые колонки без crash', async () => {
+  it('Incarnations tab: state_schema 404 → base columns without crash', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis/state-schema', status: 404, body: { title: 'not found' } },
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
@@ -412,7 +412,7 @@ describe('ServiceDetail', () => {
     expect(screen.queryByRole('columnheader', { name: 'redis_version' })).not.toBeInTheDocument();
   });
 
-  it('таб Dependencies рендерит destiny с ref', async () => {
+  it('Dependencies tab renders destiny with ref', async () => {
     installFetchMock([
       // /dependencies — more specific than /v1/services/redis -> first
       {
@@ -438,7 +438,7 @@ describe('ServiceDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: /Dependencies|Зависимости/i }));
+    await user.click(screen.getByRole('tab', { name: /Dependencies/i }));
     await waitFor(() => {
       expect(screen.getByTestId('svc-deps-section')).toBeInTheDocument();
     });
@@ -448,7 +448,7 @@ describe('ServiceDetail', () => {
     expect(screen.getByText('wb.redis-failover')).toBeInTheDocument();
   });
 
-  it('таб Dependencies: пустой destiny + пустые modules → empty-state без crash', async () => {
+  it('Dependencies tab: empty destiny + empty modules → empty-state without crash', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -465,17 +465,17 @@ describe('ServiceDetail', () => {
     );
     await waitFor(() => expect(screen.getByRole('heading', { name: 'redis' })).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: /Dependencies|Зависимости/i }));
+    await user.click(screen.getByRole('tab', { name: /Dependencies/i }));
     await waitFor(() => {
       expect(screen.getByTestId('svc-deps-section')).toBeInTheDocument();
     });
-    expect(screen.getByText(/Нет destiny-зависимостей|No destiny/i)).toBeInTheDocument();
-    expect(screen.getByText(/Нет custom-модулей|No custom/i)).toBeInTheDocument();
+    expect(screen.getByText(/No destiny dependencies/i)).toBeInTheDocument();
+    expect(screen.getByText(/No custom modules/i)).toBeInTheDocument();
   });
 
   // -- Guard tests: clickable links -----------------------------------------
 
-  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] created_by_aid renders as a link to /archons/:aid', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
     ]);
@@ -492,7 +492,7 @@ describe('ServiceDetail', () => {
     expect(createdLink).toHaveAttribute('href', '/archons/archon-bootstrap');
   });
 
-  it('[LINKS] updated_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] updated_by_aid renders as a link to /archons/:aid', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis', body: SAMPLE },
     ]);
@@ -509,7 +509,7 @@ describe('ServiceDetail', () => {
     expect(updatedLink).toHaveAttribute('href', '/archons/archon-alice');
   });
 
-  it('[LINKS] отсутствующий created_by_aid не рендерит ссылку', async () => {
+  it('[LINKS] missing created_by_aid does not render a link', async () => {
     installFetchMock([
       {
         method: 'GET',

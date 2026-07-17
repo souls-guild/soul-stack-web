@@ -81,20 +81,20 @@ function addPair(field: string, idx: number, key: string, val: string) {
 }
 
 // --- pure helpers -------------------------------------------------------------
-describe('NIM-76 хелперы версии/каталога', () => {
-  it('versionToSeries: первые два компонента полной версии', () => {
+describe('NIM-76 version/catalog helpers', () => {
+  it('versionToSeries: first two components of a full version', () => {
     expect(versionToSeries('8.2.2')).toBe('8.2');
     expect(versionToSeries('6.2.14')).toBe('6.2');
     expect(versionToSeries('7.0')).toBe('7.0');
   });
 
-  it('versionToSeries: пустое/битое → undefined', () => {
+  it('versionToSeries: empty/broken → undefined', () => {
     expect(versionToSeries(undefined)).toBeUndefined();
     expect(versionToSeries('')).toBeUndefined();
     expect(versionToSeries('8')).toBeUndefined();
   });
 
-  it('versionToSeries: снимает "v"-префикс и Debian-epoch (зеркалит backend)', () => {
+  it('versionToSeries: strips "v"-prefix and Debian epoch (mirrors backend)', () => {
     // epoch -- real day-2 case of state.redis_version (Debian Redis build).
     expect(versionToSeries('5:7.4.1-1~deb12u7')).toBe('7.4');
     expect(versionToSeries('6:8.2.2')).toBe('8.2');
@@ -104,12 +104,12 @@ describe('NIM-76 хелперы версии/каталога', () => {
     expect(versionToSeries(' 8.2.2 ')).toBe('8.2');
   });
 
-  it('directiveFieldTag: truthy x-directives → тег, иначе undefined', () => {
+  it('directiveFieldTag: truthy x-directives → tag, otherwise undefined', () => {
     expect(directiveFieldTag(directiveMapSchema.redis_settings)).toBe('redis');
     expect(directiveFieldTag(plainMapSchema.opts)).toBeUndefined();
   });
 
-  it('directiveNamesForVersion: серия из каталога / graceful undefined', () => {
+  it('directiveNamesForVersion: series from catalog / graceful undefined', () => {
     expect(directiveNamesForVersion(CATALOG, '8.2.2')).toEqual(['appendonly', 'maxmemory', 'maxmemory-policy']);
     // catalog not loaded -> undefined (graceful)
     expect(directiveNamesForVersion({ loaded: false, directives: CATALOG.directives }, '8.2.2')).toBeUndefined();
@@ -119,7 +119,7 @@ describe('NIM-76 хелперы версии/каталога', () => {
     expect(directiveNamesForVersion(CATALOG, undefined)).toBeUndefined();
   });
 
-  it('schemaHasDirectiveField: гейт fetch каталога', () => {
+  it('schemaHasDirectiveField: catalog-fetch gate', () => {
     expect(schemaHasDirectiveField(directiveMapSchema)).toBe(true);
     expect(schemaHasDirectiveField(plainMapSchema)).toBe(false);
     expect(schemaHasDirectiveField(undefined)).toBe(false);
@@ -127,8 +127,8 @@ describe('NIM-76 хелперы версии/каталога', () => {
 });
 
 // --- #1 known vs unknown directive (inline, not on submit) --------------------
-describe('NIM-76 #1 inline-подсветка неизвестного ключа', () => {
-  it('известная директива серии → нет ошибки', async () => {
+describe('NIM-76 #1 inline highlight of an unknown key', () => {
+  it('known directive of the series → no error', async () => {
     render(<StatefulFields schema={directiveMapSchema} directiveCatalog={CATALOG} directiveVersion="8.2.2" />);
     addPair('redis_settings', 0, 'maxmemory', '256mb');
     await waitFor(() => {
@@ -136,7 +136,7 @@ describe('NIM-76 #1 inline-подсветка неизвестного ключ�
     });
   });
 
-  it('неизвестная директива → красная подсветка + span с версией сразу (не на submit)', async () => {
+  it('unknown directive → red highlight + version span immediately (not on submit)', async () => {
     render(<StatefulFields schema={directiveMapSchema} directiveCatalog={CATALOG} directiveVersion="8.2.2" />);
     addPair('redis_settings', 0, 'not-a-directive', 'x');
     const err = await screen.findByTestId('field-map-error-redis_settings');
@@ -146,7 +146,7 @@ describe('NIM-76 #1 inline-подсветка неизвестного ключ�
     expect(screen.getByTestId('field-map-key-redis_settings-0')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('директива чужой серии (save есть в 6.2, нет в 8.2) → unknown на 8.2.2', async () => {
+  it('directive from another series (save exists in 6.2, not in 8.2) → unknown on 8.2.2', async () => {
     render(<StatefulFields schema={directiveMapSchema} directiveCatalog={CATALOG} directiveVersion="8.2.2" />);
     addPair('redis_settings', 0, 'save', '900 1');
     await waitFor(() => {
@@ -156,8 +156,8 @@ describe('NIM-76 #1 inline-подсветка неизвестного ключ�
 });
 
 // --- #2 unknown-directive blocks submit via onInvalidMapChange channel --------
-describe('NIM-76 #2 unknown-directive → канал ошибок (submit-gate)', () => {
-  it('unknown → onInvalidMapChange содержит поле; исправление известной → канал очищается', async () => {
+describe('NIM-76 #2 unknown-directive → error channel (submit-gate)', () => {
+  it('unknown → onInvalidMapChange contains the field; fixing to a known one → channel clears', async () => {
     let invalid: string[] = [];
     render(
       <StatefulFields
@@ -176,8 +176,8 @@ describe('NIM-76 #2 unknown-directive → канал ошибок (submit-gate)'
 });
 
 // --- #3 graceful-degrade: catalog unavailable -> don't flag/block --------------
-describe('NIM-76 #3 graceful-degrade без каталога', () => {
-  it('loaded=false → произвольный ключ НЕ помечается, канал не блокирует', async () => {
+describe('NIM-76 #3 graceful-degrade without a catalog', () => {
+  it('loaded=false → an arbitrary key is NOT flagged, the channel does not block', async () => {
     let invalid: string[] = [];
     render(
       <StatefulFields
@@ -196,7 +196,7 @@ describe('NIM-76 #3 graceful-degrade без каталога', () => {
     expect(invalid).not.toContain('redis_settings');
   });
 
-  it('каталог загружен, но серии нет (directives:{}) → тоже graceful', async () => {
+  it('catalog loaded but the series is missing (directives:{}) → also graceful', async () => {
     render(
       <StatefulFields
         schema={directiveMapSchema}
@@ -213,8 +213,8 @@ describe('NIM-76 #3 graceful-degrade без каталога', () => {
 });
 
 // --- #4 only marked fields are validated ---------------------------------------
-describe('NIM-76 #4 поле без x-directives не валидируется', () => {
-  it('обычный map + каталог на руках → неизвестный ключ НЕ ошибка', async () => {
+describe('NIM-76 #4 a field without x-directives is not validated', () => {
+  it('plain map + catalog available → an unknown key is NOT an error', async () => {
     render(<StatefulFields schema={plainMapSchema} directiveCatalog={CATALOG} directiveVersion="8.2.2" />);
     addPair('opts', 0, 'definitely-not-a-redis-directive', 'v');
     await waitFor(() => {
@@ -228,7 +228,7 @@ describe('NIM-76 #4 поле без x-directives не валидируется',
 
 // --- #5 typeahead: datalist carries series names -------------------------------
 describe('NIM-76 #5 typeahead datalist', () => {
-  it('datalist содержит имена выбранной серии, ключ-инпут ссылается на него', async () => {
+  it('datalist contains names of the selected series, the key input references it', async () => {
     render(<StatefulFields schema={directiveMapSchema} directiveCatalog={CATALOG} directiveVersion="8.2.2" />);
     fireEvent.click(screen.getByTestId('field-map-add-redis_settings'));
     const datalist = await screen.findByTestId('field-map-directives-redis_settings');
@@ -241,8 +241,8 @@ describe('NIM-76 #5 typeahead datalist', () => {
 });
 
 // --- #6 version reactivity (create): changing version changes the valid set ----
-describe('NIM-76 #6 реактивность версии', () => {
-  it('ранее валидный ключ становится unknown при смене серии', async () => {
+describe('NIM-76 #6 version reactivity', () => {
+  it('a previously valid key becomes unknown when the series changes', async () => {
     let invalid: string[] = [];
     const props = {
       schema: directiveMapSchema,
@@ -266,8 +266,8 @@ describe('NIM-76 #6 реактивность версии', () => {
 });
 
 // --- BUG-1: epoch-pinned version validates like a plain one (not suppressed) ---
-describe('NIM-76 BUG-1 epoch-версия ведёт себя как обычная', () => {
-  it('версия "6:8.2.2" → серия 8.2: unknown блокирует, known — нет', async () => {
+describe('NIM-76 BUG-1 epoch version behaves like a plain one', () => {
+  it('version "6:8.2.2" → series 8.2: unknown blocks, known does not', async () => {
     let invalid: string[] = [];
     render(
       <StatefulFields
@@ -293,7 +293,7 @@ describe('NIM-76 BUG-1 epoch-версия ведёт себя как обычн�
 });
 
 // --- #7 day-2: version from incarnation.state.redis_version --------------------
-describe('NIM-76 #7 day-2 update_config берёт версию из state.redis_version', () => {
+describe('NIM-76 #7 day-2 update_config takes the version from state.redis_version', () => {
   function stubFetch() {
     const scenarios = [
       {
@@ -330,7 +330,7 @@ describe('NIM-76 #7 day-2 update_config берёт версию из state.redis
     }) as typeof fetch);
   }
 
-  it('datalist серии 8.2 (из state.redis_version=8.2.2) на step 3', async () => {
+  it('datalist for series 8.2 (from state.redis_version=8.2.2) at step 3', async () => {
     stubFetch();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false }, mutations: { retry: false } } });
     render(
@@ -341,8 +341,8 @@ describe('NIM-76 #7 day-2 update_config берёт версию из state.redis
       </QueryClientProvider>,
     );
     // step 1 -> 2 -> 3 (deep-link pre-selects service+scenario+incarnation).
-    fireEvent.click(await screen.findByRole('button', { name: /Далее/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /Далее/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Next/ }));
     // At step 3 ScenarioInputFields renders with redis_settings; datalist from version 8.2.2.
     const datalist = await screen.findByTestId('field-map-directives-redis_settings', {}, { timeout: 4000 });
     const values = Array.from(datalist.querySelectorAll('option')).map((o) => (o as HTMLOptionElement).value);
@@ -353,8 +353,8 @@ describe('NIM-76 #7 day-2 update_config берёт версию из state.redis
 });
 
 // --- FIX-1: unmounting an errored field clears the submit-gate (no sticking) ---
-describe('NIM-76 FIX-1 unmount снимает ошибку map-поля', () => {
-  it('скрытие errored redis_settings → onInvalidMapChange очищает поле', async () => {
+describe('NIM-76 FIX-1 unmount clears a map-field error', () => {
+  it('hiding an errored redis_settings → onInvalidMapChange clears the field', async () => {
     let invalid: string[] = [];
     function Wrapper({ show }: { show: boolean }) {
       const [state, setState] = useState<ScenarioFieldsState>({});
@@ -381,7 +381,7 @@ describe('NIM-76 FIX-1 unmount снимает ошибку map-поля', () => 
 });
 
 // --- FIX-2: day-2 mixed-target (>1 incarnation) -> directives don't block ------
-describe('NIM-76 FIX-2 day-2 fan-out на >1 инкарнацию → graceful', () => {
+describe('NIM-76 FIX-2 day-2 fan-out over >1 incarnation → graceful', () => {
   function stubFetchMulti() {
     const scenarios = [
       {
@@ -417,7 +417,7 @@ describe('NIM-76 FIX-2 day-2 fan-out на >1 инкарнацию → graceful',
     }) as typeof fetch);
   }
 
-  it('regex матчит 2 инкарнации → MapEditor есть, datalist НЕ навешен', async () => {
+  it('regex matches 2 incarnations → MapEditor present, datalist NOT attached', async () => {
     stubFetchMulti();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false }, mutations: { retry: false } } });
     render(
@@ -427,8 +427,8 @@ describe('NIM-76 FIX-2 day-2 fan-out на >1 инкарнацию → graceful',
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: /Далее/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /Далее/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Next/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Next/ }));
     // MapEditor renders, but directive validation is disabled (mixed-target) -> no datalist.
     await screen.findByTestId('field-map-redis_settings', {}, { timeout: 4000 });
     expect(screen.queryByTestId('field-map-directives-redis_settings')).not.toBeInTheDocument();

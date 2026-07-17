@@ -64,7 +64,7 @@ describe('PluginDetail', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
-  it('рендерит meta + sha256 из list lookup-а', async () => {
+  it('renders meta + sha256 from list lookup', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: ACTIVE }]);
     renderWithProviders(
       <Routes>
@@ -82,7 +82,7 @@ describe('PluginDetail', () => {
     expect(screen.getByText(ACTIVE.items[0].sha256)).toBeInTheDocument();
   });
 
-  it('пустой state когда записи нет', async () => {
+  it('empty state when no record exists', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: { items: [] } }]);
     renderWithProviders(
       <Routes>
@@ -91,11 +91,11 @@ describe('PluginDetail', () => {
       '/plugins/mod/unknown/v9.9.9',
     );
     await waitFor(() => {
-      expect(screen.getByText(/Активного Sigil-допуска/i)).toBeInTheDocument();
+      expect(screen.getByText(/No active Sigil grant/i)).toBeInTheDocument();
     });
   });
 
-  it('Audit-таб фильтрует events по (ns, name, ref) из payload', async () => {
+  it('Audit tab filters events by (ns, name, ref) from payload', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/plugins/sigils', body: ACTIVE },
       { method: 'GET', url: '/v1/audit', body: AUDIT },
@@ -116,7 +116,7 @@ describe('PluginDetail', () => {
     expect(screen.queryByText('other-mod')).not.toBeInTheDocument();
   });
 
-  it('Plugin kinds tab показывает справку по namespace-ам', async () => {
+  it('Plugin kinds tab shows namespace reference', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: ACTIVE }]);
     renderWithProviders(
       <Routes>

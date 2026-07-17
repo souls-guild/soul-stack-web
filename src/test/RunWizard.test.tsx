@@ -242,7 +242,7 @@ describe('RunWizard', () => {
       static CLOSED = 2;
     };
   });
-  it('Step 1: ровно 2 workload-карточки (Scenario / Command), без Push', () => {
+  it('Step 1: exactly 2 workload cards (Scenario / Command), no Push', () => {
     setupFetchStub();
     renderWizardWithRoutes();
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
@@ -250,39 +250,39 @@ describe('RunWizard', () => {
     expect(screen.queryByLabelText('Push destiny')).not.toBeInTheDocument();
   });
 
-  it('Scenario: пустая regex → «Далее» заблокирован, подсказка показана', async () => {
+  it('Scenario: empty regex → Next disabled, hint shown', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
     // Step 1 -> 2 (scenario select).
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     // Step 2 -> 3. Regex is empty.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
 
     // Empty regex -> matched=[], "Next" disabled, hint visible.
     expect(screen.getByLabelText('Incarnation regex')).toHaveValue('');
-    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
     // Hint "specify a regex or * for all" must be present on screen.
-    await waitFor(() => expect(screen.getByText(/укажите regex или \* для всех/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/enter a regex or \* for all/)).toBeInTheDocument());
   });
 
   // NIM-73 A2: leading paragraph of scenario description -> prominent info callout ABOVE fields
   // (operator sees the precondition before running); rest of description is dim outside the callout.
-  it('Scenario: ведущий абзац описания рендерится заметным callout над полями', async () => {
+  it('Scenario: leading description paragraph renders as a prominent callout above fields', async () => {
     setupFetchStub({
       scenarios: [
         {
           name: 'add_user',
           kind: 'operational',
           description:
-            '★ Перед запуском засей пароль добавляемого юзера в Vault по пути secret/redis/<incarnation>/users/<name>#password\n\nДобавить или переопределить одного ACL-пользователя на работающем Redis без рестарта.',
+            '★ Before running, seed the added user password in Vault at secret/redis/<incarnation>/users/<name>#password\n\nAdd or override a single ACL user on a running Redis without a restart.',
           input_schema: { username: { type: 'string' } },
         },
       ],
@@ -291,36 +291,36 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     // Step 1 -> 2 -> select service and scenario.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /add_user/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'add_user');
 
     // Step 2 -> 3: scenario input fields + note are rendered.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     const note = await screen.findByTestId('scenario-note');
-    expect(note).toHaveTextContent(/Перед запуском засей пароль добавляемого юзера в Vault/);
+    expect(note).toHaveTextContent(/Before running, seed the added user password in Vault/);
     // Callout contains ONLY the leading paragraph; rest of the description renders separately.
-    expect(note).not.toHaveTextContent(/Добавить или переопределить одного ACL-пользователя/);
-    expect(screen.getByText(/Добавить или переопределить одного ACL-пользователя на работающем Redis без рестарта/)).toBeInTheDocument();
+    expect(note).not.toHaveTextContent(/Add or override a single ACL user/);
+    expect(screen.getByText(/Add or override a single ACL user on a running Redis without a restart/)).toBeInTheDocument();
   });
 
-  it('Scenario: regex * → все incarnations → submit', async () => {
+  it('Scenario: regex * → all incarnations → submit', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
     // Step 1 -> 2 (scenario select).
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     // Step 2 -> 3. Type * -> ALL incarnations match.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() => {
@@ -328,11 +328,11 @@ describe('RunWizard', () => {
       expect(list).toContain('redis-prod');
       expect(list).toContain('redis-staging');
     });
-    expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
 
     // Step 3 -> 4 -> submit -> POST /v1/voyages with incarnations=[redis-prod, redis-staging].
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     // A single POST to /v1/voyages (no fan-out).
@@ -344,18 +344,18 @@ describe('RunWizard', () => {
     expect(vBody.target.incarnations.sort()).toEqual(['redis-prod', 'redis-staging']);
   });
 
-  it('Scenario regex-фильтр: совпавшее подмножество → fan-out по совпавшим', async () => {
+  it('Scenario regex filter: matched subset → fan-out over matched', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-a', 'redis-b', 'pg-1'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // regex ^redis- -> only redis-a / redis-b (pg-1 doesn't match).
     await user.type(screen.getByLabelText('Incarnation regex'), '^redis-');
     await waitFor(() => {
@@ -365,8 +365,8 @@ describe('RunWizard', () => {
       expect(list).not.toContain('pg-1');
     });
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     // A single POST /v1/voyages with only the matched incarnations (redis-a, redis-b).
@@ -377,28 +377,28 @@ describe('RunWizard', () => {
     expect(vBody.target.incarnations).not.toContain('pg-1');
   });
 
-  it('Scenario невалидная regex → 0 совпадений, submit заблокирован', async () => {
+  it('Scenario invalid regex → 0 matches, submit disabled', async () => {
     setupFetchStub({ incarnationNames: ['redis-a'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Unclosed group — invalid regex.
     await user.type(screen.getByLabelText('Incarnation regex'), '(redis');
     await waitFor(() =>
-      expect(screen.getByLabelText('Matched incarnations').textContent).toMatch(/нет совпадений/),
+      expect(screen.getByLabelText('Matched incarnations').textContent).toMatch(/no matches/),
     );
     // 0 matches -> "Next" disabled (no incarnations for fan-out).
-    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
   });
 
-  it('Scenario per-field input доходит до submit-body.input', async () => {
+  it('Scenario per-field input reaches submit body.input', async () => {
     const stub = setupFetchStub({
       serviceName: 'hello-world',
       incarnationNames: ['hello-prod'],
@@ -414,14 +414,14 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'hello-world');
     await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
     // Step 2 -> 3 (incarnations + input). * -> matches hello-prod.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -431,8 +431,8 @@ describe('RunWizard', () => {
     const greetingField = await screen.findByTestId('field-text-greeting') as HTMLInputElement;
     await user.type(greetingField, 'hello world');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect(stub.posted?.url).toContain('/v1/voyages');
@@ -443,7 +443,7 @@ describe('RunWizard', () => {
     expect(vBody.target.incarnations).toContain('hello-prod');
   });
 
-  it('Scenario без input_schema → DynamicInputBuilder, поля в POST.input', async () => {
+  it('Scenario without input_schema → DynamicInputBuilder, fields in POST.input', async () => {
     const stub = setupFetchStub({
       serviceName: 'redis',
       incarnationNames: ['redis-prod'],
@@ -452,13 +452,13 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -470,14 +470,14 @@ describe('RunWizard', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /field key/i }), { target: { value: 'shard' } });
     fireEvent.change(screen.getByRole('textbox', { name: /field value/i }), { target: { value: 'primary' } });
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({ shard: 'primary' });
   });
 
-  it('Scenario смешанная schema (simple + array): типизированные поля, не raw-JSON fallback', async () => {
+  it('Scenario mixed schema (simple + array): typed fields, not raw-JSON fallback', async () => {
     // Regression: previously a single composite type (array/object) dropped the WHOLE form into
     // DynamicInputBuilder, hiding simple typed fields. Now — per-field.
     const stub = setupFetchStub({
@@ -497,13 +497,13 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /add_replicas/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'add_replicas');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -521,14 +521,14 @@ describe('RunWizard', () => {
     // Invalid JSON in the composite field -> submit blocked + inline error.
     fireEvent.change(composite, { target: { value: '[broken' } });
     await waitFor(() => expect(screen.getByTestId('field-json-error-replicas')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
 
     // Valid JSON array -> unblocked; value reaches submit.input.
     fireEvent.change(composite, { target: { value: '["r1.example.com","r2.example.com"]' } });
     await waitFor(() => expect(screen.queryByTestId('field-json-error-replicas')).not.toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as { input: Record<string, unknown> }).input).toEqual({
@@ -537,7 +537,7 @@ describe('RunWizard', () => {
     });
   });
 
-  it('Stepper: прыжок вперёд на невалидный шаг заблокирован (не красит done)', async () => {
+  it('Stepper: jumping forward to an invalid step is blocked (does not mark done)', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
@@ -558,7 +558,7 @@ describe('RunWizard', () => {
     expect(doneCount).toBe(0);
   });
 
-  it('Command: host-selector резолвит coven-критерий → sids в POST /v1/errand-runs', async () => {
+  it('Command: host selector resolves coven criterion → sids in POST /v1/errand-runs', async () => {
     const stub = setupFetchStub({
       souls: [
         { sid: 'db-1.example.com', covens: ['prod', 'db'] },
@@ -570,7 +570,7 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Step 2 — host selector. Filter by coven=db.
     const covenChip = await screen.findByLabelText('Coven labels');
@@ -581,14 +581,14 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
     // Step 2 -> 3 (module/params). Default module core.cmd.shell -> params form with textarea cmd.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     // Step 3 -> 4 -> submit.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect(stub.posted?.url).toContain('/v1/voyages');
@@ -600,7 +600,7 @@ describe('RunWizard', () => {
     expect(body.concurrency).toBe(50);
   });
 
-  it('Command: batch (строка) заполнен → уходит в Voyage POST как сырая строка', async () => {
+  it('Command: batch (string) filled → sent in Voyage POST as a raw string', async () => {
     const stub = setupFetchStub({
       souls: [
         { sid: 'db-1.example.com', covens: ['prod'] },
@@ -610,22 +610,22 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     // Enter the string "3" — send a raw string, don't parse client-side.
     await user.type(screen.getByLabelText('Batch'), '3');
 
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -636,7 +636,7 @@ describe('RunWizard', () => {
     expect('batch_percent' in body).toBe(false);
   });
 
-  it('Command: пустой batch → batch не в теле Voyage POST', async () => {
+  it('Command: empty batch → batch not in Voyage POST body', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'db-1.example.com', covens: ['prod'] }],
     });
@@ -644,19 +644,19 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // don't fill in batch.
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -664,7 +664,7 @@ describe('RunWizard', () => {
     expect('batch_size' in body).toBe(false);
   });
 
-  it('Command: schedule_at → уходит в Voyage POST', async () => {
+  it('Command: schedule_at → sent in Voyage POST', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'db-1.example.com', covens: ['prod'] }],
     });
@@ -672,28 +672,28 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2099-06-01T10:00' } });
 
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.schedule_at).toBe(new Date('2099-06-01T10:00').toISOString());
   });
 
-  it('Command: dry_run чекбокс недоступен (command-workload), тело без dry_run=true', async () => {
+  it('Command: dry_run checkbox unavailable (command workload), body without dry_run=true', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'db-1.example.com', covens: ['prod'] }],
     });
@@ -701,27 +701,27 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // dry_run checkbox should not be on step 4 for command-workload.
     expect(screen.queryByLabelText('dry_run')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as Record<string, unknown>).dry_run).toBe(false);
   });
 
-  it('Command: SID-regex критерий резолвит подмножество хостов', async () => {
+  it('Command: SID-regex criterion resolves a subset of hosts', async () => {
     const stub = setupFetchStub({
       souls: [
         { sid: 'db-1.example.com', covens: [] },
@@ -733,25 +733,25 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Full-match (anchored): a prefix needs `.*`, otherwise `db-` would match
     // only the exact string "db-".
     await user.type(screen.getByLabelText('SID regex'), 'db-.*');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as { target: { sids: string[] } };
     expect(body.target.sids.sort()).toEqual(['db-1.example.com', 'db-2.example.com']);
   });
 
-  it('Command module-search: выбор plugin-модуля из каталога → params-форма → POST', async () => {
+  it('Command module-search: pick a plugin module from the catalog → params form → POST', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'host-a.example.com', covens: ['prod'] }],
       modules: [
@@ -773,13 +773,13 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Host selector: coven=prod -> 1 host.
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Params step: open the module picker, search and select a plugin module from the catalog.
     await waitFor(() => expect(screen.getByTestId('module-picker-control')).toBeInTheDocument());
@@ -792,8 +792,8 @@ describe('RunWizard', () => {
     const urlField = await screen.findByTestId('field-text-url') as HTMLInputElement;
     await user.type(urlField, 'https://example.com');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as { kind: string; module: string; input: Record<string, unknown>; target: { sids: string[] } };
@@ -804,7 +804,7 @@ describe('RunWizard', () => {
     expect(body.target.sids).toEqual(['host-a.example.com']);
   });
 
-  it('Command module-search: каталог недоступен (404) → free-text имя + DynamicInputBuilder', async () => {
+  it('Command module-search: catalog unavailable (404) → free-text name + DynamicInputBuilder', async () => {
     const stub = setupFetchStub({
       souls: [{ sid: 'host-a.example.com', covens: ['prod'] }],
       modules: [], // list will return {items:[]}; overridden with 404 below
@@ -823,11 +823,11 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Free-text fallback: enter the module name manually + dynamic input.
     const freeText = await screen.findByTestId('module-freetext');
@@ -838,8 +838,8 @@ describe('RunWizard', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /field key/i }), { target: { value: 'url' } });
     fireEvent.change(screen.getByRole('textbox', { name: /field value/i }), { target: { value: 'https://example.com' } });
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as { kind: string; module: string; input: Record<string, unknown> };
@@ -849,36 +849,36 @@ describe('RunWizard', () => {
     expect(body.input).toEqual({ url: 'https://example.com' });
   });
 
-  it('Command-state переживает переключение workload Command↔Scenario↔Command', async () => {
+  it('Command state survives workload switching Command↔Scenario↔Command', async () => {
     setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['db'] }] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
     // Command -> Step2 host -> Step3 params, fill in the cmd field.
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'db ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     // Back to Step1, switch to Scenario and back to Command.
-    await user.click(screen.getByRole('button', { name: /Назад/ }));
-    await user.click(screen.getByRole('button', { name: /Назад/ }));
+    await user.click(screen.getByRole('button', { name: /Back/ }));
+    await user.click(screen.getByRole('button', { name: /Back/ }));
     await user.click(screen.getByLabelText('Scenario apply'));
     await user.click(screen.getByLabelText('Command'));
 
     // Go forward to Step3 — paramFields.cmd value persisted via the draft.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     expect((screen.getByTestId('field-multiline-cmd') as HTMLTextAreaElement).value).toBe('uptime');
   });
 
-  it('Scenario required-поле блокирует Далее/submit + inline-ошибка', async () => {
+  it('Scenario required field blocks Next/submit + inline error', async () => {
     setupFetchStub({
       serviceName: 'hello-world',
       incarnationNames: ['hello-prod'],
@@ -894,13 +894,13 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'hello-world');
     await waitFor(() => expect(screen.getByRole('option', { name: /set_greeting/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'set_greeting');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -909,39 +909,39 @@ describe('RunWizard', () => {
 
     // required greeting is empty -> inline error + Next button disabled.
     await waitFor(() => expect(screen.getByTestId('field-required-greeting')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Далее/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
 
     // Fill in -> error clears, can proceed.
     const greetingField = await screen.findByTestId('field-text-greeting') as HTMLInputElement;
     await user.type(greetingField, 'hi');
     await waitFor(() => expect(screen.queryByTestId('field-required-greeting')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
   });
 
-  it('Scenario: batch (строка) заполнен → уходит в Voyage POST как сырая строка', async () => {
+  it('Scenario: batch (string) filled → sent in Voyage POST as a raw string', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Batch field is present, enter a value.
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Batch'), '5');
 
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect(stub.posted?.url).toContain('/v1/voyages');
@@ -963,18 +963,18 @@ describe('RunWizard', () => {
     expect(body.target.incarnations).toContain('redis-prod');
   });
 
-  it('Scenario: пустой batch → batch не в теле Voyage POST', async () => {
+  it('Scenario: empty batch → batch not in Voyage POST body', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -982,9 +982,9 @@ describe('RunWizard', () => {
     );
 
     // Batch is empty by default — don't fill in.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -994,175 +994,175 @@ describe('RunWizard', () => {
     expect((body.target as { incarnations: string[] }).incarnations).toContain('redis-prod');
   });
 
-  it('Scenario + dry-run: Voyage POST несёт dry_run=true в body', async () => {
+  it('Scenario + dry-run: Voyage POST carries dry_run=true in body', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('dry_run')).toBeInTheDocument());
     await user.click(screen.getByLabelText('dry_run'));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect(stub.posted?.url).toContain('/v1/voyages');
     expect((stub.posted?.body as Record<string, unknown>).dry_run).toBe(true);
   });
 
-  it('Scenario без dry-run: Voyage POST несёт dry_run=false', async () => {
+  it('Scenario without dry-run: Voyage POST carries dry_run=false', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as Record<string, unknown>).dry_run).toBe(false);
   });
 
-  it('Scenario + schedule_at: уходит в Voyage POST', async () => {
+  it('Scenario + schedule_at: sent in Voyage POST', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
     // datetime-local input — change via fireEvent.
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2099-12-31T23:59' } });
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.schedule_at).toBe(new Date('2099-12-31T23:59').toISOString());
   });
 
-  it('Scenario: пустой schedule_at → schedule_at не в теле Voyage POST', async () => {
+  it('Scenario: empty schedule_at → schedule_at not in Voyage POST body', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // schedule_at is empty — don't fill in.
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect('schedule_at' in body).toBe(false);
   });
 
-  it('Scenario: schedule_at в прошлом → submit заблокирован, показана ошибка', async () => {
+  it('Scenario: schedule_at in the past → submit disabled, error shown', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
     // Time in the past — should block submit and show an error.
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2000-01-01T00:00' } });
 
-    const submitBtn = screen.getByRole('button', { name: /Запустить/ });
+    const submitBtn = screen.getByRole('button', { name: /Run/ });
     expect(submitBtn).toBeDisabled();
-    expect(screen.getByText(/Время запуска должно быть в будущем|Schedule time must be in the future/)).toBeInTheDocument();
+    expect(screen.getByText(/Schedule time must be in the future/)).toBeInTheDocument();
   });
 
-  it('Scenario: schedule_at в будущем → submit разблокирован, schedule_at в теле', async () => {
+  it('Scenario: schedule_at in the future → submit enabled, schedule_at in body', async () => {
     const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2099-06-15T12:00' } });
 
-    const submitBtn = screen.getByRole('button', { name: /Запустить/ });
+    const submitBtn = screen.getByRole('button', { name: /Run/ });
     expect(submitBtn).not.toBeDisabled();
-    expect(screen.queryByText(/Время запуска должно быть в будущем|Schedule time must be in the future/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Schedule time must be in the future/)).not.toBeInTheDocument();
 
     await user.click(submitBtn);
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
     expect((stub.posted?.body as Record<string, unknown>).schedule_at).toBe(new Date('2099-06-15T12:00').toISOString());
   });
 
-  it('Stale-черновик старой формы (без v / без incarnations) → визард грузится на дефолтах без краша', async () => {
+  it('Stale draft of an old form (no v / no incarnations) → wizard loads on defaults without crashing', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     // Draft of the previous form version: no `v` field, scenarioState without
     // `incarnations` (array added recently), options without Tide fields.
@@ -1185,17 +1185,17 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
 
     // Defaults applied — walk through the wizard from scratch without errors.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Empty regex -> matched=[] (step blocked) — the test only checks there's no crash.
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
   });
 
-  it('Stale-черновик прошлой версии (v отличается) → отбрасывается, дефолты без краша', async () => {
+  it('Stale draft of a previous version (v differs) → discarded, defaults without crash', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     // Previous form version (v=3, scenarioState without incarnationRegex). loadDraft
     // discards it on version mismatch -> the wizard starts from defaults, no crash.
@@ -1217,7 +1217,7 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Валидный свежий черновик (v=10, incarnationRegex) → state восстанавливается', async () => {
+  it('Valid fresh draft (v=10, incarnationRegex) → state is restored', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
@@ -1273,25 +1273,25 @@ describe('RunWizard', () => {
     });
   });
 
-  it('Batch size: невалидное значение → inline-ошибка видна, submit заблокирован', async () => {
+  it('Batch size: invalid value → inline error visible, submit disabled', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     // Invalid format (letters — not N|N%).
     await user.type(screen.getByLabelText('Batch'), 'abc');
@@ -1299,95 +1299,95 @@ describe('RunWizard', () => {
     // Inline error appeared.
     await waitFor(() =>
       expect(
-        screen.getByText(/Формат: целое число|Format: integer/),
+        screen.getByText(/Format: integer/),
       ).toBeInTheDocument(),
     );
     // Submit blocked.
-    expect(screen.getByRole('button', { name: /Запустить/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Run/ })).toBeDisabled();
   });
 
-  it('Batch: валидное значение N → ошибки нет, submit не заблокирован', async () => {
+  it('Batch: valid value N → no error, submit not disabled', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Batch'), '5');
 
     expect(
-      screen.queryByText(/Формат: целое число|Format: integer/),
+      screen.queryByText(/Format: integer/),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Run/ })).not.toBeDisabled();
   });
 
-  it('Batch: валидное значение N% → ошибки нет, submit не заблокирован', async () => {
+  it('Batch: valid value N% → no error, submit not disabled', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Batch'), '20%');
 
     expect(
-      screen.queryByText(/Формат: целое число|Format: integer/),
+      screen.queryByText(/Format: integer/),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Run/ })).not.toBeDisabled();
   });
 
-  it('Batch: пустое поле → ошибки нет (поле опциональное)', async () => {
+  it('Batch: empty field → no error (field is optional)', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     // Don't enter anything — field is empty.
 
     expect(
-      screen.queryByText(/Формат: целое число|Format: integer/),
+      screen.queryByText(/Format: integer/),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Run/ })).not.toBeDisabled();
   });
 
   it('Pre-fill ?workload=command&target_coven=prod → host-criteria coven', async () => {
@@ -1396,7 +1396,7 @@ describe('RunWizard', () => {
     // Workload=command selected.
     expect(screen.getByLabelText('Command')).toBeChecked();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Coven criterion pre-filled (chip 'prod').
     await waitFor(() => expect(screen.getByLabelText('Coven labels').textContent).toContain('prod'));
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
@@ -1409,19 +1409,19 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
     return { stub, user };
   }
 
-  it('batch_mode=window → поле Batch скрыто, concurrency-hint изменён', async () => {
+  it('batch_mode=window → Batch field hidden, concurrency hint changed', async () => {
     await reachStep4Command();
     // Default barrier — Batch visible.
     expect(screen.getByLabelText('Batch')).toBeInTheDocument();
@@ -1433,14 +1433,14 @@ describe('RunWizard', () => {
     // concurrency hint contains a sliding window description.
     await waitFor(() => {
       const hint = document.querySelector('[aria-label="Concurrency"]')?.closest('label')?.textContent ?? '';
-      expect(hint).toMatch(/окн|window/i);
+      expect(hint).toMatch(/window/i);
     });
   });
 
-  it('batch_mode=window → batch/batch_size не уходят в POST', async () => {
+  it('batch_mode=window → batch/batch_size not sent in POST', async () => {
     const { stub, user } = await reachStep4Command();
     await user.click(screen.getByLabelText('batch_mode_window'));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -1449,10 +1449,10 @@ describe('RunWizard', () => {
     expect('batch_size' in body).toBe(false);
   });
 
-  it('batch_mode=barrier (дефолт) → batch_mode=barrier в POST, без лишних полей', async () => {
+  it('batch_mode=barrier (default) → batch_mode=barrier in POST, no extra fields', async () => {
     const { stub, user } = await reachStep4Command();
     // Default barrier, don't touch anything.
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -1461,10 +1461,10 @@ describe('RunWizard', () => {
     expect('inter_unit_interval_ms' in body).toBe(false);
   });
 
-  it('batch строка «20%» уходит в POST как сырая строка, не число', async () => {
+  it('batch string 20% sent in POST as a raw string, not a number', async () => {
     const { stub, user } = await reachStep4Command();
     await user.type(screen.getByLabelText('Batch'), '20%');
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -1474,10 +1474,10 @@ describe('RunWizard', () => {
     expect('batch_percent' in body).toBe(false);
   });
 
-  it('max_failures строка заполнена → уходит в POST как max_failures (строка)', async () => {
+  it('max_failures string filled → sent in POST as max_failures (string)', async () => {
     const { stub, user } = await reachStep4Command();
     await user.type(screen.getByLabelText('Max failures'), '3');
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -1485,33 +1485,33 @@ describe('RunWizard', () => {
     expect('fail_threshold' in body).toBe(false);
   });
 
-  it('max_failures пустой → не уходит в POST', async () => {
+  it('max_failures empty → not sent in POST', async () => {
     const { stub, user } = await reachStep4Command();
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect('max_failures' in (stub.posted?.body as Record<string, unknown>)).toBe(false);
     expect('fail_threshold' in (stub.posted?.body as Record<string, unknown>)).toBe(false);
   });
 
-  it('require_alive чекбокс → уходит в POST', async () => {
+  it('require_alive checkbox → sent in POST', async () => {
     const { stub, user } = await reachStep4Command();
     await user.click(screen.getByLabelText('require_alive'));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as Record<string, unknown>).require_alive).toBe(true);
   });
 
-  it('require_alive дефолт false → уходит в POST как false', async () => {
+  it('require_alive default false → sent in POST as false', async () => {
     const { stub, user } = await reachStep4Command();
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     expect((stub.posted?.body as Record<string, unknown>).require_alive).toBe(false);
   });
 
-  it('inter_unit_interval_ms поле виден только в window, уходит в POST', async () => {
+  it('inter_unit_interval_ms field visible only in window, sent in POST', async () => {
     const { stub, user } = await reachStep4Command();
     // Default barrier — inter_unit not visible.
     expect(screen.queryByLabelText('Inter-unit interval ms')).not.toBeInTheDocument();
@@ -1525,7 +1525,7 @@ describe('RunWizard', () => {
     expect(screen.queryByLabelText('Inter-batch interval ms')).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Inter-unit interval ms'), '500');
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -1551,34 +1551,34 @@ describe('RunWizard', () => {
     await user.click(cadenceRadioInput);
 
     // Step 1 -> Step 2: workload=scenario (default), click Next.
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Step 2 -> select service and scenario.
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Step 3 → incarnation regex.
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Step 4 -> cadence block appears in Options (runMode='cadence' is already set).
     await waitFor(() => expect(screen.getByTestId('cadence-interval')).toBeInTheDocument());
 
     return { user };
   }
 
-  it('Cadence: input[min] равен CONSTRAINTS.cadenceIntervalSecondsMin', async () => {
+  it('Cadence: input[min] equals CONSTRAINTS.cadenceIntervalSecondsMin', async () => {
     await reachStep4Cadence();
 
     const intervalInput = screen.getByTestId('cadence-interval') as HTMLInputElement;
     expect(Number(intervalInput.min)).toBe(CONSTRAINTS.cadenceIntervalSecondsMin);
   });
 
-  it('Cadence: submit-валидация отвергает значение ниже floor', async () => {
+  it('Cadence: submit validation rejects a value below the floor', async () => {
     const { user } = await reachStep4Cadence();
 
     // Fill in the Cadence name (required field) and enter a value below the floor.
@@ -1589,10 +1589,10 @@ describe('RunWizard', () => {
     fireEvent.change(intervalInput, { target: { value: String(CONSTRAINTS.cadenceIntervalSecondsMin - 1) } });
 
     // Submit should be blocked (below floor).
-    expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Create schedule/ })).toBeDisabled();
   });
 
-  it('Cadence: submit-валидация принимает значение точно на floor', async () => {
+  it('Cadence: submit validation accepts a value exactly at the floor', async () => {
     const { user } = await reachStep4Cadence();
 
     // Fill in the Cadence name and enter a value exactly at the floor.
@@ -1603,21 +1603,21 @@ describe('RunWizard', () => {
     fireEvent.change(intervalInput, { target: { value: String(CONSTRAINTS.cadenceIntervalSecondsMin) } });
 
     // Submit should be unblocked (exactly at floor).
-    expect(screen.getByRole('button', { name: /Создать расписание|Create schedule/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Create schedule/ })).not.toBeDisabled();
   });
 
   // --- Guard tests S6: batch / max_failures / preview ---
 
-  it('S6: max_failures tooltip присутствует (aria-label)', async () => {
+  it('S6: max_failures tooltip present (aria-label)', async () => {
     await reachStep4Command();
     // Tooltip should be in the markup.
-    await waitFor(() => expect(screen.getByLabelText(/Threshold is counted|Порог считается/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText(/Threshold is counted/)).toBeInTheDocument());
   });
 
-  it('S6: max_failures строка «25%» уходит как max_failures в POST (не fail_threshold)', async () => {
+  it('S6: max_failures string 25% sent as max_failures in POST (not fail_threshold)', async () => {
     const { stub, user } = await reachStep4Command();
     await user.type(screen.getByLabelText('Max failures'), '25%');
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const body = stub.posted?.body as Record<string, unknown>;
@@ -1625,7 +1625,7 @@ describe('RunWizard', () => {
     expect('fail_threshold' in body).toBe(false);
   });
 
-  it('S6: snapshot target (regex/sids) → batch-preview клиентский, preview-endpoint НЕ вызывается', async () => {
+  it('S6: snapshot target (regex/sids) → client-side batch preview, preview endpoint NOT called', async () => {
     // Command with sidRegex — snapshot-target. Preview endpoint should not be hit.
     const previewCalls: string[] = [];
     const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: [] }] });
@@ -1640,13 +1640,13 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.type(screen.getByLabelText('SID regex'), 'db-.*');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
 
     // Enter batch — preview should not be hit (snapshot-target).
@@ -1659,7 +1659,7 @@ describe('RunWizard', () => {
     void stub; // Suppress unused var warning.
   });
 
-  it('S6: late-binding coven target → preview-endpoint вызывается (debounced)', async () => {
+  it('S6: late-binding coven target → preview endpoint called (debounced)', async () => {
     // Command with coven-only -> late-binding -> preview is called.
     const previewReplies: unknown[] = [];
     setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
@@ -1682,14 +1682,14 @@ describe('RunWizard', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
 
     // Preview should be called (after debounce).
@@ -1697,26 +1697,26 @@ describe('RunWizard', () => {
     expect(previewReplies.length).toBeGreaterThan(0);
   });
 
-  it('S6: window batch_mode → batch-preview показывает window-сообщение (не null)', async () => {
+  it('S6: window batch_mode → batch preview shows window message (not null)', async () => {
     // For a snapshot-target with 1 incarnation, window mode.
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     // Switch to window — batch field hidden, batch-preview not shown.
     await waitFor(() => expect(screen.getByLabelText('batch_mode_window')).toBeInTheDocument());
     await user.click(screen.getByLabelText('batch_mode_window'));
@@ -1726,25 +1726,25 @@ describe('RunWizard', () => {
     expect(screen.queryByTestId('batch-preview')).not.toBeInTheDocument();
   });
 
-  it('S6: snapshot scenario-target + batch «2» → local batch-preview показан (≈1 батч для 1 инкарнации)', async () => {
+  it('S6: snapshot scenario target + batch 2 → local batch preview shown (~1 batch for 1 incarnation)', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod'] });
     renderWizardWithRoutes();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
       expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
     );
 
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Batch'), '2');
 
@@ -1753,7 +1753,7 @@ describe('RunWizard', () => {
     expect(screen.getByTestId('batch-preview').textContent).toMatch(/1/);
   });
 
-  it('S6: 422 от preview/create → показан detail из keeper в submitError', async () => {
+  it('S6: 422 from preview/create → keeper detail shown in submitError', async () => {
     setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: ['prod'] }] });
     const baseFetch = globalThis.fetch;
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1771,15 +1771,15 @@ describe('RunWizard', () => {
     renderWizardWithRoutes();
     const user = userEvent.setup();
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     const covenChip = await screen.findByLabelText('Coven labels');
     await user.type(covenChip.querySelector('input') as HTMLInputElement, 'prod ');
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
 
     // 422 error from keeper shown in submitError.
     await waitFor(() =>
@@ -1790,7 +1790,7 @@ describe('RunWizard', () => {
 
 // --- Notify block RunWizard (ADR-052(g) amendment N2) ---
 
-describe('RunWizard — notify-блок Step 4', () => {
+describe('RunWizard — notify block Step 4', () => {
   beforeEach(() => {
     tokenStore.clear();
     sessionStorage.clear();
@@ -1805,14 +1805,14 @@ describe('RunWizard — notify-блок Step 4', () => {
     renderWizardWithRoutes();
 
     // Step 1 → 2
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
     await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     // Step 2 → 3
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
     await waitFor(() =>
@@ -1820,19 +1820,19 @@ describe('RunWizard — notify-блок Step 4', () => {
     );
 
     // Step 3 → 4
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('notify-block')).toBeInTheDocument());
 
     return stub;
   }
 
-  it('notify-блок виден на Step 4 (voyage-режим)', async () => {
+  it('notify block visible on Step 4 (voyage mode)', async () => {
     const user = userEvent.setup();
     await reachStep4Scenario(user);
     expect(screen.getByTestId('notify-block')).toBeInTheDocument();
   });
 
-  it('кнопка «Добавить уведомление» создаёт новый notify-элемент', async () => {
+  it('the Add notification button creates a new notify item', async () => {
     const user = userEvent.setup();
     await reachStep4Scenario(user);
 
@@ -1841,7 +1841,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     expect(screen.getByTestId('notify-herald-select-0')).toBeInTheDocument();
   });
 
-  it('выбор Herald и submit несут notify[] в POST /v1/voyages', async () => {
+  it('selecting a Herald and submitting carries notify[] in POST /v1/voyages', async () => {
     const user = userEvent.setup();
     const stub = await reachStep4Scenario(user);
 
@@ -1851,7 +1851,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     await user.selectOptions(screen.getByTestId('notify-herald-select-0'), 'ops-webhook');
 
     // Submit.
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
@@ -1861,7 +1861,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     expect(body.notify![0].herald).toBe('ops-webhook');
   });
 
-  it('notify-элемент с пустым herald не попадает в POST', async () => {
+  it('a notify item with an empty herald is not included in POST', async () => {
     const user = userEvent.setup();
     const stub = await reachStep4Scenario(user);
 
@@ -1870,7 +1870,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     await waitFor(() => expect(screen.getByTestId('notify-item-0')).toBeInTheDocument());
 
     // Submit without Herald.
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
@@ -1880,7 +1880,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     expect(body.notify).toBeUndefined();
   });
 
-  it('кнопка «Удалить» удаляет notify-элемент', async () => {
+  it('the Remove button removes a notify item', async () => {
     const user = userEvent.setup();
     await reachStep4Scenario(user);
 
@@ -1893,7 +1893,7 @@ describe('RunWizard — notify-блок Step 4', () => {
 
   // Guard: regression — the "add" annotation button didn't add a row
   // (kvToAnnotations dropped an empty key -> annotations: undefined -> the row disappeared).
-  it('GUARD: кнопка добавления annotations добавляет редактируемую строку (key+value)', async () => {
+  it('GUARD: the add-annotation button adds an editable row (key+value)', async () => {
     const user = userEvent.setup();
     await reachStep4Scenario(user);
 
@@ -1915,7 +1915,7 @@ describe('RunWizard — notify-блок Step 4', () => {
   });
 
   // Guard: filled-in annotations end up in POST /v1/voyages.
-  it('GUARD: заполненные annotations попадают в POST body', async () => {
+  it('GUARD: filled-in annotations end up in POST body', async () => {
     const user = userEvent.setup();
     const stub = await reachStep4Scenario(user);
 
@@ -1934,7 +1934,7 @@ describe('RunWizard — notify-блок Step 4', () => {
     await user.type(screen.getByLabelText('annotation value 0'), 'prod');
 
     // Submit.
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const voyagePost = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));

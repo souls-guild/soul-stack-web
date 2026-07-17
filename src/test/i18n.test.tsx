@@ -8,10 +8,10 @@ import { useTranslation } from 'react-i18next';
 import i18n, { DEFAULT_LANG, changeLang, SUPPORTED_LANGS } from '../i18n';
 import { LangToggle } from '../components/layout/LangToggle';
 
-// ru is inline in src (bundled); en is static in public/locales (lazy via http-backend),
+// en is inline in src (bundled); ru is static in public/locales (lazy via http-backend),
 // read from disk in the node test.
-const RU_DIR = path.resolve('src/i18n/locales/ru');
-const EN_DIR = path.resolve('public/locales/en');
+const EN_DIR = path.resolve('src/i18n/locales/en');
+const RU_DIR = path.resolve('public/locales/ru');
 
 function readNsKeys(dir: string, ns: string): string[] {
   const json = JSON.parse(readFileSync(path.join(dir, `${ns}.json`), 'utf-8'));
@@ -19,7 +19,7 @@ function readNsKeys(dir: string, ns: string): string[] {
 }
 
 // http-backend in jsdom fetches /locales/<lng>/<ns>.json — there is no real server,
-// so we serve public/locales contents from disk, otherwise changeLanguage('en')
+// so we serve public/locales contents from disk, otherwise changeLanguage('ru')
 // never resolves.
 // The stub is reinstalled in beforeEach because the global afterEach in setup.ts
 // calls vi.unstubAllGlobals() after every test.
@@ -29,7 +29,7 @@ function installI18nFetch() {
     const m = url.match(/\/locales\/([^/]+)\/([^/]+)\.json$/);
     if (!m) return new Response('not found', { status: 404 });
     const [, lng, ns] = m;
-    const dir = lng === 'ru' ? RU_DIR : path.resolve('public/locales', lng);
+    const dir = path.resolve('public/locales', lng);
     try {
       const body = readFileSync(path.join(dir, `${ns}.json`), 'utf-8');
       return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -63,52 +63,52 @@ function Sample() {
 }
 
 describe('i18n', () => {
-  it('default-locale = ru: кнопка по-русски (inline, без http)', () => {
-    expect(i18n.resolvedLanguage).toBe('ru');
+  it('default locale = en: button in English (inline, no http)', () => {
+    expect(i18n.resolvedLanguage).toBe('en');
     render(<Sample />);
-    expect(screen.getByRole('button', { name: 'Создать' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
   });
 
-  it('имя сущности остаётся English в обоих locale', async () => {
+  it('entity name stays English in both locales', async () => {
     render(<Sample />);
-    expect(screen.getByTestId('entity')).toHaveTextContent('Archon');
-    await act(async () => { await changeLang('en'); });
     expect(screen.getByTestId('entity')).toHaveTextContent('Archon');
     await act(async () => { await changeLang('ru'); });
     expect(screen.getByTestId('entity')).toHaveTextContent('Archon');
+    await act(async () => { await changeLang('en'); });
+    expect(screen.getByTestId('entity')).toHaveTextContent('Archon');
   });
 
-  it('changeLang переключает resolvedLanguage и persist в localStorage', async () => {
-    await act(async () => { await changeLang('en'); });
-    expect(i18n.resolvedLanguage).toBe('en');
-    expect(window.localStorage.getItem('lang')).toBe('en');
+  it('changeLang switches resolvedLanguage and persists to localStorage', async () => {
     await act(async () => { await changeLang('ru'); });
     expect(i18n.resolvedLanguage).toBe('ru');
     expect(window.localStorage.getItem('lang')).toBe('ru');
+    await act(async () => { await changeLang('en'); });
+    expect(i18n.resolvedLanguage).toBe('en');
+    expect(window.localStorage.getItem('lang')).toBe('en');
   });
 
-  it('LangToggle: рендерит обе кнопки, ru активна по default, клик зовёт changeLang', async () => {
+  it('LangToggle: renders both buttons, en active by default, click calls changeLang', async () => {
     const user = userEvent.setup();
     render(<LangToggle />);
-    const en = screen.getByTestId('lang-en');
-    expect(screen.getByTestId('lang-ru')).toHaveAttribute('aria-pressed', 'true');
-    await user.click(en);
-    await waitFor(() => expect(i18n.resolvedLanguage).toBe('en'));
-    expect(en).toHaveAttribute('aria-pressed', 'true');
+    const ru = screen.getByTestId('lang-ru');
+    expect(screen.getByTestId('lang-en')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(ru);
+    await waitFor(() => expect(i18n.resolvedLanguage).toBe('ru'));
+    expect(ru).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('public en-файлы существуют, валидный JSON и ключ-синхронны с ru', () => {
-    const ruData = i18n.getDataByLanguage('ru') ?? {};
-    const namespaces = Object.keys(ruData);
+  it('public ru files exist, valid JSON and key-synced with en', () => {
+    const enData = i18n.getDataByLanguage('en') ?? {};
+    const namespaces = Object.keys(enData);
     expect(namespaces.length).toBeGreaterThan(0);
     for (const ns of namespaces) {
-      const ruKeys = readNsKeys(RU_DIR, ns);
-      const enKeys = readNsKeys(EN_DIR, ns); // throws if the file is missing/broken.
-      expect(enKeys, `namespace ${ns}`).toEqual(ruKeys);
+      const enKeys = readNsKeys(EN_DIR, ns);
+      const ruKeys = readNsKeys(RU_DIR, ns); // throws if the file is missing/broken.
+      expect(ruKeys, `namespace ${ns}`).toEqual(enKeys);
     }
   });
 
-  it('SUPPORTED_LANGS включает ru и en', () => {
+  it('SUPPORTED_LANGS includes en and ru', () => {
     expect(SUPPORTED_LANGS).toContain('ru');
     expect(SUPPORTED_LANGS).toContain('en');
   });

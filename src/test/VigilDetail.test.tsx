@@ -28,7 +28,7 @@ describe('VigilDetail', () => {
     tokenStore.clear();
   });
 
-  it('рендерит детали Vigil-а из /v1/vigils/{name}', async () => {
+  it('renders Vigil details from /v1/vigils/{name}', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/vigils/redis-down', body: SAMPLE },
     ]);
@@ -50,7 +50,7 @@ describe('VigilDetail', () => {
 
   // -- Guard tests: clickable links --------------------------------------------------
 
-  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] created_by_aid renders as a link to /archons/:aid', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/vigils/redis-down', body: SAMPLE },
     ]);
@@ -68,7 +68,7 @@ describe('VigilDetail', () => {
     expect(links.some((l) => l.getAttribute('href') === '/archons/archon-alice')).toBe(true);
   });
 
-  it('[LINKS] при отсутствии created_by_aid показывает «—», ссылок нет', async () => {
+  it('[LINKS] shows «—» and no links when created_by_aid is absent', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/vigils/redis-down', body: SAMPLE_NO_AID },
     ]);

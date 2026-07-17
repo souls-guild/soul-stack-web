@@ -12,7 +12,7 @@ import {
 } from '../pages/incarnations/hostVitals';
 
 describe('hostVitals', () => {
-  it('utilTone: пороги 70/90', () => {
+  it('utilTone: 70/90 thresholds', () => {
     expect(utilTone(0)).toBe('ok');
     expect(utilTone(69.9)).toBe('ok');
     expect(utilTone(70)).toBe('warn');
@@ -22,21 +22,21 @@ describe('hostVitals', () => {
     expect(utilTone(undefined)).toBe('ok');
   });
 
-  it('ratioPct: гард нулевого/битого total', () => {
+  it('ratioPct: guards zero/invalid total', () => {
     expect(ratioPct(50, 100)).toBe(50);
     expect(ratioPct(1, 0)).toBeNull();
     expect(ratioPct(1, -5)).toBeNull();
     expect(ratioPct(NaN, 100)).toBeNull();
   });
 
-  it('formatPct: округление и прочерк', () => {
+  it('formatPct: rounding and dash', () => {
     expect(formatPct(42.4)).toBe('42%');
     expect(formatPct(42.6)).toBe('43%');
     expect(formatPct(null)).toBe('—');
     expect(formatPct(undefined)).toBe('—');
   });
 
-  it('formatLoad: 2 знака, прочерк на nil/NaN', () => {
+  it('formatLoad: 2 decimals, dash on nil/NaN', () => {
     expect(formatLoad(1.2)).toBe('1.20');
     expect(formatLoad(0)).toBe('0.00');
     expect(formatLoad(null)).toBe('—');
@@ -51,7 +51,7 @@ describe('hostVitals', () => {
     expect(formatMb(null)).toBe('—');
   });
 
-  it('formatUptime: компактные единицы', () => {
+  it('formatUptime: compact units', () => {
     expect(formatUptime(45)).toBe('45s');
     expect(formatUptime(90)).toBe('1m');
     expect(formatUptime(3600)).toBe('1h 0m');
@@ -60,7 +60,7 @@ describe('hostVitals', () => {
     expect(formatUptime(null)).toBe('—');
   });
 
-  it('busiestDisk: максимальный used%', () => {
+  it('busiestDisk: highest used%', () => {
     expect(busiestDisk(null)).toBeNull();
     expect(busiestDisk([])).toBeNull();
     expect(
@@ -71,14 +71,14 @@ describe('hostVitals', () => {
     ).toEqual({ mount: '/data', pct: 90 });
   });
 
-  it('skewMinutes: > 10 мин иначе null', () => {
+  it('skewMinutes: > 10 min else null', () => {
     expect(skewMinutes('2026-05-26T10:00:00Z', '2026-05-26T10:05:00Z')).toBeNull();
     expect(skewMinutes('2026-05-26T10:00:00Z', '2026-05-26T10:11:00Z')).toBe(11);
     expect(skewMinutes(undefined, '2026-05-26T10:00:00Z')).toBeNull();
     expect(skewMinutes('bad', 'also-bad')).toBeNull();
   });
 
-  it('ageSeconds: >= 0 от now, future→0', () => {
+  it('ageSeconds: >= 0 from now, future→0', () => {
     const now = new Date('2026-05-26T10:00:30Z').getTime();
     expect(ageSeconds('2026-05-26T10:00:00Z', now)).toBe(30);
     expect(ageSeconds('2026-05-26T10:01:00Z', now)).toBe(0);

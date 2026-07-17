@@ -83,7 +83,7 @@ function recordingFetch(opts?: {
   return calls;
 }
 
-// Роутинг: страница на /rbac/roles/new, маркер на /rbac для проверки навигации.
+// Routing: page at /rbac/roles/new, marker at /rbac to verify navigation.
 function renderPage() {
   return renderWithProviders(
     <Routes>
@@ -99,17 +99,17 @@ describe('CreateRolePage (NIM-80)', () => {
     tokenStore.clear();
   });
 
-  it('рендерит форму и каталог permissions сгруппированно', async () => {
+  it('renders the form and the permissions catalog grouped', async () => {
     recordingFetch();
     renderPage();
-    expect(screen.getByRole('heading', { name: /Создать роль/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Create role/i })).toBeInTheDocument();
     expect(await screen.findByRole('checkbox', { name: 'audit.read' })).toBeInTheDocument();
-    // Wildcard-строки на группу.
+    // Wildcard rows per group.
     expect(screen.getByRole('checkbox', { name: /incarnation\.\*/ })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /soul\.\*/ })).toBeInTheDocument();
   });
 
-  it('name + wildcard incarnation.* → POST с ["incarnation.*"] и переход на /rbac', async () => {
+  it('name + wildcard incarnation.* → POST with ["incarnation.*"] and navigation to /rbac', async () => {
     const calls = recordingFetch();
     renderPage();
     const user = userEvent.setup();
@@ -117,21 +117,21 @@ describe('CreateRolePage (NIM-80)', () => {
     await user.type(screen.getByPlaceholderText('soul-operator'), 'inc-admin');
     const wildcard = await screen.findByRole('checkbox', { name: /incarnation\.\*/ });
     await user.click(wildcard);
-    await user.click(screen.getByRole('button', { name: /^Создать$/ }));
+    await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
       expect(post).toBeDefined();
       expect(post!.body).toContain('"name":"inc-admin"');
       expect(post!.body).toContain('"incarnation.*"');
-      // Не перечисление действий.
+      // Not an enumeration of actions.
       expect(post!.body).not.toContain('incarnation.read');
     });
-    // Успех → навигация на /rbac.
+    // Success → navigation to /rbac.
     await waitFor(() => expect(screen.getByText('RBAC-LANDING')).toBeInTheDocument());
   });
 
-  it('scope на странице: soul.list + coven=ops → POST "soul.list on coven=ops"', async () => {
+  it('scope on the page: soul.list + coven=ops → POST "soul.list on coven=ops"', async () => {
     const calls = recordingFetch();
     renderPage();
     const user = userEvent.setup();
@@ -139,11 +139,11 @@ describe('CreateRolePage (NIM-80)', () => {
     await user.type(screen.getByPlaceholderText('soul-operator'), 'soul-ops');
     const cb = await screen.findByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
-    const keySelect = await screen.findByRole('combobox', { name: /^ключ селектора scope$/i });
+    const keySelect = await screen.findByRole('combobox', { name: /^scope selector key$/i });
     await user.selectOptions(keySelect, 'coven');
-    const valueInput = await screen.findByRole('textbox', { name: /значение coven$/i });
+    const valueInput = await screen.findByRole('textbox', { name: /value for coven$/i });
     await user.type(valueInput, 'ops');
-    await user.click(screen.getByRole('button', { name: /^Создать$/ }));
+    await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
@@ -152,7 +152,7 @@ describe('CreateRolePage (NIM-80)', () => {
     });
   });
 
-  it('409 already-exists → ошибка видна, страница не покидается', async () => {
+  it('409 already-exists → error visible, page is not left', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/roles$/,
@@ -166,30 +166,30 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'log-reader');
-    await user.click(screen.getByRole('button', { name: /^Создать$/ }));
+    await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/уже существует|already exists/i);
-    // Остаёмся на странице (маркер /rbac не появился).
+    expect(alert).toHaveTextContent(/already exists/i);
+    // Stay on the page (the /rbac marker did not appear).
     expect(screen.queryByText('RBAC-LANDING')).not.toBeInTheDocument();
   });
 
-  it('невалидное имя (не kebab-case) → клиентская валидация, POST не уходит', async () => {
+  it('invalid name (not kebab-case) → client validation, POST is not sent', async () => {
     const calls = recordingFetch();
     renderPage();
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'Bad Name');
-    await user.click(screen.getByRole('button', { name: /^Создать$/ }));
+    await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
-    // Zod-валидация блокирует submit — POST не должен уйти.
+    // Zod validation blocks submit — POST must not be sent.
     await waitFor(() => {
       expect(screen.getByText(/kebab-case/i)).toBeInTheDocument();
     });
     expect(calls.find((c) => c.url === '/v1/roles' && c.method === 'POST')).toBeUndefined();
   });
 
-  it('#3: невалидный scope (пробел в значении) → ошибка прав видна, POST не уходит', async () => {
+  it('#3: invalid scope (space in value) → permission error visible, POST is not sent', async () => {
     const calls = recordingFetch();
     renderPage();
     const user = userEvent.setup();
@@ -197,22 +197,22 @@ describe('CreateRolePage (NIM-80)', () => {
     await user.type(screen.getByPlaceholderText('soul-operator'), 'scoped-role');
     const cb = await screen.findByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
-    const keySelect = await screen.findByRole('combobox', { name: /^ключ селектора scope$/i });
+    const keySelect = await screen.findByRole('combobox', { name: /^scope selector key$/i });
     await user.selectOptions(keySelect, 'coven');
-    const valueInput = await screen.findByRole('textbox', { name: /значение coven$/i });
-    await user.type(valueInput, 'ops team'); // пробел → 'soul.list on coven=ops team' не проходит regex
-    await user.click(screen.getByRole('button', { name: /^Создать$/ }));
+    const valueInput = await screen.findByRole('textbox', { name: /value for coven$/i });
+    await user.type(valueInput, 'ops team'); // space → 'soul.list on coven=ops team' fails the regex
+    await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
-    // Клиентская валидация ловит битую permission-строку — виден alert, POST не уходит.
-    expect(await screen.findByText(/недопустим|invalid/i)).toBeInTheDocument();
+    // Client validation catches the broken permission string — alert visible, POST not sent.
+    expect(await screen.findByText(/invalid/i)).toBeInTheDocument();
     expect(calls.find((c) => c.url === '/v1/roles' && c.method === 'POST')).toBeUndefined();
   });
 
-  it('Cancel → возврат на /rbac без POST', async () => {
+  it('Cancel → back to /rbac without POST', async () => {
     const calls = recordingFetch();
     renderPage();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Отмена|Cancel/i }));
+    await user.click(screen.getByRole('button', { name: /Cancel/i }));
     await waitFor(() => expect(screen.getByText('RBAC-LANDING')).toBeInTheDocument());
     expect(calls.find((c) => c.method === 'POST')).toBeUndefined();
   });

@@ -11,7 +11,7 @@ describe('IncarnationNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('zod-валидация: пустое name блокирует submit', async () => {
+  it('zod validation: empty name blocks submit', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -28,11 +28,11 @@ describe('IncarnationNewForm', () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
-    expect(await screen.findByText(/обязательное поле/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
+    expect(await screen.findByText(/required field/i)).toBeInTheDocument();
   });
 
-  it('create-input: типизированные поля из scenario с create=true, converge не предлагается', async () => {
+  it('create-input: typed fields from scenario with create=true, converge not offered', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -86,7 +86,7 @@ describe('IncarnationNewForm', () => {
     expect(screen.queryByLabelText('Scenario create input fields')).not.toBeInTheDocument();
   });
 
-  it('create-input: пустое required-поле блокирует submit + inline-ошибка', async () => {
+  it('create-input: empty required field blocks submit + inline error', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -126,7 +126,7 @@ describe('IncarnationNewForm', () => {
     await screen.findByTestId('create-input-fields');
 
     // Submit disabled while required maxmemory is empty.
-    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    const submitBtn = screen.getByRole('button', { name: /Create incarnation/i });
     expect(submitBtn).toBeDisabled();
 
     // Fill required -> submit unblocked.
@@ -136,7 +136,7 @@ describe('IncarnationNewForm', () => {
   });
 
   // Guard: hidden required field (show_when=false) does NOT block submit.
-  it('submit-gate: скрытое required-поле (show_when=false) не блокирует кнопку', async () => {
+  it('submit-gate: hidden required field (show_when=false) does not block the button', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -153,7 +153,7 @@ describe('IncarnationNewForm', () => {
               // mode - a regular field; slave_of - required, but shown only when mode=sentinel.
               // With empty mode show_when=false -> field hidden -> does not block submit.
               input_schema: {
-                mode: { type: 'string', required: false, description: 'режим' },
+                mode: { type: 'string', required: false, description: 'mode' },
                 slave_of: {
                   type: 'string',
                   required: true,
@@ -195,12 +195,12 @@ describe('IncarnationNewForm', () => {
     await screen.findByTestId('create-input-fields');
 
     // slave_of required but hidden (mode != "sentinel") -> submit NOT blocked.
-    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    const submitBtn = screen.getByRole('button', { name: /Create incarnation/i });
     expect(submitBtn).not.toBeDisabled();
   });
 
   // Guard: required_when predicate is true -> field blocks submit.
-  it('submit-gate: required_when=true блокирует кнопку', async () => {
+  it('submit-gate: required_when=true blocks the button', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -247,7 +247,7 @@ describe('IncarnationNewForm', () => {
     await screen.findByTestId('create-input-fields');
 
     // sentinel_host required_when=true and field is empty -> submit BLOCKED.
-    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    const submitBtn = screen.getByRole('button', { name: /Create incarnation/i });
     expect(submitBtn).toBeDisabled();
 
     // Fill field -> submit unblocked.
@@ -256,7 +256,7 @@ describe('IncarnationNewForm', () => {
     expect(submitBtn).not.toBeDisabled();
   });
 
-  it('POST /v1/incarnations отправляется с create_scenario в body', async () => {
+  it('POST /v1/incarnations is sent with create_scenario in body', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -316,7 +316,7 @@ describe('IncarnationNewForm', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
     // Wait for create-scenario dropdown.
     await screen.findByTestId('create-scenario-select-wrapper');
-    await user.click(screen.getByRole('button', { name: /Создать incarnation/i }));
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
@@ -331,7 +331,7 @@ describe('IncarnationNewForm', () => {
   });
 
   // Guard: service without create-scenarios -> bare incarnation, POST without create_scenario.
-  it('bare-инкарнация: нет create-сценариев — показывается инфо-блок, POST без create_scenario', async () => {
+  it('bare incarnation: no create scenarios — info block shown, POST without create_scenario', async () => {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -387,7 +387,7 @@ describe('IncarnationNewForm', () => {
     expect(screen.queryByTestId('create-scenario-select-wrapper')).not.toBeInTheDocument();
 
     // Submit not blocked.
-    const submitBtn = screen.getByRole('button', { name: /Создать incarnation/i });
+    const submitBtn = screen.getByRole('button', { name: /Create incarnation/i });
     expect(submitBtn).not.toBeDisabled();
 
     await user.click(submitBtn);
@@ -403,7 +403,7 @@ describe('IncarnationNewForm', () => {
   });
 
   // Guard: two create scenarios -> dropdown, selection switches input_schema.
-  it('multi-create: dropdown переключает input_schema между сценариями', async () => {
+  it('multi-create: dropdown switches input_schema between scenarios', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -466,7 +466,7 @@ describe('IncarnationNewForm', () => {
   });
 
   // Guard: create_from_souls scenario -> help block with a link to Souls is shown.
-  it('create_from_souls сценарий — отображает хелп-блок с подсказкой онбординга', async () => {
+  it('create_from_souls scenario — shows help block with onboarding hint', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -509,7 +509,7 @@ describe('IncarnationNewForm', () => {
   });
 
   // Guard: regular create scenario (not from_souls) -> help block is NOT shown.
-  it('обычный create сценарий — хелп-блок from_souls НЕ показывается', async () => {
+  it('regular create scenario — from_souls help block is NOT shown', async () => {
     installFetchMock([
       {
         method: 'GET',

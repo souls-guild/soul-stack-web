@@ -41,7 +41,7 @@ describe('PushRunsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит список push-прогонов', async () => {
+  it('renders the push runs list', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/push-runs', body: SAMPLE_PAGE },
     ]);
@@ -58,7 +58,7 @@ describe('PushRunsList', () => {
     expect(screen.getAllByText('failed').length).toBeGreaterThan(1);
   });
 
-  it('ssh_provider filter уходит в query как ?ssh_provider=', async () => {
+  it('ssh_provider filter goes into the query as ?ssh_provider=', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -75,7 +75,7 @@ describe('PushRunsList', () => {
     });
   });
 
-  it('status chip multi-select добавляет ?status= повторно', async () => {
+  it('status chip multi-select adds ?status= repeatedly', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;

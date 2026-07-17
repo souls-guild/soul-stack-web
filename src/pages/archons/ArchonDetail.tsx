@@ -332,7 +332,7 @@ export function ArchonDetail() {
                 fontSize: 13,
               }}
             >
-              Открыть Audit ↗
+              Open Audit ↗
             </Link>
           </div>
         </section>

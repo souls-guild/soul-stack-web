@@ -78,8 +78,8 @@ export function getSelectorKeys(
 }
 
 /**
- * Объединение selector_keys всех действий ресурса — набор scope-ключей для
- * action-wildcard `resource.*` и для bulk-scope пикера группы.
+ * Union of selector_keys across all actions of a resource — the set of scope keys for
+ * the action-wildcard `resource.*` and for the group's bulk-scope picker.
  */
 export function unionSelectorKeys(res: PermissionResource): string[] {
   const keys = new Set<string>();

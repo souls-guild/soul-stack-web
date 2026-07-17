@@ -19,7 +19,7 @@ describe('ArchonDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит профиль активного Архонта', async () => {
+  it('renders an active Archon profile', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -49,7 +49,7 @@ describe('ArchonDetail', () => {
     expect(screen.getByTestId('created-via-archon-alice')).toHaveTextContent('user');
   });
 
-  it('показывает revoked + bootstrap initial badges', async () => {
+  it('shows revoked + bootstrap initial badges', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -75,7 +75,7 @@ describe('ArchonDetail', () => {
     // the "Bootstrap initial" string in meta -- different case).
     expect(screen.getAllByText(/bootstrap initial/i).length).toBeGreaterThanOrEqual(1);
     // empty metadata → placeholder.
-    expect(screen.getByText(/metadata пустой/i)).toBeInTheDocument();
+    expect(screen.getByText(/metadata is empty/i)).toBeInTheDocument();
   });
 
   // -- Guard tests: created_via badge --------------------------------------
@@ -83,7 +83,7 @@ describe('ArchonDetail', () => {
   it.each([
     ['oidc', 'archon-oidc'],
     ['system', 'archon-system'],
-  ] as const)('created_via=%s отображается в Badge по data-testid', async (createdVia, aid) => {
+  ] as const)('created_via=%s is shown in the Badge by data-testid', async (createdVia, aid) => {
     installFetchMock([
       {
         method: 'GET',
@@ -107,7 +107,7 @@ describe('ArchonDetail', () => {
     });
   });
 
-  it('created_via=null/undefined → показывает «—» в badge-ячейке', async () => {
+  it('created_via=null/undefined → shows «—» in the badge cell', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -131,7 +131,7 @@ describe('ArchonDetail', () => {
     });
   });
 
-  it('Revoke-кнопка отсутствует для уже-отозванного Архонта', async () => {
+  it('Revoke button is absent for an already-revoked Archon', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -156,7 +156,7 @@ describe('ArchonDetail', () => {
     expect(screen.queryByRole('button', { name: /^Revoke$/ })).not.toBeInTheDocument();
   });
 
-  it('Revoke-flow: клик на Revoke → Modal → POST /v1/operators/archon-alice/revoke', async () => {
+  it('Revoke flow: click Revoke → Modal → POST /v1/operators/archon-alice/revoke', async () => {
     const calls: Array<{ url: string; method: string }> = [];
     const detailBody = {
       aid: 'archon-alice',
@@ -192,7 +192,7 @@ describe('ArchonDetail', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByTestId('revoke-archon'));
-    expect(await screen.findByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /Revoke archon-alice/i })).toBeInTheDocument();
     await user.click(screen.getByTestId('revoke-submit'));
     await waitFor(() => {
       expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
@@ -270,7 +270,7 @@ describe('ArchonDetail', () => {
     return { calls };
   }
 
-  it('Guard: кнопка «Назначить роль» открывает AssignRoleModal с правильным aid', async () => {
+  it('Guard: «Assign role» button opens AssignRoleModal with the correct aid', async () => {
     roleRecordingFetch({ op: ALICE_OP, roles: ROLES_WITH_ALICE });
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -283,11 +283,11 @@ describe('ArchonDetail', () => {
     await user.click(assignBtn);
 
     // Modal opened with the current archon's aid
-    const dialog = await screen.findByRole('dialog', { name: /Назначить роль: archon-alice/i });
+    const dialog = await screen.findByRole('dialog', { name: /Assign role: archon-alice/i });
     expect(dialog).toBeInTheDocument();
   });
 
-  it('Guard: успешное назначение роли вызывает POST /v1/roles/{name}/operators и закрывает модалку', async () => {
+  it('Guard: successful role assignment calls POST /v1/roles/{name}/operators and closes the modal', async () => {
     const { calls } = roleRecordingFetch({ op: ALICE_OP, roles: ROLES_NO_ALICE });
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -297,9 +297,9 @@ describe('ArchonDetail', () => {
     const assignBtn = await screen.findByTestId('assign-role-btn');
     await user.click(assignBtn);
 
-    const dialog = await screen.findByRole('dialog', { name: /Назначить роль: archon-alice/i });
+    const dialog = await screen.findByRole('dialog', { name: /Assign role: archon-alice/i });
     await user.selectOptions(dialog.querySelector('select')!, 'soul-operator');
-    await user.click(screen.getByRole('button', { name: /^Назначить$/ }));
+    await user.click(screen.getByRole('button', { name: /^Assign$/ }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.method === 'POST' && c.url === '/v1/roles/soul-operator/operators');
@@ -308,11 +308,11 @@ describe('ArchonDetail', () => {
     });
     // Modal closes after success (invalidateQueries has run)
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /Назначить роль/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: /Assign role/i })).not.toBeInTheDocument();
     });
   });
 
-  it('Guard: кнопка «×» рядом с ролью вызывает revokeOperator(role, aid) + рефетч', async () => {
+  it('Guard: «×» button next to a role calls revokeOperator(role, aid) + refetch', async () => {
     // window.confirm auto-confirmed
     vi.stubGlobal('confirm', () => true);
     const { calls } = roleRecordingFetch({ op: ALICE_OP, roles: ROLES_WITH_ALICE });
@@ -321,7 +321,7 @@ describe('ArchonDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
 
     // Wait for the role chip to appear
-    const revokeBtn = await screen.findByRole('button', { name: /снять роль cluster-admin/i });
+    const revokeBtn = await screen.findByRole('button', { name: /unassign role cluster-admin/i });
     const user = userEvent.setup();
     await user.click(revokeBtn);
 
@@ -335,7 +335,7 @@ describe('ArchonDetail', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('Guard: 409 lockout → inline-ошибка видна, роль НЕ исчезает из списка', async () => {
+  it('Guard: 409 lockout → inline error is visible, role does NOT disappear from the list', async () => {
     vi.stubGlobal('confirm', () => true);
     roleRecordingFetch({
       op: ALICE_OP,
@@ -348,7 +348,7 @@ describe('ArchonDetail', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
 
-    const revokeBtn = await screen.findByRole('button', { name: /снять роль cluster-admin/i });
+    const revokeBtn = await screen.findByRole('button', { name: /unassign role cluster-admin/i });
     const user = userEvent.setup();
     await user.click(revokeBtn);
 
@@ -357,10 +357,10 @@ describe('ArchonDetail', () => {
     expect(alert).toHaveTextContent(/lock-?out|self-lockout|admin/i);
 
     // Role is still in the DOM (did not disappear)
-    expect(screen.getByRole('button', { name: /снять роль cluster-admin/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /unassign role cluster-admin/i })).toBeInTheDocument();
   });
 
-  it('Guard: 403 при снятии роли → понятное сообщение об ошибке', async () => {
+  it('Guard: 403 on role removal → clear error message', async () => {
     vi.stubGlobal('confirm', () => true);
     roleRecordingFetch({
       op: ALICE_OP,
@@ -372,15 +372,15 @@ describe('ArchonDetail', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: /Alice Ops/i })).toBeInTheDocument());
 
-    const revokeBtn = await screen.findByRole('button', { name: /снять роль cluster-admin/i });
+    const revokeBtn = await screen.findByRole('button', { name: /unassign role cluster-admin/i });
     const user = userEvent.setup();
     await user.click(revokeBtn);
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/недостаточно прав|forbidden/i);
+    expect(alert).toHaveTextContent(/insufficient permissions|forbidden/i);
   });
 
-  it('Activity-tab показывает link на /audit?archon_aid=<aid>', async () => {
+  it('Activity tab shows a link to /audit?archon_aid=<aid>', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -404,7 +404,7 @@ describe('ArchonDetail', () => {
     });
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Activity/i }));
-    const link = screen.getByRole('link', { name: /Открыть Audit/i });
+    const link = screen.getByRole('link', { name: /Open Audit/i });
     expect(link).toHaveAttribute('href', '/audit?archon_aid=archon-alice');
   });
 
@@ -442,7 +442,7 @@ describe('ArchonDetail', () => {
     });
   }
 
-  it('Guard: синоды-члены отображаются в секции, не-члены не показываются', async () => {
+  it('Guard: member synods are shown in the section, non-members are not', async () => {
     synodFetch(ALICE_OP, SYNODS_WITH_ALICE);
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -462,7 +462,7 @@ describe('ArchonDetail', () => {
     expect(screen.queryByRole('link', { name: /dev-team/i })).not.toBeInTheDocument();
   });
 
-  it('Guard: ссылки на синоды ведут на /synods/:name', async () => {
+  it('Guard: synod links point to /synods/:name', async () => {
     synodFetch(ALICE_OP, SYNODS_WITH_ALICE);
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -470,7 +470,7 @@ describe('ArchonDetail', () => {
     expect(link).toHaveAttribute('href', '/synods/ops-team');
   });
 
-  it('Guard: empty-state если архонт не в ни одной группе', async () => {
+  it('Guard: empty-state when the archon is not in any group', async () => {
     synodFetch(ALICE_OP, SYNODS_NO_ALICE);
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -480,7 +480,7 @@ describe('ArchonDetail', () => {
 
     // Wait until synods finish loading and the empty-state appears
     await waitFor(() => {
-      expect(screen.getByText(/не состоит ни в одной группе/i)).toBeInTheDocument();
+      expect(screen.getByText(/is not a member of any group/i)).toBeInTheDocument();
     });
     // No links to synods
     expect(screen.queryByRole('link', { name: /ops-team/i })).not.toBeInTheDocument();
@@ -488,7 +488,7 @@ describe('ArchonDetail', () => {
 
   // -- Guard tests: role links --------------------------------------------------
 
-  it('[LINKS] роли архонта рендерятся ссылками на /rbac', async () => {
+  it('[LINKS] archon roles render as links to /rbac', async () => {
     roleRecordingFetch({ op: ALICE_OP, roles: ROLES_WITH_ALICE });
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -499,7 +499,7 @@ describe('ArchonDetail', () => {
     expect(link).toHaveAttribute('href', '/rbac');
   });
 
-  it('[LINKS] при отсутствии ролей ссылок в секции ролей нет', async () => {
+  it('[LINKS] with no roles there are no links in the roles section', async () => {
     roleRecordingFetch({ op: ALICE_OP, roles: ROLES_NO_ALICE });
     renderWithProviders(withParamRoute(), '/archons/archon-alice');
 
@@ -508,7 +508,7 @@ describe('ArchonDetail', () => {
     // Wait for roles to load (the section stops being loading)
     await waitFor(() => {
       const section = screen.getByRole('region', { name: /^roles$/i });
-      expect(section).not.toHaveTextContent(/Загрузка/i);
+      expect(section).not.toHaveTextContent(/Loading/i);
     });
 
     // None of the roles are assigned to alice -- no links to /rbac

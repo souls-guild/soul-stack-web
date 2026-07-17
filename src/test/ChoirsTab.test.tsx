@@ -77,7 +77,7 @@ describe('ChoirsTab', () => {
   });
   // --- rendering the tab via IncarnationDetail ---
 
-  it('рендерит вкладку Choirs, переход открывает секцию', async () => {
+  it('renders the Choirs tab, navigation opens the section', async () => {
     // More specific URLs go first (installFetchMock uses startsWith).
     installFetchMock([
       { method: 'GET', url: '/v1/incarnations/redis-prod/choirs', body: CHOIRS_EMPTY },
@@ -101,12 +101,12 @@ describe('ChoirsTab', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Choirs/i })).toBeInTheDocument();
     });
-    expect(screen.getByText(/Choir-ов нет/i)).toBeInTheDocument();
+    expect(screen.getByText(/No Choirs/i)).toBeInTheDocument();
   });
 
   // --- creating a Choir ---
 
-  it('Create Choir — модалка открывается, POST уходит при submit', async () => {
+  it('Create Choir — modal opens, POST is sent on submit', async () => {
     let postCount = 0;
     let lastBody: unknown = null;
 
@@ -156,7 +156,7 @@ describe('ChoirsTab', () => {
     await waitFor(() => screen.getByRole('heading', { name: /Choirs/i }));
 
     // Open the create modal (aria-label - a button, not empty-hint).
-    const createBtn = screen.getAllByRole('button').find((b) => /Создать Choir/.test(b.textContent ?? ''))!;
+    const createBtn = screen.getAllByRole('button').find((b) => /Create Choir/.test(b.textContent ?? ''))!;
     await user.click(createBtn);
 
     // Fill in the name.
@@ -174,7 +174,7 @@ describe('ChoirsTab', () => {
 
   // --- choir name validation ---
 
-  it('choir_name с невалидным паттерном → form-error, POST не уходит', async () => {
+  it('choir_name with invalid pattern → form error, POST is not sent', async () => {
     let postCount = 0;
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -204,7 +204,7 @@ describe('ChoirsTab', () => {
     await user.click(screen.getByRole('tab', { name: /Choirs/i }));
     await waitFor(() => screen.getByRole('heading', { name: /Choirs/i }));
 
-    const createBtn2 = screen.getAllByRole('button').find((b) => /Создать Choir/.test(b.textContent ?? ''))!;
+    const createBtn2 = screen.getAllByRole('button').find((b) => /Create Choir/.test(b.textContent ?? ''))!;
     await user.click(createBtn2);
 
     const nameInput = screen.getByTestId('choir-name-input');
@@ -212,14 +212,14 @@ describe('ChoirsTab', () => {
     await user.click(screen.getByTestId('create-choir-submit'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Название должно соответствовать/)).toBeInTheDocument();
+      expect(screen.getByText(/Name must match/)).toBeInTheDocument();
     });
     expect(postCount).toBe(0);
   });
 
   // --- deleting a Choir ---
 
-  it('Delete Choir — confirm-модалка, DELETE уходит только после подтверждения чекбоксом', async () => {
+  it('Delete Choir — confirm modal, DELETE is sent only after checkbox confirmation', async () => {
     let deleteCount = 0;
 
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -277,7 +277,7 @@ describe('ChoirsTab', () => {
 
   // --- adding a Voice ---
 
-  it('Add Voice → POST уходит с sid/role/position', async () => {
+  it('Add Voice → POST is sent with sid/role/position', async () => {
     let voicePostCount = 0;
     let lastVoiceBody: unknown = null;
 
@@ -341,8 +341,8 @@ describe('ChoirsTab', () => {
     await user.click(screen.getByTestId('choir-toggle-primaries'));
 
     // "Add Voice" button.
-    await waitFor(() => screen.getByText(/Добавить Voice/i));
-    await user.click(screen.getByText(/Добавить Voice/i));
+    await waitFor(() => screen.getByText(/Add Voice/i));
+    await user.click(screen.getByText(/Add Voice/i));
 
     // Select SID.
     await waitFor(() => screen.getByTestId('voice-sid-select'));
@@ -364,7 +364,7 @@ describe('ChoirsTab', () => {
 
   // --- 422 ErrNotMembers ---
 
-  it('422 ErrNotMembers при add voice → человекочитаемое сообщение', async () => {
+  it('422 ErrNotMembers on add voice → human-readable message', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -413,8 +413,8 @@ describe('ChoirsTab', () => {
     await waitFor(() => screen.getByTestId('choir-toggle-primaries'));
     await user.click(screen.getByTestId('choir-toggle-primaries'));
 
-    await waitFor(() => screen.getByText(/Добавить Voice/i));
-    await user.click(screen.getByText(/Добавить Voice/i));
+    await waitFor(() => screen.getByText(/Add Voice/i));
+    await user.click(screen.getByText(/Add Voice/i));
 
     await waitFor(() => screen.getByTestId('voice-sid-select'));
     await user.selectOptions(screen.getByTestId('voice-sid-select'), 'host-a.local');
@@ -429,7 +429,7 @@ describe('ChoirsTab', () => {
 
   // --- deleting a Voice ---
 
-  it('Remove Voice — кнопка Trash2 отправляет DELETE', async () => {
+  it('Remove Voice — Trash2 button sends DELETE', async () => {
     let deleteVoiceCount = 0;
 
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -487,7 +487,7 @@ describe('ChoirsTab', () => {
 
   // --- direct render of ChoirsTab (graceful empty-state) ---
 
-  it('ChoirsTab — graceful empty-state без краша при пустых данных', async () => {
+  it('ChoirsTab — graceful empty-state without crash on empty data', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/incarnations/x/choirs', body: CHOIRS_EMPTY },
     ]);
@@ -495,13 +495,13 @@ describe('ChoirsTab', () => {
       <ChoirsTab incarnationName="x" />,
     );
     await waitFor(() => {
-      expect(screen.getByText(/Choir-ов нет/i)).toBeInTheDocument();
+      expect(screen.getByText(/No Choirs/i)).toBeInTheDocument();
     });
   });
 
   // --- Choir list with description and min/max ---
 
-  it('Choir с description/min_size/max_size рендерится без краша', async () => {
+  it('Choir with description/min_size/max_size renders without crash', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/incarnations/redis-prod/choirs', body: CHOIRS_ONE },
     ]);
@@ -517,7 +517,7 @@ describe('ChoirsTab', () => {
 
   // --- graceful-404: choir subsystem unavailable ---
 
-  it('choirs.list 404 → graceful-плейсхолдер, не error-box', async () => {
+  it('choirs.list 404 → graceful placeholder, not error-box', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
       if (url.includes('/choirs')) {
@@ -538,12 +538,12 @@ describe('ChoirsTab', () => {
       expect(screen.getByTestId('choirs-degraded')).toBeInTheDocument();
     });
     // There should be no red error-box with choirsLoadFailed.
-    expect(screen.queryByText(/Не удалось загрузить Choir/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Failed to load Choir/i)).not.toBeInTheDocument();
   });
 
   // --- DeleteChoir confirm modal ---
 
-  it('DeleteChoirModal: кнопка Delete заблокирована без подтверждения чекбокса', async () => {
+  it('DeleteChoirModal: Delete button disabled without checkbox confirmation', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/incarnations/redis-prod/choirs', body: CHOIRS_ONE },
     ]);

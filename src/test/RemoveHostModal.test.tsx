@@ -5,7 +5,7 @@ import { renderWithProviders } from './renderWithProviders';
 import { RemoveHostModal } from '../pages/incarnations/RemoveHostModal';
 
 describe('RemoveHostModal', () => {
-  it('закрыта при sid=null', () => {
+  it('is closed when sid=null', () => {
     renderWithProviders(
       <RemoveHostModal
         sid={null}
@@ -19,7 +19,7 @@ describe('RemoveHostModal', () => {
     expect(screen.queryByTestId('remove-host-warning')).not.toBeInTheDocument();
   });
 
-  it('показывает warning с sid + именем incarnation, кнопка disabled до подтверждения', async () => {
+  it('shows warning with sid + incarnation name, button disabled until confirmed', async () => {
     renderWithProviders(
       <RemoveHostModal
         sid="host-a.local"
@@ -39,11 +39,11 @@ describe('RemoveHostModal', () => {
     expect(btn).toBeDisabled();
 
     const user = userEvent.setup();
-    await user.click(screen.getByLabelText('Подтвердить удаление хоста'));
+    await user.click(screen.getByLabelText('Confirm host removal'));
     expect(btn).not.toBeDisabled();
   });
 
-  it('onConfirm зовётся с sid после подтверждения', async () => {
+  it('onConfirm is called with sid after confirmation', async () => {
     const onConfirm = vi.fn();
     renderWithProviders(
       <RemoveHostModal
@@ -56,12 +56,12 @@ describe('RemoveHostModal', () => {
       />,
     );
     const user = userEvent.setup();
-    await user.click(screen.getByLabelText('Подтвердить удаление хоста'));
+    await user.click(screen.getByLabelText('Confirm host removal'));
     await user.click(screen.getByTestId('remove-host-confirm'));
     expect(onConfirm).toHaveBeenCalledWith('host-a.local');
   });
 
-  it('без подтверждения onConfirm не зовётся (кнопка disabled)', async () => {
+  it('onConfirm is not called without confirmation (button disabled)', async () => {
     const onConfirm = vi.fn();
     renderWithProviders(
       <RemoveHostModal
@@ -78,17 +78,17 @@ describe('RemoveHostModal', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it('error отображается внутри модалки', () => {
+  it('error is displayed inside the modal', () => {
     renderWithProviders(
       <RemoveHostModal
         sid="host-a.local"
         incarnationName="redis-prod"
         pending={false}
-        error="Incarnation в состоянии destroying — правка spec.hosts невозможна."
+        error="Incarnation is in destroying state — editing spec.hosts is not possible."
         onClose={() => {}}
         onConfirm={() => {}}
       />,
     );
-    expect(screen.getByText(/состоянии destroying/)).toBeInTheDocument();
+    expect(screen.getByText(/destroying state/)).toBeInTheDocument();
   });
 });

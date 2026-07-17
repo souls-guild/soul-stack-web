@@ -48,7 +48,7 @@ describe('ErrandDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит meta + stdout в табе Output', async () => {
+  it('renders meta + stdout in the Output tab', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.includes('/v1/errands/')) {
@@ -69,7 +69,7 @@ describe('ErrandDetail', () => {
     });
   });
 
-  it('таб Events показывает started/finished', async () => {
+  it('Events tab shows started/finished', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(JSON.stringify(TERMINAL_RESULT), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     renderAt('/errands/01HZAA0000000000000000000B');
@@ -85,7 +85,7 @@ describe('ErrandDetail', () => {
     });
   });
 
-  it('running → 202 polling, без stdout', async () => {
+  it('running → 202 polling, no stdout', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(JSON.stringify({ errand_id: 'x', status: 'running' }), {
         status: 202,

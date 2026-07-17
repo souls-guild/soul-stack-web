@@ -39,14 +39,14 @@ function emit(frame: { event: string; data: string }) {
   });
 }
 
-describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
+describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
   beforeEach(() => {
     tokenStore.clear();
     hoisted.opts = null;
     hoisted.calls = 0;
   });
 
-  it('primary: /tasks рендерит master-detail (список + панель), audit-таблицы нет', async () => {
+  it('primary: /tasks renders master-detail (list + panel), no audit table', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -89,7 +89,7 @@ describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
     expect(screen.queryByTestId('run-task-timeline-table')).not.toBeInTheDocument();
   });
 
-  it('live-nudge: SSE task.executed → refetch /tasks обновляет вид', async () => {
+  it('live-nudge: SSE task.executed → refetch /tasks updates the view', async () => {
     let tasksCall = 0;
     vi.stubGlobal(
       'fetch',
@@ -138,7 +138,7 @@ describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
     expect(tasksCall).toBeGreaterThanOrEqual(2);
   });
 
-  it('fallback: /tasks 404 → деградация к audit-таймлайну (per-host итог остаётся)', async () => {
+  it('fallback: /tasks 404 → degrades to audit timeline (per-host summary remains)', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -187,7 +187,7 @@ describe('RunDetail Схема-2 master-detail (NIM-37)', () => {
     expect(screen.queryByTestId('run-tasks-md')).not.toBeInTheDocument();
   });
 
-  it('fallback + audit 403 → мягкая деградация (плашка), per-host итог остаётся', async () => {
+  it('fallback + audit 403 → soft degradation (notice), per-host summary remains', async () => {
     installFetchMock([
       {
         method: 'GET',

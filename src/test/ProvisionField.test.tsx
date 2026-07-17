@@ -30,7 +30,7 @@ import type { ScenarioInputSchema } from '../api/keeper';
 // ─── helpers unit tests ───────────────────────────────────────────────────
 
 describe('isProvisionObjectField', () => {
-  it('true: object с properties.enabled.type=boolean', () => {
+  it('true: object with properties.enabled.type=boolean', () => {
     expect(
       isProvisionObjectField({
         type: 'object',
@@ -39,22 +39,22 @@ describe('isProvisionObjectField', () => {
     ).toBe(true);
   });
 
-  it('false: обычный object без properties', () => {
+  it('false: plain object without properties', () => {
     expect(isProvisionObjectField({ type: 'object', isMap: true, items: { type: 'string' } })).toBe(false);
   });
 
-  it('false: string-поле', () => {
+  it('false: string field', () => {
     expect(isProvisionObjectField({ type: 'string' })).toBe(false);
   });
 });
 
 describe('readProvisionEnabled / setProvisionEnabled', () => {
-  it('пустое значение → false', () => {
+  it('empty value → false', () => {
     expect(readProvisionEnabled(undefined)).toBe(false);
     expect(readProvisionEnabled('')).toBe(false);
   });
 
-  it('serialized JSON с enabled=false → false', () => {
+  it('serialized JSON with enabled=false → false', () => {
     expect(readProvisionEnabled(JSON.stringify({ enabled: false, provider: 'wb' }))).toBe(false);
   });
 
@@ -63,7 +63,7 @@ describe('readProvisionEnabled / setProvisionEnabled', () => {
     expect(readProvisionEnabled(raw)).toBe(true);
   });
 
-  it('сохраняет существующие sub-поля при смене enabled', () => {
+  it('preserves existing sub-fields when toggling enabled', () => {
     const initial = JSON.stringify({ enabled: false, provider: 'wb' });
     const next = setProvisionEnabled(initial, true);
     const obj = JSON.parse(next);
@@ -85,15 +85,15 @@ describe('computeRequiredHostCount', () => {
     expect(computeRequiredHostCount({ redis_type: 'cluster', replicas_per_master: '2', shards: '3' })).toBe(9);
   });
 
-  it('cluster без shards → null', () => {
+  it('cluster without shards → null', () => {
     expect(computeRequiredHostCount({ redis_type: 'cluster', replicas_per_master: '2' })).toBeNull();
   });
 
-  it('нет replicas_per_master → null', () => {
+  it('no replicas_per_master → null', () => {
     expect(computeRequiredHostCount({ redis_type: 'sentinel' })).toBeNull();
   });
 
-  it('числовое replicas_per_master', () => {
+  it('numeric replicas_per_master', () => {
     expect(computeRequiredHostCount({ replicas_per_master: 2 })).toBe(3);
   });
 });
@@ -119,9 +119,9 @@ const PROVISION_SCHEMA: ScenarioInputSchema = {
   provision: {
     type: 'object',
     required: false,
-    description: 'Облачное создание VM',
+    description: 'Cloud VM creation',
     properties: {
-      enabled: { type: 'boolean', default: false, description: 'Включить cloud provision' },
+      enabled: { type: 'boolean', default: false, description: 'Enable cloud provision' },
       provider: { type: 'string', description: 'Cloud provider' },
       profile: { type: 'string', description: 'VM profile' },
       await_timeout: { type: 'string', description: 'Timeout' },
@@ -142,7 +142,7 @@ function ProvisionWrapper({ schema, incarnationName }: { schema: ScenarioInputSc
 }
 
 describe('ScenarioInputFields: ProvisionField', () => {
-  it('рендерит toggle вместо JSON-textarea', () => {
+  it('renders a toggle instead of a JSON textarea', () => {
     render(<ProvisionWrapper schema={PROVISION_SCHEMA} />);
     // Toggle is present.
     expect(screen.getByTestId('field-provision-toggle-provision')).toBeInTheDocument();
@@ -150,12 +150,12 @@ describe('ScenarioInputFields: ProvisionField', () => {
     expect(screen.queryByTestId('field-composite-provision')).not.toBeInTheDocument();
   });
 
-  it('disabled по умолчанию — показывает подсказку existing-souls', () => {
+  it('disabled by default — shows the existing-souls hint', () => {
     render(<ProvisionWrapper schema={PROVISION_SCHEMA} incarnationName="redis-prod" />);
     expect(screen.getByTestId('field-provision-disabled-hint-provision')).toBeInTheDocument();
   });
 
-  it('включение toggle скрывает подсказку и показывает под-поля', async () => {
+  it('enabling the toggle hides the hint and shows sub-fields', async () => {
     const user = userEvent.setup();
     render(<ProvisionWrapper schema={PROVISION_SCHEMA} incarnationName="redis-prod" />);
 
@@ -169,7 +169,7 @@ describe('ScenarioInputFields: ProvisionField', () => {
     expect(screen.getByTestId('field-provision-sub-provision-profile')).toBeInTheDocument();
   });
 
-  it('под-поля НЕ видны когда toggle выключен', () => {
+  it('sub-fields are NOT visible when the toggle is off', () => {
     render(<ProvisionWrapper schema={PROVISION_SCHEMA} />);
     expect(screen.queryByTestId('field-provision-sub-provision-provider')).not.toBeInTheDocument();
   });
@@ -187,12 +187,12 @@ const PROVISION_CREATE_SCENARIO = {
       type: 'string',
       required: true,
       enum: ['sentinel', 'cluster'],
-      description: 'Режим',
+      description: 'Mode',
     },
     replicas_per_master: {
       type: 'integer',
       required: false,
-      description: 'Реплик на master',
+      description: 'Replicas per master',
     },
     provision: {
       type: 'object',
@@ -230,7 +230,7 @@ function mockRedisScenarios(scenario: any = PROVISION_CREATE_SCENARIO) {
 // (unit level). Integration test — via IncarnationNewForm with mock data.
 
 describe('IncarnationNewForm: provision host warning', () => {
-  it('warning НЕ появляется по умолчанию (provision disabled, replicas пустые)', async () => {
+  it('warning does NOT appear by default (provision disabled, replicas empty)', async () => {
     mockRedisScenarios();
     const user = userEvent.setup();
 
@@ -250,7 +250,7 @@ describe('IncarnationNewForm: provision host warning', () => {
     expect(screen.queryByTestId('provision-host-warning')).not.toBeInTheDocument();
   });
 
-  it('warning появляется после ввода replicas_per_master (provision disabled)', async () => {
+  it('warning appears after entering replicas_per_master (provision disabled)', async () => {
     mockRedisScenarios();
     const user = userEvent.setup();
 
@@ -279,7 +279,7 @@ describe('IncarnationNewForm: provision host warning', () => {
     expect(await screen.findByTestId('provision-host-warning')).toBeInTheDocument();
   });
 
-  it('warning НЕ появляется когда provision=enabled', async () => {
+  it('warning does NOT appear when provision=enabled', async () => {
     mockRedisScenarios();
     const user = userEvent.setup();
 
@@ -303,7 +303,7 @@ describe('IncarnationNewForm: provision host warning', () => {
     expect(screen.queryByTestId('provision-host-warning')).not.toBeInTheDocument();
   });
 
-  it('warning НЕ появляется когда схема не содержит replicas_per_master', async () => {
+  it('warning does NOT appear when the schema has no replicas_per_master', async () => {
     mockRedisScenarios({
       name: 'create',
       kind: 'lifecycle',

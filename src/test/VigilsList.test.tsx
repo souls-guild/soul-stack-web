@@ -39,7 +39,7 @@ describe('VigilsList', () => {
     tokenStore.clear();
   });
 
-  it('рендерит таблицу из /v1/vigils', async () => {
+  it('renders the table from /v1/vigils', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/vigils', body: SAMPLE }]);
     renderWithProviders(<VigilsList />, '/vigils');
     expect(screen.getByRole('heading', { name: /Vigils/i })).toBeInTheDocument();
@@ -52,7 +52,7 @@ describe('VigilsList', () => {
     expect(screen.getByText('prod, redis-master')).toBeInTheDocument();
   });
 
-  it('фильтр "enabled only" скрывает disabled Vigils', async () => {
+  it('the "enabled only" filter hides disabled Vigils', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/vigils', body: SAMPLE }]);
     renderWithProviders(<VigilsList />, '/vigils');
     await waitFor(() => expect(screen.getByText('config-changed')).toBeInTheDocument());
@@ -62,7 +62,7 @@ describe('VigilsList', () => {
     expect(screen.getByText('redis-down')).toBeInTheDocument();
   });
 
-  it('фильтр по beacon kind — exact match', async () => {
+  it('filters by beacon kind — exact match', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/vigils', body: SAMPLE }]);
     renderWithProviders(<VigilsList />, '/vigils');
     await waitFor(() => expect(screen.getByText('redis-down')).toBeInTheDocument());

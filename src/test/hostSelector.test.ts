@@ -7,12 +7,12 @@ function soul(sid: string, covens: string[] = []): SoulListEntry {
 }
 
 describe('compileSidRegex — anchored full-match', () => {
-  it('пустой паттерн → null без ошибки', () => {
+  it('empty pattern → null without error', () => {
     expect(compileSidRegex('')).toEqual({ re: null, error: null });
     expect(compileSidRegex('   ')).toEqual({ re: null, error: null });
   });
 
-  it('`x*` НЕ матчит реальный SID (баг unanchored)', () => {
+  it('`x*` does NOT match a real SID (unanchored bug)', () => {
     const { re, error } = compileSidRegex('x*');
     expect(error).toBeNull();
     expect(re).not.toBeNull();
@@ -22,20 +22,20 @@ describe('compileSidRegex — anchored full-match', () => {
     expect(re!.test('')).toBe(true);
   });
 
-  it('`soul-aws-.*` матчит соответствующий SID', () => {
+  it('`soul-aws-.*` matches the corresponding SID', () => {
     const { re } = compileSidRegex('soul-aws-.*');
     expect(re!.test('soul-aws-01')).toBe(true);
     expect(re!.test('soul-gcp-01')).toBe(false);
   });
 
-  it('полное имя матчит точно и только его', () => {
+  it('full name matches exactly and only itself', () => {
     const { re } = compileSidRegex('soul-aws-01');
     expect(re!.test('soul-aws-01')).toBe(true);
     expect(re!.test('soul-aws-011')).toBe(false);
     expect(re!.test('x-soul-aws-01')).toBe(false);
   });
 
-  it('чередование верхнего уровня якорится целиком (a|b → ^(?:a|b)$)', () => {
+  it('top-level alternation is anchored as a whole (a|b → ^(?:a|b)$)', () => {
     const { re } = compileSidRegex('host-a|host-b');
     expect(re!.test('host-a')).toBe(true);
     expect(re!.test('host-b')).toBe(true);
@@ -44,31 +44,31 @@ describe('compileSidRegex — anchored full-match', () => {
     expect(re!.test('prefix-host-b')).toBe(false);
   });
 
-  it('невалидный regex → ошибка, re=null (не крашит, не матчит всё)', () => {
+  it('invalid regex → error, re=null (does not crash, does not match everything)', () => {
     const { re, error } = compileSidRegex('[');
     expect(re).toBeNull();
     expect(error).toBeTruthy();
   });
 });
 
-describe('matchStableCriteria — sidRegex применяется через compiled re', () => {
+describe('matchStableCriteria — sidRegex applied via compiled re', () => {
   const souls = [soul('soul-aws-01'), soul('soul-aws-02'), soul('soul-gcp-01')];
 
-  it('`x*` НЕ таргетит весь флот', () => {
+  it('`x*` does NOT target all souls', () => {
     const c = { ...EMPTY_HOST_CRITERIA, sidRegex: 'x*' };
     const { re } = compileSidRegex(c.sidRegex);
     const matched = souls.filter((s) => matchStableCriteria(s, c, re));
     expect(matched).toHaveLength(0);
   });
 
-  it('`soul-aws-.*` таргетит только aws', () => {
+  it('`soul-aws-.*` targets only aws', () => {
     const c = { ...EMPTY_HOST_CRITERIA, sidRegex: 'soul-aws-.*' };
     const { re } = compileSidRegex(c.sidRegex);
     const matched = souls.filter((s) => matchStableCriteria(s, c, re));
     expect(matched.map((s) => s.sid)).toEqual(['soul-aws-01', 'soul-aws-02']);
   });
 
-  it('невалидный regex (re=null) → критерий-regex отключён', () => {
+  it('invalid regex (re=null) → regex criterion disabled', () => {
     const c = { ...EMPTY_HOST_CRITERIA, sidRegex: '[' };
     const { re } = compileSidRegex(c.sidRegex);
     expect(re).toBeNull();

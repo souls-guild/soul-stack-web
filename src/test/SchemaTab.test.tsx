@@ -27,7 +27,7 @@ describe('SchemaTab', () => {
     tokenStore.clear();
   });
 
-  it('фетчит state-schema и рендерит поля + миграции', async () => {
+  it('fetches state-schema and renders fields + migrations', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services/redis/state-schema', body: REPLY },
     ]);
@@ -41,7 +41,7 @@ describe('SchemaTab', () => {
       expect(screen.getByText('maxmemory')).toBeInTheDocument();
     });
     // required flag
-    expect(screen.getByText('да')).toBeInTheDocument();
+    expect(screen.getByText('yes')).toBeInTheDocument();
     // from->to migration
     expect(screen.getByText('migrations/001_to_002.yml')).toBeInTheDocument();
     expect(screen.getByText('v1')).toBeInTheDocument();
@@ -61,11 +61,11 @@ describe('SchemaTab', () => {
       '/incarnations/x',
     );
     await waitFor(() => {
-      expect(screen.getByText(/Детальная state-schema по этому сервису сейчас недоступна/)).toBeInTheDocument();
+      expect(screen.getByText(/Detailed state-schema for this service is currently unavailable/)).toBeInTheDocument();
     });
   });
 
-  it('schema без декларации → empty-state структуры, но миграции отдельно', async () => {
+  it('schema without declaration → empty-state structure, but migrations separately', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -78,8 +78,8 @@ describe('SchemaTab', () => {
       '/incarnations/x',
     );
     await waitFor(() => {
-      expect(screen.getByText(/Структура state не задекларирована/)).toBeInTheDocument();
+      expect(screen.getByText(/State structure is not declared/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/Миграций нет/)).toBeInTheDocument();
+    expect(screen.getByText(/No migrations/)).toBeInTheDocument();
   });
 });

@@ -38,7 +38,7 @@ describe('RegisterServiceModal', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('валидная форма шлёт POST /v1/services с правильным body', async () => {
+  it('valid form sends POST /v1/services with the correct body', async () => {
     const calls = installCapturingMock(201, {
       name: 'redis',
       git: 'https://git.example.com/service-redis.git',
@@ -73,7 +73,7 @@ describe('RegisterServiceModal', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('blocks submit при невалидном name (не kebab-case)', async () => {
+  it('blocks submit on invalid name (not kebab-case)', async () => {
     installCapturingMock(201, {});
     renderWithProviders(<RegisterServiceModal open onClose={vi.fn()} />, '/services');
     const user = userEvent.setup();
@@ -88,7 +88,7 @@ describe('RegisterServiceModal', () => {
     expect(screen.getByRole('button', { name: /^Register$/ })).toBeDisabled();
   });
 
-  it('blocks submit при невалидном git (не git-URL)', async () => {
+  it('blocks submit on invalid git (not a git URL)', async () => {
     installCapturingMock(201, {});
     renderWithProviders(<RegisterServiceModal open onClose={vi.fn()} />, '/services');
     const user = userEvent.setup();
@@ -96,11 +96,11 @@ describe('RegisterServiceModal', () => {
     await user.type(screen.getByPlaceholderText('redis'), 'redis');
     await user.type(screen.getByPlaceholderText(/git\.example\.com\/service-redis/i), 'not-a-url');
 
-    expect(await screen.findByText(/git-URL/i)).toBeInTheDocument();
+    expect(await screen.findByText(/git URL/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Register$/ })).toBeDisabled();
   });
 
-  it('file:// git — валиден (dev file-repos не блокируем)', async () => {
+  it('file:// git is valid (dev file-repos are not blocked)', async () => {
     installCapturingMock(201, {});
     renderWithProviders(<RegisterServiceModal open onClose={vi.fn()} />, '/services');
     const user = userEvent.setup();
@@ -116,7 +116,7 @@ describe('RegisterServiceModal', () => {
     );
   });
 
-  it('409 already-exists → pretty-error, modal не закрывается', async () => {
+  it('409 already-exists → pretty-error, modal stays open', async () => {
     installCapturingMock(409, { title: 'conflict', detail: 'service-already-exists' });
     const onClose = vi.fn();
     renderWithProviders(<RegisterServiceModal open onClose={onClose} />, '/services');
@@ -131,7 +131,7 @@ describe('RegisterServiceModal', () => {
     await waitFor(() => expect(submit).not.toBeDisabled());
     await user.click(submit);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/уже зарегистрирован/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already registered/i);
     expect(onClose).not.toHaveBeenCalled();
   });
 });

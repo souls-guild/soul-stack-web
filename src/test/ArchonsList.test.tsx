@@ -48,7 +48,7 @@ describe('ArchonsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит таблицу Архонтов из GET /v1/operators', async () => {
+  it('renders the Archons table from GET /v1/operators', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -63,7 +63,7 @@ describe('ArchonsList', () => {
     expect(screen.getByText('initial')).toBeInTheDocument();
   });
 
-  it('rendering — clickable AID-link на detail', async () => {
+  it('renders a clickable AID link to detail', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -75,7 +75,7 @@ describe('ArchonsList', () => {
     expect(link).toHaveAttribute('href', '/archons/archon-alice');
   });
 
-  it('фильтры auth_method + hide-revoked попадают в query', async () => {
+  it('auth_method + hide-revoked filters reach the query', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -86,17 +86,17 @@ describe('ArchonsList', () => {
     });
     renderWithProviders(<ArchonsList />, '/archons');
     const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText(/Метод аутентификации/i), 'jwt');
+    await user.selectOptions(screen.getByLabelText(/Auth method/i), 'jwt');
     // Default: Hide revoked = ON -> revoked param is NOT passed (server-default
     // = active only). Uncheck the checkbox -> revoked=true should appear.
-    await user.click(screen.getByLabelText(/Скрыть отозванных/i));
+    await user.click(screen.getByLabelText(/Hide revoked/i));
     await waitFor(() => {
       expect(lastUrl).toMatch(/auth_method=jwt/);
       expect(lastUrl).toMatch(/revoked=true/);
     });
   });
 
-  it('Hide revoked default ON: revoked-Архонт скрыт + counter X of Y', async () => {
+  it('Hide revoked default ON: revoked Archon hidden + counter X of Y', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -107,10 +107,10 @@ describe('ArchonsList', () => {
     // archon-old (revoked_at != null) is hidden by default.
     expect(screen.queryByRole('link', { name: 'archon-old' })).not.toBeInTheDocument();
     // Counter: 2 visible, 3 total.
-    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/2.*3/);
+    expect(screen.getByLabelText(/archons counter/i)).toHaveTextContent(/2.*3/);
   });
 
-  it('Hide revoked OFF: revoked-Архонт виден с red chip + Revoke disabled', async () => {
+  it('Hide revoked OFF: revoked Archon visible with red chip + Revoke disabled', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -119,7 +119,7 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(/Скрыть отозванных/i));
+    await user.click(screen.getByLabelText(/Hide revoked/i));
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
     });
@@ -130,10 +130,10 @@ describe('ArchonsList', () => {
     expect(screen.getByTestId('revoke-archon-old')).toBeDisabled();
     expect(screen.getByTestId('issue-token-archon-old')).toBeDisabled();
     // Counter: 3 of 3.
-    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/3.*3/);
+    expect(screen.getByLabelText(/archons counter/i)).toHaveTextContent(/3.*3/);
   });
 
-  it('per-row Revoke через Modal → POST /v1/operators/{aid}/revoke', async () => {
+  it('per-row Revoke via Modal → POST /v1/operators/{aid}/revoke', async () => {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -161,21 +161,21 @@ describe('ArchonsList', () => {
     await user.click(screen.getByTestId('revoke-archon-alice'));
     // Modal should open with a title containing the AID.
     await waitFor(() => {
-      expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /Revoke archon-alice/i })).toBeInTheDocument();
     });
     // Inside the Modal enter reason and submit.
-    const textarea = screen.getByPlaceholderText(/уход сотрудника/i);
-    await user.type(textarea, 'компрометация ключа');
+    const textarea = screen.getByPlaceholderText(/employee offboarding/i);
+    await user.type(textarea, 'key compromise');
     await user.click(screen.getByTestId('revoke-submit'));
     await waitFor(() => {
       expect(calls.some((c) => c.url === '/v1/operators/archon-alice/revoke' && c.method === 'POST')).toBe(true);
     });
     // Body contains reason without the aid field (path-param is the authority).
     const revokeCall = calls.find((c) => c.url === '/v1/operators/archon-alice/revoke');
-    expect(revokeCall?.body).toContain('компрометация ключа');
+    expect(revokeCall?.body).toContain('key compromise');
   });
 
-  it('Revoke 409 (last cluster-admin) — pretty-error в Modal, Modal не закрывается', async () => {
+  it('Revoke 409 (last cluster-admin) — pretty-error in Modal, Modal stays open', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -211,11 +211,11 @@ describe('ArchonsList', () => {
     await user.click(screen.getByTestId('revoke-archon-alice'));
     await user.click(await screen.findByTestId('revoke-submit'));
     // Pretty-error visible in Modal; Modal does not close.
-    expect(await screen.findByRole('alert')).toHaveTextContent(/last-?cluster-?admin|self-lockout|последнего/i);
-    expect(screen.getByRole('dialog', { name: /Отозвать archon-alice/i })).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/last-?cluster-?admin|self-lockout|last Archon/i);
+    expect(screen.getByRole('dialog', { name: /Revoke archon-alice/i })).toBeInTheDocument();
   });
 
-  it('Create — POST /v1/operators возвращает jwt, рендерит JwtReveal', async () => {
+  it('Create — POST /v1/operators returns jwt, renders JwtReveal', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
       {
@@ -237,17 +237,17 @@ describe('ArchonsList', () => {
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
 
-    const createBtn = screen.getByRole('button', { name: /Создать/i });
+    const createBtn = screen.getByRole('button', { name: /Create/i });
     expect(createBtn).not.toBeDisabled();
     await user.click(createBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/JWT выпущен/i)).toBeInTheDocument();
+      expect(screen.getByText(/JWT issued/i)).toBeInTheDocument();
     });
     expect(screen.getByDisplayValue('eyJ.payload.sig')).toBeInTheDocument();
   });
 
-  it('inline-ошибка pattern при некорректном AID', async () => {
+  it('inline pattern error on invalid AID', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
     ]);
@@ -255,11 +255,11 @@ describe('ArchonsList', () => {
     const user = userEvent.setup();
     // Invalid AID: uppercase - violates ^[a-z0-9]...
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'Alice!');
-    expect(screen.getAllByText(/формат:/i).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
+    expect(screen.getAllByText(/format:/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Create/i })).toBeDisabled();
   });
 
-  it('пустой display_name блокирует submit, валидный AID', async () => {
+  it('empty display_name blocks submit, valid AID', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
     ]);
@@ -267,13 +267,13 @@ describe('ArchonsList', () => {
     const user = userEvent.setup();
     // Valid AID, but display_name empty -> submit disabled.
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
-    expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Create/i })).toBeDisabled();
     // Filled display_name -> submit unlocked.
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
-    expect(screen.getByRole('button', { name: /Создать/i })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Create/i })).not.toBeDisabled();
   });
 
-  it('display_name > 128 символов — inline-ошибка + submit disabled', async () => {
+  it('display_name > 128 characters — inline error + submit disabled', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: { items: [], offset: 0, limit: 50, total: 0 } },
     ]);
@@ -281,8 +281,8 @@ describe('ArchonsList', () => {
     const user = userEvent.setup();
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'x'.repeat(129));
-    expect(screen.getByText(/максимум 128 символов/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Создать/i })).toBeDisabled();
+    expect(screen.getByText(/maximum 128 characters/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Create/i })).toBeDisabled();
   });
 
   // --- Multi-select roles (extended payload {aid, display_name, roles[]}) ---
@@ -337,9 +337,9 @@ describe('ArchonsList', () => {
 
     // Wait for select to fill with options.
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
+      expect(screen.getByRole('combobox', { name: /add role/i })).not.toBeDisabled();
     });
-    const rolesSelect = screen.getByRole('combobox', { name: /добавить роль/i });
+    const rolesSelect = screen.getByRole('combobox', { name: /add role/i });
     await user.selectOptions(rolesSelect, 'ops-viewer');
     await user.selectOptions(rolesSelect, 'release-engineer');
 
@@ -347,7 +347,7 @@ describe('ArchonsList', () => {
     expect(screen.getByText('ops-viewer')).toBeInTheDocument();
     expect(screen.getByText('release-engineer')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Создать/i }));
+    await user.click(screen.getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/operators' && c.method === 'POST');
@@ -396,7 +396,7 @@ describe('ArchonsList', () => {
 
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
-    await user.click(screen.getByRole('button', { name: /Создать/i }));
+    await user.click(screen.getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/operators' && c.method === 'POST');
@@ -443,17 +443,17 @@ describe('ArchonsList', () => {
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
+      expect(screen.getByRole('combobox', { name: /add role/i })).not.toBeDisabled();
     });
-    await user.selectOptions(screen.getByRole('combobox', { name: /добавить роль/i }), 'ops-viewer');
-    await user.click(screen.getByRole('button', { name: /Создать/i }));
+    await user.selectOptions(screen.getByRole('combobox', { name: /add role/i }), 'ops-viewer');
+    await user.click(screen.getByRole('button', { name: /Create/i }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/422/);
     expect(alert).toHaveTextContent(/unknown role|validation/i);
   });
 
-  it('Backend без поддержки roles (404 на extended payload) — graceful degradation', async () => {
+  it('Backend without roles support (404 on extended payload) — graceful degradation', async () => {
     let postCount = 0;
     const postBodies: string[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -507,26 +507,26 @@ describe('ArchonsList', () => {
     await user.type(screen.getByPlaceholderText(/alice@corp\.com/i), 'archon-alice');
     await user.type(screen.getByPlaceholderText(/Alice Ops/i), 'Alice');
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: /добавить роль/i })).not.toBeDisabled();
+      expect(screen.getByRole('combobox', { name: /add role/i })).not.toBeDisabled();
     });
-    await user.selectOptions(screen.getByRole('combobox', { name: /добавить роль/i }), 'ops-viewer');
-    await user.click(screen.getByRole('button', { name: /Создать/i }));
+    await user.selectOptions(screen.getByRole('combobox', { name: /add role/i }), 'ops-viewer');
+    await user.click(screen.getByRole('button', { name: /Create/i }));
 
     // JWT rendered - Archon was created after all.
     await waitFor(() => {
-      expect(screen.getByText(/JWT выпущен/i)).toBeInTheDocument();
+      expect(screen.getByText(/JWT issued/i)).toBeInTheDocument();
     });
     // There were two POSTs: with roles and without.
     expect(postCount).toBe(2);
     expect(JSON.parse(postBodies[0])).toHaveProperty('roles');
     expect(JSON.parse(postBodies[1]).roles).toBeUndefined();
     // Hint to the user about unsupported.
-    expect(screen.getByRole('status')).toHaveTextContent(/backend не поддерживает/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/backend does not support/i);
   });
 
   // --- created_via column ---
 
-  it('created_via отображается как Badge в таблице', async () => {
+  it('created_via is shown as a Badge in the table', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -542,7 +542,7 @@ describe('ArchonsList', () => {
     expect(screen.queryByTestId('created-via-archon-old')).not.toBeInTheDocument();
   });
 
-  it('created_via=ldap отображается при снятом hide-revoked', async () => {
+  it('created_via=ldap is shown when hide-revoked is off', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -552,7 +552,7 @@ describe('ArchonsList', () => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
     // Turn off hide-revoked -> archon-old visible
-    await user.click(screen.getByLabelText(/Скрыть отозванных/i));
+    await user.click(screen.getByLabelText(/Hide revoked/i));
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-old' })).toBeInTheDocument();
     });
@@ -582,8 +582,8 @@ describe('ArchonsList', () => {
     if (aid.length > 0) {
       await user.type(input, aid);
     }
-    const errorShown = screen.queryAllByText(/формат:/i).length > 0;
-    const btnDisabled = screen.getByRole('button', { name: /Создать/i }).hasAttribute('disabled');
+    const errorShown = screen.queryAllByText(/format:/i).length > 0;
+    const btnDisabled = screen.getByRole('button', { name: /Create/i }).hasAttribute('disabled');
     if (expectedValid) {
       // Valid AID: no error hint; button may be disabled due to display_name
       expect(errorShown).toBe(false);
@@ -598,7 +598,7 @@ describe('ArchonsList', () => {
 
   // --- Search in Archons list ---
 
-  it('search по AID — фильтрует client-side по aid', async () => {
+  it('search by AID — filters client-side by aid', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -607,16 +607,16 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     });
-    const searchInput = screen.getByPlaceholderText(/AID или имя/i);
+    const searchInput = screen.getByPlaceholderText(/AID or name/i);
     await user.type(searchInput, 'alice');
     // Only alice visible, bootstrap hidden.
     expect(screen.getByRole('link', { name: 'archon-alice' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'archon-bootstrap' })).not.toBeInTheDocument();
-    // Counter updated: "Найдено 1 из 2"
-    expect(screen.getByLabelText(/счётчик архонтов/i)).toHaveTextContent(/1/);
+    // Counter updated: "Found 1 of 2"
+    expect(screen.getByLabelText(/archons counter/i)).toHaveTextContent(/1/);
   });
 
-  it('search по display_name — фильтрует client-side по display_name', async () => {
+  it('search by display_name — filters client-side by display_name', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);
@@ -625,14 +625,14 @@ describe('ArchonsList', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'archon-bootstrap' })).toBeInTheDocument();
     });
-    const searchInput = screen.getByPlaceholderText(/AID или имя/i);
+    const searchInput = screen.getByPlaceholderText(/AID or name/i);
     // display_name = 'Bootstrap Archon'
     await user.type(searchInput, 'Bootstrap');
     expect(screen.getByRole('link', { name: 'archon-bootstrap' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'archon-alice' })).not.toBeInTheDocument();
   });
 
-  it('search пустой — показывает всех', async () => {
+  it('empty search — shows all', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/operators', body: SAMPLE_LIST },
     ]);

@@ -13,7 +13,7 @@ import type { ProvisioningMethod } from '../api/keeper';
 // This runtime test additionally pins down the currently expected set of values
 // and fails if ALL_METHODS/gen go out of sync (e.g. manually).
 describe('ALL_METHODS exhaustiveness guard', () => {
-  it('содержит ровно те методы, что определены в ProvisioningMethod union', async () => {
+  it('contains exactly the methods defined in the ProvisioningMethod union', async () => {
     // All possible ProvisioningMethod members from the gen schema at time of writing.
     // When adding a new method in OpenAPI: (1) the compile-time guard in
     // ProvisioningPolicy.tsx breaks the build, (2) this array also needs updating.
@@ -32,7 +32,7 @@ describe('ALL_METHODS exhaustiveness guard', () => {
     KNOWN_METHODS.forEach((m) => {
       expect(
         screen.getByTestId(`method-checkbox-${m}`),
-        `checkbox для метода "${m}" отсутствует в ALL_METHODS`,
+        `checkbox for method "${m}" is missing from ALL_METHODS`,
       ).toBeInTheDocument();
     });
   });
@@ -43,7 +43,7 @@ describe('ProvisioningPolicy', () => {
     tokenStore.clear();
   });
 
-  it('рендерит заголовок и чекбоксы для всех трёх методов', async () => {
+  it('renders the heading and checkboxes for all three methods', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -59,7 +59,7 @@ describe('ProvisioningPolicy', () => {
     expect(screen.getByRole('checkbox', { name: /oidc/i })).toBeInTheDocument();
   });
 
-  it('policy_set=false → показывает default-hint, все чекбоксы включены', async () => {
+  it('policy_set=false → shows the default hint, all checkboxes enabled', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -77,7 +77,7 @@ describe('ProvisioningPolicy', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('policy_set=true, allowed_methods=[user] → только user отмечен', async () => {
+  it('policy_set=true, allowed_methods=[user] → only user is checked', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -93,7 +93,7 @@ describe('ProvisioningPolicy', () => {
     expect(screen.getByRole('checkbox', { name: /oidc/i })).not.toBeChecked();
   });
 
-  it('снятие всех чекбоксов → Save задизейблен + anti-lockout alert', async () => {
+  it('unchecking all boxes → Save disabled + anti-lockout alert', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -115,7 +115,7 @@ describe('ProvisioningPolicy', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  it('PUT /v1/provisioning-policy отправляется с выбранными методами', async () => {
+  it('PUT /v1/provisioning-policy is sent with the selected methods', async () => {
     const calls: Array<{ url: string; method: string; body: string | null }> = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -161,7 +161,7 @@ describe('ProvisioningPolicy', () => {
     });
   });
 
-  it('успешный PUT → показывает saved-сообщение', async () => {
+  it('successful PUT → shows the saved message', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -192,12 +192,12 @@ describe('ProvisioningPolicy', () => {
 // Saved message appears
     await waitFor(() => {
       const statuses = screen.getAllByRole('status');
-      const savedStatus = statuses.find((el) => /обновлена|updated/i.test(el.textContent ?? ''));
+      const savedStatus = statuses.find((el) => /updated/i.test(el.textContent ?? ''));
       expect(savedStatus).toBeDefined();
     });
   });
 
-  it('ошибка сети GET → показывает error-alert', async () => {
+  it('GET network error → shows error alert', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -212,7 +212,7 @@ describe('ProvisioningPolicy', () => {
     });
   });
 
-  it('ошибка PUT → показывает error-alert', async () => {
+  it('PUT error → shows error alert', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -242,14 +242,14 @@ describe('ProvisioningPolicy', () => {
 
     await waitFor(() => {
       const alerts = screen.getAllByRole('alert');
-      const errAlert = alerts.find((el) => /сохранить|save/i.test(el.textContent ?? ''));
+      const errAlert = alerts.find((el) => /save/i.test(el.textContent ?? ''));
       expect(errAlert).toBeDefined();
     });
   });
 
   // -- Guard: policy_set=true + allowed_methods=null -> all methods (fallback) --
 
-  it('policy_set=true, allowed_methods=null → init уходит в fallback «все методы»', async () => {
+  it('policy_set=true, allowed_methods=null → init falls back to "all methods"', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -267,7 +267,7 @@ describe('ProvisioningPolicy', () => {
     // default-hint is NOT shown (policy_set=true, but allowed_methods=null --
     // this is a valid response, UI treats it as "all allowed", hint hidden)
     const statuses = screen.queryAllByRole('status');
-    const hint = statuses.find((el) => /по умолчанию|default/i.test(el.textContent ?? ''));
+    const hint = statuses.find((el) => /default/i.test(el.textContent ?? ''));
     expect(hint).toBeUndefined();
   });
 });

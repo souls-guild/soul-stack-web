@@ -77,7 +77,7 @@ beforeEach(() => {
 });
 
 describe('CadencesList', () => {
-  it('рендерит список cadences из API', async () => {
+  it('renders the cadences list from the API', async () => {
     setupMocks();
     renderWithProviders(
       <Routes>
@@ -96,7 +96,7 @@ describe('CadencesList', () => {
     expect(screen.getByText('cron: 0 3 * * *')).toBeInTheDocument();
   });
 
-  it('пустой список — показывает empty-state', async () => {
+  it('empty list shows the empty state', async () => {
     setupMocks({ items: [] });
     renderWithProviders(
       <Routes>
@@ -106,11 +106,11 @@ describe('CadencesList', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText(/Расписаний нет/)).toBeInTheDocument(),
+      expect(screen.getByText(/No schedules yet/)).toBeInTheDocument(),
     );
   });
 
-  it('клик disable-тоггла открывает модалку, не вызывает mutate сразу', async () => {
+  it('clicking the disable toggle opens the modal without mutating immediately', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderWithProviders(
@@ -123,15 +123,15 @@ describe('CadencesList', () => {
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
     // redis-hourly enabled=true - toggle button for disable
-    const disableBtn = screen.getByRole('button', { name: /Выключить/i });
+    const disableBtn = screen.getByRole('button', { name: /Disable/i });
     await user.click(disableBtn);
 
     // Modal opened - no immediate mutate
     await waitFor(() =>
-      expect(screen.getByText('Выключить расписание?')).toBeInTheDocument(),
+      expect(screen.getByText('Disable schedule?')).toBeInTheDocument(),
     );
     // Text warning about the consequence
-    expect(screen.getByText(/ПЕРЕСТАНЕТ спавнить прогоны/)).toBeInTheDocument();
+    expect(screen.getByText(/STOP spawning runs/)).toBeInTheDocument();
     // Name appears
     expect(screen.getAllByText(/redis-hourly/).length).toBeGreaterThan(0);
 
@@ -144,7 +144,7 @@ describe('CadencesList', () => {
     expect(disableCallBefore).toBeUndefined();
   });
 
-  it('подтверждение disable → POST /disable', async () => {
+  it('confirming disable → POST /disable', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderWithProviders(
@@ -156,11 +156,11 @@ describe('CadencesList', () => {
 
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /Выключить/i }));
-    await waitFor(() => expect(screen.getByText('Выключить расписание?')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Disable/i }));
+    await waitFor(() => expect(screen.getByText('Disable schedule?')).toBeInTheDocument());
 
     // Confirm
-    await user.click(screen.getByRole('button', { name: /Подтвердить/i }));
+    await user.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
       const calls = vi.mocked(globalThis.fetch).mock.calls;
@@ -172,7 +172,7 @@ describe('CadencesList', () => {
     });
   });
 
-  it('отмена disable → нет POST /disable', async () => {
+  it('cancelling disable → no POST /disable', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderWithProviders(
@@ -184,15 +184,15 @@ describe('CadencesList', () => {
 
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /Выключить/i }));
-    await waitFor(() => expect(screen.getByText('Выключить расписание?')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Disable/i }));
+    await waitFor(() => expect(screen.getByText('Disable schedule?')).toBeInTheDocument());
 
     // Cancel
-    await user.click(screen.getByRole('button', { name: /Отмена/i }));
+    await user.click(screen.getByRole('button', { name: /Cancel/i }));
 
     // Modal closed
     await waitFor(() =>
-      expect(screen.queryByText('Выключить расписание?')).not.toBeInTheDocument(),
+      expect(screen.queryByText('Disable schedule?')).not.toBeInTheDocument(),
     );
 
     // disable request was never sent
@@ -204,7 +204,7 @@ describe('CadencesList', () => {
     expect(disableCall).toBeUndefined();
   });
 
-  it('клик enable-тоггла открывает модалку, подтверждение → POST /enable', async () => {
+  it('clicking the enable toggle opens the modal, confirm → POST /enable', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderWithProviders(
@@ -217,14 +217,14 @@ describe('CadencesList', () => {
     await waitFor(() => expect(screen.getByText('db-backup')).toBeInTheDocument());
 
     // db-backup enabled=false - toggle button for enable
-    const enableBtn = screen.getByRole('button', { name: /Включить/i });
+    const enableBtn = screen.getByRole('button', { name: /Enable/i });
     await user.click(enableBtn);
 
     // Modal opened with correct text
     await waitFor(() =>
-      expect(screen.getByText('Включить расписание?')).toBeInTheDocument(),
+      expect(screen.getByText('Enable schedule?')).toBeInTheDocument(),
     );
-    expect(screen.getByText(/начнёт спавнить прогоны/)).toBeInTheDocument();
+    expect(screen.getByText(/start spawning runs/)).toBeInTheDocument();
     expect(screen.getAllByText(/db-backup/).length).toBeGreaterThan(0);
 
     // enable request was not sent yet
@@ -236,7 +236,7 @@ describe('CadencesList', () => {
     expect(enableCallBefore).toBeUndefined();
 
     // Confirm
-    await user.click(screen.getByRole('button', { name: /Подтвердить/i }));
+    await user.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
       const calls = vi.mocked(globalThis.fetch).mock.calls;
@@ -248,7 +248,7 @@ describe('CadencesList', () => {
     });
   });
 
-  it('delete кнопка открывает подтверждение', async () => {
+  it('delete button opens the confirmation', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderWithProviders(
@@ -261,26 +261,26 @@ describe('CadencesList', () => {
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
 
     // Click delete button of the first row
-    const deleteBtns = screen.getAllByRole('button', { name: /Удалить/i });
+    const deleteBtns = screen.getAllByRole('button', { name: /Delete/i });
     await user.click(deleteBtns[0]);
 
     // Modal opened with a title
     await waitFor(() =>
-      expect(screen.getByText('Удалить Cadence?')).toBeInTheDocument(),
+      expect(screen.getByText('Delete Cadence?')).toBeInTheDocument(),
     );
     // Cadence name appears in the confirmation
     expect(screen.getAllByText(/redis-hourly/).length).toBeGreaterThan(0);
 
     // Cancel button closes the modal
-    await user.click(screen.getByRole('button', { name: /Отменить|Отмена/i }));
+    await user.click(screen.getByRole('button', { name: /Cancel/i }));
     await waitFor(() =>
-      expect(screen.queryByText('Удалить Cadence?')).not.toBeInTheDocument(),
+      expect(screen.queryByText('Delete Cadence?')).not.toBeInTheDocument(),
     );
   });
 });
 
 describe('CadenceDetail', () => {
-  it('показывает метаданные Cadence и список runs', async () => {
+  it('shows Cadence metadata and the runs list', async () => {
     setupMocks();
     renderWithProviders(
       <Routes>
@@ -299,7 +299,7 @@ describe('CadenceDetail', () => {
     expect(screen.getByText('succeeded')).toBeInTheDocument();
   });
 
-  it('runs — пустой список — empty-state', async () => {
+  it('runs — empty list — empty state', async () => {
     setupMocks({ runs: [] });
     renderWithProviders(
       <Routes>
@@ -310,12 +310,12 @@ describe('CadenceDetail', () => {
     );
 
     await waitFor(() => expect(screen.getByText('redis-hourly')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText(/Прогонов ещё нет/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No runs yet/)).toBeInTheDocument());
   });
 
   // -- Guard tests: clickable links --------------------------------------
 
-  it('[LINKS] created_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] created_by_aid renders as a link to /archons/:aid', async () => {
     setupMocks();
     renderWithProviders(
       <Routes>
@@ -333,7 +333,7 @@ describe('CadenceDetail', () => {
     expect(link).toHaveAttribute('href', '/archons/archon-alice');
   });
 
-  it('[LINKS] created_by_aid с спецсимволами корректно URL-кодируется', async () => {
+  it('[LINKS] created_by_aid with special characters is URL-encoded correctly', async () => {
     const specialCadence = {
       ...CADENCE_INTERVAL,
       created_by_aid: 'archon-special+one',

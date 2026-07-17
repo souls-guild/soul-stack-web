@@ -11,14 +11,14 @@ const SAMPLE = {
   items: [
     {
       name: 'cluster-admin',
-      description: 'Полные права',
+      description: 'Full permissions',
       builtin: true,
       permissions: ['*'],
       operators: ['archon-bootstrap', 'archon-alice'],
     },
     {
       name: 'soul-operator',
-      description: 'Управление Soul-ами',
+      description: 'Manage Souls',
       builtin: false,
       permissions: ['soul.list', 'soul.read', 'soul.exec'],
       operators: ['archon-alice'],
@@ -144,7 +144,7 @@ describe('RbacPage', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит список ролей из /v1/roles', async () => {
+  it('renders role list from /v1/roles', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/roles', body: SAMPLE }]);
     renderWithProviders(<RbacPage />, '/rbac');
     expect(screen.getByRole('heading', { name: /RBAC/i })).toBeInTheDocument();
@@ -154,7 +154,7 @@ describe('RbacPage', () => {
     });
   });
 
-  it('переключение на Role permissions показывает permission-чипы', async () => {
+  it('switching to Role permissions shows permission chips', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/roles', body: SAMPLE }]);
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
@@ -166,7 +166,7 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Archon assignments сводит роли по AID', async () => {
+  it('Archon assignments groups roles by AID', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/roles', body: SAMPLE },
       { method: 'GET', url: '/v1/operators', body: OPERATORS_SAMPLE },
@@ -181,17 +181,17 @@ describe('RbacPage', () => {
     });
   });
 
-  it('empty-state при пустом ответе', async () => {
+  it('empty-state on empty response', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/roles', body: { items: [] } }]);
     renderWithProviders(<RbacPage />, '/rbac');
     await waitFor(() => {
-      expect(screen.getByText(/Ролей в кластере нет/i)).toBeInTheDocument();
+      expect(screen.getByText(/No roles in the cluster/i)).toBeInTheDocument();
     });
   });
 
-  it('«Создать роль» ведёт на dedicated route /rbac/roles/new (NIM-80), не модалка', async () => {
-    // Создание роли вынесено на отдельную страницу (CreateRolePage.test.tsx
-    // покрывает саму форму). RbacPage лишь навигирует.
+  it('«Create role» navigates to dedicated route /rbac/roles/new (NIM-80), not a modal', async () => {
+    // Role creation was moved to a separate page (CreateRolePage.test.tsx
+    // covers the form itself). RbacPage only navigates.
     recordingFetch({ rolesList: SAMPLE });
     renderWithProviders(
       <Routes>
@@ -203,19 +203,19 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /Создать роль/i }));
+    await user.click(screen.getByRole('button', { name: /Create role/i }));
     await waitFor(() => expect(screen.getByText('CREATE-ROLE-PAGE')).toBeInTheDocument());
-    expect(screen.queryByRole('dialog', { name: /Создать роль/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Create role/i })).not.toBeInTheDocument();
   });
 
-  it('Edit permissions: PATCH /v1/roles/{name}/permissions с новым набором', async () => {
+  it('Edit permissions: PATCH /v1/roles/{name}/permissions with the new set', async () => {
     const calls = recordingFetch({ rolesList: SAMPLE });
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
     // Edit button is next to soul-operator (second table row).
-    const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
+    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
     // soul-operator -- second role; editButtons[1] corresponds to it.
     await user.click(editButtons[1]);
 
@@ -225,7 +225,7 @@ describe('RbacPage', () => {
     expect(soulExec).toBeChecked();
     await user.click(soulExec);
     await user.click(within(dialog).getByRole('checkbox', { name: 'incarnation.read' }));
-    await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Save/i }));
 
     await waitFor(() => {
       const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
@@ -254,13 +254,13 @@ describe('RbacPage', () => {
 
     // Edit on cluster-admin (first role). The button is not set disabled
     // for builtin (submit is blocked internally instead), so we land in Modal.
-    const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
+    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
     await user.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: cluster-admin/i });
     // Submit button is disabled for builtin -- verify explicitly.
-    expect(within(dialog).getByRole('button', { name: /Сохранить/i })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: /Save/i })).toBeDisabled();
     // And the "editing blocked" warning is visible.
-    expect(within(dialog).getByText(/Редактирование заблокировано/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Editing is disabled/i)).toBeInTheDocument();
   });
 
   it('Delete role: confirm-modal → DELETE /v1/roles/{name}', async () => {
@@ -270,15 +270,15 @@ describe('RbacPage', () => {
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
     // Delete on soul-operator (non-builtin); cluster-admin disabled.
-    const deleteButtons = screen.getAllByRole('button', { name: /удалить роль/i });
+    const deleteButtons = screen.getAllByRole('button', { name: /delete role/i });
     // deleteButtons[0] — cluster-admin (builtin, disabled), [1] — soul-operator.
     expect(deleteButtons[0]).toBeDisabled();
     await user.click(deleteButtons[1]);
 
-    const dialog = await screen.findByRole('dialog', { name: /Удалить роль: soul-operator/i });
+    const dialog = await screen.findByRole('dialog', { name: /Delete role: soul-operator/i });
     // Operators who will lose permissions are visible.
-    expect(within(dialog).getByText(/потеряет/i)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: /^Удалить$/ }));
+    expect(within(dialog).getByText(/will lose/i)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }));
 
     await waitFor(() => {
       const del = calls.find((c) => c.url === '/v1/roles/soul-operator' && c.method === 'DELETE');
@@ -301,18 +301,18 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
-    const deleteButtons = screen.getAllByRole('button', { name: /удалить роль/i });
+    const deleteButtons = screen.getAllByRole('button', { name: /delete role/i });
     await user.click(deleteButtons[1]);
-    const dialog = await screen.findByRole('dialog', { name: /Удалить роль: soul-operator/i });
-    await user.click(within(dialog).getByRole('button', { name: /^Удалить$/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Delete role: soul-operator/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }));
 
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/lock-?out|self-lockout|админ/i);
+    expect(alert).toHaveTextContent(/lock-?out|self-lockout|admin/i);
     // Modal doesn't close -- dialog is still in DOM.
-    expect(screen.getByRole('dialog', { name: /Удалить роль: soul-operator/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /Delete role: soul-operator/i })).toBeInTheDocument();
   });
 
-  it('Assign role: POST /v1/roles/{name}/operators c {aid}', async () => {
+  it('Assign role: POST /v1/roles/{name}/operators with {aid}', async () => {
     const calls = recordingFetch({ rolesList: SAMPLE });
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
@@ -321,14 +321,14 @@ describe('RbacPage', () => {
     // Wait for archon-bob (who has no roles) to appear.
     await waitFor(() => expect(screen.getByText('archon-bob')).toBeInTheDocument());
 
-    const assignButtons = screen.getAllByRole('button', { name: /назначить роль/i });
+    const assignButtons = screen.getAllByRole('button', { name: /assign role/i });
     // archon-alice, archon-bob, archon-bootstrap -- 3 buttons; pick archon-bob.
-    const bobBtn = assignButtons.find((b) => b.getAttribute('aria-label') === 'назначить роль archon-bob');
+    const bobBtn = assignButtons.find((b) => b.getAttribute('aria-label') === 'assign role archon-bob');
     await user.click(bobBtn!);
 
-    const dialog = await screen.findByRole('dialog', { name: /Назначить роль: archon-bob/i });
+    const dialog = await screen.findByRole('dialog', { name: /Assign role: archon-bob/i });
     await user.selectOptions(within(dialog).getByLabelText('role'), 'soul-operator');
-    await user.click(within(dialog).getByRole('button', { name: /^Назначить$/ }));
+    await user.click(within(dialog).getByRole('button', { name: /^Assign$/ }));
 
     await waitFor(() => {
       const post = calls.find(
@@ -339,7 +339,7 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Revoke role (× на чипе): DELETE /v1/roles/{name}/operators/{aid}', async () => {
+  it('Revoke role (× on chip): DELETE /v1/roles/{name}/operators/{aid}', async () => {
     const calls = recordingFetch({ rolesList: SAMPLE });
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
@@ -349,7 +349,7 @@ describe('RbacPage', () => {
 
     // Remove archon-alice from soul-operator. The chip with x has aria-label
     // "remove archon-alice from role soul-operator".
-    const x = screen.getByRole('button', { name: /снять archon-alice с роли soul-operator/i });
+    const x = screen.getByRole('button', { name: /unassign archon-alice from role soul-operator/i });
     await user.click(x);
 
     await waitFor(() => {
@@ -360,21 +360,21 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Permissions-picker: каталог недоступен (404) → graceful, права роли сохраняются', async () => {
+  it('Permissions-picker: catalog unavailable (404) → graceful, role permissions preserved', async () => {
     // /v1/permissions returns 599 (no handler) -- recordingFetch with an empty catalog.
     const calls = recordingFetch({ rolesList: SAMPLE, permissions: { items: [] } });
     renderWithProviders(<RbacPage />, '/rbac');
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
-    const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
+    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
     await user.click(editButtons[1]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
     // Catalog is empty -- hint is visible, existing permissions shown as preserved chips.
-    expect(within(dialog).getByText(/Каталог permissions недоступен/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Permission catalog is unavailable/i)).toBeInTheDocument();
     expect(within(dialog).getByText('soul.exec')).toBeInTheDocument();
     // Save without a catalog doesn't drop existing permissions (replace semantics).
-    await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Save/i }));
     await waitFor(() => {
       const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
       expect(patch).toBeDefined();
@@ -382,7 +382,7 @@ describe('RbacPage', () => {
     });
   });
 
-  it('Scope-builder: парсинг существующего scoped-права роли → checked чекбокс', async () => {
+  it('Scope-builder: parsing an existing scoped role permission → checked checkbox', async () => {
     // Role has a scoped permission -- base soul.list is in the catalog -> checked checkbox.
     const sample = {
       items: [
@@ -400,7 +400,7 @@ describe('RbacPage', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('scoped-role')).toBeInTheDocument());
 
-    const editButtons = screen.getAllByRole('button', { name: /редактировать permissions/i });
+    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
     await user.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: scoped-role/i });
 
@@ -416,7 +416,7 @@ describe('RbacPage', () => {
 
   // -- Guard tests: clickable links --------------------------------------------
 
-  it('[LINKS] AID в Archon assignments рендерятся ссылками на /archons/:aid', async () => {
+  it('[LINKS] AIDs in Archon assignments render as links to /archons/:aid', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/roles', body: SAMPLE },
       { method: 'GET', url: '/v1/operators', body: OPERATORS_SAMPLE },
@@ -442,7 +442,7 @@ describe('RbacPage', () => {
     expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
   });
 
-  it('[LINKS] AID с спецсимволами корректно URL-кодируется', async () => {
+  it('[LINKS] AID with special characters is correctly URL-encoded', async () => {
     // AID with "+" or a space -- encodeURIComponent prevents a broken href.
     const specialSample = {
       items: [

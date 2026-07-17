@@ -15,7 +15,7 @@ describe('toServerRange (TZ=UTC+3)', () => {
     else process.env.TZ = origTZ;
   });
 
-  it('from → начало дня, to → конец дня: локальная полночь UTC+3 → UTC-инстант', () => {
+  it('from → start of day, to → end of day: local UTC+3 midnight → UTC instant', () => {
     const out = toServerRange({ from: '2026-07-04', to: '2026-07-04' });
     // 2026-07-04T00:00:00.000+03:00 → 2026-07-03T21:00:00.000Z
     expect(out.started_after).toBe('2026-07-03T21:00:00.000Z');
@@ -23,19 +23,19 @@ describe('toServerRange (TZ=UTC+3)', () => {
     expect(out.started_before).toBe('2026-07-04T20:59:59.999Z');
   });
 
-  it('пустая верхняя граница (to="") → started_before опущено', () => {
+  it('empty upper bound (to="") → started_before omitted', () => {
     const out = toServerRange({ from: '2026-07-04', to: '' });
     expect(out.started_after).toBe('2026-07-03T21:00:00.000Z');
     expect(out).not.toHaveProperty('started_before');
   });
 
-  it('пустая нижняя граница (from="") → started_after опущено', () => {
+  it('empty lower bound (from="") → started_after omitted', () => {
     const out = toServerRange({ from: '', to: '2026-07-04' });
     expect(out).not.toHaveProperty('started_after');
     expect(out.started_before).toBe('2026-07-04T20:59:59.999Z');
   });
 
-  it('обе границы пусты → пустой объект (оба поля опущены)', () => {
+  it('both bounds empty → empty object (both fields omitted)', () => {
     expect(toServerRange({ from: '', to: '' })).toEqual({});
   });
 });

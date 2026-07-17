@@ -21,10 +21,10 @@ import {
   type VitalsTone,
 } from './hostVitals';
 
-// Под-панель Host-Utilization (NIM-88, эпик NIM-85). Обзор — агрегат по хостам
-// инкарнации (latest+stale, без окна); спарклайны+skew — per-soul по требованию
-// (окно есть только в soul-эндпоинте). Свежесть — по backend-флагу stale (TTL уже
-// посчитан сервером), не выдаём протухшее за свежее; нет latest → graceful «нет данных».
+// Host-Utilization sub-panel (NIM-88, epic NIM-85). Overview — aggregate over the
+// incarnation's hosts (latest+stale, no window); sparklines+skew — per-soul on demand
+// (a window exists only in the soul endpoint). Freshness — from the backend `stale` flag
+// (TTL already computed server-side); we never pass stale data off as fresh; no latest → graceful "no data".
 const REFETCH_MS = 15000;
 
 const meterTone: Record<VitalsTone, string> = {
@@ -48,8 +48,8 @@ export function HostUtilizationPanel({ incarnationName }: { incarnationName: str
 
   const status = q.error instanceof ApiError ? q.error.status : null;
   const forbidden = status === 403;
-  // 404/501 — эндпоинт telemetry не задеплоен (старый Keeper) → мягкая деградация,
-  // не красный error-box (CLAUDE.md #3); симметрично soul-стороне.
+  // 404/501 — the telemetry endpoint isn't deployed (old Keeper) → soft degradation,
+  // not a red error-box (CLAUDE.md #3); symmetric to the soul side.
   const unavailable = status === 404 || status === 501;
   const hosts = q.data?.hosts ?? [];
 
@@ -243,8 +243,8 @@ function MetricCell({ value, pct, tone }: { value: string; pct?: number | null; 
   );
 }
 
-// Спарклайны+skew конкретного хоста — отдельный per-soul запрос (окно есть только
-// в soul-эндпоинте). Монтируется лишь когда строка развёрнута → нет N-polling.
+// A specific host's sparklines+skew — a separate per-soul request (a window exists only
+// in the soul endpoint). Mounted only when the row is expanded → no N-polling.
 function HostSparklines({ sid }: { sid: string }) {
   const { t } = useTranslation();
   const q = useQuery({
@@ -266,7 +266,7 @@ function HostSparklines({ sid }: { sid: string }) {
   }
 
   const data = q.data;
-  const win = [...(data?.window ?? [])].reverse(); // API newest-first → хронологически
+  const win = [...(data?.window ?? [])].reverse(); // API newest-first → chronological
   const skew = skewMinutes(data?.collected_at, data?.received_at);
   if (win.length === 0) {
     return (

@@ -52,7 +52,7 @@ describe('SoulsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит список Souls из /v1/souls', async () => {
+  it('renders the Souls list from /v1/souls', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -126,8 +126,8 @@ describe('SoulsList', () => {
     expect(runBtn).toBeDisabled();
 
     // Select both hosts via row-checkbox.
-    await user.click(screen.getByLabelText('выбрать host01.example.com'));
-    await user.click(screen.getByLabelText('выбрать host02.example.com'));
+    await user.click(screen.getByLabelText('select host01.example.com'));
+    await user.click(screen.getByLabelText('select host02.example.com'));
 
     // Counter in the button.
     await waitFor(() =>
@@ -146,7 +146,7 @@ describe('SoulsList', () => {
     expect(decodeURIComponent(search)).toMatch(/target_sids=host0[12]\.example\.com,host0[12]\.example\.com/);
   });
 
-  it('soulprint-filter: lazy fetch + client-side фильтрация по фактам', async () => {
+  it('soulprint filter: lazy fetch + client-side filtering by facts', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -225,7 +225,7 @@ describe('SoulsList — keyset pagination', () => {
 
   // Guard: when next_cursor is present in the response — "Load more" button renders;
   // on click — the next request carries cursor= in the URL.
-  it('показывает кнопку «Загрузить ещё» при наличии next_cursor, передаёт cursor в следующий запрос', async () => {
+  it('shows the "Load more" button when next_cursor is present, passes cursor in the next request', async () => {
     const page1Items = [
       { sid: 'host01.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
       { sid: 'host02.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
@@ -296,7 +296,7 @@ describe('SoulsList — keyset pagination', () => {
   });
 
   // Guard: total_approximate=true -> renders an element with an approximate marker.
-  it('total_approximate=true → показывает приблизительный маркер счётчика', async () => {
+  it('total_approximate=true → shows the approximate counter marker', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -328,7 +328,7 @@ describe('SoulsList — keyset pagination', () => {
 
   // Guard: total_approximate=false (offset mode, no next_cursor) -> no "more" button,
   // no approximation marker (regression of coven mode).
-  it('offset-режим (нет next_cursor, total_approximate=false) → нет кнопки «ещё» и нет ≈', async () => {
+  it('offset mode (no next_cursor, total_approximate=false) → no "more" button and no ≈', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -359,7 +359,7 @@ describe('SoulsList — keyset pagination', () => {
   // Guard: race-condition — changing the filter during an in-flight loadMore.
   // Without the fix: the in-flight response of filter A got mixed into filter B's set.
   // With the fix: the in-flight result is discarded, filter B's set stays clean.
-  it('loadMore in-flight: смена фильтра отбрасывает старый ответ, набор нового фильтра чист', async () => {
+  it('loadMore in-flight: changing the filter discards the stale response, the new filter set stays clean', async () => {
     // Deferred promise for the second request of filter A (page 2).
     // Resolved manually AFTER the filter change.
     let resolveLoadMoreA!: (r: Response) => void;
@@ -450,7 +450,7 @@ describe('SoulsList — keyset pagination', () => {
   // Guard: dedup by sid on OVERLAPPING pages.
   // Page A: host-a, host-b (next_cursor=tok). Page B (cursor=tok): host-b (duplicate!), host-c.
   // Invariant: host-b renders EXACTLY once; total rows = 3, not 4.
-  it('дедуп: перекрывающиеся страницы — дубль sid рендерится ровно один раз', async () => {
+  it('dedup: overlapping pages — a duplicate sid renders exactly once', async () => {
     const page1Items = [
       { sid: 'host-a.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
       { sid: 'host-b.example.com', transport: 'agent' as const, status: 'connected' as const, registered_at: '2026-05-01T00:00:00Z' },
@@ -510,7 +510,7 @@ describe('SoulsList — keyset pagination', () => {
 
   // Guard: empty souls list in keyset mode (scoped operator with zero coverage).
   // Invariant: no "Load more" button; empty-state renders; app does not crash.
-  it('пустой список (keyset, items=[]): нет кнопки «ещё», рендерится empty-state', async () => {
+  it('empty list (keyset, items=[]): no "more" button, empty-state renders', async () => {
     const fetchSpy = vi.fn(async () => {
       return new Response(JSON.stringify({
         items: [],
@@ -523,9 +523,9 @@ describe('SoulsList — keyset pagination', () => {
     renderWithProviders(<SoulsList />, '/souls');
 
     // Wait for loading to finish.
-    // With items=[] the component shows an empty-state with a "Connect Soul" button
-    // (souls:registerSoul = "Connect Soul" from the ru bundle).
-    await screen.findByRole('button', { name: /Подключить Soul/i });
+    // With items=[] the component shows an empty-state with a "Register Soul" button
+    // (souls:registerSoul = "Register Soul").
+    await screen.findByRole('button', { name: /Register Soul/i });
 
     // "Load more" button must not be present (no next_cursor).
     expect(screen.queryByTestId('load-more-btn')).not.toBeInTheDocument();
@@ -536,7 +536,7 @@ describe('SoulsList — keyset pagination', () => {
 
   // Guard: the badge while search is active shows visible.length, NOT the server/loaded total.
   // Invariant: the badge "doesn't lie" — counter = number of visible rows.
-  it('search: бейдж показывает visible.length (найдено), не серверный total', async () => {
+  it('search: badge shows visible.length (found), not the server total', async () => {
     const fetchSpy = vi.fn(async () => {
       return new Response(JSON.stringify({
         items: [
@@ -603,7 +603,7 @@ describe('SoulsList — keyset pagination', () => {
 
   // Guard: when souls.list rejects on "Load more" — an inline error renders,
   // the button becomes available again for retry (FIX 2).
-  it('loadMore error: реджект показывает inline-ошибку, кнопка снова активна', async () => {
+  it('loadMore error: rejection shows an inline error, the button becomes active again', async () => {
     let callCount = 0;
     const fetchSpy = vi.fn(async () => {
       callCount++;
@@ -657,13 +657,13 @@ describe('SoulsList — keyset pagination', () => {
 });
 
 describe('soulprintFilter — parse', () => {
-  it('одно простое правило', () => {
+  it('single simple rule', () => {
     const r = parseSoulprintFilter('os.family=debian');
     expect(r.invalid).toEqual([]);
     expect(r.rules).toEqual([{ path: 'os.family', op: '=', value: 'debian' }]);
   });
 
-  it('compound AND через пробел и &', () => {
+  it('compound AND via space and &', () => {
     const r = parseSoulprintFilter('os.family=debian & memory.total_mb>=4096');
     expect(r.invalid).toEqual([]);
     expect(r.rules).toEqual([
@@ -672,18 +672,18 @@ describe('soulprintFilter — parse', () => {
     ]);
   });
 
-  it('wildcard в значении сохраняется как строка', () => {
+  it('wildcard in value is preserved as a string', () => {
     const r = parseSoulprintFilter('kernel.version=6.*');
     expect(r.rules).toEqual([{ path: 'kernel.version', op: '=', value: '6.*' }]);
   });
 
-  it('невалидный токен попадает в invalid', () => {
+  it('invalid token goes into invalid', () => {
     const r = parseSoulprintFilter('garbage');
     expect(r.rules).toEqual([]);
     expect(r.invalid).toEqual(['garbage']);
   });
 
-  it('!= оператор', () => {
+  it('!= operator', () => {
     const r = parseSoulprintFilter('os.distro!=ubuntu');
     expect(r.rules).toEqual([{ path: 'os.distro', op: '!=', value: 'ubuntu' }]);
   });
@@ -697,12 +697,12 @@ describe('soulprintFilter — eval', () => {
     network: { primary_ip: '10.0.0.5' },
   };
 
-  it('= по строке матчит', () => {
+  it('= on a string matches', () => {
     expect(evalRule(sp, { path: 'os.family', op: '=', value: 'debian' })).toBe(true);
     expect(evalRule(sp, { path: 'os.family', op: '=', value: 'rhel' })).toBe(false);
   });
 
-  it('wildcard 6.* матчит 6.1.0-26-generic', () => {
+  it('wildcard 6.* matches 6.1.0-26-generic', () => {
     expect(evalRule(sp, { path: 'kernel.version', op: '=', value: '6.*' })).toBe(true);
     expect(evalRule(sp, { path: 'kernel.version', op: '=', value: '5.*' })).toBe(false);
   });
@@ -717,7 +717,7 @@ describe('soulprintFilter — eval', () => {
     expect(evalRule(sp, { path: 'network.primary_ip', op: '=', value: '192.168.*' })).toBe(false);
   });
 
-  it('неизвестный путь → false (хост исключается)', () => {
+  it('unknown path → false (host is excluded)', () => {
     expect(evalRule(sp, { path: 'os.codename', op: '=', value: 'jammy' })).toBe(false);
   });
 
@@ -734,7 +734,7 @@ describe('soulprintFilter — eval', () => {
     expect(fail).toBe(false);
   });
 
-  it('пустой набор правил → всегда true', () => {
+  it('empty rule set → always true', () => {
     expect(applyFilter(sp, [])).toBe(true);
   });
 });

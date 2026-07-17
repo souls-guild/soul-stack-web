@@ -20,7 +20,7 @@ describe('SoulDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит overview-вкладку с данными Soul', async () => {
+  it('renders the overview tab with Soul data', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -44,7 +44,7 @@ describe('SoulDetail', () => {
     expect(screen.getByText('prod, redis-prod')).toBeInTheDocument();
   });
 
-  it('Soulprint-вкладка рендерит typed_facts.os.family', async () => {
+  it('Soulprint tab renders typed_facts.os.family', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -106,7 +106,7 @@ describe('SoulDetail', () => {
     expect(screen.getByText('10.0.0.10')).toBeInTheDocument();
   });
 
-  it('History-вкладка: рендерит timeline + корректный link-routing', async () => {
+  it('History tab: renders timeline + correct link routing', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -201,7 +201,7 @@ describe('SoulDetail', () => {
     expect(screen.getAllByText('core.cmd.shell').length).toBeGreaterThan(0);
   });
 
-  it('History-вкладка: фильтр по type зовёт endpoint с ?type=errand', async () => {
+  it('History tab: filtering by type calls the endpoint with ?type=errand', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -242,7 +242,7 @@ describe('SoulDetail', () => {
     expect(lastUrl).not.toContain('type=scenario');
   });
 
-  it('History-вкладка: empty-state «Нет операций с этим хостом»', async () => {
+  it('History tab: empty-state "No operations with this host"', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -269,11 +269,11 @@ describe('SoulDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: 'History' }));
     await waitFor(() => {
-      expect(screen.getByText(/Нет операций с этим хостом/)).toBeInTheDocument();
+      expect(screen.getByText(/No operations with this host/)).toBeInTheDocument();
     });
   });
 
-  it('410 → graceful «soulprint ещё не получен»', async () => {
+  it('410 → graceful "soulprint not received yet"', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -303,7 +303,7 @@ describe('SoulDetail', () => {
     await user.click(screen.getByRole('tab', { name: 'Soulprint' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/ещё не получен от Soul/i)).toBeInTheDocument();
+      expect(screen.getByText(/not received from Soul yet/i)).toBeInTheDocument();
     });
   });
 });

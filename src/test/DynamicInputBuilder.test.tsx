@@ -32,7 +32,7 @@ function snapshot(): unknown {
 }
 
 describe('DynamicInputBuilder', () => {
-  it('TestAddField: добавление строки и ввод key/value emit-ит правильный объект', async () => {
+  it('TestAddField: adding a row and typing key/value emits the correct object', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     // Empty state - "Add first field" button.
@@ -47,7 +47,7 @@ describe('DynamicInputBuilder', () => {
     expect(snapshot()).toEqual({ name: 'redis-prod' });
   });
 
-  it('TestDeleteField: удаление строки убирает её из объекта', async () => {
+  it('TestDeleteField: deleting a row removes it from the object', async () => {
     const user = userEvent.setup();
     render(<Harness initial={{ a: '1', b: '2' }} />);
     const keyInputs = screen.getAllByRole('textbox', { name: /field key/i });
@@ -62,7 +62,7 @@ describe('DynamicInputBuilder', () => {
     expect(snapshot()).toEqual({ b: '2' });
   });
 
-  it('TestTypeChange: смена string → integer коэрсит value в число', async () => {
+  it('TestTypeChange: switching string → integer coerces the value to a number', async () => {
     const user = userEvent.setup();
     render(<Harness initial={{ port: '6379' }} />);
     const typeSelect = screen.getByRole('combobox', { name: /field type/i });
@@ -70,7 +70,7 @@ describe('DynamicInputBuilder', () => {
     expect(snapshot()).toEqual({ port: 6379 });
   });
 
-  it('TestTypeChange: boolean toggling emit-ит boolean', async () => {
+  it('TestTypeChange: toggling boolean emits a boolean', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: /Add first field/i }));
@@ -82,7 +82,7 @@ describe('DynamicInputBuilder', () => {
     expect(snapshot()).toEqual({ enabled: true });
   });
 
-  it('TestRawJsonToggle: переключение в raw + редактирование + обратно конвертирует структуру', async () => {
+  it('TestRawJsonToggle: switching to raw + editing + back converts the structure', async () => {
     const user = userEvent.setup();
     render(<Harness initial={{ greeting: 'hello' }} />);
 
@@ -107,7 +107,7 @@ describe('DynamicInputBuilder', () => {
     expect((types[1] as HTMLSelectElement).value).toBe('boolean');
   });
 
-  it('TestRawJsonInvalid: невалидный JSON показывает inline-ошибку и не дёргает onChange', async () => {
+  it('TestRawJsonInvalid: invalid JSON shows an inline error and does not fire onChange', async () => {
     const user = userEvent.setup();
     render(<Harness initial={{ x: 1 }} />);
     await user.click(screen.getByRole('button', { name: /raw JSON/i }));
@@ -118,7 +118,7 @@ describe('DynamicInputBuilder', () => {
     expect(snapshot()).toEqual({ x: 1 });
   });
 
-  it('TestSubmit: финальный объект собирается из всех валидных строк, дубликаты не emit-ятся', async () => {
+  it('TestSubmit: the final object is assembled from all valid rows, duplicates are not emitted', async () => {
     const user = userEvent.setup();
     render(<Harness initial={{ host: 'example.com', port: 443 }} />);
 
@@ -132,16 +132,16 @@ describe('DynamicInputBuilder', () => {
     // Via fireEvent - atomic, without intermediate "hos" / "ho" states.
     fireEvent.change(keys[2], { target: { value: 'host' } });
 
-    expect(screen.getAllByText(/дубликат ключа/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/duplicate key/i).length).toBeGreaterThan(0);
     expect(snapshot()).toEqual({ host: 'example.com', port: 443 });
   });
 
-  it('TestHideRawToggle: allowRawJsonToggle=false скрывает кнопку режима', () => {
+  it('TestHideRawToggle: allowRawJsonToggle=false hides the mode button', () => {
     render(<Harness allowRawJsonToggle={false} />);
     expect(screen.queryByRole('button', { name: /raw JSON/i })).toBeNull();
   });
 
-  it('Preview показывает JSON, когда есть валидные строки', async () => {
+  it('Preview shows JSON when there are valid rows', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: /Add first field/i }));

@@ -164,7 +164,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Segment: All ------------------------------------------------------------
 
-  it('[All] мержит все 4 источника (voyage+push+errand+scenario apply_run) + подпись «первые N»', async () => {
+  it('[All] merges all 4 sources (voyage+push+errand+scenario apply_run) + "first N" caption', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     // 2 voyages + 1 push + 1 errand + 2 apply_run = 6.
@@ -178,7 +178,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(screen.getByTestId('runs-first-n')).toBeInTheDocument();
   });
 
-  it('[All] scenario apply_run линкуется на RunDetail incarnation/apply_id', async () => {
+  it('[All] scenario apply_run links to RunDetail incarnation/apply_id', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -191,7 +191,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Segment filter by type ---------------------------------------------------
 
-  it('[segment] Push → остаются только push-строки; подпись «первые N» скрыта', async () => {
+  it('[segment] Push → only push rows remain; "first N" caption hidden', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -205,7 +205,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(screen.queryByTestId('runs-row-01VSCY0000000000000000001')).not.toBeInTheDocument();
   });
 
-  it('[segment] Voyage → обе voyage-строки (scenario+command)', async () => {
+  it('[segment] Voyage → both voyage rows (scenario+command)', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -218,7 +218,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Guard #1: clicking the header toggles order and aria-sort ----------------
 
-  it('[sort union] клик по заголовку Started тогглит aria-sort и разворачивает порядок', async () => {
+  it('[sort union] clicking the Started header toggles aria-sort and reverses order', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -244,7 +244,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Guard #4: client-side sort is stable (tie-break by id) -------------------
 
-  it('[sort union] при равных started_at порядок детерминирован по id (tie-break)', async () => {
+  it('[sort union] equal started_at → order is deterministic by id (tie-break)', async () => {
     const TIE_ERRANDS = {
       items: [
         { errand_id: 'errand-bbb', sid: 'h', module: 'm', status: 'success', started_at: '2026-05-27T13:00:00Z', finished_at: '2026-05-27T13:00:01Z' },
@@ -266,7 +266,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Preserve: status chips + date-range + optional-miss + empty ---------------
 
-  it('[status] chip running → только running-прогон', async () => {
+  it('[status] chip running → only the running run', async () => {
     installFetchMock(baseRoutes({ runs: EMPTY }));
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(4));
@@ -276,7 +276,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(screen.getByTestId('runs-row-01VSCY0000000000000000001')).toBeInTheDocument();
   });
 
-  it('[optional-miss] push-runs 404 пропускается без error-box', async () => {
+  it('[optional-miss] push-runs 404 is skipped without an error box', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/voyages', body: VOYAGES },
       { method: 'GET', url: '/v1/push-runs', status: 404, body: { title: 'not found' } },
@@ -287,16 +287,16 @@ describe('RunsFeed (unified /runs)', () => {
     renderWithProviders(<RunsFeed />, '/runs');
     // 3 (voyages 2 + errand 1), scenario empty, push miss.
     await waitFor(() => expect(unionRows()).toHaveLength(3));
-    expect(screen.queryByText(/ошибка/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/error/)).not.toBeInTheDocument();
   });
 
-  it('[empty] пустой All → empty-state', async () => {
+  it('[empty] empty All → empty-state', async () => {
     installFetchMock(baseRoutes({ voyages: EMPTY, push: EMPTY, errands: EMPTY, runs: EMPTY }));
     renderWithProviders(<RunsFeed />, '/runs');
-    await waitFor(() => expect(screen.getByText(/Ещё не было прогонов/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No runs yet/)).toBeInTheDocument());
   });
 
-  it('[date-range] сужает ленту по started_at', async () => {
+  it('[date-range] narrows the feed by started_at', async () => {
     installFetchMock(baseRoutes({ runs: EMPTY }));
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(4));
@@ -310,7 +310,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- NIM-42 PART B: client-side search over loaded union rows ------------------
 
-  it('[union-search] фильтрует по подстроке target (case-insensitive), backend НЕ дёргается', async () => {
+  it('[union-search] filters by target substring (case-insensitive), backend is NOT hit', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -321,7 +321,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(screen.getByTestId('runs-row-01PUSH00000000000000000001')).toBeInTheDocument();
   });
 
-  it('[union-search] совпадение по id ИЛИ status; пусто = без фильтра', async () => {
+  it('[union-search] matches by id OR status; empty = no filter', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -342,7 +342,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Segment: Scenario (collapsed IncarnationRunsList) ------------------------
 
-  it('[scenario] рендерит apply_run из /v1/runs + stats + линки RunDetail/incarnation/archon', async () => {
+  it('[scenario] renders apply_run from /v1/runs + stats + RunDetail/incarnation/archon links', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     await waitFor(() => expect(unionRows()).toHaveLength(6));
@@ -371,7 +371,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Guard #2: Scenario sends sort/sort_dir + RESETS offset on sort change ---
 
-  it('[scenario] сортировка колонки уходит в query как sort/sort_dir и СБРАСЫВАЕТ offset', async () => {
+  it('[scenario] column sort goes into query as sort/sort_dir and RESETS offset', async () => {
     const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -379,7 +379,7 @@ describe('RunsFeed (unified /runs)', () => {
     await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
 
     // Go to page 2 (offset=50).
-    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
 
     // Click on the sortable incarnation header -> sort=incarnation & sort_dir=asc & offset RESET to 0.
@@ -397,7 +397,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Guard #3: Scenario status — server-side (query + offset reset), NOT client-side --
 
-  it('[scenario] статус-фильтр server-side: уходит в /v1/runs как ?status= и СБРАСЫВАЕТ offset', async () => {
+  it('[scenario] status filter is server-side: goes to /v1/runs as ?status= and RESETS offset', async () => {
     const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -405,7 +405,7 @@ describe('RunsFeed (unified /runs)', () => {
     await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
 
     // Go to page 2 (offset=50).
-    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
 
     // Selecting status failed -> server ?status=failed AND offset RESET to 0.
@@ -417,7 +417,7 @@ describe('RunsFeed (unified /runs)', () => {
     );
   });
 
-  it('[scenario] incarnation-фильтр уходит в query как ?incarnation=', async () => {
+  it('[scenario] incarnation filter goes into query as ?incarnation=', async () => {
     const captured = captureRuns();
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -429,7 +429,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- NIM-42 PART A: Service column + server sort/filter service + search q ----
 
-  it('[scenario] рендерит колонку Service (r.service) в шапке и ячейках', async () => {
+  it('[scenario] renders the Service column (r.service) in header and cells', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -444,7 +444,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(within(row2).getByText('postgres')).toBeInTheDocument();
   });
 
-  it('[scenario] сортировка по Service — server-side sort=service & sort_dir + reset offset', async () => {
+  it('[scenario] sorting by Service — server-side sort=service & sort_dir + reset offset', async () => {
     const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -452,7 +452,7 @@ describe('RunsFeed (unified /runs)', () => {
     await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
 
     // Go to page 2 (offset=50).
-    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
 
     await user.click(screen.getByTestId('runs-scen-sort-service'));
@@ -466,7 +466,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(screen.getByTestId('runs-scen-sort-service').closest('th')).toHaveAttribute('aria-sort', 'ascending');
   });
 
-  it('[scenario] Service-фильтр — опции из каталога keeperApi.services.list()', async () => {
+  it('[scenario] Service filter — options from the keeperApi.services.list() catalog', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -480,7 +480,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect((select as HTMLSelectElement).options[0].value).toBe('');
   });
 
-  it('[scenario] Service-фильтр: каталог недоступен (404) → только дефолт-опция, без краха', async () => {
+  it('[scenario] Service filter: catalog unavailable (404) → only default option, no crash', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/voyages', body: VOYAGES },
       { method: 'GET', url: '/v1/push-runs', body: PUSH },
@@ -497,7 +497,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(select.querySelectorAll('option')).toHaveLength(1);
   });
 
-  it('[scenario] выбор Service уходит в query как ?service= и СБРАСЫВАЕТ offset', async () => {
+  it('[scenario] selecting Service goes into query as ?service= and RESETS offset', async () => {
     const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -509,7 +509,7 @@ describe('RunsFeed (unified /runs)', () => {
     );
 
     // Go to page 2 (offset=50).
-    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
 
     await user.selectOptions(screen.getByTestId('runs-scenario-service-filter'), 'redis');
@@ -520,7 +520,7 @@ describe('RunsFeed (unified /runs)', () => {
     );
   });
 
-  it('[scenario] свободный поиск q уходит в query как ?q= и СБРАСЫВАЕТ offset', async () => {
+  it('[scenario] free-text search q goes into query as ?q= and RESETS offset', async () => {
     const captured = captureRuns(120);
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -528,7 +528,7 @@ describe('RunsFeed (unified /runs)', () => {
     await waitFor(() => expect(screen.getByTestId('runs-scenario-table')).toBeInTheDocument());
 
     // Go to page 2 (offset=50).
-    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
 
     await user.type(screen.getByTestId('runs-scenario-search-filter'), 'redis');
@@ -537,7 +537,7 @@ describe('RunsFeed (unified /runs)', () => {
     );
   });
 
-  it('[scenario] date-range виден и шлёт started_after/started_before в query + reset offset', async () => {
+  it('[scenario] date-range is visible and sends started_after/started_before in query + reset offset', async () => {
     const captured = captureRuns(120); // total>limit -> Pager Next is active
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -548,7 +548,7 @@ describe('RunsFeed (unified /runs)', () => {
     expect(screen.getByTestId('date-to')).toBeInTheDocument();
 
     // Go to page 2 (offset=50).
-    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(captured.urls.some((u) => u.startsWith('/v1/runs?') && u.includes('offset=50'))).toBe(true));
 
     // from -> started_after (start of day, ISO); offset RESET to 0.
@@ -567,7 +567,7 @@ describe('RunsFeed (unified /runs)', () => {
     );
   });
 
-  it('[scenario] очистка date-range убирает started_after/started_before из query', async () => {
+  it('[scenario] clearing date-range removes started_after/started_before from query', async () => {
     const captured = captureRuns();
     renderWithProviders(<RunsFeed />, '/runs');
     const user = userEvent.setup();
@@ -588,7 +588,7 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Guard #5: /incarnation-runs -> redirect to /runs --------------------------
 
-  it('[redirect] /incarnation-runs редиректит на /runs (backward-compat)', () => {
+  it('[redirect] /incarnation-runs redirects to /runs (backward-compat)', () => {
     // Mirrors the App.tsx route: <Route path="/incarnation-runs" element={<Navigate to="/runs" replace />} />.
     render(
       <MemoryRouter initialEntries={['/incarnation-runs']}>

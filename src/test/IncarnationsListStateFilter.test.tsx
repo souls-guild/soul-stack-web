@@ -93,20 +93,20 @@ describe('IncarnationsList — state filter', () => {
     tokenStore.clear();
     navigateSpy.mockReset();
   });
-  it('панель state-фильтра скрыта без выбора сервиса', async () => {
+  it('state filter panel is hidden without selecting a service', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services', body: SERVICES_REPLY },
       { method: 'GET', url: '/v1/incarnations', body: { items: [], total: 0 } },
     ]);
     renderWithProviders(<IncarnationsList />, '/incarnations');
     await waitFor(() => {
-      expect(screen.getAllByText(/выберите сервис для фильтрации по state/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/select a service to filter by state fields/i).length).toBeGreaterThan(0);
     });
     // "Add condition" button should not be present until service is selected.
-    expect(screen.queryByText(/добавить условие/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/add condition/i)).not.toBeInTheDocument();
   });
 
-  it('поля берутся из схемы (не хардкод) после выбора сервиса', async () => {
+  it('fields come from the schema (not hardcoded) after selecting a service', async () => {
     // More specific route (/v1/services/redis/state-schema) must come before
     // the general one (/v1/services), otherwise startsWith matching will pick the wrong route.
     installFetchMock([
@@ -123,20 +123,20 @@ describe('IncarnationsList — state filter', () => {
     await userEvent.selectOptions(serviceSelect, 'redis');
 
     // Wait for "Add condition" button to appear (panel loads the schema).
-    const addBtn = await screen.findByRole('button', { name: /добавить условие/i });
+    const addBtn = await screen.findByRole('button', { name: /add condition/i });
 
     // Add a predicate.
     await userEvent.click(addBtn);
 
     // Check: field select has schema fields redis_version and maxmemory (not hardcoded - from schema).
-    const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
+    const fieldSelect = screen.getByRole('combobox', { name: /state field/i });
     const options = within(fieldSelect).getAllByRole('option');
     const optionValues = options.map((o) => o.textContent);
     expect(optionValues).toContain('redis_version');
     expect(optionValues).toContain('maxmemory');
   });
 
-  it('отправляет state.<field>=<op>:<value> при заполненном предикате', async () => {
+  it('sends state.<field>=<op>:<value> when the predicate is filled', async () => {
     let capturedUrl: string | null = null;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -167,19 +167,19 @@ describe('IncarnationsList — state filter', () => {
     await waitForOption(allSelects[0], 'redis');
     await userEvent.selectOptions(allSelects[0], 'redis');
 
-    const addBtn2 = await screen.findByRole('button', { name: /добавить условие/i });
+    const addBtn2 = await screen.findByRole('button', { name: /add condition/i });
     await userEvent.click(addBtn2);
 
     // Select the maxmemory field.
-    const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
+    const fieldSelect = screen.getByRole('combobox', { name: /state field/i });
     await userEvent.selectOptions(fieldSelect, 'maxmemory');
 
     // Set the gte operator.
-    const opSelect = screen.getByRole('combobox', { name: /оператор/i });
+    const opSelect = screen.getByRole('combobox', { name: /operator/i });
     await userEvent.selectOptions(opSelect, 'gte');
 
     // Enter a value.
-    const valueInput = screen.getByRole('spinbutton', { name: /значение/i });
+    const valueInput = screen.getByRole('spinbutton', { name: /value/i });
     await userEvent.clear(valueInput);
     await userEvent.type(valueInput, '1024');
 
@@ -191,7 +191,7 @@ describe('IncarnationsList — state filter', () => {
     }, { timeout: 3000 });
   });
 
-  it('422 от backend → показывает ошибку, не краш', async () => {
+  it('422 from backend shows an error, no crash', async () => {
     // First request to incarnations returns 422 immediately (without state filters).
     // To trigger 422 with a filled predicate - create a mock,
     // that always returns 422 for /v1/incarnations.
@@ -231,26 +231,26 @@ describe('IncarnationsList — state filter', () => {
     await userEvent.selectOptions(allSelects[0], 'redis');
 
     await waitFor(() => {
-      expect(screen.getByText(/добавить условие/i)).toBeInTheDocument();
+      expect(screen.getByText(/add condition/i)).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByText(/добавить условие/i));
+    await userEvent.click(screen.getByText(/add condition/i));
 
-    const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
+    const fieldSelect = screen.getByRole('combobox', { name: /state field/i });
     await userEvent.selectOptions(fieldSelect, 'maxmemory');
 
-    const opSelect = screen.getByRole('combobox', { name: /оператор/i });
+    const opSelect = screen.getByRole('combobox', { name: /operator/i });
     await userEvent.selectOptions(opSelect, 'gte');
 
-    const valueInput = screen.getByRole('spinbutton', { name: /значение/i });
+    const valueInput = screen.getByRole('spinbutton', { name: /value/i });
     await userEvent.clear(valueInput);
     await userEvent.type(valueInput, '100');
 
     await waitFor(() => {
-      expect(screen.getByText(/ошибка фильтра/i)).toBeInTheDocument();
+      expect(screen.getByText(/filter error/i)).toBeInTheDocument();
     });
   });
 
-  it('total из ответа backend отображается', async () => {
+  it('total from backend response is displayed', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/services', body: SERVICES_REPLY },
       { method: 'GET', url: '/v1/incarnations', body: INCARNATIONS_REPLY },
@@ -258,11 +258,11 @@ describe('IncarnationsList — state filter', () => {
     renderWithProviders(<IncarnationsList />, '/incarnations');
 
     await waitFor(() => {
-      expect(screen.getByText(/Итого: 2 инкарнаций/)).toBeInTheDocument();
+      expect(screen.getByText(/Total: 2 incarnations/)).toBeInTheDocument();
     });
   });
 
-  it('sort передаётся как query-param (server-side)', async () => {
+  it('sort is passed as a query param (server-side)', async () => {
     let capturedUrl: string | null = null;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -295,7 +295,7 @@ describe('IncarnationsList — state filter', () => {
     capturedUrl = null;
     // Sort button is inside th; find by full text.
     const sortButtons = screen.getAllByRole('button');
-    const nameBtn = sortButtons.find((b) => b.textContent?.trim().startsWith('Имя'));
+    const nameBtn = sortButtons.find((b) => b.textContent?.trim().startsWith('Name'));
     expect(nameBtn).toBeDefined();
     await userEvent.click(nameBtn!);
 
@@ -306,7 +306,7 @@ describe('IncarnationsList — state filter', () => {
     });
   });
 
-  it('кнопка «Run по набору» вызывает navigate с service + incarnation regex (snapshot)', async () => {
+  it('«Run on set» button calls navigate with service + incarnation regex (snapshot)', async () => {
     // More specific route (/v1/services/redis/state-schema) must come before
     // the general one (/v1/services), otherwise startsWith matching will pick the wrong route.
     installFetchMock([
@@ -321,15 +321,15 @@ describe('IncarnationsList — state filter', () => {
     await userEvent.selectOptions(allSelects[0], 'redis');
 
     await waitFor(() => {
-      expect(screen.getByText(/добавить условие/i)).toBeInTheDocument();
+      expect(screen.getByText(/add condition/i)).toBeInTheDocument();
     });
 
     // Add a predicate: switch field to maxmemory (integer -> spinbutton),
     // then enter a value so the predicate becomes active and the Run button appears.
-    await userEvent.click(screen.getByText(/добавить условие/i));
-    const fieldSelect = screen.getByRole('combobox', { name: /поле state/i });
+    await userEvent.click(screen.getByText(/add condition/i));
+    const fieldSelect = screen.getByRole('combobox', { name: /state field/i });
     await userEvent.selectOptions(fieldSelect, 'maxmemory');
-    const valueInput = screen.getByRole('spinbutton', { name: /значение/i });
+    const valueInput = screen.getByRole('spinbutton', { name: /value/i });
     await userEvent.type(valueInput, '100');
 
     // Wait for results to load.
@@ -340,7 +340,7 @@ describe('IncarnationsList — state filter', () => {
     // "Run on set" button should appear.
     // aria-label = runSetAria = "Run scenario..." - accessible name for AT;
     // button text content - "Run on set".
-    const runBtn = await screen.findByRole('button', { name: /запустить сценарий на отфильтрованном наборе/i });
+    const runBtn = await screen.findByRole('button', { name: /run a scenario on the filtered set/i });
     await userEvent.click(runBtn);
 
     expect(navigateSpy).toHaveBeenCalledOnce();
@@ -358,7 +358,7 @@ describe('IncarnationsList — state filter', () => {
     expect(decoded).toContain('redis-staging');
   });
 
-  it('RunWizard c ?incarnation_regex реально резолвит список (не экранированный литерал)', async () => {
+  it('RunWizard with ?incarnation_regex actually resolves the list (not an escaped literal)', async () => {
     // This test reproduces finding 1/2 from review: snapshot-Run passed regex via
     // param `incarnation`, which RunWizard wrapped again in ^...$ -> double escaping
     // -> incarnationRegex contained an escaped literal instead of a live OR-regex -> 0 matches.
@@ -422,7 +422,7 @@ describe('IncarnationsList — state filter', () => {
 
     // Move Step1 -> Step2.
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // In Step2 service is already selected from query - select scenario.
     await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
@@ -430,7 +430,7 @@ describe('IncarnationsList — state filter', () => {
     await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
 
     // Move Step2 -> Step3 (incarnation regex).
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // incarnationRegex is already filled from ?incarnation_regex (not wrapped again).
     // After incarnations load, the matched list should contain BOTH.
@@ -442,6 +442,6 @@ describe('IncarnationsList — state filter', () => {
     }, { timeout: 3000 });
 
     // Additionally: "Next" is not blocked (there are matches).
-    expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
   });
 });

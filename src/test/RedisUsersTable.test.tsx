@@ -1,11 +1,11 @@
 /**
- * NIM-74: reveal-глаз для redis-юзеров в State-вьюхе.
- * 1. Глаз рендерится только для юзеров из revealable.keys (default — без глаза).
- * 2. Клик → reveal → пароль виден инлайн + кнопка copy (пишет в clipboard).
- * 3. 403 на reveal → тост «недостаточно прав», пароль НЕ показан.
+ * NIM-74: reveal-eye for redis users in the State view.
+ * 1. Eye renders only for users in revealable.keys (default — no eye).
+ * 2. Click → reveal → password shown inline + copy button (writes to clipboard).
+ * 3. 403 on reveal → "insufficient permissions" toast, password NOT shown.
  *
- * Безопасность-инвариант: значение фетчится лениво по клику и живёт только в
- * локальном стейте (регресс на префетч/кэш сломал бы контракт).
+ * Security invariant: the value is fetched lazily on click and lives only in
+ * local state (a regression to prefetch/cache would break the contract).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
@@ -46,7 +46,7 @@ describe('RedisUsersTable — reveal password', () => {
     vi.restoreAllMocks();
   });
 
-  it('глаз рендерится для revealable-юзеров и отсутствует для системного', async () => {
+  it('renders eye for revealable users and omits it for the system account', async () => {
     renderTable();
     expect(await screen.findByTestId('reveal-eye-alice')).toBeInTheDocument();
     expect(screen.getByTestId('reveal-eye-bob')).toBeInTheDocument();
@@ -54,7 +54,7 @@ describe('RedisUsersTable — reveal password', () => {
     expect(screen.queryByTestId('reveal-eye-default')).not.toBeInTheDocument();
   });
 
-  it('клик по глазу раскрывает пароль инлайн + copy пишет в clipboard', async () => {
+  it('clicking the eye reveals the password inline + copy writes to clipboard', async () => {
     const spy = vi
       .spyOn(keeperApi.incarnations, 'revealSecret')
       .mockResolvedValue({ value: 's3cr3t-alice' });
@@ -71,11 +71,11 @@ describe('RedisUsersTable — reveal password', () => {
 
     // copy -> clipboard-stub userEvent resolves -> "Copied" toast.
     await user.click(screen.getByTestId('reveal-copy-alice'));
-    expect(await screen.findByTestId('state-toast')).toHaveTextContent('Скопировано');
+    expect(await screen.findByTestId('state-toast')).toHaveTextContent('Copied');
     expect(await navigator.clipboard.readText()).toBe('s3cr3t-alice');
   });
 
-  it('403 → тост «недостаточно прав», пароль НЕ показан', async () => {
+  it('403 → "insufficient permissions" toast, password NOT shown', async () => {
     vi.spyOn(keeperApi.incarnations, 'revealSecret').mockRejectedValue(
       new ApiError(403, 'about:blank', 'Forbidden', 'forbidden'),
     );
@@ -85,12 +85,12 @@ describe('RedisUsersTable — reveal password', () => {
     await user.click(await screen.findByTestId('reveal-eye-alice'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('state-toast')).toHaveTextContent('Недостаточно прав');
+      expect(screen.getByTestId('state-toast')).toHaveTextContent('Insufficient permissions');
     });
     expect(screen.queryByTestId('reveal-value-alice')).not.toBeInTheDocument();
   });
 
-  it('404 → тост «Значение не найдено», пароль НЕ показан', async () => {
+  it('404 → "Value not found" toast, password NOT shown', async () => {
     vi.spyOn(keeperApi.incarnations, 'revealSecret').mockRejectedValue(
       new ApiError(404, 'about:blank', 'Not Found', 'no such key'),
     );
@@ -100,12 +100,12 @@ describe('RedisUsersTable — reveal password', () => {
     await user.click(await screen.findByTestId('reveal-eye-alice'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('state-toast')).toHaveTextContent('Значение не найдено');
+      expect(screen.getByTestId('state-toast')).toHaveTextContent('Value not found');
     });
     expect(screen.queryByTestId('reveal-value-alice')).not.toBeInTheDocument();
   });
 
-  it('[ГЕЙТ] без права incarnation.view-secrets глаз не рендерится', async () => {
+  it('[GATE] without incarnation.view-secrets permission the eye does not render', async () => {
     // Permission not covering incarnation.view-secrets -> canView=false after resolve.
     vi.spyOn(keeperApi.permissions, 'listMy').mockResolvedValue({
       permissions: [{ wildcard: false, resource: 'soul', action: 'list' }],
@@ -119,7 +119,7 @@ describe('RedisUsersTable — reveal password', () => {
     expect(screen.queryByTestId('reveal-eye-bob')).not.toBeInTheDocument();
   });
 
-  it('[ИНВАРИАНТ] авто-скрытие: раскрытый пароль исчезает через 30с', async () => {
+  it('[INVARIANT] auto-hide: revealed password disappears after 30s', async () => {
     vi.useFakeTimers();
     try {
       vi.spyOn(keeperApi.incarnations, 'revealSecret').mockResolvedValue({ value: 's3cr3t-alice' });

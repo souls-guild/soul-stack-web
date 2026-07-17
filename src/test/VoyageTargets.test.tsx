@@ -99,7 +99,7 @@ function renderVoyage(voyageId: string) {
   );
 }
 
-describe('VoyageTargets (через VoyageDetail)', () => {
+describe('VoyageTargets (via VoyageDetail)', () => {
   beforeEach(() => {
     tokenStore.clear();
     // @ts-expect-error — EventSource not present in jsdom.
@@ -112,7 +112,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     };
   });
 
-  it('barrier-режим: 2 батча → 2 заголовка групп, targets распределены правильно', async () => {
+  it('barrier mode: 2 batches → 2 group headings, targets distributed correctly', async () => {
     // IMPORTANT: /targets must come BEFORE /voyages/{id} — fetchMock matches by startsWith.
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },
@@ -146,7 +146,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     expect(screen.getByText('cancelled')).toBeInTheDocument();
   });
 
-  it('window-режим: все batch_index=0 → ровно 1 группа', async () => {
+  it('window mode: all batch_index=0 → exactly 1 group', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_WINDOW },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: VOYAGE_BASE },
@@ -174,7 +174,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     expect(screen.getByText('running')).toBeInTheDocument();
   });
 
-  it('пустой targets-список → empty-сообщение', async () => {
+  it('empty targets list → empty message', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: { voyage_id: VOYAGE_ID, targets: [] } },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: VOYAGE_BASE },
@@ -187,11 +187,11 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Targets ещё не появились/)).toBeInTheDocument();
+      expect(screen.getByText(/No targets yet/)).toBeInTheDocument();
     });
   });
 
-  it('statusFilter=succeeded → отображает только succeeded targets, остальные скрыты', async () => {
+  it('statusFilter=succeeded → shows only succeeded targets, others hidden', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },
     ]);
@@ -208,7 +208,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     expect(screen.queryByText('pg-prod-3')).toBeNull();
   });
 
-  it('[guard] apply_id рендерится ссылкой на /voyages/:apply_id если присутствует', async () => {
+  it('[guard] apply_id renders as a link to /voyages/:apply_id when present', async () => {
     const targetsWithApplyId = {
       voyage_id: VOYAGE_ID,
       targets: [
@@ -247,7 +247,7 @@ describe('VoyageTargets (через VoyageDetail)', () => {
     expect(screen.queryByTestId('target-apply-link-redis-stage')).not.toBeInTheDocument();
   });
 
-  it('statusFilter с 0 совпадений → сообщение "нет targets с таким статусом"', async () => {
+  it('statusFilter with 0 matches → "no targets with this status" message', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },
     ]);

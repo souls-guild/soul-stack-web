@@ -10,7 +10,7 @@ describe('ErrandsList', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит список errand-ов из GET /v1/errands', async () => {
+  it('renders the errand list from GET /v1/errands', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -60,7 +60,7 @@ describe('ErrandsList', () => {
 
   // -- Guard tests: clickable links --------------------------------------------
 
-  it('[LINKS] sid в строке таблицы — ссылка на /souls/:sid', async () => {
+  it('[LINKS] sid in a table row is a link to /souls/:sid', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -94,7 +94,7 @@ describe('ErrandsList', () => {
     expect(link).toHaveAttribute('href', '/souls/host01');
   });
 
-  it('[LINKS] при пустом списке errand-ов ссылок на souls нет', async () => {
+  it('[LINKS] no soul links when the errand list is empty', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -107,7 +107,7 @@ describe('ErrandsList', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: /^host/ })).not.toBeInTheDocument());
   });
 
-  it('module CSV-фильтр уходит в query как multi-value ?module=', async () => {
+  it('module CSV filter goes into the query as multi-value ?module=', async () => {
     let lastUrl = '';
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       lastUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;

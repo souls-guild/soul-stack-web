@@ -29,11 +29,11 @@ function makeQC() {
   });
 }
 
-describe('useMyPermissions — optimistic-enable инвариант', () => {
+describe('useMyPermissions — optimistic-enable invariant', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('[ИНВАРИАНТ] при 403 /v1/me/permissions hasPermission("synod.create") возвращает true', async () => {
+  it('[INVARIANT] on 403 /v1/me/permissions hasPermission("synod.create") returns true', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({ type: 'about:blank', title: 'Forbidden', status: 403, detail: 'forbidden' }),
@@ -52,7 +52,7 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
     expect(result.current.hasPermission('soul.list')).toBe(true);
   });
 
-  it('[ИНВАРИАНТ] при 500 /v1/me/permissions hasPermission возвращает true', async () => {
+  it('[INVARIANT] on 500 /v1/me/permissions hasPermission returns true', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({ type: 'about:blank', title: 'Error', status: 500, detail: 'internal' }),
@@ -66,7 +66,7 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
     expect(result.current.hasPermission('synod.delete')).toBe(true);
   });
 
-  it('[БАЗОВАЯ] при успешном ответе без нужного права hasPermission возвращает false', async () => {
+  it('[BASELINE] on a successful response without the needed permission hasPermission returns false', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({
@@ -83,7 +83,7 @@ describe('useMyPermissions — optimistic-enable инвариант', () => {
     expect(result.current.hasPermission('soul.list')).toBe(true);
   });
 
-  it('[БАЗОВАЯ] wildcard=true → hasPermission всегда true', async () => {
+  it('[BASELINE] wildcard=true → hasPermission always true', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(
         JSON.stringify({ permissions: [{ wildcard: true }] }),

@@ -11,7 +11,7 @@ describe('IncarnationDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит detail incarnation-а и Overview summary с переходами на Spec/State/Schema/Hosts', async () => {
+  it('renders incarnation detail and Overview summary with navigation to Spec/State/Schema/Hosts', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -102,7 +102,7 @@ describe('IncarnationDetail', () => {
     expect(screen.getAllByText('v2.0.0').length).toBeGreaterThan(0);
   });
 
-  it('фильтр top-level ключей в State работает', async () => {
+  it('top-level key filter in State works', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -150,7 +150,7 @@ describe('IncarnationDetail', () => {
     expect(keyTexts.some((t) => t.includes('gamma'))).toBe(true);
 
     // Filter by "alp" - leaves only alpha.
-    const input = screen.getByLabelText('Фильтр по top-level ключам');
+    const input = screen.getByLabelText('Filter by top-level keys');
     await user.type(input, 'alp');
 
     const filtered = screen.getAllByRole('button', { expanded: false }).map((b) => b.textContent ?? '');
@@ -159,7 +159,7 @@ describe('IncarnationDetail', () => {
     expect(filtered.every((t) => !t.includes('gamma'))).toBe(true);
   });
 
-  it('Trash2 на declared-host открывает RemoveHostModal, PATCH уходит только после подтверждения', async () => {
+  it('Trash2 on a declared host opens RemoveHostModal, PATCH is sent only after confirmation', async () => {
     let patchCount = 0;
     let lastUrl = '';
     let lastBody: unknown = null;
@@ -219,7 +219,7 @@ describe('IncarnationDetail', () => {
     expect(patchCount).toBe(0);
 
     // Confirmation via checkbox -> confirm.
-    await user.click(screen.getByLabelText('Подтвердить удаление хоста'));
+    await user.click(screen.getByLabelText('Confirm host removal'));
     await user.click(screen.getByTestId('remove-host-confirm'));
 
     await waitFor(() => {
@@ -229,7 +229,7 @@ describe('IncarnationDetail', () => {
     expect(lastBody).toEqual({ mode: 'remove', hosts: [{ sid: 'agent-04.local' }] });
   });
 
-  it('Overview summary-карточка кликает на Hosts tab и показывает per-host runtime data', async () => {
+  it('Overview summary card clicks the Hosts tab and shows per-host runtime data', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -283,7 +283,7 @@ describe('IncarnationDetail', () => {
     expect(screen.getByText('host-a')).toBeInTheDocument();
   });
 
-  it('History tab: apply_id рендерится ссылкой на /incarnations/:name/runs/:apply_id (НЕ /voyages/)', async () => {
+  it('History tab: apply_id renders as a link to /incarnations/:name/runs/:apply_id (NOT /voyages/)', async () => {
     // More specific paths come FIRST (fetchMock matches the first match).
     installFetchMock([
       {
@@ -356,7 +356,7 @@ describe('IncarnationDetail', () => {
     }, { timeout: 3000 });
   });
 
-  it('Overview показывает traits инкарнации (scalar + list) в meta-блоке', async () => {
+  it('Overview shows incarnation traits (scalar + list) in the meta block', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -396,7 +396,7 @@ describe('IncarnationDetail', () => {
     expect(screen.getByText('tier=gold, critical')).toBeInTheDocument();
   });
 
-  it('Overview graceful empty когда incarnation.traits отсутствует (не краш)', async () => {
+  it('Overview graceful empty when incarnation.traits is absent (no crash)', async () => {
     installFetchMock([
       {
         method: 'GET',

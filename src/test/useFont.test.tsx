@@ -8,19 +8,19 @@ function wrapper({ children }: { children: ReactNode }) {
   return <FontProvider>{children}</FontProvider>;
 }
 
-describe('useFont (context-based, независим от темы)', () => {
+describe('useFont (context-based, independent of theme)', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-font');
   });
 
-  it('initial font = system, data-font не выставлен', () => {
+  it('initial font = system, data-font not set', () => {
     const { result } = renderHook(() => useFont(), { wrapper });
     expect(result.current.font).toBe('system');
     expect(document.documentElement.getAttribute('data-font')).toBeNull();
   });
 
-  it('setFont("mono") выставляет data-font="mono" и пишет в localStorage', () => {
+  it('setFont("mono") sets data-font="mono" and writes to localStorage', () => {
     const { result } = renderHook(() => useFont(), { wrapper });
     act(() => result.current.setFont('mono'));
     expect(result.current.font).toBe('mono');
@@ -28,7 +28,7 @@ describe('useFont (context-based, независим от темы)', () => {
     expect(window.localStorage.getItem('app-font')).toBe('mono');
   });
 
-  it('setFont("serif") выставляет data-font="serif"', () => {
+  it('setFont("serif") sets data-font="serif"', () => {
     const { result } = renderHook(() => useFont(), { wrapper });
     act(() => result.current.setFont('mono'));
     act(() => result.current.setFont('serif'));
@@ -37,7 +37,7 @@ describe('useFont (context-based, независим от темы)', () => {
   });
 
   it.each(['manrope', 'quicksand', 'unbounded', 'caveat', 'comfortaa', 'comic-neue'] as const)(
-    'setFont("%s") выставляет соответствующий data-font',
+    'setFont("%s") sets the corresponding data-font',
     (mode) => {
       const { result } = renderHook(() => useFont(), { wrapper });
       act(() => result.current.setFont(mode));
@@ -47,7 +47,7 @@ describe('useFont (context-based, независим от темы)', () => {
     },
   );
 
-  it('setFont("system") после нестандартного шрифта снимает data-font (возврат к дефолту)', () => {
+  it('setFont("system") after a non-default font clears data-font (returns to default)', () => {
     const { result } = renderHook(() => useFont(), { wrapper });
     act(() => result.current.setFont('unbounded'));
     act(() => result.current.setFont('system'));
@@ -55,17 +55,17 @@ describe('useFont (context-based, независим от темы)', () => {
     expect(document.documentElement.getAttribute('data-font')).toBeNull();
   });
 
-  it('useFont без провайдера бросает ошибку', () => {
+  it('useFont without a provider throws an error', () => {
     expect(() => renderHook(() => useFont())).toThrow('useFont must be used inside <FontProvider>');
   });
 
-  it('при localStorage("app-font")="unbounded" инициализируется как unbounded', () => {
+  it('initializes as unbounded when localStorage("app-font")="unbounded"', () => {
     window.localStorage.setItem('app-font', 'unbounded');
     const { result } = renderHook(() => useFont(), { wrapper });
     expect(result.current.font).toBe('unbounded');
   });
 
-  it('невалидное значение localStorage игнорируется, откат на system', () => {
+  it('invalid localStorage value is ignored, falls back to system', () => {
     window.localStorage.setItem('app-font', 'comic-sans-does-not-exist');
     const { result } = renderHook(() => useFont(), { wrapper });
     expect(result.current.font).toBe('system');

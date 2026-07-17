@@ -71,8 +71,8 @@ function StatefulFields({
 }
 
 // -- predicates ----------------------------------------------------------
-describe('isObjectWithProperties хелпер', () => {
-  it('true: type=object + properties (не map, не provision)', () => {
+describe('isObjectWithProperties helper', () => {
+  it('true: type=object + properties (not a map, not provision)', () => {
     expect(isObjectWithProperties(aclUserSchema.user)).toBe(true);
   });
 
@@ -85,7 +85,7 @@ describe('isObjectWithProperties хелпер', () => {
     ).toBe(false);
   });
 
-  it('false: map по additional_properties (нет properties)', () => {
+  it('false: map via additional_properties (no properties)', () => {
     expect(isObjectWithProperties(additionalPropsMapSchema.opts)).toBe(false);
   });
 
@@ -93,57 +93,57 @@ describe('isObjectWithProperties хелпер', () => {
     expect(isObjectWithProperties({ type: 'object', isMap: true, items: { type: 'string' } })).toBe(false);
   });
 
-  it('false: object без properties (голый object → JSON-textarea)', () => {
+  it('false: object without properties (bare object → JSON textarea)', () => {
     expect(isObjectWithProperties({ type: 'object' })).toBe(false);
   });
 
-  it('false: string-поле', () => {
+  it('false: string field', () => {
     expect(isObjectWithProperties({ type: 'string' })).toBe(false);
   });
 });
 
 describe('isMapWithAdditionalProps + mapValueType', () => {
-  it('true: additional_properties скалярная схема {type:string}', () => {
+  it('true: additional_properties scalar schema {type:string}', () => {
     expect(isMapWithAdditionalProps(additionalPropsMapSchema.opts)).toBe(true);
     expect(mapValueType(additionalPropsMapSchema.opts)).toBe('string');
   });
 
-  it('mapValueType: integer из additional_properties', () => {
+  it('mapValueType: integer from additional_properties', () => {
     const prop = { type: 'object', additional_properties: { type: 'integer' } } as unknown as ScenarioInputSchemaProperty;
     expect(isMapWithAdditionalProps(prop)).toBe(true);
     expect(mapValueType(prop)).toBe('integer');
   });
 
-  it('false: additional_properties=false (типизированный объект, не map)', () => {
+  it('false: additional_properties=false (typed object, not a map)', () => {
     expect(isMapWithAdditionalProps(aclUserSchema.user)).toBe(false);
   });
 
-  it('false: additional_properties=true (JSON-schema allow-any → не scalar-map)', () => {
+  it('false: additional_properties=true (JSON-schema allow-any → not a scalar map)', () => {
     expect(isMapWithAdditionalProps({ type: 'object', additional_properties: true })).toBe(false);
   });
 
-  it('mapValueType всё ещё читает items.type (isMap-путь)', () => {
+  it('mapValueType still reads items.type (isMap path)', () => {
     expect(mapValueType({ type: 'object', isMap: true, items: { type: 'integer' } })).toBe('integer');
   });
 });
 
-describe('isCompositeType исключает object-with-properties и additional_properties-map', () => {
-  it('object+properties → false (не JSON-textarea)', () => {
+describe('isCompositeType excludes object-with-properties and additional_properties-map', () => {
+  it('object+properties → false (not a JSON textarea)', () => {
     expect(isCompositeType(aclUserSchema.user)).toBe(false);
   });
 
-  it('additional_properties-map → false (не JSON-textarea)', () => {
+  it('additional_properties-map → false (not a JSON textarea)', () => {
     expect(isCompositeType(additionalPropsMapSchema.opts)).toBe(false);
   });
 
-  it('голый object без properties → true (JSON-textarea)', () => {
+  it('bare object without properties → true (JSON textarea)', () => {
     expect(isCompositeType({ type: 'object' })).toBe(true);
   });
 });
 
 // -- symptom regression: textarea -> typed sub-fields ------------------------
-describe('ObjectField рендер (симптом-регресс)', () => {
-  it('рендерит field-object-user + под-поля, НЕ field-composite-user textarea', () => {
+describe('ObjectField render (symptom regression)', () => {
+  it('renders field-object-user + sub-fields, NOT field-composite-user textarea', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.getByTestId('field-object-user')).toBeTruthy();
     // Key regression: raw JSON textarea is NOT rendered.
@@ -154,7 +154,7 @@ describe('ObjectField рендер (симптом-регресс)', () => {
     expect(screen.getByTestId('field-enum-user.state')).toBeTruthy();
   });
 
-  it('state → <select> с опциями on/off', () => {
+  it('state → <select> with on/off options', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     const select = screen.getByTestId('field-enum-user.state');
     expect(select.tagName).toBe('SELECT');
@@ -163,32 +163,32 @@ describe('ObjectField рендер (симптом-регресс)', () => {
     expect(options).toContain('off');
   });
 
-  it('name/perms → text input (не enum-select)', () => {
+  it('name/perms → text input (not enum-select)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     const nameInput = screen.getByTestId('field-text-user.name');
     expect(nameInput.tagName).toBe('INPUT');
     expect((nameInput as HTMLInputElement).type).toBe('text');
   });
 
-  it('required-маркеры на обязательных под-полях (name, perms), не на state', () => {
+  it('required markers on required sub-fields (name, perms), not on state', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.getByTestId('field-required-marker-user.name')).toBeTruthy();
     expect(screen.getByTestId('field-required-marker-user.perms')).toBeTruthy();
     expect(screen.queryByTestId('field-required-marker-user.state')).toBeNull();
   });
 
-  it('x-type отображается как лейбл типа', () => {
+  it('x-type is shown as the type label', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.getByTestId('field-object-user').textContent).toContain('AclUser');
   });
 
-  it('pattern-валидация под-поля работает (вложенно через движок)', () => {
+  it('sub-field pattern validation works (nested through the engine)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     fireEvent.change(screen.getByTestId('field-text-user.name'), { target: { value: 'BAD_123' } });
     expect(screen.getByTestId('field-pattern-error-user.name')).toBeTruthy();
   });
 
-  it('под-поле показывает голый subKey как лейбл (паритет с ArrayOfObjectField), testid остаётся namespaced', () => {
+  it('sub-field shows the bare subKey as its label (parity with ArrayOfObjectField), testid stays namespaced', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     // testid is namespaced (field-text-user.name), but the visible label is "name", not "user.name".
     const nameLabel = screen.getByTestId('field-text-user.name').closest('label');
@@ -198,8 +198,8 @@ describe('ObjectField рендер (симптом-регресс)', () => {
 });
 
 // -- *layout: object is NOT buried in advanced-collapse (Variant B) ----------
-describe('object-with-properties не уходит в advanced-collapse', () => {
-  it('★единственное object-поле без form → НЕ внутри advanced-collapse, collapse отсутствует', () => {
+describe('object-with-properties does not go into advanced-collapse', () => {
+  it('★single object field without form → NOT inside advanced-collapse, collapse absent', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     const objectField = screen.getByTestId('field-object-user');
     // Key regression (old layout buried object in a collapsed <details>).
@@ -208,7 +208,7 @@ describe('object-with-properties не уходит в advanced-collapse', () => 
     expect(screen.queryByTestId('advanced-collapse')).toBeNull();
   });
 
-  it('★object лифтится в верхнюю группу даже когда advanced-collapse есть (рядом optional-поле)', () => {
+  it('★object is lifted into the top group even when advanced-collapse exists (an optional field nearby)', () => {
     const schema: ScenarioInputSchema = {
       user: aclUserSchema.user,
       note: { type: 'string', required: false },
@@ -234,21 +234,21 @@ const aclUserRequiredSchema: ScenarioInputSchema = {
   } as unknown as ScenarioInputSchemaProperty,
 };
 
-describe('x-required → `*` на object-поле', () => {
-  it('isFieldRequired: true при x-required, несмотря на required=массив детей', () => {
+describe('x-required → `*` on the object field', () => {
+  it('isFieldRequired: true with x-required, despite required=array of children', () => {
     expect(isFieldRequired(aclUserRequiredSchema.user, {})).toBe(true);
   });
 
-  it('isFieldRequired: false без x-required (required=массив не делает поле обязательным)', () => {
+  it('isFieldRequired: false without x-required (required=array does not make the field required)', () => {
     expect(isFieldRequired(aclUserSchema.user, {})).toBe(false);
   });
 
-  it('рендер: маркер field-required-marker-user есть при x-required', () => {
+  it('render: field-required-marker-user marker present with x-required', () => {
     render(<StatefulFields schema={aclUserRequiredSchema} />);
     expect(screen.getByTestId('field-required-marker-user')).toBeTruthy();
   });
 
-  it('рендер: без x-required маркера на контейнере нет (под-поля свои маркеры сохраняют)', () => {
+  it('render: without x-required no marker on the container (sub-fields keep their own markers)', () => {
     render(<StatefulFields schema={aclUserSchema} />);
     expect(screen.queryByTestId('field-required-marker-user')).toBeNull();
     // Control: required sub-fields stay marked.
@@ -258,13 +258,13 @@ describe('x-required → `*` на object-поле', () => {
 
 // -- map via additional_properties --------------------------------------------
 describe('additional_properties map → MapEditor', () => {
-  it('рендерит field-map-opts, НЕ field-composite-opts textarea', () => {
+  it('renders field-map-opts, NOT field-composite-opts textarea', () => {
     render(<StatefulFields schema={additionalPropsMapSchema} />);
     expect(screen.getByTestId('field-map-opts')).toBeTruthy();
     expect(screen.queryByTestId('field-composite-opts')).toBeNull();
   });
 
-  it('добавление пары → key/value инпуты', () => {
+  it('adding a pair → key/value inputs', () => {
     render(<StatefulFields schema={additionalPropsMapSchema} />);
     fireEvent.click(screen.getByTestId('field-map-add-opts'));
     expect(screen.getByTestId('field-map-key-opts-0')).toBeTruthy();
@@ -274,7 +274,7 @@ describe('additional_properties map → MapEditor', () => {
 
 // -- serialization / defaults / validation -------------------------------------
 describe('serializeFields object-with-properties', () => {
-  it('собирает вложенный объект {name,perms,state} из под-state', () => {
+  it('assembles a nested object {name,perms,state} from sub-state', () => {
     const state: ScenarioFieldsState = {
       user: JSON.stringify({ name: 'alice', perms: '+@read', state: 'on' }),
     };
@@ -282,7 +282,7 @@ describe('serializeFields object-with-properties', () => {
     expect(body.user).toMatchObject({ name: 'alice', perms: '+@read', state: 'on' });
   });
 
-  it('пустые под-поля пропускаются, дефолтный state=on остаётся', () => {
+  it('empty sub-fields are skipped, default state=on stays', () => {
     const state: ScenarioFieldsState = {
       user: JSON.stringify({ name: '', perms: '', state: 'on' }),
     };
@@ -290,17 +290,17 @@ describe('serializeFields object-with-properties', () => {
     expect(body.user).toEqual({ state: 'on' });
   });
 
-  it('пустое значение объекта → поле отсутствует в body', () => {
+  it('empty object value → field absent from body', () => {
     const body = serializeFields(aclUserSchema, { user: '' });
     expect(body).not.toHaveProperty('user');
   });
 
-  it('additional_properties map сериализуется как объект строк', () => {
+  it('additional_properties map serializes as an object of strings', () => {
     const body = serializeFields(additionalPropsMapSchema, { opts: JSON.stringify({ FOO: 'bar' }) });
     expect(body).toEqual({ opts: { FOO: 'bar' } });
   });
 
-  it('сквозной UI: заполнение под-полей → onChange даёт вложенный объект', () => {
+  it('end-to-end UI: filling sub-fields → onChange yields a nested object', () => {
     const captured: ScenarioFieldsState[] = [];
     render(<StatefulFields schema={aclUserSchema} onChangeSpy={(s) => captured.push(s)} />);
     fireEvent.change(screen.getByTestId('field-text-user.name'), { target: { value: 'alice' } });
@@ -315,7 +315,7 @@ describe('serializeFields object-with-properties', () => {
 });
 
 describe('defaultsFromSchema object-with-properties', () => {
-  it('AclUser: сидирует JSON-строкой с preset (perms/state) + пустой name', () => {
+  it('AclUser: seeds a JSON string with preset (perms/state) + empty name', () => {
     const defaults = defaultsFromSchema(aclUserSchema);
     expect(typeof defaults.user).toBe('string');
     const parsed = JSON.parse(defaults.user as string);
@@ -324,7 +324,7 @@ describe('defaultsFromSchema object-with-properties', () => {
     expect(parsed.state).toBe('on');
   });
 
-  it('не-AclUser объект: только схема-дефолты, без preset', () => {
+  it('non-AclUser object: schema defaults only, no preset', () => {
     const genericSchema: ScenarioInputSchema = {
       cfg: {
         type: 'object',
@@ -337,7 +337,7 @@ describe('defaultsFromSchema object-with-properties', () => {
 });
 
 describe('missingRequiredFields object-level required:[children]', () => {
-  it('пустое обязательное под-поле гейтит submit', () => {
+  it('an empty required sub-field gates submit', () => {
     const missing = missingRequiredFields(aclUserSchema, {
       user: JSON.stringify({ name: '', perms: '', state: 'on' }),
     });
@@ -346,20 +346,20 @@ describe('missingRequiredFields object-level required:[children]', () => {
     expect(missing.length).toBeGreaterThan(0);
   });
 
-  it('все обязательные под-поля заполнены → submit не блокируется', () => {
+  it('all required sub-fields filled → submit not blocked', () => {
     const missing = missingRequiredFields(aclUserSchema, {
       user: JSON.stringify({ name: 'alice', perms: '+@read', state: 'on' }),
     });
     expect(missing).toEqual([]);
   });
 
-  it('скрытое поле (show_when=false) не гейтит', () => {
+  it('a hidden field (show_when=false) does not gate', () => {
     const visible = new Set<string>(); // user is not visible
     const missing = missingRequiredFields(aclUserSchema, { user: '' }, visible);
     expect(missing).toEqual([]);
   });
 
-  it('object-with-properties не считается invalidComposite (значение всегда валидный JSON)', () => {
+  it('object-with-properties is not counted as invalidComposite (value is always valid JSON)', () => {
     const invalid = invalidCompositeFields(aclUserSchema, {
       user: JSON.stringify({ name: 'alice', perms: '+@read', state: 'on' }),
     });

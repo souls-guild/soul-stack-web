@@ -12,10 +12,10 @@ import { normalizePermissionCatalog } from './permissions';
 import { prettyRbacError } from './errors';
 import styles from '../common.module.css';
 
-// Создание роли на dedicated route /rbac/roles/new (NIM-80): имя, описание,
-// набор прав (action-wildcard + scope + bulk-apply — общий PermissionsEditor),
-// валидация roleCreateSchema. Каталог фетчит сама (общий ['rbac.permissions']).
-// Успех → возврат на /rbac.
+// Role creation on the dedicated route /rbac/roles/new (NIM-80): name, description,
+// permission set (action-wildcard + scope + bulk-apply — shared PermissionsEditor),
+// roleCreateSchema validation. Fetches the catalog itself (shared ['rbac.permissions']).
+// Success → back to /rbac.
 export function CreateRolePage() {
   const { t } = useTranslation();
   const nav = useNavigate();

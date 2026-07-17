@@ -43,13 +43,13 @@ function Wrapper({
 }
 
 const SCHEMA: ScenarioInputSchema = {
-  username: { type: 'string', required: true, description: 'Имя пользователя' },
-  password: { type: 'string', required: true, description: 'Пароль' },
-  comment:  { type: 'string', description: 'Комментарий' },
+  username: { type: 'string', required: true, description: 'Username' },
+  password: { type: 'string', required: true, description: 'Password' },
+  comment:  { type: 'string', description: 'Comment' },
 };
 
-describe('ScenarioInputFields с form-секциями', () => {
-  it('при отсутствии form рендерит плоский layout (обратная совместимость)', () => {
+describe('ScenarioInputFields with form sections', () => {
+  it('renders a flat layout when no form is provided (backward compatibility)', () => {
     render(<Wrapper schema={SCHEMA} />);
     // No sections — no testid form-section-*
     expect(screen.queryByTestId('form-section-auth')).toBeNull();
@@ -57,7 +57,7 @@ describe('ScenarioInputFields с form-секциями', () => {
     expect(screen.getByTestId('field-text-username')).toBeInTheDocument();
   });
 
-  it('при form рендерит секции с testid form-section-<key>', () => {
+  it('renders sections with testid form-section-<key> when form is provided', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -72,7 +72,7 @@ describe('ScenarioInputFields с form-секциями', () => {
     expect(screen.getByText('Authentication')).toBeInTheDocument();
   });
 
-  it('поле с label из form отображает label-override вместо имени поля', () => {
+  it('a field with a label from form shows the label override instead of the field name', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -86,7 +86,7 @@ describe('ScenarioInputFields с form-секциями', () => {
     expect(screen.getByText(/Login name/)).toBeInTheDocument();
   });
 
-  it('поля вне секций попадают в default-секцию', () => {
+  it('fields outside sections go into the default section', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -102,7 +102,7 @@ describe('ScenarioInputFields с form-секциями', () => {
     expect(screen.getByTestId('field-text-password')).toBeInTheDocument();
   });
 
-  it('collapsed=true рендерит <details> (сворачиваемую секцию)', () => {
+  it('collapsed=true renders <details> (a collapsible section)', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -118,7 +118,7 @@ describe('ScenarioInputFields с form-секциями', () => {
     expect(section.tagName.toLowerCase()).toBe('details');
   });
 
-  it('description секции отображается в DOM', () => {
+  it('section description is rendered in the DOM', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -133,7 +133,7 @@ describe('ScenarioInputFields с form-секциями', () => {
     expect(screen.getByText('Credentials for the new account')).toBeInTheDocument();
   });
 
-  it('пустой form.sections — fallback на плоский рендер', () => {
+  it('empty form.sections — falls back to flat render', () => {
     const form: ScenarioForm = { sections: [] };
     render(<Wrapper schema={SCHEMA} form={form} />);
     expect(screen.queryByTestId(/form-section/)).toBeNull();

@@ -1,10 +1,10 @@
 /**
- * Dual-mode приём секрета Herald (ADR-064, NIM-11):
- *   1. Config-секрет (telegram bot_token) в режиме «значение» → POST config несёт
- *      plaintext `bot_token`, БЕЗ `bot_token_ref` (XOR).
- *   2. Config-секрет в режиме «путь» (default) → POST config несёт `bot_token_ref`.
- *   3. Top-level webhook secret в режиме «значение» → POST несёт `secret`, без `secret_ref`.
- *   4. accept_plaintext выключен (422) → форма показывает pretty-error, не крашится.
+ * Herald dual-mode secret ingestion (ADR-064, NIM-11):
+ *   1. Config secret (telegram bot_token) in "value" mode → POST config carries
+ *      plaintext `bot_token`, WITHOUT `bot_token_ref` (XOR).
+ *   2. Config secret in "path" mode (default) → POST config carries `bot_token_ref`.
+ *   3. Top-level webhook secret in "value" mode → POST carries `secret`, without `secret_ref`.
+ *   4. accept_plaintext disabled (422) → form shows a pretty error, does not crash.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -27,8 +27,8 @@ const CATALOG = {
       type: 'telegram',
       secret_required: false,
       fields: [
-        { name: 'bot_token_ref', label: 'Vault-ref токена бота', required: true, secret: true, kind: 'vault_ref' },
-        { name: 'chat_id', label: 'ID чата', required: true, secret: false, kind: 'string' },
+        { name: 'bot_token_ref', label: 'Bot token Vault-ref', required: true, secret: true, kind: 'vault_ref' },
+        { name: 'chat_id', label: 'Chat ID', required: true, secret: false, kind: 'string' },
       ],
     },
   ],
@@ -83,14 +83,14 @@ async function openCreate() {
   const user = userEvent.setup();
   await waitFor(() => expect(screen.getByTestId('herald-create-btn')).toBeInTheDocument());
   await user.click(screen.getByTestId('herald-create-btn'));
-  const dialog = await screen.findByRole('dialog', { name: /Создать Herald/i });
+  const dialog = await screen.findByRole('dialog', { name: /Create Herald/i });
   return { dialog, user };
 }
 
 beforeEach(() => { tokenStore.clear(); });
 
 describe('Herald dual-mode secret (NIM-11)', () => {
-  it('config-секрет в режиме «значение» → POST config несёт plaintext bot_token, без bot_token_ref', async () => {
+  it('config secret in "value" mode → POST config carries plaintext bot_token, without bot_token_ref', async () => {
     const calls = setupMock();
     renderNotif();
     const { dialog, user } = await openCreate();
@@ -104,7 +104,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     await user.type(within(dialog).getByTestId('herald-secret-bot_token-value'), '123456:ABC-PLAINTEXT');
     await user.type(within(dialog).getByTestId('herald-field-chat_id'), '777');
 
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/heralds' && c.method === 'POST');
@@ -115,7 +115,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     });
   });
 
-  it('config-секрет в режиме «путь» (default) → POST config несёт bot_token_ref, без plaintext', async () => {
+  it('config secret in "path" mode (default) → POST config carries bot_token_ref, without plaintext', async () => {
     const calls = setupMock();
     renderNotif();
     const { dialog, user } = await openCreate();
@@ -126,7 +126,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
 
     await user.type(within(dialog).getByTestId('herald-field-bot_token_ref'), 'vault:secret/tg');
     await user.type(within(dialog).getByTestId('herald-field-chat_id'), '777');
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/heralds' && c.method === 'POST');
@@ -136,7 +136,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     });
   });
 
-  it('top-level webhook secret в режиме «значение» → POST несёт plaintext secret, без secret_ref', async () => {
+  it('top-level webhook secret in "value" mode → POST carries plaintext secret, without secret_ref', async () => {
     const calls = setupMock();
     renderNotif();
     const { dialog, user } = await openCreate();
@@ -150,7 +150,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     await user.click(within(dialog).getByTestId('herald-secret-mode-value'));
     await user.type(within(dialog).getByTestId('herald-secret-value'), 'plain-signing-token');
 
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/heralds' && c.method === 'POST');
@@ -160,7 +160,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     });
   });
 
-  it('accept_plaintext выключен (422) → показывает pretty-error, форма не крашится', async () => {
+  it('accept_plaintext disabled (422) → shows pretty error, form does not crash', async () => {
     setupMock({ postStatus: 422, postDetail: 'plaintext secret ingestion disabled (enable secret_ingest.accept_plaintext ...)' });
     renderNotif();
     const { dialog, user } = await openCreate();
@@ -171,10 +171,10 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     await user.click(within(dialog).getByTestId('herald-secret-bot_token-mode-value'));
     await user.type(within(dialog).getByTestId('herald-secret-bot_token-value'), 'plain');
     await user.type(within(dialog).getByTestId('herald-field-chat_id'), '777');
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     const err = await within(dialog).findByTestId('herald-form-error');
-    expect(err.textContent ?? '').toMatch(/Путь \(Vault\)/);
+    expect(err.textContent ?? '').toMatch(/Path \(Vault\)/);
     expect(dialog).toBeInTheDocument();
   });
 });

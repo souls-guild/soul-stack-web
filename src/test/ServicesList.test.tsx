@@ -31,7 +31,7 @@ describe('ServicesList', () => {
     tokenStore.clear();
   });
 
-  it('рендерит таблицу из /v1/services', async () => {
+  it('renders the table from /v1/services', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/services', body: SAMPLE }]);
     renderWithProviders(<ServicesList />, '/services');
     expect(screen.getByRole('heading', { name: /Services/i })).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('ServicesList', () => {
     });
   });
 
-  it('фильтр по name contains скрывает несовпадающие строки', async () => {
+  it('name contains filter hides non-matching rows', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/services', body: SAMPLE }]);
     renderWithProviders(<ServicesList />, '/services');
     await waitFor(() => expect(screen.getByText('redis')).toBeInTheDocument());
@@ -51,7 +51,7 @@ describe('ServicesList', () => {
     expect(screen.getByText('postgres')).toBeInTheDocument();
   });
 
-  it('фильтр по ref equals — exact match', async () => {
+  it('ref equals filter — exact match', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/services', body: SAMPLE }]);
     renderWithProviders(<ServicesList />, '/services');
     await waitFor(() => expect(screen.getByText('redis')).toBeInTheDocument());

@@ -163,7 +163,7 @@ describe('SynodDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('рендерит секцию Members: список архонтов из ops-team', async () => {
+  it('renders Members section: list of archons from ops-team', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => {
@@ -174,7 +174,7 @@ describe('SynodDetail', () => {
     expect(screen.getByRole('region', { name: /members/i })).toBeInTheDocument();
   });
 
-  it('рендерит секцию Roles: привязанные роли ops-team', async () => {
+  it('renders Roles section: roles bound to ops-team', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => {
@@ -184,7 +184,7 @@ describe('SynodDetail', () => {
     expect(screen.getByRole('region', { name: /group-roles/i })).toBeInTheDocument();
   });
 
-  it('отображает фильтрацию по :name — переходим на /synods/empty-group', async () => {
+  it('filters by :name — navigating to /synods/empty-group', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/empty-group');
     await waitFor(() => {
@@ -194,23 +194,23 @@ describe('SynodDetail', () => {
     expect(screen.queryByText('archon-alice')).not.toBeInTheDocument();
   });
 
-  it('empty-state members: noMembers при пустом operators', async () => {
+  it('empty-state members: noMembers when operators is empty', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/empty-group');
     await waitFor(() => {
-      expect(screen.getByText(/Участников нет/i)).toBeInTheDocument();
+      expect(screen.getByText(/No members/i)).toBeInTheDocument();
     });
   });
 
-  it('empty-state roles: noRoles при пустом roles', async () => {
+  it('empty-state roles: noRoles when roles is empty', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/empty-group');
     await waitFor(() => {
-      expect(screen.getByText(/Ролей в группе нет/i)).toBeInTheDocument();
+      expect(screen.getByText(/No roles in this group/i)).toBeInTheDocument();
     });
   });
 
-  it('isLoading: показывает loading-индикатор пока данные грузятся', async () => {
+  it('isLoading: shows loading indicator while data loads', async () => {
     // Fetch never resolves — checking the loading state.
     let resolve: ((v: Response) => void) | undefined;
     vi.stubGlobal('fetch', () =>
@@ -219,13 +219,13 @@ describe('SynodDetail', () => {
       }));
 
     renderWithProviders(withRoute(), '/synods/ops-team');
-    expect(screen.getByText(/Загрузка/i)).toBeInTheDocument();
+    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
 
     // Resolve the promise so it doesn't leak.
     resolve!(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
   });
 
-  it('error: показывает errorBox при ошибке GET /v1/synods', async () => {
+  it('error: shows errorBox on GET /v1/synods failure', async () => {
     recordingFetch({ synodsStatus: 500 });
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => {
@@ -234,21 +234,21 @@ describe('SynodDetail', () => {
     });
   });
 
-  it('synod-не-найден: показывает errors:synodNotFound когда name не в items', async () => {
+  it('synod-not-found: shows errors:synodNotFound when name is not in items', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ghost-group');
     await waitFor(() => {
-      expect(screen.getByText(/Synod не найден/i)).toBeInTheDocument();
+      expect(screen.getByText(/Synod not found/i)).toBeInTheDocument();
     });
   });
 
-  it('Remove-operator: DELETE /v1/synods/{name}/operators/{aid} по кнопке ×', async () => {
+  it('Remove-operator: DELETE /v1/synods/{name}/operators/{aid} via × button', async () => {
     const calls = recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
-    const removeBtn = screen.getByRole('button', { name: /убрать archon-alice из группы/i });
+    const removeBtn = screen.getByRole('button', { name: /remove archon-alice from group/i });
     await user.click(removeBtn);
 
     await waitFor(() => {
@@ -260,13 +260,13 @@ describe('SynodDetail', () => {
     });
   });
 
-  it('Revoke-role: DELETE /v1/synods/{name}/roles/{role} по кнопке ×', async () => {
+  it('Revoke-role: DELETE /v1/synods/{name}/roles/{role} via × button', async () => {
     const calls = recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-    const revokeBtn = screen.getByRole('button', { name: /отвязать роль cluster-admin от группы/i });
+    const revokeBtn = screen.getByRole('button', { name: /unbind role cluster-admin from group/i });
     await user.click(revokeBtn);
 
     await waitFor(() => {
@@ -278,7 +278,7 @@ describe('SynodDetail', () => {
     });
   });
 
-  it('Remove-operator ошибка 409: inline memberError показывается в секции members', async () => {
+  it('Remove-operator error 409: inline memberError shown in members section', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team\/operators\/archon-alice$/,
@@ -292,16 +292,16 @@ describe('SynodDetail', () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
-    const removeBtn = screen.getByRole('button', { name: /убрать archon-alice из группы/i });
+    const removeBtn = screen.getByRole('button', { name: /remove archon-alice from group/i });
     await user.click(removeBtn);
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
-      expect(alert).toHaveTextContent(/lock-?out|администратора/i);
+      expect(alert).toHaveTextContent(/lock-?out|admin/i);
     });
   });
 
-  it('Revoke-role ошибка 403: inline roleError показывается в секции roles', async () => {
+  it('Revoke-role error 403: inline roleError shown in roles section', async () => {
     recordingFetch({
       conflict: {
         path: /^\/v1\/synods\/ops-team\/roles\/cluster-admin$/,
@@ -315,23 +315,23 @@ describe('SynodDetail', () => {
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-    const revokeBtn = screen.getByRole('button', { name: /отвязать роль cluster-admin от группы/i });
+    const revokeBtn = screen.getByRole('button', { name: /unbind role cluster-admin from group/i });
     await user.click(revokeBtn);
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
-      expect(alert).toHaveTextContent(/subset|эскалац|права/i);
+      expect(alert).toHaveTextContent(/subset|escalation|permission/i);
     });
   });
 
-  it('[RBAC] без synod.add-operator кнопка «Добавить архонта» не рендерится', async () => {
+  it('[RBAC] without synod.add-operator the "Add archon" button is not rendered', async () => {
     recordingFetch({ myPerms: MY_PERMS_READONLY });
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => expect(screen.getByText('archon-alice')).toBeInTheDocument());
     expect(screen.queryByTestId('add-operator-btn')).not.toBeInTheDocument();
   });
 
-  it('[RBAC] без synod.grant-role кнопка «Привязать роль» не рендерится', async () => {
+  it('[RBAC] without synod.grant-role the "Bind role" button is not rendered', async () => {
     recordingFetch({ myPerms: MY_PERMS_READONLY });
     renderWithProviders(withRoute(), '/synods/ops-team');
     await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
@@ -340,7 +340,7 @@ describe('SynodDetail', () => {
 
   // --- Edit guard tests ---
 
-  it('[EDIT] кнопка edit-synod-btn открывает EditSynodModal с именем и описанием', async () => {
+  it('[EDIT] edit-synod-btn opens EditSynodModal with name and description', async () => {
     const { within: w } = await import('@testing-library/react');
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
@@ -349,12 +349,12 @@ describe('SynodDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod: ops-team/i });
     expect(w(dialog).getByTestId('edit-synod-name-readonly')).toHaveValue('ops-team');
     expect(w(dialog).getByTestId('edit-synod-description-input')).toHaveValue('Operations team');
   });
 
-  it('[EDIT] PATCH /v1/synods/{name} шлёт { description }', async () => {
+  it('[EDIT] PATCH /v1/synods/{name} sends { description }', async () => {
     const { within: w } = await import('@testing-library/react');
     const calls = recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
@@ -363,11 +363,11 @@ describe('SynodDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod: ops-team/i });
     const textarea = w(dialog).getByTestId('edit-synod-description-input');
     await user.clear(textarea);
     await user.type(textarea, 'New description');
-    await user.click(w(dialog).getByRole('button', { name: /^Сохранить$/ }));
+    await user.click(w(dialog).getByRole('button', { name: /^Save$/ }));
 
     await waitFor(() => {
       const patch = calls.find((c) => c.url === '/v1/synods/ops-team' && c.method === 'PATCH');
@@ -377,7 +377,7 @@ describe('SynodDetail', () => {
     });
   });
 
-  it('[EDIT][RBAC] без synod.update кнопка edit-synod-btn disabled', async () => {
+  it('[EDIT][RBAC] without synod.update edit-synod-btn is disabled', async () => {
     recordingFetch({ myPerms: MY_PERMS_NO_UPDATE });
     renderWithProviders(withRoute(), '/synods/ops-team');
 
@@ -387,7 +387,7 @@ describe('SynodDetail', () => {
     expect(btn).toHaveAttribute('title', expect.stringMatching(/synod\.update/i));
   });
 
-  it('[EDIT] 422 от PATCH показывается в модалке', async () => {
+  it('[EDIT] 422 from PATCH is shown in the modal', async () => {
     const { within: w } = await import('@testing-library/react');
     recordingFetch({
       conflict: {
@@ -403,17 +403,17 @@ describe('SynodDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
     await user.click(screen.getByTestId('edit-synod-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Synod: ops-team/i });
-    await user.click(w(dialog).getByRole('button', { name: /^Сохранить$/ }));
+    const dialog = await screen.findByRole('dialog', { name: /Edit Synod: ops-team/i });
+    await user.click(w(dialog).getByRole('button', { name: /^Save$/ }));
 
     const alert = await w(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(/description too long|валид/i);
-    expect(screen.getByRole('dialog', { name: /Редактировать Synod/i })).toBeInTheDocument();
+    expect(alert).toHaveTextContent(/description too long|valid/i);
+    expect(screen.getByRole('dialog', { name: /Edit Synod/i })).toBeInTheDocument();
   });
 
   // -- Guard tests: clickable links --------------------------------------------------
 
-  it('[LINKS] участники-архоны рендерятся ссылками на /archons/:aid', async () => {
+  it('[LINKS] member archons render as links to /archons/:aid', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
 
@@ -426,7 +426,7 @@ describe('SynodDetail', () => {
     expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
   });
 
-  it('[LINKS] роли группы рендерятся ссылками на /rbac', async () => {
+  it('[LINKS] group roles render as links to /rbac', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
 
@@ -439,7 +439,7 @@ describe('SynodDetail', () => {
     expect(linkViewer).toHaveAttribute('href', '/rbac');
   });
 
-  it('[LINKS] при пустых секциях ссылок нет (empty-group)', async () => {
+  it('[LINKS] no links when sections are empty (empty-group)', async () => {
     recordingFetch({});
     renderWithProviders(withRoute(), '/synods/empty-group');
 
@@ -451,7 +451,7 @@ describe('SynodDetail', () => {
 
   // -- Picker tests (typeahead multi-select) -------------------------------------------
 
-  it('[ADD] AddOperatorModal: typeahead-выбор → POST /v1/synods/{name}/operators', async () => {
+  it('[ADD] AddOperatorModal: typeahead select → POST /v1/synods/{name}/operators', async () => {
     const { within: w } = await import('@testing-library/react');
     const calls = recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
@@ -460,7 +460,7 @@ describe('SynodDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     await user.click(w(dialog).getByTestId('add-operator-search'));
     // archon-dave is not a member of ops-team -> available in options.
     await user.click(await w(dialog).findByTestId('add-operator-option-archon-dave'));
@@ -478,7 +478,7 @@ describe('SynodDetail', () => {
   // Guard NIM-70: headline contract — archon search is SERVER-SIDE (GET /v1/operators?q=...),
   // not "fetch all + .filter on the client". A regression to client-side filtering would pass
   // all other picker tests (they don't type into the search), but would break with 50+ archons.
-  it('[SERVER-Q] AddOperatorModal: ввод в поиск уходит как ?q= в GET /v1/operators', async () => {
+  it('[SERVER-Q] AddOperatorModal: search input goes out as ?q= in GET /v1/operators', async () => {
     const { within: w } = await import('@testing-library/react');
     const calls = recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
@@ -487,7 +487,7 @@ describe('SynodDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
     await user.click(screen.getByTestId('add-operator-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Добавить архонта в ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Add archon to ops-team/i });
     // Type a substring — the picker must forward it to the server (debounce inside SearchMultiSelect).
     await user.type(w(dialog).getByTestId('add-operator-search'), 'dave');
 
@@ -500,14 +500,14 @@ describe('SynodDetail', () => {
         });
         expect(
           served,
-          'picker должен слать ?q= на сервер (серверный поиск), а не фильтровать клиентски',
+          'picker must send ?q= to the server (server-side search), not filter client-side',
         ).toBeDefined();
       },
       { timeout: 2000 },
     );
   });
 
-  it('[GRANT] GrantRoleModal: typeahead-выбор → POST /v1/synods/{name}/roles', async () => {
+  it('[GRANT] GrantRoleModal: typeahead select → POST /v1/synods/{name}/roles', async () => {
     const { within: w } = await import('@testing-library/react');
     const calls = recordingFetch({});
     renderWithProviders(withRoute(), '/synods/ops-team');
@@ -516,7 +516,7 @@ describe('SynodDetail', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'ops-team' })).toBeInTheDocument());
     await user.click(screen.getByTestId('grant-role-btn'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Привязать роль к ops-team/i });
+    const dialog = await screen.findByRole('dialog', { name: /Bind role to ops-team/i });
     await user.click(w(dialog).getByTestId('grant-role-search'));
     // soul-operator is not tied to ops-team -> available in options.
     await user.click(await w(dialog).findByTestId('grant-role-option-soul-operator'));

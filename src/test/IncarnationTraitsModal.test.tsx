@@ -31,7 +31,7 @@ describe('IncarnationTraitsModal', () => {
     tokenStore.clear();
   });
 
-  it('prefill: текущие traits (scalar + list) показаны при открытии', () => {
+  it('prefill: current traits (scalar + list) shown on open', () => {
     renderWithProviders(
       <IncarnationTraitsModal
         open
@@ -42,16 +42,16 @@ describe('IncarnationTraitsModal', () => {
     );
 
     expect(screen.getAllByTestId('trait-row')).toHaveLength(2);
-    const keys = screen.getAllByRole('textbox', { name: /ключ trait/i });
+    const keys = screen.getAllByRole('textbox', { name: /trait key/i });
     expect(keys[0]).toHaveValue('env');
     expect(keys[1]).toHaveValue('regions');
-    expect(screen.getByRole('textbox', { name: /значение trait/i })).toHaveValue('prod');
+    expect(screen.getByRole('textbox', { name: /trait value/i })).toHaveValue('prod');
     expect(screen.getByText('eu')).toBeInTheDocument();
     expect(screen.getByText('us')).toBeInTheDocument();
-    expect(screen.getByText(/предзаполнена текущими значениями/)).toBeInTheDocument();
+    expect(screen.getByText(/pre-filled with current values/)).toBeInTheDocument();
   });
 
-  it('без currentTraits редактор пуст', () => {
+  it('editor is empty without currentTraits', () => {
     renderWithProviders(
       <IncarnationTraitsModal open incarnationName="redis-prod" onClose={noop} />,
     );
@@ -59,7 +59,7 @@ describe('IncarnationTraitsModal', () => {
     expect(screen.getByTestId('traits-add-row')).toBeInTheDocument();
   });
 
-  it('добавление trait сохраняет prefilled-значения в PUT (полный набор)', async () => {
+  it('adding a trait keeps prefilled values in the PUT (full set)', async () => {
     const puts = installPutMock();
     renderWithProviders(
       <IncarnationTraitsModal
@@ -72,22 +72,22 @@ describe('IncarnationTraitsModal', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByTestId('traits-add-row'));
-    const keys = screen.getAllByRole('textbox', { name: /ключ trait/i });
+    const keys = screen.getAllByRole('textbox', { name: /trait key/i });
     await user.type(keys[keys.length - 1], 'owner');
-    const vals = screen.getAllByRole('textbox', { name: /значение trait/i });
+    const vals = screen.getAllByRole('textbox', { name: /trait value/i });
     await user.type(vals[vals.length - 1], 'core');
 
-    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Traits инкарнации обновлены')).toBeInTheDocument();
+      expect(screen.getByText('Incarnation traits updated')).toBeInTheDocument();
     });
     expect(puts).toHaveLength(1);
     expect(puts[0].url).toMatch(/\/v1\/incarnations\/redis-prod\/traits/);
     expect(puts[0].body).toEqual({ traits: { env: 'prod', tier: 'gold', owner: 'core' } });
   });
 
-  it('удаление строки — явное удаление trait из PUT', async () => {
+  it('removing a row explicitly deletes the trait from the PUT', async () => {
     const puts = installPutMock();
     renderWithProviders(
       <IncarnationTraitsModal
@@ -99,8 +99,8 @@ describe('IncarnationTraitsModal', () => {
     );
     const user = userEvent.setup();
 
-    await user.click(screen.getAllByRole('button', { name: /Удалить trait/i })[0]);
-    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await user.click(screen.getAllByRole('button', { name: /Remove trait/i })[0]);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(puts).toHaveLength(1);
@@ -108,7 +108,7 @@ describe('IncarnationTraitsModal', () => {
     expect(puts[0].body).toEqual({ traits: { tier: 'gold' } });
   });
 
-  it('save инвалидирует и detail, и список инкарнаций', async () => {
+  it('save invalidates both the detail and the incarnations list', async () => {
     installPutMock();
     const qc = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -128,9 +128,9 @@ describe('IncarnationTraitsModal', () => {
     );
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
-      expect(screen.getByText('Traits инкарнации обновлены')).toBeInTheDocument();
+      expect(screen.getByText('Incarnation traits updated')).toBeInTheDocument();
     });
 
     const keys = spy.mock.calls.map(([f]) => f?.queryKey);
@@ -138,7 +138,7 @@ describe('IncarnationTraitsModal', () => {
     expect(keys).toContainEqual(['incarnations']);
   });
 
-  it('reopen пересидирует форму свежими currentTraits', () => {
+  it('reopen reseeds the form with fresh currentTraits', () => {
     const view = renderWithProviders(
       <IncarnationTraitsModal
         open={false}
@@ -157,7 +157,7 @@ describe('IncarnationTraitsModal', () => {
         onClose={noop}
       />,
     );
-    expect(screen.getByRole('textbox', { name: /значение trait/i })).toHaveValue('prod');
+    expect(screen.getByRole('textbox', { name: /trait value/i })).toHaveValue('prod');
 
     view.rerender(
       <IncarnationTraitsModal
@@ -175,6 +175,6 @@ describe('IncarnationTraitsModal', () => {
         onClose={noop}
       />,
     );
-    expect(screen.getByRole('textbox', { name: /значение trait/i })).toHaveValue('stage');
+    expect(screen.getByRole('textbox', { name: /trait value/i })).toHaveValue('stage');
   });
 });

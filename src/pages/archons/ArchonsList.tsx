@@ -57,7 +57,7 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
   return (
     <div
       role="dialog"
-      aria-label="Новый JWT"
+      aria-label="New JWT"
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--warn, #b07f00)',
@@ -128,7 +128,7 @@ function RolesPicker({
     <label className={styles.rolesPickerField}>
       <span className={styles.metaKey}>{t('pages:archonRolesOptional')}</span>
       <div
-        aria-label="выбранные роли"
+        aria-label="selected roles"
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -159,7 +159,7 @@ function RolesPicker({
             {rn}
             <button
               type="button"
-              aria-label={`убрать роль ${rn}`}
+              aria-label={`remove role ${rn}`}
               onClick={() => onChange(selected.filter((x) => x !== rn))}
               style={{
                 border: 0,
@@ -175,7 +175,7 @@ function RolesPicker({
           </span>
         ))}
         <select
-          aria-label="добавить роль"
+          aria-label="add role"
           value=""
           disabled={disabled || remaining.length === 0}
           onChange={(e) => {
@@ -463,7 +463,7 @@ export function ArchonsList() {
         {createMut.error ? (
           <div className={styles.errorBox} role="alert">
             {createMut.error instanceof ApiError
-              ? `Ошибка ${createMut.error.status}: ${createMut.error.message}`
+              ? `Error ${createMut.error.status}: ${createMut.error.message}`
               : String(createMut.error)}
           </div>
         ) : null}
@@ -538,7 +538,7 @@ export function ArchonsList() {
 
         {list.data ? (
           <div
-            aria-label="счётчик архонтов"
+            aria-label="archons counter"
             style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
           >
             {needle
@@ -550,7 +550,7 @@ export function ArchonsList() {
         {list.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
         {list.error ? (
           <div className={styles.errorBox}>
-            {list.error instanceof ApiError ? `Ошибка ${list.error.status}: ${list.error.message}` : String(list.error)}
+            {list.error instanceof ApiError ? `Error ${list.error.status}: ${list.error.message}` : String(list.error)}
           </div>
         ) : null}
 
@@ -572,7 +572,7 @@ export function ArchonsList() {
         {issueMut.error ? (
           <div className={styles.errorBox}>
             {issueMut.error instanceof ApiError
-              ? `Ошибка ${issueMut.error.status}: ${issueMut.error.message}`
+              ? `Error ${issueMut.error.status}: ${issueMut.error.message}`
               : String(issueMut.error)}
           </div>
         ) : null}

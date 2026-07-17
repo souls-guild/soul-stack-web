@@ -1,7 +1,7 @@
 /**
- * NIM-74 guard: State-вьюха деградирует gracefully, если discovery раскрываемых
- * секретов недоступен (403 / 404 / ошибка). Таблица redis_users НЕ рендерится,
- * ключ redis_users показывается обычным JSON-фильтром, глазов нет, UI не падает.
+ * NIM-74 guard: the State view degrades gracefully when discovery of revealable
+ * secrets is unavailable (403 / 404 / error). The redis_users table is NOT rendered,
+ * the redis_users key is shown via the regular JSON filter, there are no eyes, the UI does not crash.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -24,9 +24,9 @@ describe('StateTab — graceful discovery redis_users', () => {
   });
 
   it.each([
-    ['403 (вне scope права)', 403],
-    ['404 (инкарнация вне scope)', 404],
-  ])('discovery %s → таблицы нет, redis_users через JSON-фильтр, глазов нет', async (_label, status) => {
+    ['403 (out-of-scope permissions)', 403],
+    ['404 (incarnation out of scope)', 404],
+  ])('discovery %s → no table, redis_users via JSON filter, no eyes', async (_label, status) => {
     const spy = vi
       .spyOn(keeperApi.incarnations, 'revealableSecrets')
       .mockRejectedValue(new ApiError(status, 'about:blank', 'err', 'err'));
@@ -49,7 +49,7 @@ describe('StateTab — graceful discovery redis_users', () => {
     expect(screen.getByText('Runtime State')).toBeInTheDocument();
   });
 
-  it('discovery с пустым items → таблицы нет, redis_users через JSON-фильтр', async () => {
+  it('discovery with empty items → no table, redis_users via JSON filter', async () => {
     const spy = vi
       .spyOn(keeperApi.incarnations, 'revealableSecrets')
       .mockResolvedValue({ items: [] });

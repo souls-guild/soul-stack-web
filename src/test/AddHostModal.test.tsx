@@ -20,7 +20,7 @@ describe('AddHostModal', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('select исключает уже-declared SID-ы', async () => {
+  it('select excludes already-declared SIDs', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/souls', body: SOULS }]);
     renderWithProviders(
       <AddHostModal open incarnationName="redis-prod" existingSids={['host-a.local']} onClose={() => {}} />,
@@ -31,7 +31,7 @@ describe('AddHostModal', () => {
     expect(screen.queryByRole('option', { name: /host-a.local/ })).not.toBeInTheDocument();
   });
 
-  it('submit → PATCH .../hosts mode=append с выбранным SID + role', async () => {
+  it('submit → PATCH .../hosts mode=append with selected SID + role', async () => {
     let lastUrl = '';
     let lastBody: unknown = null;
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -56,10 +56,10 @@ describe('AddHostModal', () => {
     );
     const user = userEvent.setup();
     await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
-    await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
+    await user.selectOptions(screen.getByLabelText('host SID'), 'host-a.local');
     await user.type(screen.getByPlaceholderText('master / replica / …'), 'master');
     // Force-add requires confirming the dangerous operation.
-    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.click(screen.getByLabelText('Confirm force-add'));
     await user.click(screen.getByTestId('force-add-confirm'));
 
     await waitFor(() => {
@@ -88,29 +88,29 @@ describe('AddHostModal', () => {
     );
     const user = userEvent.setup();
     await waitFor(() => screen.getByRole('option', { name: /host-a.local/ }));
-    await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
-    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.selectOptions(screen.getByLabelText('host SID'), 'host-a.local');
+    await user.click(screen.getByLabelText('Confirm force-add'));
     await user.click(screen.getByTestId('force-add-confirm'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Неизвестный SID/)).toBeInTheDocument();
+      expect(screen.getByText(/Unknown SID/)).toBeInTheDocument();
     });
   });
 
-  it('пустой SID → form-error без запроса', async () => {
+  it('empty SID → form-error without request', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/souls', body: SOULS }]);
     renderWithProviders(
       <AddHostModal open incarnationName="redis-prod" existingSids={[]} onClose={() => {}} />,
     );
     const user = userEvent.setup();
-    await waitFor(() => screen.getByLabelText('SID хоста'));
+    await waitFor(() => screen.getByLabelText('host SID'));
     // Confirm (otherwise the button is disabled), then submit without SID.
-    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.click(screen.getByLabelText('Confirm force-add'));
     await user.click(screen.getByTestId('force-add-confirm'));
-    expect(screen.getByText('Выберите SID хоста.')).toBeInTheDocument();
+    expect(screen.getByText('Select a host SID.')).toBeInTheDocument();
   });
 
-  it('force-add: danger-warning + кнопка заблокирована без подтверждения', async () => {
+  it('force-add: danger-warning + button disabled without confirmation', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/souls', body: SOULS }]);
     renderWithProviders(
       <AddHostModal open incarnationName="redis-prod" existingSids={[]} onClose={() => {}} />,
@@ -120,16 +120,16 @@ describe('AddHostModal', () => {
 
     // Warning block is visible.
     expect(screen.getByTestId('force-add-warning')).toBeInTheDocument();
-    expect(screen.getByTestId('force-add-warning').textContent).toMatch(/несогласованному состоянию/);
+    expect(screen.getByTestId('force-add-warning').textContent).toMatch(/inconsistent state/);
 
     // Button is disabled before confirmation.
     const addBtn = screen.getByTestId('force-add-confirm');
     expect(addBtn).toBeDisabled();
-    await user.selectOptions(screen.getByLabelText('SID хоста'), 'host-a.local');
+    await user.selectOptions(screen.getByLabelText('host SID'), 'host-a.local');
     expect(addBtn).toBeDisabled();
 
     // After confirmation -- enabled.
-    await user.click(screen.getByLabelText('Подтвердить принудительное добавление'));
+    await user.click(screen.getByLabelText('Confirm force-add'));
     expect(addBtn).not.toBeDisabled();
   });
 });

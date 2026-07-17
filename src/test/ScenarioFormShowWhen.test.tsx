@@ -52,8 +52,8 @@ function Wrapper({
   );
 }
 
-describe('show_when поля', () => {
-  it('поле с show_when=false не рендерится', () => {
+describe('show_when fields', () => {
+  it('field with show_when=false does not render', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -73,7 +73,7 @@ describe('show_when поля', () => {
     expect(screen.queryByTestId('field-text-sentinels')).toBeNull();
   });
 
-  it('поле с show_when реагирует на изменение значения', () => {
+  it('field with show_when reacts to value change', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -97,7 +97,7 @@ describe('show_when поля', () => {
     expect(screen.getByTestId('field-text-sentinels')).toBeInTheDocument();
   });
 
-  it('поле прячется обратно при изменении значения', () => {
+  it('field hides again when value changes', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -119,8 +119,8 @@ describe('show_when поля', () => {
   });
 });
 
-describe('show_when секции', () => {
-  it('секция с show_when=false скрывает все поля секции', () => {
+describe('show_when sections', () => {
+  it('section with show_when=false hides all its fields', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -147,8 +147,8 @@ describe('show_when секции', () => {
   });
 });
 
-describe('placeholder из form', () => {
-  it('placeholder переопределяет prop.example', () => {
+describe('placeholder from form', () => {
+  it('placeholder overrides prop.example', () => {
     const schemaWithExample: ScenarioInputSchema = {
       host: { type: 'string', example: 'default-example' },
     };
@@ -165,7 +165,7 @@ describe('placeholder из form', () => {
     expect(input.placeholder).toBe('custom-placeholder');
   });
 
-  it('без placeholder из form — используется prop.example', () => {
+  it('without form placeholder — prop.example is used', () => {
     const schemaWithExample: ScenarioInputSchema = {
       host: { type: 'string', example: 'host.example.com' },
     };
@@ -183,22 +183,22 @@ describe('placeholder из form', () => {
   });
 });
 
-describe('hint из form', () => {
-  it('hint из form отображается под полем', () => {
+describe('hint from form', () => {
+  it('hint from form is shown under the field', () => {
     const form: ScenarioForm = {
       sections: [
         {
           key: 'main',
-          fields: [{ name: 'mode', hint: 'Выберите режим работы Redis' }],
+          fields: [{ name: 'mode', hint: 'Select the Redis operating mode' }],
         },
       ],
     };
     render(<Wrapper schema={SCHEMA} form={form} />);
     expect(screen.getByTestId('field-hint-mode')).toBeInTheDocument();
-    expect(screen.getByTestId('field-hint-mode').textContent).toBe('Выберите режим работы Redis');
+    expect(screen.getByTestId('field-hint-mode').textContent).toBe('Select the Redis operating mode');
   });
 
-  it('без hint из form — отображается prop.description', () => {
+  it('without form hint — prop.description is shown', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -211,7 +211,7 @@ describe('hint из form', () => {
     expect(screen.getByTestId('field-hint-sentinels').textContent).toBe('Sentinel nodes');
   });
 
-  it('hint из form перекрывает prop.description', () => {
+  it('hint from form overrides prop.description', () => {
     const form: ScenarioForm = {
       sections: [
         {
@@ -225,8 +225,8 @@ describe('hint из form', () => {
   });
 });
 
-describe('computeVisibleFields интеграция', () => {
-  it('скрытое required поле не блокирует отправку (через missingRequiredFields)', () => {
+describe('computeVisibleFields integration', () => {
+  it('hidden required field does not block submission (via missingRequiredFields)', () => {
     const schema: ScenarioInputSchema = {
       mode: { type: 'string', required: true },
       host: { type: 'string', required: true },

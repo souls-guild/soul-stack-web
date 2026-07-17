@@ -50,7 +50,7 @@ describe('UpgradeModal — upgrade-paths preview (NIM-34)', () => {
     tokenStore.clear();
   });
 
-  it('found-цель → badge found + список миграций', async () => {
+  it('found target → found badge + migration list', async () => {
     installFetchMock([
       REFS,
       {
@@ -82,7 +82,7 @@ describe('UpgradeModal — upgrade-paths preview (NIM-34)', () => {
     expect(screen.getByTestId('upgrade-submit')).not.toBeDisabled();
   });
 
-  it('legacy-цель → badge legacy', async () => {
+  it('legacy target → legacy badge', async () => {
     installFetchMock([
       REFS,
       {
@@ -113,7 +113,7 @@ describe('UpgradeModal — upgrade-paths preview (NIM-34)', () => {
     expect(screen.getByTestId('upgrade-submit')).not.toBeDisabled();
   });
 
-  it('reachable=false → красный баннер с reason + submit заблокирован', async () => {
+  it('reachable=false → red banner with reason + submit disabled', async () => {
     installFetchMock([
       REFS,
       {
@@ -142,7 +142,7 @@ describe('UpgradeModal — upgrade-paths preview (NIM-34)', () => {
     expect(screen.getByTestId('upgrade-submit')).toBeDisabled();
   });
 
-  it('404 → панель скрыта, модалка работает', async () => {
+  it('404 → panel hidden, modal still works', async () => {
     installFetchMock([
       REFS,
       {
@@ -195,13 +195,13 @@ async function runUpgrade(pathsBody: unknown, reply: Record<string, unknown>) {
   ]);
 }
 
-describe('UpgradeModal — «Отслеживать процесс» (NIM-34)', () => {
+describe('UpgradeModal — «Track run» (NIM-34)', () => {
   beforeEach(() => {
     tokenStore.clear();
     navigateSpy.mockClear();
   });
 
-  it('успех с run_apply_id → показаны ОБЕ кнопки (Track + Close)', async () => {
+  it('success with run_apply_id → BOTH buttons shown (Track + Close)', async () => {
     runUpgrade(FOUND_PATHS, { apply_id: '01APPLYMIGRATE0000000000AA', run_apply_id: '01RUNHOSTS00000000000000AA' });
     renderModal();
     const user = userEvent.setup();
@@ -212,7 +212,7 @@ describe('UpgradeModal — «Отслеживать процесс» (NIM-34)', 
     expect(screen.getByTestId('upgrade-track-run')).toBeInTheDocument();
   });
 
-  it('успех без run_apply_id (миграция без host-Run) → только Close', async () => {
+  it('success without run_apply_id (migration without host-Run) → Close only', async () => {
     runUpgrade(LEGACY_PATHS, { apply_id: '01APPLYMIGRATE0000000000BB' });
     renderModal();
     const user = userEvent.setup();
@@ -223,7 +223,7 @@ describe('UpgradeModal — «Отслеживать процесс» (NIM-34)', 
     expect(screen.queryByTestId('upgrade-track-run')).not.toBeInTheDocument();
   });
 
-  it('клик по Track → navigate на RunDetail по run_apply_id + закрытие модалки', async () => {
+  it('click Track → navigate to RunDetail by run_apply_id + close modal', async () => {
     const RUN = '01RUNHOSTS00000000000000CC';
     runUpgrade(FOUND_PATHS, { apply_id: '01APPLYMIGRATE0000000000CC', run_apply_id: RUN });
     const onClose = vi.fn();

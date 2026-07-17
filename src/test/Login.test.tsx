@@ -13,7 +13,7 @@ describe('Login', () => {
     installFetchMock([]);
   });
 
-  it('рендерится без ошибок и показывает форму JWT', () => {
+  it('renders without errors and shows the JWT form', () => {
     renderWithProviders(
       <AuthProvider>
         <Login />
@@ -21,11 +21,11 @@ describe('Login', () => {
       '/login',
     );
     expect(screen.getByRole('heading', { name: /Soul Stack/i })).toBeInTheDocument();
-    expect(screen.getByText(/Keeper UI · вход Архонта/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Войти/i })).toBeInTheDocument();
+    expect(screen.getByText(/Keeper UI · Archon login/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sign in/i })).toBeInTheDocument();
   });
 
-  it('валидирует пустой ввод через zod', async () => {
+  it('validates empty input via zod', async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <AuthProvider>
@@ -33,11 +33,11 @@ describe('Login', () => {
       </AuthProvider>,
       '/login',
     );
-    await user.click(screen.getByRole('button', { name: /Войти/i }));
-    expect(await screen.findByText(/вставьте JWT-токен/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Sign in/i }));
+    expect(await screen.findByText(/paste the Archon JWT token/i)).toBeInTheDocument();
   });
 
-  it('отвергает строку, не похожую на JWT', async () => {
+  it('rejects a string that does not look like a JWT', async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <AuthProvider>
@@ -47,7 +47,7 @@ describe('Login', () => {
     );
     const ta = screen.getByPlaceholderText(/eyJhbGciOi/);
     await user.type(ta, 'not-a-jwt');
-    await user.click(screen.getByRole('button', { name: /Войти/i }));
-    expect(await screen.findByText(/не похоже на JWT/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Sign in/i }));
+    expect(await screen.findByText(/does not look like a JWT/i)).toBeInTheDocument();
   });
 });

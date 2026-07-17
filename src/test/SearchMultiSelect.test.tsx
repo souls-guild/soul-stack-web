@@ -40,7 +40,7 @@ function Harness(props: {
 }
 
 describe('SearchMultiSelect', () => {
-  it('рендерит поле поиска; фокус открывает listbox с опциями (items-режим)', async () => {
+  it('renders the search field; focus opens the listbox with options (items mode)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} />);
 
@@ -56,7 +56,7 @@ describe('SearchMultiSelect', () => {
     expect(screen.getByTestId('ms-option-cherry')).toBeInTheDocument();
   });
 
-  it('фильтрует по подстроке лейбла/сублейбла на клиенте', async () => {
+  it('filters by label/sublabel substring on the client', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} />);
 
@@ -70,7 +70,7 @@ describe('SearchMultiSelect', () => {
     });
   });
 
-  it('фильтрует по сублейблу (desc)', async () => {
+  it('filters by sublabel (desc)', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} />);
 
@@ -83,7 +83,7 @@ describe('SearchMultiSelect', () => {
     });
   });
 
-  it('multi-select: клики по опциям добавляют чипы, aria-selected выставляется', async () => {
+  it('multi-select: clicking options adds chips and sets aria-selected', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} />);
 
@@ -100,7 +100,7 @@ describe('SearchMultiSelect', () => {
     expect(screen.getByTestId('ms-option-banana')).toHaveAttribute('aria-selected', 'false');
   });
 
-  it('удаление: X на чипе снимает выбор; повторный клик по опции тоже снимает', async () => {
+  it('removal: X on a chip deselects; clicking the option again also deselects', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} initial={['apple', 'banana']} />);
 
@@ -116,7 +116,7 @@ describe('SearchMultiSelect', () => {
     expect(screen.queryByTestId('ms-chip-banana')).not.toBeInTheDocument();
   });
 
-  it('async search-режим: вызывает search(q) и рендерит результат', async () => {
+  it('async search mode: calls search(q) and renders the result', async () => {
     const user = userEvent.setup();
     const search = vi.fn(async (q: string) =>
       ITEMS.filter((i) => i.name.includes(q.toLowerCase())),
@@ -135,7 +135,7 @@ describe('SearchMultiSelect', () => {
     expect(search).toHaveBeenCalled();
   });
 
-  it('empty-state: показывает emptyText когда нет совпадений', async () => {
+  it('empty state: shows emptyText when there are no matches', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness items={ITEMS} />);
 

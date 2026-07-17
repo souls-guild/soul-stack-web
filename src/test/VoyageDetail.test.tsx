@@ -112,7 +112,7 @@ describe('VoyageDetail', () => {
     };
   });
 
-  it('рендерит scenario-voyage с метаданными и summary', async () => {
+  it('renders scenario voyage with metadata and summary', async () => {
     // IMPORTANT: /targets must come BEFORE /voyages/{id} -- fetchMock matches by startsWith.
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
@@ -132,7 +132,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByTestId('voyage-summary-counts').textContent).toContain('succeeded: 3');
   });
 
-  it('рендерит command-voyage с target.sids', async () => {
+  it('renders command voyage with target.sids', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/voyages/01VCMD0000000000000000002/targets', body: { voyage_id: '01VCMD0000000000000000002', targets: [] } },
       { method: 'GET', url: '/v1/voyages/01VCMD0000000000000000002', body: SAMPLE_VOYAGE_COMMAND },
@@ -144,20 +144,20 @@ describe('VoyageDetail', () => {
     expect(screen.getByText('core.cmd.shell')).toBeInTheDocument();
     expect(screen.getByText(/host-a\.example\.com/)).toBeInTheDocument();
     // No summary -> pending message.
-    expect(screen.getByText(/Summary появится по мере выполнения/)).toBeInTheDocument();
+    expect(screen.getByText(/Summary will appear as the run progresses/)).toBeInTheDocument();
   });
 
-  it('ошибка API → errorBox', async () => {
+  it('API error → errorBox', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, status: 404, body: { title: 'not found' } },
     ]);
     renderVoyage(VOYAGE_ID);
     await waitFor(() => {
-      expect(screen.getByText(/Ошибка 404/)).toBeInTheDocument();
+      expect(screen.getByText(/Error 404/)).toBeInTheDocument();
     });
   });
 
-  it('progress bar рассчитывается корректно', async () => {
+  it('progress bar computed correctly', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -174,7 +174,7 @@ describe('VoyageDetail', () => {
   // FIX 1: Batch N/M -- barrier vs window
   // ──────────────────────────────────────────────
 
-  it('barrier: текущий_батч/тотал рендерится (3/10)', async () => {
+  it('barrier: current batch / total renders (3/10)', async () => {
     const vid = VOYAGE_BARRIER_PARTIAL.voyage_id;
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${vid}/targets`, body: EMPTY_TARGETS },
@@ -186,7 +186,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByText(/Batch 3\s*\/\s*10/)).toBeInTheDocument();
   });
 
-  it('barrier: terminal succeeded → 10/10 в заголовке (не 0/1)', async () => {
+  it('barrier: terminal succeeded → 10/10 in heading (not 0/1)', async () => {
     const vid = VOYAGE_BARRIER_TERMINAL.voyage_id;
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${vid}/targets`, body: EMPTY_TARGETS },
@@ -209,7 +209,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByText(/Batch 1\s*\/\s*1/)).toBeInTheDocument();
   });
 
-  it('window: НЕ показывает «Batch N/M», а прогресс по targets (done/scope_size)', async () => {
+  it('window: does NOT show "Batch N/M", but progress by targets (done/scope_size)', async () => {
     const vid = VOYAGE_WINDOW.voyage_id;
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${vid}/targets`, body: EMPTY_TARGETS },
@@ -227,7 +227,7 @@ describe('VoyageDetail', () => {
   // FIX 2: clickable summary filter -> targets
   // ──────────────────────────────────────────────
 
-  it('клик «succeeded» → видны только succeeded targets', async () => {
+  it('click "succeeded" → only succeeded targets visible', async () => {
     const voyage = { ...SAMPLE_VOYAGE_SCENARIO, summary: { total: 3, succeeded: 2, failed: 1, cancelled: 0 } };
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: SUMMARY_TARGETS },
@@ -249,7 +249,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByText('host-a')).toBeInTheDocument();
   });
 
-  it('клик «failed» → видны только failed targets', async () => {
+  it('click "failed" → only failed targets visible', async () => {
     const voyage = { ...SAMPLE_VOYAGE_SCENARIO, summary: { total: 3, succeeded: 2, failed: 1, cancelled: 0 } };
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: SUMMARY_TARGETS },
@@ -270,7 +270,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByText('host-b')).toBeInTheDocument();
   });
 
-  it('повторный клик на тот же фильтр → сброс (все targets видны)', async () => {
+  it('clicking the same filter again → reset (all targets visible)', async () => {
     const voyage = { ...SAMPLE_VOYAGE_SCENARIO, summary: { total: 3, succeeded: 2, failed: 1, cancelled: 0 } };
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: SUMMARY_TARGETS },
@@ -293,7 +293,7 @@ describe('VoyageDetail', () => {
     });
   });
 
-  it('активный фильтр-бейдж имеет data-active=true', async () => {
+  it('active filter badge has data-active=true', async () => {
     const voyage = { ...SAMPLE_VOYAGE_SCENARIO, summary: { total: 3, succeeded: 2, failed: 1, cancelled: 0 } };
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: SUMMARY_TARGETS },
@@ -315,7 +315,7 @@ describe('VoyageDetail', () => {
   // [LINKS] clickable links
   // ──────────────────────────────────────────────
 
-  it('[LINKS] started_by_aid рендерится ссылкой на /archons/:aid', async () => {
+  it('[LINKS] started_by_aid renders as a link to /archons/:aid', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -327,7 +327,7 @@ describe('VoyageDetail', () => {
     expect(link).toHaveAttribute('href', '/archons/archon-alice');
   });
 
-  it('[LINKS] target.sids в command-voyage рендерятся ссылками на /souls/:sid', async () => {
+  it('[LINKS] target.sids in command voyage render as links to /souls/:sid', async () => {
     const cmdId = SAMPLE_VOYAGE_COMMAND.voyage_id;
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${cmdId}/targets`, body: { voyage_id: cmdId, targets: [] } },
@@ -343,7 +343,7 @@ describe('VoyageDetail', () => {
     expect(linkB).toHaveAttribute('href', '/souls/host-b.example.com');
   });
 
-  it('[LINKS] разделитель «, » между SID-ссылками сохранён визуально', async () => {
+  it('[LINKS] the ", " separator between SID links is preserved visually', async () => {
     const cmdId = SAMPLE_VOYAGE_COMMAND.voyage_id;
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${cmdId}/targets`, body: { voyage_id: cmdId, targets: [] } },
@@ -359,7 +359,7 @@ describe('VoyageDetail', () => {
     expect(sidCell.textContent).toContain(',');
   });
 
-  it('[LINKS] command-voyage без target.sids — секция target.sids не рендерится', async () => {
+  it('[LINKS] command voyage without target.sids — the target.sids section does not render', async () => {
     const voyage = { ...SAMPLE_VOYAGE_COMMAND, target: {} };
     const cmdId = voyage.voyage_id;
     installFetchMock([
@@ -378,7 +378,7 @@ describe('VoyageDetail', () => {
   // Voyage "Notifications" section
   // ──────────────────────────────────────────────
 
-  it('уведомления пусты → empty-state', async () => {
+  it('notifications empty → empty-state', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -386,11 +386,11 @@ describe('VoyageDetail', () => {
     ]);
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('voyage-notifications-section')).toBeInTheDocument());
-    expect(screen.getByText(/Уведомлений по этому прогону не было/)).toBeInTheDocument();
+    expect(screen.getByText(/No notifications for this run/)).toBeInTheDocument();
     expect(screen.queryByTestId('voyage-notifications-table')).not.toBeInTheDocument();
   });
 
-  it('уведомления: delivered показывается с бейджем ok, failed — danger', async () => {
+  it('notifications: delivered shown with ok badge, failed — danger', async () => {
     const deliveredEv = {
       id: 'AUD01DELIVERED00000000001',
       type: 'herald.delivered',
@@ -429,15 +429,15 @@ describe('VoyageDetail', () => {
     expect(heraldLinks[0]).toHaveAttribute('href', '/notifications/heralds/ops-webhook');
 
     // Statuses: delivered -> "delivered", failed -> "error".
-    expect(screen.getByText('доставлено')).toBeInTheDocument();
-    expect(screen.getByText('ошибка')).toBeInTheDocument();
+    expect(screen.getByText('delivered')).toBeInTheDocument();
+    expect(screen.getByText('failed')).toBeInTheDocument();
 
     // Response code.
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('503')).toBeInTheDocument();
   });
 
-  it('audit-запрос уведомлений отправляет correlation_id=voyage_id', async () => {
+  it('notifications audit request sends correlation_id=voyage_id', async () => {
     const calls: string[] = [];
     const origFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -511,7 +511,7 @@ describe('VoyageDetail', () => {
     },
   };
 
-  it('[changed] секция рендерится и фетч идёт с payload_voyage=voyage_id', async () => {
+  it('[changed] section renders and fetch goes with payload_voyage=voyage_id', async () => {
     const calls: string[] = [];
     const origFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const method = (init?.method ?? 'GET').toUpperCase();
@@ -540,7 +540,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByTestId('voyage-changed-tasks')).toBeInTheDocument();
   });
 
-  it('[changed] changed_tasks рендерятся: задача + N из M хостов', async () => {
+  it('[changed] changed_tasks render: task + N of M hosts', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -567,7 +567,7 @@ describe('VoyageDetail', () => {
     expect(screen.getByTestId('changed-task-row-0-1').textContent).toContain('core.file');
   });
 
-  it('[changed] пустой changed_tasks → «без изменений»', async () => {
+  it('[changed] empty changed_tasks → "no changes"', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -581,12 +581,12 @@ describe('VoyageDetail', () => {
     await waitFor(() => expect(screen.getByTestId('changed-run-0')).toBeInTheDocument());
 
     // changed_tasks empty -> "no changes"
-    expect(screen.getByText(/без изменений/)).toBeInTheDocument();
+    expect(screen.getByText(/no changes/)).toBeInTheDocument();
     // Task table does not render
     expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
   });
 
-  it('[changed] status=success → бейдж «успешно» (ok-тон)', async () => {
+  it('[changed] status=success → "success" badge (ok tone)', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -606,10 +606,10 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('run-status-badge-0')).toBeInTheDocument());
 
-    expect(screen.getByTestId('run-status-badge-0').textContent).toContain('успешно');
+    expect(screen.getByTestId('run-status-badge-0').textContent).toContain('success');
   });
 
-  it('[changed] status=failed → бейдж «ошибка» (danger-тон)', async () => {
+  it('[changed] status=failed → "failed" badge (danger tone)', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -629,10 +629,10 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('run-status-badge-0')).toBeInTheDocument());
 
-    expect(screen.getByTestId('run-status-badge-0').textContent).toContain('ошибка');
+    expect(screen.getByTestId('run-status-badge-0').textContent).toContain('failed');
   });
 
-  it('[changed] нет событий → пустой стейт «Нет событий прогона»', async () => {
+  it('[changed] no events → empty state "No run events"', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -645,7 +645,7 @@ describe('VoyageDetail', () => {
     renderVoyage(VOYAGE_ID);
     await waitFor(() => expect(screen.getByTestId('voyage-changed-section')).toBeInTheDocument());
 
-    expect(screen.getByText(/Нет событий прогона/)).toBeInTheDocument();
+    expect(screen.getByText(/No run events/)).toBeInTheDocument();
     expect(screen.queryByTestId('voyage-changed-tasks')).not.toBeInTheDocument();
   });
 
@@ -653,7 +653,7 @@ describe('VoyageDetail', () => {
   // GUARD: type-safety invariants of parseRunCompletedPayload / isChangedTask
   // ──────────────────────────────────────────────
 
-  it('[guard] грязный payload: changed_tasks не массив → секция не падает, «без изменений»', async () => {
+  it('[guard] dirty payload: changed_tasks not an array → section does not crash, "no changes"', async () => {
     const dirtyEvent = {
       id: 'AUD01DIRTY00000000000001',
       type: 'incarnation.run_completed',
@@ -683,10 +683,10 @@ describe('VoyageDetail', () => {
     expect(screen.getByTestId('changed-run-0').textContent).toContain('dirty-inc');
     // No task table -- "no changes" is shown
     expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
-    expect(screen.getByText(/без изменений/)).toBeInTheDocument();
+    expect(screen.getByText(/no changes/)).toBeInTheDocument();
   });
 
-  it('[guard] элемент changed_tasks без числовых changed_hosts/total_hosts → отсеивается isChangedTask, секция не падает', async () => {
+  it('[guard] changed_tasks item without numeric changed_hosts/total_hosts → filtered out by isChangedTask, section does not crash', async () => {
     const eventWithBadTasks = {
       id: 'AUD01BADTASKS0000000001',
       type: 'incarnation.run_completed',
@@ -721,11 +721,11 @@ describe('VoyageDetail', () => {
     // Incarnation visible, component alive
     expect(screen.getByTestId('changed-run-0').textContent).toContain('bad-tasks-inc');
     // All items filtered out -- "no changes"
-    expect(screen.getByText(/без изменений/)).toBeInTheDocument();
+    expect(screen.getByText(/no changes/)).toBeInTheDocument();
     expect(screen.queryByTestId('changed-tasks-table-0')).not.toBeInTheDocument();
   });
 
-  it('[guard] multi-incarnation: несколько run_completed событий → несколько блоков', async () => {
+  it('[guard] multi-incarnation: several run_completed events → several blocks', async () => {
     const event1 = {
       id: 'AUD01MULTI000000000001',
       type: 'incarnation.run_completed',
@@ -771,10 +771,10 @@ describe('VoyageDetail', () => {
     // First block: has a task table
     expect(screen.getByTestId('changed-tasks-table-0')).toBeInTheDocument();
     // Second block: "no changes"
-    expect(screen.getByTestId('changed-run-1').textContent).toContain('без изменений');
+    expect(screen.getByTestId('changed-run-1').textContent).toContain('no changes');
   });
 
-  it('[guard] кнопка «Повторить» доступна для scenario-voyage и отправляет на /run с параметрами', async () => {
+  it('[guard] "Repeat" button available for scenario voyage and navigates to /run with parameters', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -792,7 +792,7 @@ describe('VoyageDetail', () => {
     expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
   });
 
-  it('[guard] confirm-диалог появляется если в sessionStorage есть черновик', async () => {
+  it('[guard] confirm dialog appears if sessionStorage has a draft', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: EMPTY_TARGETS },
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}`, body: SAMPLE_VOYAGE_SCENARIO },
@@ -807,13 +807,13 @@ describe('VoyageDetail', () => {
     await user.click(screen.getByTestId('voyage-repeat-btn'));
     // Dialog must appear
     expect(screen.getByTestId('voyage-repeat-confirm-dialog')).toBeInTheDocument();
-    // Cancel -> dialog closes ("Close" button -- ru locale is default in tests)
-    await user.click(screen.getByRole('button', { name: /Закрыть/i }));
+    // Cancel -> dialog closes ("Close" button -- en locale is default in tests)
+    await user.click(screen.getByRole('button', { name: /Close/i }));
     expect(screen.queryByTestId('voyage-repeat-confirm-dialog')).not.toBeInTheDocument();
     sessionStorage.clear();
   });
 
-  it('[guard] status=undefined → тон muted, лейбл «—»', async () => {
+  it('[guard] status=undefined → muted tone, "—" label', async () => {
     const eventNoStatus = {
       id: 'AUD01NOSTATUS000000001',
       type: 'incarnation.run_completed',

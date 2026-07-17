@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import {
   Boxes,
@@ -121,11 +122,12 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const { t } = useTranslation();
   const [helpOpen, setHelpOpen] = useState(false);
   return (
     <nav
       className={collapsed ? `${styles.sidebar} ${styles.collapsed}` : styles.sidebar}
-      aria-label="Основная навигация"
+      aria-label={t('sidebarNav')}
       data-collapsed={collapsed ? 'true' : 'false'}
     >
       <div className={styles.toggleRow}>
@@ -143,9 +145,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           type="button"
           className={styles.toggle}
           onClick={onToggle}
-          aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
+          aria-label={collapsed ? t('expandSidebar') : t('collapseSidebar')}
           aria-expanded={!collapsed}
-          title={collapsed ? 'Развернуть' : 'Свернуть'}
+          title={collapsed ? t('expand') : t('collapse')}
         >
           <SidebarToggleIcon size={18} collapsed={collapsed} />
         </button>
@@ -175,13 +177,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           type="button"
           className={`${styles.link} ${styles.helpBtn}`}
           onClick={() => setHelpOpen(true)}
-          title={collapsed ? 'Помощь' : undefined}
-          aria-label="Помощь"
+          title={collapsed ? t('help') : undefined}
+          aria-label={t('help')}
         >
           <span className={styles.icon}>
             <HelpCircle size={16} />
           </span>
-          {collapsed ? null : <span className={styles.label}>Помощь</span>}
+          {collapsed ? null : <span className={styles.label}>{t('help')}</span>}
         </button>
       </div>
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />

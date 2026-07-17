@@ -193,10 +193,10 @@ function ScopeBadge({ scopeKey, scopeValues }: { scopeKey: string; scopeValues: 
   );
 }
 
-// Bulk-scope bar: массовое задание общего scope на все отмеченные права группы
-// разом (поинт NIM-79). Появляется когда в resource-группе отмечено ≥2 действия
-// и у ресурса есть selector_keys. Применяет выбранный key=value ко всем
-// отмеченным действиям группы, поддерживающим этот ключ.
+// Bulk-scope bar: sets a shared scope on all checked permissions of a group at
+// once (NIM-79). Appears when ≥2 actions are checked in a resource group and the
+// resource has selector_keys. Applies the chosen key=value to all checked actions
+// of the group that support this key.
 function BulkScopeBar({
   selectorKeys,
   draft,
@@ -211,8 +211,8 @@ function BulkScopeBar({
   onClear: () => void;
 }) {
   const { t } = useTranslation();
-  // Черновик держит родитель (keyed by resource) — переживает размонтирование
-  // bar-а при падении числа отмеченных <2, ввод не теряется.
+  // The parent holds the draft (keyed by resource) — it survives the bar unmounting
+  // when the checked count drops below 2, so input isn't lost.
   const { key, value } = draft;
   const options = useAutocompleteOptions(key);
   const datalistId = useId();
@@ -312,13 +312,13 @@ function BulkScopeBar({
   );
 }
 
-// Grouped permission-picker по реальному каталогу GET /v1/permissions (ADR-042):
-// resource → actions, оператор отмечает чекбоксы. Первым в группе — action-wildcard
-// `resource.*` («все действия», в т.ч. будущие); при нём индивидуальные чекбоксы
-// глушатся (право покрывает всё). При наличии selector_keys — опциональный
-// scope-пикер (key=value), для группы — bulk-scope. Полное право =
-// `resource.action` | `resource.*` | `… on key=value`. Права вне каталога
-// (full `*`, legacy) — read-only чипы.
+// Grouped permission-picker over the real catalog GET /v1/permissions (ADR-042):
+// resource → actions, the operator ticks checkboxes. First in the group is the
+// action-wildcard `resource.*` ("all actions", including future ones); when it's on,
+// individual checkboxes are muted (the permission covers everything). When
+// selector_keys are present — an optional scope picker (key=value), and for the group
+// a bulk-scope. A full permission = `resource.action` | `resource.*` | `… on key=value`.
+// Permissions outside the catalog (full `*`, legacy) — read-only chips.
 export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props) {
   const { t } = useTranslation();
   const groupId = useId();
@@ -336,8 +336,8 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     return m;
   });
 
-  // Черновики bulk-scope пикеров, keyed by resource — переживают размонтирование
-  // BulkScopeBar (когда отмеченных <2), чтобы не терять недоприменённый ввод.
+  // Drafts of the bulk-scope pickers, keyed by resource — they survive BulkScopeBar
+  // unmounting (when checked <2), so unapplied input isn't lost.
   const [bulkDrafts, setBulkDrafts] = useState<Map<string, { key: string; value: string }>>(
     new Map(),
   );
@@ -349,17 +349,17 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     for (const act of (res.actions ?? [])) catalogBases.add(`${res.resource}.${act.action}`);
   }
 
-  // Право «представимо» редактором = действие каталога или action-wildcard
-  // `resource.*` известного ресурса. endsWith('.*') (не split по первой точке)
-  // корректен и для ресурсов с точкой в имени.
+  // A permission is "representable" by the editor = a catalog action or the
+  // action-wildcard `resource.*` of a known resource. endsWith('.*') (not a split on
+  // the first dot) is correct even for resources with a dot in the name.
   const isResourceWildcard = (base: string) =>
     base.endsWith('.*') && catalogResources.has(base.slice(0, -2));
   const isRepresentable = (base: string) => catalogBases.has(base) || isResourceWildcard(base);
 
-  // Сколько раз база встречается в value. База с одним вхождением редактируется
-  // галкой+scope; та же база с ДВУМЯ разными scope (`incarnation.* on service=…`
-  // и `on coven=…`) не влезает в единственный ScopeState — такие оставляем
-  // verbatim в preserved, чтобы не потерять грант при replace-save.
+  // How many times a base appears in value. A base with a single occurrence is edited
+  // via checkbox+scope; the same base with TWO different scopes (`incarnation.* on service=…`
+  // and `on coven=…`) doesn't fit a single ScopeState — those we keep verbatim in
+  // preserved, so the grant isn't lost on a replace-save.
   const baseCounts = new Map<string, number>();
   for (const perm of value) {
     const { base } = parsePermission(perm);
@@ -367,16 +367,16 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
   }
   const isAdopted = (base: string) => isRepresentable(base) && baseCounts.get(base) === 1;
 
-  // selected: базы под управлением чекбоксов (представимы и уникальны).
+  // selected: bases controlled by checkboxes (representable and unique).
   const selected = new Set<string>();
   for (const perm of value) {
     const { base } = parsePermission(perm);
     if (isAdopted(base)) selected.add(base);
   }
 
-  // preserved: всё, что редактор не адаптировал — round-trip verbatim (full `*`,
-  // legacy/unknown, дубли одной базы с разными scope). buildValue не перечисляет
-  // их через selected → нет двойной эмиссии.
+  // preserved: everything the editor didn't adopt — round-tripped verbatim (full `*`,
+  // legacy/unknown, duplicates of one base with different scopes). buildValue doesn't
+  // enumerate them via selected → no double emission.
   const preserved = value.filter((p) => !isAdopted(parsePermission(p).base));
 
   // Build the current value from selected + scopeStates.
@@ -411,9 +411,9 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     onChange(buildValue(selected, next, preserved));
   }
 
-  // Wildcard `resource.*` — «все действия». Включение снимает индивидуальные
-  // действия ресурса из набора (они покрыты) → результат `["resource.*"]`, а не
-  // перечисление. Выключение оставляет группу пустой (переотметит оператор).
+  // Wildcard `resource.*` — "all actions". Enabling removes the resource's individual
+  // actions from the set (they're covered) → the result is `["resource.*"]`, not an
+  // enumeration. Disabling leaves the group empty (the operator re-ticks).
   function toggleWildcard(res: PermissionResource, on: boolean) {
     const wc = `${res.resource}.*`;
     const next = new Set(selected);
@@ -433,8 +433,8 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     onChange(buildValue(next, nextScopes, preserved));
   }
 
-  // Bulk: применить общий scope key=value ко всем отмеченным действиям группы,
-  // поддерживающим этот ключ. Пустое value → снять scope у затронутых.
+  // Bulk: apply a shared scope key=value to all checked actions of the group that
+  // support this key. An empty value → clear the scope on the affected ones.
   function applyBulkScope(res: PermissionResource, key: string, value: string) {
     const next = new Map(scopeStates);
     const v = value.trim();
@@ -469,8 +469,8 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
             const wildcardOn = selected.has(wildcardBase);
             const unionKeys = unionSelectorKeys(res);
             const wildcardScope = scopeStates.get(wildcardBase) ?? null;
-            // catalog-drift: если сохранённый scope-ключ wildcard вне union —
-            // добавить его в опции, чтобы значение осталось видимым/редактируемым.
+            // catalog-drift: if a saved wildcard scope-key is outside the union —
+            // add it to the options so the value stays visible/editable.
             const wildcardKeys =
               wildcardScope?.key && !unionKeys.includes(wildcardScope.key)
                 ? [...unionKeys, wildcardScope.key]
@@ -497,7 +497,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
                 {res.resource}
               </legend>
 
-              {/* Action-wildcard: все действия ресурса, включая будущие. */}
+              {/* Action-wildcard: all actions of the resource, including future ones. */}
               <div style={{ marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>
                 <label
                   htmlFor={wildcardId}

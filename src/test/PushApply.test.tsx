@@ -9,7 +9,7 @@ describe('PushApply', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('submit → 202 → poll до success, рендерит per-host summary', async () => {
+  it('submit → 202 → poll to success, renders per-host summary', async () => {
     const seen: string[] = [];
     let pollCount = 0;
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {

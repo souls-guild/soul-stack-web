@@ -1,15 +1,15 @@
 /**
- * Тесты динамического рендера HeraldModal по каталогу GET /v1/herald-types
+ * Tests for dynamic HeraldModal rendering driven by the GET /v1/herald-types catalog
  * (ADR-052 amendment, ADR-042 no-hardcode).
  *
- * Проверяет:
- *   1. GET /v1/herald-types фетчится при открытии HeraldModal.
- *   2. Выбор типа канала рендерит ИМЕННО его поля из каталога (не хардкод).
- *   3. Смена типа сбрасывает значения полей предыдущего типа.
- *   4. kind=bool/map/list_string/vault_ref/enum маппятся на соответствующий контрол.
- *   5. Fallback при ошибке фетча каталога: форма без краша, submit недоступен
- *      (нечем рендерить поля конкретного типа без каталога).
- *   6. Submit disabled, пока не заполнены required-поля выбранного типа.
+ * Verifies:
+ *   1. GET /v1/herald-types is fetched when HeraldModal opens.
+ *   2. Selecting a channel type renders EXACTLY its catalog fields (not hardcoded).
+ *   3. Changing the type resets the previous type's field values.
+ *   4. kind=bool/map/list_string/vault_ref/enum map to the matching control.
+ *   5. Fallback when the catalog fetch fails: form does not crash, submit unavailable
+ *      (no way to render a specific type's fields without the catalog).
+ *   6. Submit disabled until the selected type's required fields are filled.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -26,26 +26,26 @@ const HERALD_TYPES_CATALOG = {
       secret_required: true,
       fields: [
         { name: 'url', label: 'URL', required: true, secret: false, kind: 'url' },
-        { name: 'headers', label: 'HTTP-заголовки', required: false, secret: false, kind: 'map' },
-        { name: 'http_allowed', label: 'Разрешить http://', required: false, secret: false, kind: 'bool' },
+        { name: 'headers', label: 'HTTP headers', required: false, secret: false, kind: 'map' },
+        { name: 'http_allowed', label: 'Allow http://', required: false, secret: false, kind: 'bool' },
       ],
     },
     {
       type: 'telegram',
       secret_required: false,
       fields: [
-        { name: 'bot_token_ref', label: 'Vault-ref токена бота', required: true, secret: true, kind: 'vault_ref' },
-        { name: 'chat_id', label: 'ID чата/канала', required: true, secret: false, kind: 'string' },
-        { name: 'parse_mode', label: 'Формат текста', required: false, secret: false, kind: 'enum', enum_values: ['', 'MarkdownV2', 'HTML'] },
+        { name: 'bot_token_ref', label: 'Bot token Vault-ref', required: true, secret: true, kind: 'vault_ref' },
+        { name: 'chat_id', label: 'Chat/channel ID', required: true, secret: false, kind: 'string' },
+        { name: 'parse_mode', label: 'Text format', required: false, secret: false, kind: 'enum', enum_values: ['', 'MarkdownV2', 'HTML'] },
       ],
     },
     {
       type: 'email',
       secret_required: false,
       fields: [
-        { name: 'smtp_host', label: 'SMTP-хост', required: true, secret: false, kind: 'string' },
-        { name: 'smtp_port', label: 'SMTP-порт', required: true, secret: false, kind: 'int' },
-        { name: 'to', label: 'Получатели', required: true, secret: false, kind: 'list_string' },
+        { name: 'smtp_host', label: 'SMTP host', required: true, secret: false, kind: 'string' },
+        { name: 'smtp_port', label: 'SMTP port', required: true, secret: false, kind: 'int' },
+        { name: 'to', label: 'Recipients', required: true, secret: false, kind: 'list_string' },
       ],
     },
   ],
@@ -119,7 +119,7 @@ async function openCreateModal() {
   const user = userEvent.setup();
   await waitFor(() => expect(screen.getByTestId('herald-create-btn')).toBeInTheDocument());
   await user.click(screen.getByTestId('herald-create-btn'));
-  const dialog = await screen.findByRole('dialog', { name: /Создать Herald/i });
+  const dialog = await screen.findByRole('dialog', { name: /Create Herald/i });
   return { dialog, user };
 }
 
@@ -127,8 +127,8 @@ beforeEach(() => {
   tokenStore.clear();
 });
 
-describe('HeraldModal — динамический рендер по каталогу GET /v1/herald-types', () => {
-  it('GET /v1/herald-types вызывается при открытии HeraldModal', async () => {
+describe('HeraldModal — dynamic rendering driven by the GET /v1/herald-types catalog', () => {
+  it('GET /v1/herald-types is called when HeraldModal opens', async () => {
     const calls = setupMock();
     renderNotif();
     await openCreateModal();
@@ -138,7 +138,7 @@ describe('HeraldModal — динамический рендер по катал�
     });
   });
 
-  it('селектор типа предлагает все типы из каталога (не хардкод)', async () => {
+  it('type selector offers all catalog types (not hardcoded)', async () => {
     setupMock();
     renderNotif();
     const { dialog } = await openCreateModal();
@@ -151,7 +151,7 @@ describe('HeraldModal — динамический рендер по катал�
     });
   });
 
-  it('выбор telegram рендерит ИМЕННО его поля (bot_token_ref/chat_id/parse_mode), не webhook-поля', async () => {
+  it('selecting telegram renders EXACTLY its fields (bot_token_ref/chat_id/parse_mode), not webhook fields', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -167,7 +167,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(within(dialog).queryByTestId('herald-field-headers')).not.toBeInTheDocument();
   });
 
-  it('kind=vault_ref рендерится как password-input (секрет не виден на экране)', async () => {
+  it('kind=vault_ref renders as a password input (secret not visible on screen)', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -179,7 +179,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(tokenInput).toHaveAttribute('type', 'password');
   });
 
-  it('kind=list_string рендерится как textarea (email.to)', async () => {
+  it('kind=list_string renders as a textarea (email.to)', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -191,7 +191,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(toField.tagName).toBe('TEXTAREA');
   });
 
-  it('kind=int рендерится как number-input (email.smtp_port)', async () => {
+  it('kind=int renders as a number input (email.smtp_port)', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -203,7 +203,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(portField).toHaveAttribute('type', 'number');
   });
 
-  it('kind=enum с enum_values из каталога рендерится как select с опциями (не хардкод)', async () => {
+  it('kind=enum with enum_values from the catalog renders as a select with options (not hardcoded)', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -216,13 +216,13 @@ describe('HeraldModal — динамический рендер по катал�
     expect(within(parseMode).getByRole('option', { name: 'MarkdownV2' })).toBeInTheDocument();
     expect(within(parseMode).getByRole('option', { name: 'HTML' })).toBeInTheDocument();
     // Empty string in enum_values - readable "not set" option, not a bare "" in the list.
-    expect(within(parseMode).getByRole('option', { name: '— не задано —' })).toBeInTheDocument();
+    expect(within(parseMode).getByRole('option', { name: '— not set —' })).toBeInTheDocument();
 
     await user.selectOptions(parseMode, 'HTML');
     expect(parseMode).toHaveValue('HTML');
   });
 
-  it('kind=enum без enum_values в каталоге (пусто/absent) — fallback на текстовый ввод, форма не крашится', async () => {
+  it('kind=enum without enum_values in the catalog (empty/absent) — falls back to text input, form does not crash', async () => {
     const calls: { url: string }[] = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
@@ -236,8 +236,8 @@ describe('HeraldModal — динамический рендер по катал�
             type: 'telegram',
             secret_required: false,
             fields: [
-              { name: 'chat_id', label: 'ID чата/канала', required: true, secret: false, kind: 'string' },
-              { name: 'parse_mode', label: 'Формат текста', required: false, secret: false, kind: 'enum' },
+              { name: 'chat_id', label: 'Chat/channel ID', required: true, secret: false, kind: 'string' },
+              { name: 'parse_mode', label: 'Text format', required: false, secret: false, kind: 'enum' },
             ],
           }],
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -261,7 +261,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(parseMode).not.toHaveAttribute('type', 'password');
   });
 
-  it('смена типа сбрасывает значения полей предыдущего типа', async () => {
+  it('changing the type resets the previous type field values', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -279,7 +279,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(within(dialog).getByTestId('herald-field-url')).toHaveValue('');
   });
 
-  it('submit disabled, пока required-поля выбранного типа не заполнены', async () => {
+  it('submit disabled until the selected type required fields are filled', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -288,7 +288,7 @@ describe('HeraldModal — динамический рендер по катал�
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
 
-    const submitBtn = within(dialog).getByRole('button', { name: /Создать/i });
+    const submitBtn = within(dialog).getByRole('button', { name: /Create/i });
     expect(submitBtn).toBeDisabled();
 
     await user.type(within(dialog).getByTestId('herald-field-bot_token_ref'), 'vault:secret/tok');
@@ -297,7 +297,7 @@ describe('HeraldModal — динамический рендер по катал�
     await waitFor(() => expect(submitBtn).not.toBeDisabled());
   });
 
-  it('Create с типом telegram — POST несёт config с bot_token_ref/chat_id, БЕЗ top-level secret_ref', async () => {
+  it('Create with type telegram — POST carries config with bot_token_ref/chat_id, WITHOUT top-level secret_ref', async () => {
     const calls = setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -308,7 +308,7 @@ describe('HeraldModal — динамический рендер по катал�
     await user.type(within(dialog).getByTestId('herald-field-bot_token_ref'), 'vault:secret/tg-token');
     await user.type(within(dialog).getByTestId('herald-field-chat_id'), '98765');
 
-    await user.click(within(dialog).getByRole('button', { name: /Создать/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Create/i }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.url === '/v1/heralds' && c.method === 'POST');
@@ -324,7 +324,7 @@ describe('HeraldModal — динамический рендер по катал�
     });
   });
 
-  it('top-level Vault-ref для подписи показывается для secret_required=true (webhook), не для secret_required=false (telegram)', async () => {
+  it('top-level Vault-ref for signing is shown for secret_required=true (webhook), not for secret_required=false (telegram)', async () => {
     setupMock();
     renderNotif();
     const { dialog, user } = await openCreateModal();
@@ -337,7 +337,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(within(dialog).queryByTestId('herald-secret-ref-input')).not.toBeInTheDocument();
   });
 
-  it('secret_ref-поле driven от entry.secret_required каталога, не от хардкода type==="webhook"', async () => {
+  it('secret_ref field is driven by the catalog entry.secret_required, not by a hardcoded type==="webhook"', async () => {
     // A second (hypothetical) type with secret_required=true, other than webhook -
     // proves that field display is read from the catalog, not tied to the type name.
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
@@ -348,7 +348,7 @@ describe('HeraldModal — динамический рендер по катал�
       if (url.startsWith('/v1/herald-types')) {
         return new Response(JSON.stringify({
           types: [
-            { type: 'telegram', secret_required: false, fields: [{ name: 'chat_id', label: 'ID чата', required: true, secret: false, kind: 'string' }] },
+            { type: 'telegram', secret_required: false, fields: [{ name: 'chat_id', label: 'Chat ID', required: true, secret: false, kind: 'string' }] },
             { type: 'custom', secret_required: true, fields: [{ name: 'url', label: 'URL', required: true, secret: false, kind: 'url' }] },
           ],
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -372,7 +372,7 @@ describe('HeraldModal — динамический рендер по катал�
     expect(within(dialog).queryByTestId('herald-secret-ref-input')).not.toBeInTheDocument();
   });
 
-  it('fallback при ошибке фетча каталога: форма открывается без краша, error-state показан', async () => {
+  it('fallback on catalog fetch error: form opens without crashing, error state shown', async () => {
     setupMock({ heraldTypesFail: true });
     renderNotif();
     const { dialog } = await openCreateModal();
@@ -387,8 +387,8 @@ describe('HeraldModal — динамический рендер по катал�
   });
 });
 
-describe('HeraldModal — редактирование non-webhook типа (telegram)', () => {
-  it('editing предзаполняет тип и поля из существующего config', async () => {
+describe('HeraldModal — editing a non-webhook type (telegram)', () => {
+  it('editing prefills the type and fields from the existing config', async () => {
     setupMock({ heralds: HERALDS_WITH_TELEGRAM });
     renderNotif();
     const user = userEvent.setup();
@@ -396,7 +396,7 @@ describe('HeraldModal — редактирование non-webhook типа (tel
     await waitFor(() => expect(screen.getByText('ops-telegram')).toBeInTheDocument());
     await user.click(screen.getByTestId('herald-edit-btn-ops-telegram'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Herald/i });
+    const dialog = await screen.findByRole('dialog', { name: /Edit Herald/i });
     await waitFor(() => {
       expect(within(dialog).getByTestId('herald-type-select')).toHaveValue('telegram');
     });
@@ -406,7 +406,7 @@ describe('HeraldModal — редактирование non-webhook типа (tel
     });
   });
 
-  it('Edit telegram — PUT несёт заменённый config, без top-level secret_ref', async () => {
+  it('Edit telegram — PUT carries the replaced config, without top-level secret_ref', async () => {
     const calls = setupMock({ heralds: HERALDS_WITH_TELEGRAM });
     renderNotif();
     const user = userEvent.setup();
@@ -414,13 +414,13 @@ describe('HeraldModal — редактирование non-webhook типа (tel
     await waitFor(() => expect(screen.getByText('ops-telegram')).toBeInTheDocument());
     await user.click(screen.getByTestId('herald-edit-btn-ops-telegram'));
 
-    const dialog = await screen.findByRole('dialog', { name: /Редактировать Herald/i });
+    const dialog = await screen.findByRole('dialog', { name: /Edit Herald/i });
     const chatIdInput = await within(dialog).findByTestId('herald-field-chat_id');
     await waitFor(() => expect(chatIdInput).toHaveValue('-100555'));
     await user.clear(chatIdInput);
     await user.type(chatIdInput, '-100999');
 
-    await user.click(within(dialog).getByRole('button', { name: /Сохранить/i }));
+    await user.click(within(dialog).getByRole('button', { name: /Save/i }));
 
     await waitFor(() => {
       const put = calls.find((c) => /^\/v1\/heralds\/ops-telegram$/.test(c.url) && c.method === 'PUT');

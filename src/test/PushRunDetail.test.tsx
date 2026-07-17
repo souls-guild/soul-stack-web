@@ -44,7 +44,7 @@ describe('PushRunDetail', () => {
     tokenStore.clear();
   });
 
-  it('рендерит meta + per-host table', async () => {
+  it('renders meta + per-host table', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/push/${APPLY_ID}`, body: SAMPLE_VIEW },
     ]);
@@ -63,7 +63,7 @@ describe('PushRunDetail', () => {
 
   // -- Guard tests: clickable links --------------------------------------------
 
-  it('[LINKS] sid в per-host таблице — ссылка на /souls/:sid', async () => {
+  it('[LINKS] sid in per-host table links to /souls/:sid', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/push/${APPLY_ID}`, body: SAMPLE_VIEW },
     ]);
@@ -78,7 +78,7 @@ describe('PushRunDetail', () => {
     expect(linkHost02).toHaveAttribute('href', '/souls/host02');
   });
 
-  it('[LINKS] при отсутствии summary hosts ссылок на souls нет', async () => {
+  it('[LINKS] no souls links when summary hosts are absent', async () => {
     const viewNoHosts = { ...SAMPLE_VIEW, summary: null };
     installFetchMock([
       { method: 'GET', url: `/v1/push/${APPLY_ID}`, body: viewNoHosts },

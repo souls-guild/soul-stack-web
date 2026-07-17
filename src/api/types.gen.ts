@@ -14,10 +14,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Логин оператора через LDAP
-         * @description Федеративная аутентификация (ADR-058): LDAP search-bind → маппинг на operators(aid)+роли → внутренний JWT в HttpOnly+Secure cookie. Тело ответа пустое.
+         * Operator login via LDAP
+         * @description Federated authentication (ADR-058): LDAP search-bind -> mapping onto operators(aid)+roles -> internal JWT in HttpOnly+Secure cookie. Response body is empty.
          */
         post: operations["ldapLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Available login methods
+         * @description Public list of login methods for the UI login form (password always true; ldap/oidc — depending on keeper config). Booleans only, no IdP URLs/domains.
+         */
+        get: operations["authMethods"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -32,8 +52,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * OIDC-callback оператора
-         * @description Валидирует id_token (JWKS-подпись/iss/aud/exp/nonce), маппит на operators(aid)+роли, выпускает внутренний JWT в HttpOnly+Secure cookie и редиректит (302) в UI. Ошибка валидации/маппинга → 401/403.
+         * OIDC callback for the operator
+         * @description Validates id_token (JWKS signature/iss/aud/exp/nonce), maps to operators(aid)+roles, issues the internal JWT in an HttpOnly+Secure cookie and redirects (302) to the UI. Validation/mapping error -> 401/403.
          */
         get: operations["oidcCallback"];
         put?: never;
@@ -52,12 +72,32 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Старт OIDC-логина оператора
-         * @description Федеративная аутентификация (ADR-058): генерирует state+nonce+PKCE и редиректит (302) на authorization_endpoint внешнего IdP.
+         * Start OIDC login for the operator
+         * @description Federated authentication (ADR-058): generates state+nonce+PKCE and redirects (302) to the external IdP's authorization_endpoint.
          */
         get: operations["oidcLogin"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange session-cookie for a short Bearer
+         * @description NIM-77/ADR-058 (Variant B): reads the HttpOnly cookie soul_session (internal JWT), verifies it with the same verifier as the Bearer on /v1, and issues a short-lived Bearer in the JSON body. Subject/roles are strictly from verified cookie claims. Not written to audit.
+         */
+        post: operations["authTokenExchange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -72,8 +112,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Лента audit-events (paged + фильтры)
-         * @description Read-only-лента audit_log с фильтрами (type/source multi-OR, archon_aid/correlation_id case-insensitive substring ILIKE, payload_herald/payload_voyage exact, started_after/before RFC3339) и пагинацией. Permission audit.read. Read-only, без audit (чтение не пишется — рекурсия).
+         * Feed of audit-events (paged + filters)
+         * @description Read-only feed of audit_log with filters (type/source multi-OR, archon_aid/correlation_id case-insensitive substring ILIKE, payload_herald/payload_voyage exact, started_after/before RFC3339) and pagination. Permission audit.read. Read-only, no audit (reads are not written - recursion).
          */
         get: operations["listAuditEvents"];
         put?: never;
@@ -92,14 +132,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Omen-ов (paged)
-         * @description Реестр Omen-ов с пагинацией (ADR-025). Permission omen.list. Read-only, без audit.
+         * List of Omens (paged)
+         * @description Registry of Omens with pagination (ADR-025). Permission omen.list. Read-only, no audit.
          */
         get: operations["listOmens"];
         put?: never;
         /**
-         * Создать Omen
-         * @description Заносит Omen (внешняя система) в реестр augur (ADR-025). Permission omen.create. 409 — name занят. master-credential не хранится (только auth_ref).
+         * Create Omen
+         * @description Registers an Omen (external system) in the augur registry (ADR-025). Permission omen.create. 409 - name taken. master-credential is not stored (only auth_ref).
          */
         post: operations["createOmen"];
         delete?: never;
@@ -116,15 +156,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Omen-а
-         * @description Метаданные одного Omen-а по имени (ADR-025). Permission omen.list (read покрыт list-правом). Read-only, без audit.
+         * Omen card
+         * @description Metadata of a single Omen by name (ADR-025). Permission omen.list (read is covered by the list permission). Read-only, no audit.
          */
         get: operations["getOmen"];
         put?: never;
         post?: never;
         /**
-         * Удалить Omen
-         * @description Удаляет Omen каскадно (связанные Rite-ы, ADR-025). Permission omen.delete. 404 — записи нет.
+         * Delete Omen
+         * @description Deletes an Omen cascadingly (related Rites, ADR-025). Permission omen.delete. 404 - record absent.
          */
         delete: operations["deleteOmen"];
         options?: never;
@@ -140,14 +180,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Rite-ов по Omen
-         * @description Rite-ы (grant-ы) одного Omen-а (ADR-025). Permission rite.list. Обязательный фильтр omen=<name>. Read-only, без audit.
+         * List of Rites by Omen
+         * @description Rites (grants) of a single Omen (ADR-025). Permission rite.list. Required filter omen=<name>. Read-only, no audit.
          */
         get: operations["listRites"];
         put?: never;
         /**
-         * Создать Rite (grant)
-         * @description Заносит Rite (grant) в реестр augur (ADR-025). Permission rite.create. 404 — Omen не существует. 422 — XOR-нарушение субъекта/битый allow.
+         * Create Rite (grant)
+         * @description Registers a Rite (grant) in the augur registry (ADR-025). Permission rite.create. 404 - Omen does not exist. 422 - subject XOR violation/broken allow.
          */
         post: operations["createRite"];
         delete?: never;
@@ -167,8 +207,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Удалить Rite
-         * @description Снимает grant-запись Rite по id (ADR-025). Permission rite.delete. 404 — записи нет. 422 — id не положительное число.
+         * Delete Rite
+         * @description Removes a Rite grant record by id (ADR-025). Permission rite.delete. 404 - record absent. 422 - id is not a positive number.
          */
         delete: operations["deleteRite"];
         options?: never;
@@ -184,14 +224,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список расписаний (Cadence, paged)
-         * @description Read-only-список Cadence с фильтрами enabled/kind и пагinацией (sort created_at DESC). Permission cadence.list. Read-only, без audit.
+         * List of cadences (Cadence, paged)
+         * @description Read-only list of Cadences with enabled/kind filters and pagination (sort created_at DESC). Permission cadence.list. Read-only, no audit.
          */
         get: operations["listCadences"];
         put?: never;
         /**
-         * Создать расписание (Cadence)
-         * @description Регулярный/повторяющийся Voyage (ADR-046). Двухуровневый RBAC: cadence.create + Voyage-permission по kind рецепта.
+         * Create schedule (Cadence)
+         * @description Regular/recurring Voyage (ADR-046). Two-tier RBAC: cadence.create + Voyage-permission by recipe kind.
          */
         post: operations["createCadence"];
         delete?: never;
@@ -208,22 +248,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Получить расписание (Cadence)
-         * @description Деталь расписания по ULID. Permission cadence.list. Read-only, без audit.
+         * Get schedule (Cadence)
+         * @description Schedule detail by ULID. Permission cadence.list. Read-only, no audit.
          */
         get: operations["getCadence"];
         put?: never;
         post?: never;
         /**
-         * Снять расписание (Cadence)
-         * @description Удаляет расписание; порождённые Voyage остаются (FK ON DELETE SET NULL). Permission cadence.delete.
+         * Delete schedule (Cadence)
+         * @description Deletes schedule; spawned Voyages remain (FK ON DELETE SET NULL). Permission cadence.delete.
          */
         delete: operations["deleteCadence"];
         options?: never;
         head?: never;
         /**
-         * Обновить расписание (Cadence)
-         * @description Read-modify-write рецепта/расписания/enabled-toggle. Двухуровневый RBAC (cadence.update + Voyage-permission по kind). kind не меняется.
+         * Update schedule (Cadence)
+         * @description Read-modify-write recipe/schedule/enabled-toggle. Two-tier RBAC (cadence.update + Voyage-permission by kind). kind does not change.
          */
         patch: operations["patchCadence"];
         trace?: never;
@@ -238,8 +278,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Выключить расписание (Cadence)
-         * @description Пауза планировщика. Permission cadence.disable ИЛИ backcompat cadence.update.
+         * Disable schedule (Cadence)
+         * @description Pause scheduler. Permission cadence.disable OR backcompat cadence.update.
          */
         post: operations["disableCadence"];
         delete?: never;
@@ -258,8 +298,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Включить расписание (Cadence)
-         * @description Возобновление планировщика. Permission cadence.enable ИЛИ backcompat cadence.update.
+         * Enable schedule (Cadence)
+         * @description Resume scheduler. Permission cadence.enable OR backcompat cadence.update.
          */
         post: operations["enableCadence"];
         delete?: never;
@@ -276,8 +316,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Прогоны расписания (Cadence runs, paged)
-         * @description Список Voyage, порождённых расписанием, с фильтром status[] и пагинацией. Permission incarnation.history. Read-only, без audit.
+         * Schedule runs (Cadence runs, paged)
+         * @description List of Voyages spawned by schedule, with status[] filter and pagination. Permission incarnation.history. Read-only, no audit.
          */
         get: operations["listCadenceRuns"];
         put?: never;
@@ -296,8 +336,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * HA-топология Keeper-кластера
-         * @description Живые Keeper-инстансы из Conclave-реестра (kid + started_at + alive + is_reaper_leader) + self_kid + self_health (postgres/redis/vault текущего инстанса). Permission soul.list. Read-only, без audit. Версия агента (soul) НЕ включается.
+         * Keeper cluster HA topology
+         * @description Live Keeper instances from the Conclave registry (kid + started_at + alive + is_reaper_leader) + self_kid + self_health (postgres/redis/vault of the current instance). Permission soul.list. Read-only, no audit. Agent (soul) version NOT included.
          */
         get: operations["getCluster"];
         put?: never;
@@ -316,14 +356,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Decree-ов (paged)
-         * @description Реестр Decree-ов с пагинацией (ADR-030). Permission decree.list. Read-only, без audit.
+         * List of Decrees (paged)
+         * @description Decree registry with pagination (ADR-030). Permission decree.list. Read-only, no audit.
          */
         get: operations["listDecrees"];
         put?: never;
         /**
-         * Создать Decree
-         * @description Заносит Decree (правило reactor) в реестр oracle (ADR-030). Permission decree.create. 409 — name занят.
+         * Create Decree
+         * @description Registers a Decree (reactor rule) in the oracle registry (ADR-030). Permission decree.create. 409 -- name taken.
          */
         post: operations["createDecree"];
         delete?: never;
@@ -340,15 +380,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Decree-а
-         * @description Метаданные одного Decree-а по имени (ADR-030). Permission decree.list (read покрыт list-правом). Read-only, без audit.
+         * Decree card
+         * @description Metadata of a single Decree by name (ADR-030). Permission decree.list (read is covered by the list permission). Read-only, no audit.
          */
         get: operations["getDecree"];
         put?: never;
         post?: never;
         /**
-         * Удалить Decree
-         * @description Удаляет Decree каскадно (cooldown-state, ADR-030). Permission decree.delete. 404 — записи нет.
+         * Delete Decree
+         * @description Deletes a Decree cascading (cooldown state, ADR-030). Permission decree.delete. 404 -- record absent.
          */
         delete: operations["deleteDecree"];
         options?: never;
@@ -364,8 +404,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Errand-ов (paged)
-         * @description Реестр Errand-ов с фильтрами и пагинацией (ADR-033). Permission errand.list. Read-only, без audit.
+         * List of Errands (paged)
+         * @description Registry of Errands with filters and pagination (ADR-033). Permission errand.list. Read-only, no audit.
          */
         get: operations["listErrands"];
         put?: never;
@@ -384,15 +424,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Состояние Errand-а
-         * @description Терминал-строка (200) либо running-poll (202) по ULID (ADR-033). Permission errand.list. Read-only, без audit.
+         * Errand state
+         * @description Terminal state (200) or running-poll (202) by ULID (ADR-033). Permission errand.list. Read-only, no audit.
          */
         get: operations["getErrand"];
         put?: never;
         post?: never;
         /**
-         * Отменить Errand
-         * @description Отправляет cancel-сигнал Soul-у (ADR-033, slice E5). Permission errand.cancel. 409 — уже терминал.
+         * Cancel Errand
+         * @description Sends a cancel signal to the Soul (ADR-033, slice E5). Permission errand.cancel. 409 - already terminal.
          */
         delete: operations["cancelErrand"];
         options?: never;
@@ -408,8 +448,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Каталог event-types для Tiding-подписки
-         * @description Допустимые для подписки Tiding типы: areas (area-glob `<name>.*`) + точечные point_events (источник herald/eventtypes.go). Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
+         * Event-types catalog for Tiding subscriptions
+         * @description Valid event types for Tiding subscriptions: areas (area-glob `<name>.*`) + point-wise point_events (sourced from herald/eventtypes.go). Auth-only, no dedicated permission (self-describing). Read-only, no audit.
          */
         get: operations["listEventTypes"];
         put?: never;
@@ -428,8 +468,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Каталог типов Herald-канала
-         * @description Типы канала уведомлений и их config-поля (webhook/telegram/slack/mattermost/discord/custom/email): name/label/required/secret/kind. Источник — herald.TypeCatalog (тот же, что валидирует CRUD). Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
+         * Herald channel types catalog
+         * @description Notification channel types and their config fields (webhook/telegram/slack/mattermost/discord/custom/email): name/label/required/secret/kind. Sourced from herald.TypeCatalog (the same one which validates CRUD). Auth-only, no dedicated permission (self-describing). Read-only, no audit.
          */
         get: operations["listHeraldTypes"];
         put?: never;
@@ -448,14 +488,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Herald-каналов (paged)
-         * @description Реестр Herald-каналов с пагинацией (ADR-052). Permission herald.list. Read-only, без audit.
+         * List Herald channels (paged)
+         * @description Herald channel registry with pagination (ADR-052). Permission herald.list. Read-only, no audit.
          */
         get: operations["listHeralds"];
         put?: never;
         /**
-         * Создать Herald-канал
-         * @description Заносит Herald (канал доставки уведомлений) в реестр (ADR-052). Permission herald.create. 409 — name занят. Секрет не хранится (только secret_ref).
+         * Create Herald channel
+         * @description Registers a Herald (notification delivery channel) in the registry (ADR-052). Permission herald.create. 409 — name taken. Secret is not stored (only secret_ref).
          */
         post: operations["createHerald"];
         delete?: never;
@@ -472,19 +512,19 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Herald-канала
-         * @description Метаданные одного Herald-канала по имени (ADR-052). Permission herald.read. Read-only, без audit.
+         * Herald channel card
+         * @description Metadata of a single Herald channel by name (ADR-052). Permission herald.read. Read-only, no audit.
          */
         get: operations["getHerald"];
         /**
-         * Обновить Herald-канал (replace)
-         * @description Replace-семантика: поля полностью заменяют существующие, name immutable (ADR-052). Permission herald.update. 404 — записи нет.
+         * Update Herald channel (replace)
+         * @description Replace semantics: fields fully replace the existing ones, name immutable (ADR-052). Permission herald.update. 404 — record absent.
          */
         put: operations["updateHerald"];
         post?: never;
         /**
-         * Удалить Herald-канал
-         * @description Удаляет Herald каскадно (связанные Tiding-ы, ADR-052). Permission herald.delete. 404 — записи нет.
+         * Delete Herald channel
+         * @description Deletes the Herald cascadingly (related Tidings, ADR-052). Permission herald.delete. 404 — record absent.
          */
         delete: operations["deleteHerald"];
         options?: never;
@@ -500,14 +540,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список инкарнаций (paged)
-         * @description Фильтры service/status/coven/state.<field> + сортировка. Видимость scoped по RBAC (ADR-047). Permission incarnation.list. Read-only.
+         * List incarnations (paged)
+         * @description Filters service/status/coven/state.<field> + sorting. Visibility scoped by RBAC (ADR-047). Permission incarnation.list. Read-only.
          */
         get: operations["listIncarnations"];
         put?: never;
         /**
-         * Создать инкарнацию
-         * @description Runtime-инстанс сервиса (ADR-029). Запускает scenario create (async, если lifecycle.auto_create). Permission incarnation.create.
+         * Create incarnation
+         * @description Service runtime instance (ADR-029). Runs create scenario (async, if lifecycle.auto_create). Permission incarnation.create.
          */
         post: operations["createIncarnation"];
         delete?: never;
@@ -524,15 +564,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Получить инкарнацию
-         * @description Деталь runtime-инстанса. Вне RBAC-scope → 404 (не палим существование). Permission incarnation.get. Read-only.
+         * Get incarnation
+         * @description Service runtime instance detail. Outside RBAC scope -> 404 (does not leak existence). Permission incarnation.get. Read-only.
          */
         get: operations["getIncarnation"];
         put?: never;
         post?: never;
         /**
-         * Снести инкарнацию
-         * @description allow_destroy=true → DELETE без teardown; false → scenario destroy (S-D4). Permission incarnation.destroy.
+         * Destroy an incarnation
+         * @description allow_destroy=true -> DELETE without teardown; false -> scenario destroy (S-D4). Permission incarnation.destroy.
          */
         delete: operations["destroyIncarnation"];
         options?: never;
@@ -550,8 +590,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Проверить drift инкарнации (Scry)
-         * @description Sync dry_run converge → DriftReport (ADR-031 Slice B). Информационная маркировка status=drift. Permission incarnation.check-drift.
+         * Check incarnation drift (Scry)
+         * @description Sync dry_run converge -> DriftReport (ADR-031 Slice B). Informational status=drift marking. Permission incarnation.check-drift.
          */
         post: operations["checkIncarnationDrift"];
         delete?: never;
@@ -568,14 +608,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Choir-ов инкарнации
-         * @description Топология Choir-ов инкарнации (ADR-044). Permission choir.list. Несуществующая incarnation → items=[]. Read-only, без audit.
+         * List Choirs of the incarnation
+         * @description Topology of Choirs of the incarnation (ADR-044). Permission choir.list. Nonexistent incarnation -> items=[]. Read-only, no audit.
          */
         get: operations["listChoirs"];
         put?: never;
         /**
-         * Создать Choir
-         * @description Declared-топология хостов внутри инкарнации (ADR-044). created_by_aid из JWT. Permission choir.create. 409 — имя занято.
+         * Create Choir
+         * @description Declared-topology of hosts inside the incarnation (ADR-044). created_by_aid from JWT. Permission choir.create. 409 - name taken.
          */
         post: operations["createChoir"];
         delete?: never;
@@ -595,8 +635,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Удалить Choir
-         * @description Удаляет Choir (каскадом его Voice-ы). Permission choir.delete.
+         * Delete Choir
+         * @description Deletes Choir (cascading its Voices). Permission choir.delete.
          */
         delete: operations["deleteChoir"];
         options?: never;
@@ -612,14 +652,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Voice-ов Choir-а
-         * @description Члены Choir-а (ADR-044). Permission choir.list. Несуществующий Choir → items=[]. Read-only, без audit.
+         * List Voices of the Choir
+         * @description Members of the Choir (ADR-044). Permission choir.list. Nonexistent Choir -> items=[]. Read-only, no audit.
          */
         get: operations["listVoices"];
         put?: never;
         /**
-         * Добавить Voice в Choir
-         * @description Членство SID в Choir-е (ADR-044). added_by_aid из JWT. Permission choir.add-voice. 409 — Voice уже есть; 422 — SID не член инкарнации.
+         * Add Voice to Choir
+         * @description SID membership in the Choir (ADR-044). added_by_aid from JWT. Permission choir.add-voice. 409 - Voice already exists; 422 - SID is not a member of the incarnation.
          */
         post: operations["addVoice"];
         delete?: never;
@@ -639,8 +679,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Убрать Voice из Choir-а
-         * @description Снимает членство SID в Choir-е (ADR-044). Permission choir.remove-voice.
+         * Remove Voice from Choir
+         * @description Removes SID membership in the Choir (ADR-044). Permission choir.remove-voice.
          */
         delete: operations["removeVoice"];
         options?: never;
@@ -656,8 +696,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * История state-переходов инкарнации (paged)
-         * @description state_history с фильтром apply_id и пагинацией. Вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         * Incarnation state transition history (paged)
+         * @description state_history with apply_id filter and pagination. Outside RBAC scope -> 404. Permission incarnation.history. Read-only.
          */
         get: operations["getIncarnationHistory"];
         put?: never;
@@ -682,8 +722,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Править declared spec.hosts[] инкарнации
-         * @description Три mode (replace/append/remove) над declared hosts (ADR-008). Permission incarnation.update-hosts.
+         * Edit declared spec.hosts[] of an incarnation
+         * @description Three modes (replace/append/remove) over declared hosts (ADR-008). Permission incarnation.update-hosts.
          */
         patch: operations["updateIncarnationHosts"];
         trace?: never;
@@ -698,8 +738,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Перезапустить последний упавший сценарий из error_locked
-         * @description Снимает error_locked и тем же действием перезапускает последний упавший сценарий инкарнации (bootstrap create/… или операционный add_user/…) с сохранённым input упавшего прогона (одна tx FOR UPDATE). Permission incarnation.rerun-last.
+         * Restart the last failed scenario from error_locked
+         * @description Clears error_locked and, in the same action, restarts the incarnation last failed scenario (bootstrap create/... or operational add_user/...) with the stored input of the failed run (one tx FOR UPDATE). Permission incarnation.rerun-last.
          */
         post: operations["rerunLastIncarnation"];
         delete?: never;
@@ -716,8 +756,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список прогонов инкарнации (paged)
-         * @description Свёртка apply_runs по apply_id: статус прогона (applying/success/failed/cancelled), границы времени, инициатор. Прогон (apply_run) — НЕ Voyage. Вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         * List incarnation runs (paged)
+         * @description Fold apply_runs by apply_id: run status (applying/success/failed/cancelled), time bounds, initiator. Run (apply_run) - NOT Voyage. Outside RBAC scope -> 404. Permission incarnation.history. Read-only.
          */
         get: operations["listIncarnationRuns"];
         put?: never;
@@ -736,8 +776,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Детали прогона инкарнации (per-host)
-         * @description Срез по хостам одного apply_id: статус каждого хоста + адрес упавшей задачи (task_idx/plan_index/error). Чужой apply_id / вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         * Incarnation run details (per-host)
+         * @description Slice by hosts of one apply_id: status per host + address of failed task (task_idx/plan_index/error). Foreign apply_id / outside RBAC scope -> 404. Permission incarnation.history. Read-only.
          */
         get: operations["getIncarnationRun"];
         put?: never;
@@ -756,8 +796,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Live-ход прогона инкарнации (SSE)
-         * @description text/event-stream: task.executed/apply.completed/failed/cancelled по apply_id. Auth: Authorization: Bearer (fetch-streaming, ADR-068 §A0). Доступ: инициатор ИЛИ incarnation.get/history; чужой/несуществующий apply_id → 403 (anti-enum, parity /mcp/events). Секреты в payload маскируются.
+         * Live run progress of an incarnation (SSE)
+         * @description text/event-stream: task.executed/apply.completed/failed/cancelled by apply_id. Auth: Authorization: Bearer (fetch-streaming, ADR-068 §A0). Access: the initiator OR incarnation.get/history; someone else's/nonexistent apply_id -> 403 (anti-enum, parity /mcp/events). Secrets in the payload are masked.
          */
         get: operations["streamIncarnationRunEvents"];
         put?: never;
@@ -776,8 +816,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Задачи прогона инкарнации (план + per-host)
-         * @description План задач одного apply_id (plan_index/name/module/no_log/passage) + per-host статус/output/ошибка из журнала аудита (task.executed) джойном по plan_index. Чужой apply_id / вне RBAC-scope → 404. Permission incarnation.history. Read-only.
+         * Incarnation run tasks (plan + per-host)
+         * @description Task plan of one apply_id (plan_index/name/module/no_log/passage) + per-host status/output/error from the audit log (task.executed) joined by plan_index. Foreign apply_id / outside RBAC scope -> 404. Permission incarnation.history. Read-only.
          */
         get: operations["getIncarnationRunTasks"];
         put?: never;
@@ -798,8 +838,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Запустить сценарий инкарнации
-         * @description Async-прогон именованного scenario (ADR-009). Блокируется при cluster:degraded (503). Permission incarnation.run.
+         * Run incarnation scenario
+         * @description Async run of a named scenario (ADR-009). Blocked on cluster:degraded (503). Permission incarnation.run.
          */
         post: operations["runIncarnationScenario"];
         delete?: never;
@@ -818,10 +858,50 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Pre-fill формы операционного сценария из incarnation.state
-         * @description Текущие значения state под поля схемы сценария с prefill_from_state (docs/input.md). Path-whitelist (клиент путь не задаёт), secret-поля исключены. Вне RBAC-scope → 404. Permission incarnation.get. Read-only, без audit.
+         * Pre-fill scenario form from incarnation.state
+         * @description Current state values under scenario schema fields with prefill_from_state (docs/input.md). Path-whitelist (client does not set the path), secret fields excluded. Out of RBAC-scope → 404. Permission incarnation.get. Read-only, no audit.
          */
         post: operations["incarnationFormPrefill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/secrets/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal plaintext of an incarnation secret
+         * @description Resolves the plaintext of a secret declared in the service's revealable_secrets, from Vault. Permission incarnation.view-secrets (removes the mask, strictly more privileged than incarnation.get). key must be in the current-state enumerate array. Audit incarnation.secret_revealed (without the value). Out of scope -> 404.
+         */
+        post: operations["incarnationRevealSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/secrets/revealable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List revealable secrets of an incarnation
+         * @description Discovery of the service's revealable_secrets + keys from the current-state enumerate array. Read-only, no audit. Permission incarnation.view-secrets (existence-gate). Out of scope -> 404.
+         */
+        get: operations["incarnationRevealableSecrets"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -836,8 +916,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Host-vitals хостов инкарнации
-         * @description Агрегат последних снимков утилизации по хостам инкарнации (latest+stale на хост, без окна) из Redis (NIM-86). Permission incarnation.get; видимость хостов — soul-read-scope. Пустой флот / вне scope → hosts:[]. Read-only, без audit.
+         * Host-vitals of incarnation hosts
+         * @description Aggregate of the latest utilization snapshots across incarnation hosts (latest+stale per host, without a window) from Redis (NIM-86). Permission incarnation.get; host visibility - soul-read-scope. Empty souls / out of scope -> hosts:[]. Read-only, without audit.
          */
         get: operations["getIncarnationTelemetry"];
         put?: never;
@@ -857,8 +937,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Заменить operator-set trait-метки инкарнации
-         * @description Целостная замена incarnation.traits (ADR-060) — источника истины, проецируемого в souls.traits хостов-членов. Permission incarnation.traits-set.
+         * Replace operator-set trait labels of an incarnation
+         * @description Wholesale replacement of incarnation.traits (ADR-060) - source of truth, projected onto souls.traits of member hosts. Permission incarnation.traits-set.
          */
         put: operations["setIncarnationTraits"];
         post?: never;
@@ -878,8 +958,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Снять блокирующий статус инкарнации
-         * @description error_locked / migration_failed → ready под FOR UPDATE; state не меняется (ADR-009/019). Permission incarnation.unlock.
+         * Remove incarnation blocking status
+         * @description error_locked / migration_failed → ready under FOR UPDATE; state does not change (ADR-009/019). Permission incarnation.unlock.
          */
         post: operations["unlockIncarnation"];
         delete?: never;
@@ -898,8 +978,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Перевести инкарнацию на новую версию
-         * @description Sync-под-202 миграция state_schema (ADR-019) + смена service_version одной tx. Permission incarnation.upgrade.
+         * Migrate incarnation to new version
+         * @description Sync-under-202 migration state_schema (ADR-019) + service_version change in one tx. Permission incarnation.upgrade.
          */
         post: operations["upgradeIncarnation"];
         delete?: never;
@@ -916,8 +996,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Пути апгрейда инкарнации
-         * @description Дешёвый список тегов реестра сервиса (пометка is_current) без ?to=; on-demand анализ одной цели (direction / found-legacy / state-миграции) с ?to=<ref> (ADR-0068 §6). Permission incarnation.upgrade (read-грань). Read-only, без audit.
+         * Incarnation upgrade paths
+         * @description Cheap list of service registry refs (marking is_current) without ?to=; on-demand analysis of one target (direction / found-legacy / state migrations) with ?to=<ref> (ADR-0068 6). Permission incarnation.upgrade (read facet). Read-only, no audit.
          */
         get: operations["getIncarnationUpgradePaths"];
         put?: never;
@@ -936,8 +1016,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Эффективные права текущего Архонта
-         * @description Подмножество каталога, реально выданное текущему оператору (AID из JWT-claims). Auth-only (свои права видит любой аутентифицированный; чужие не отдаёт). Read-only, без audit.
+         * Effective permissions of the current Archon
+         * @description Subset of the catalog actually granted to the current operator (AID from JWT-claims). Auth-only (any authenticated caller can see their own permissions; others' are not exposed). Read-only, no audit.
          */
         get: operations["listMyPermissions"];
         put?: never;
@@ -956,8 +1036,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Каталог модулей
-         * @description Доступные для прогона модули (core + активные plugin) + input-метаданные (ADR-045). Опц. фильтр errand_safe. Permission service.list. Read-only, без audit.
+         * Module catalog
+         * @description Available modules to run (core + active plugin) + input metadata (ADR-045). Optional errand_safe filter. Permission service.list. Read-only, no audit.
          */
         get: operations["listModules"];
         put?: never;
@@ -976,8 +1056,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка модуля
-         * @description Деталь одного модуля по полному имени (ADR-045). Permission service.list. Read-only, без audit.
+         * Module details
+         * @description Detail of one module by full name (ADR-045). Permission service.list. Read-only, no audit.
          */
         get: operations["getModule"];
         put?: never;
@@ -998,8 +1078,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Резолв source-каталога формы модуля
-         * @description Живые SID-ы под source-поля UI-формы Run→Command (ADR-045 S3). Permission incarnation.run. Read-only-резолв, без audit.
+         * Resolve the module form source catalog
+         * @description Live SIDs for the source fields of the Run->Command UI form (ADR-045 S3). Permission incarnation.run. Read-only resolve, no audit.
          */
         post: operations["moduleFormPrep"];
         delete?: never;
@@ -1016,14 +1096,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Архонтов (paged + фильтры)
-         * @description Реестр операторов с фильтрами (auth_method enum, revoked, q — substring-поиск по display_name/aid, регистронезависимо) и пагинацией. Permission operator.list. Read-only, без audit.
+         * List of Archons (paged + filters)
+         * @description Registry of operators with filters (auth_method enum, revoked, q - substring search over display_name/aid, case-insensitive) and pagination. Permission operator.list. Read-only, no audit.
          */
         get: operations["listOperators"];
         put?: never;
         /**
-         * Создать Архонта
-         * @description Создаёт оператора (Archon) + опц. atomic-grant ролей (ADR-013/014). Permission operator.create. 409 — AID занят. Возвращает JWT один раз.
+         * Create an Archon
+         * @description Creates an operator (Archon) + opt. atomic-grant of roles (ADR-013/014). Permission operator.create. 409 - AID taken. Returns JWT once.
          */
         post: operations["createOperator"];
         delete?: never;
@@ -1040,8 +1120,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Архонта
-         * @description Метаданные одного оператора по AID. Permission operator.list (read покрыт list-правом). Read-only, без audit.
+         * Archon card
+         * @description Metadata of a single operator by AID. Permission operator.list (read covered by list-right). Read-only, no audit.
          */
         get: operations["getOperator"];
         put?: never;
@@ -1062,8 +1142,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Выпустить новый JWT Архонту
-         * @description Выпускает свежий JWT существующему оператору (ADR-014). Permission operator.issue-token. 409 — оператор revoked. Возвращает JWT один раз.
+         * Issue a new JWT to an Archon
+         * @description Issues a fresh JWT to an existing operator (ADR-014). Permission operator.issue-token. 409 - operator revoked. Returns JWT once.
          */
         post: operations["issueOperatorToken"];
         delete?: never;
@@ -1082,8 +1162,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Отозвать Архонта
-         * @description Ставит operators.revoked_at (ADR-014). Permission operator.revoke. 409 — последний cluster-admin (self-lockout-защита) либо уже revoked.
+         * Revoke an Archon
+         * @description Sets operators.revoked_at (ADR-014). Permission operator.revoke. 409 - last cluster-admin (self-lockout protection) or already revoked.
          */
         post: operations["revokeOperator"];
         delete?: never;
@@ -1100,8 +1180,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Каталог RBAC-permissions
-         * @description Машиночитаемый каталог `<resource>.<action>` (источник rbac.catalog.go), сгруппированный по resource. Auth-only, без отдельной permission (само-описывающий). Read-only, без audit.
+         * RBAC permissions catalog
+         * @description Machine-readable catalog of `<resource>.<action>` (sourced from rbac.catalog.go), grouped by resource. Auth-only, no dedicated permission (self-describing). Read-only, no audit.
          */
         get: operations["listPermissions"];
         put?: never;
@@ -1120,14 +1200,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список активных Sigil-ов
-         * @description Лента активных допусков плагинов (без signature/manifest, ADR-026 S4a). Permission plugin.list. Read-only, без audit.
+         * List active Sigils
+         * @description Feed of active plugin releases (without signature/manifest, ADR-026 S4a). Permission plugin.list. Read-only, no audit.
          */
         get: operations["listPluginSigils"];
         put?: never;
         /**
-         * Допустить плагин (Sigil)
-         * @description Заносит (namespace,name,ref) в allow-list целостности плагинов с подписью SHA-256 (ADR-026 S4a). Permission plugin.allow. 404 — плагина нет в кеше host-а. 409 — допуск уже активен.
+         * Allow a plugin (Sigil)
+         * @description Registers (namespace,name,ref) in the plugin integrity allow-list with SHA-256 signature (ADR-026 S4a). Permission plugin.allow. 404 — plugin not in the host cache. 409 — release already active.
          */
         post: operations["allowPluginSigil"];
         delete?: never;
@@ -1147,8 +1227,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Отозвать Sigil
-         * @description Снимает активный допуск (namespace,name,ref) из allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — активной записи нет.
+         * Revoke Sigil
+         * @description Removes the active release (namespace,name,ref) from allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — active record absent.
          */
         delete: operations["revokePluginSigil"];
         options?: never;
@@ -1164,14 +1244,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Cloud-Profile-ей (paged)
-         * @description Реестр Cloud-Profile-ей с пагинацией и фильтром provider (ADR-017). Permission profile.read. Read-only, без audit.
+         * List Cloud Profiles (paged)
+         * @description Registry of Cloud Profiles with pagination and provider filter (ADR-017). Permission profile.read. Read-only, no audit.
          */
         get: operations["listProfiles"];
         put?: never;
         /**
-         * Создать Cloud-Profile
-         * @description Заносит Cloud-Profile (VM-spec поверх Provider-а, реестр profiles, ADR-017). Permission profile.create. 409 — name занят; 422 — provider не существует.
+         * Create a Cloud Profile
+         * @description Creates a Cloud Profile (VM-spec on top of a Provider, profiles registry, ADR-017). Permission profile.create. 409 - name taken; 422 - provider doesn't exist.
          */
         post: operations["createProfile"];
         delete?: never;
@@ -1188,15 +1268,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Cloud-Profile-а
-         * @description Метаданные одного Cloud-Profile-а по имени (ADR-017). Permission profile.read. Read-only, без audit.
+         * Cloud Profile card
+         * @description Metadata of a single Cloud Profile by name (ADR-017). Permission profile.read. Read-only, no audit.
          */
         get: operations["getProfile"];
         put?: never;
         post?: never;
         /**
-         * Удалить Cloud-Profile
-         * @description Удаляет запись Cloud-Profile-а (ADR-017). Permission profile.delete. 404 — записи нет.
+         * Delete a Cloud Profile
+         * @description Deletes a Cloud Profile record (ADR-017). Permission profile.delete. 404 - record absent.
          */
         delete: operations["deleteProfile"];
         options?: never;
@@ -1212,14 +1292,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Cloud-Provider-ов (paged)
-         * @description Реестр Cloud-Provider-ов с пагинацией (ADR-017). Permission provider.read. Read-only, без audit.
+         * List Cloud-Providers (paged)
+         * @description Cloud-Provider registry with pagination (ADR-017). Permission provider.read. Read-only, no audit.
          */
         get: operations["listProviders"];
         put?: never;
         /**
-         * Создать Cloud-Provider
-         * @description Заносит Cloud-Provider (реестр providers, ADR-017). Permission provider.create. 409 — name занят. credentials_ref хранится как vault-путь, секрет не резолвится.
+         * Create Cloud-Provider
+         * @description Registers a Cloud-Provider (providers registry, ADR-017). Permission provider.create. 409 - name taken. credentials_ref is stored as a vault path, the secret is not resolved.
          */
         post: operations["createProvider"];
         delete?: never;
@@ -1236,15 +1316,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Cloud-Provider-а
-         * @description Метаданные одного Cloud-Provider-а по имени (ADR-017). Permission provider.read. Read-only, без audit. credentials_ref — путь, секрет не резолвится.
+         * Cloud-Provider detail
+         * @description Metadata of one Cloud-Provider by name (ADR-017). Permission provider.read. Read-only, no audit. credentials_ref is a path, the secret is not resolved.
          */
         get: operations["getProvider"];
         put?: never;
         post?: never;
         /**
-         * Удалить Cloud-Provider
-         * @description Удаляет запись Cloud-Provider-а (ADR-017). Permission provider.delete. 404 — записи нет; 409 — есть зависимые Profile-и (FK RESTRICT).
+         * Delete Cloud-Provider
+         * @description Deletes a Cloud-Provider record (ADR-017). Permission provider.delete. 404 - record not found; 409 - dependent Profiles exist (FK RESTRICT).
          */
         delete: operations["deleteProvider"];
         options?: never;
@@ -1260,13 +1340,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Политика способов создания операторов
-         * @description Текущий список разрешённых способов СОЗДАНИЯ оператора (provisioning_allowed_methods, ADR-058 Часть B). policy_set=false → политика не задана (дефолт: все способы разрешены). Permission provisioning.read. Read-only, без audit.
+         * Policy of operator creation methods
+         * @description Current list of allowed operator CREATION methods (provisioning_allowed_methods, ADR-058 Part B). policy_set=false -> policy is unset (default: all methods allowed). Permission provisioning.read. Read-only, no audit.
          */
         get: operations["getProvisioningPolicy"];
         /**
-         * Сменить политику способов создания операторов
-         * @description Replace-семантика списка разрешённых способов СОЗДАНИЯ оператора (provisioning_allowed_methods, ADR-058 Часть B). Permission provisioning.update. 422 — пустой список (anti-lockout) или метод вне {user,ldap,oidc}. Гейтит ТОЛЬКО создание оператора; существующие логинятся независимо от политики.
+         * Change the operator creation methods policy
+         * @description Replace semantics for the list of allowed operator CREATION methods (provisioning_allowed_methods, ADR-058 Part B). Permission provisioning.update. 422 - empty list (anti-lockout) or method outside {user,ldap,oidc}. Gates ONLY operator creation; existing operators log in independent of the policy.
          */
         put: operations["updateProvisioningPolicy"];
         post?: never;
@@ -1284,14 +1364,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Push-Provider-ов (paged)
-         * @description Реестр Push-Provider-ов с пагинацией и фильтром name_pattern (ADR-032 S7-2). Permission push-provider.list. Read-only, без audit.
+         * List Push Providers (paged)
+         * @description Registry of Push Providers with pagination and name_pattern filter (ADR-032 S7-2). Permission push-provider.list. Read-only, no audit.
          */
         get: operations["listPushProviders"];
         put?: never;
         /**
-         * Создать Push-Provider
-         * @description Заносит Push-Provider (per-provider env-payload, ADR-032 S7-2). Permission push-provider.create. 409 — name занят. sensitive-ключи обязаны быть vault-refs.
+         * Create a Push Provider
+         * @description Creates a Push Provider (per-provider env-payload, ADR-032 S7-2). Permission push-provider.create. 409 — name already taken. sensitive keys must be vault-refs.
          */
         post: operations["createPushProvider"];
         delete?: never;
@@ -1308,19 +1388,19 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Push-Provider-а
-         * @description Метаданные одного Push-Provider-а по имени (ADR-032 S7-2). Permission push-provider.read. Read-only, без audit.
+         * Push Provider card
+         * @description Metadata of a single Push Provider by name (ADR-032 S7-2). Permission push-provider.read. Read-only, no audit.
          */
         get: operations["getPushProvider"];
         /**
-         * Заменить params Push-Provider-а
-         * @description Replace-семантика: params полностью заменяет существующий набор (ADR-032 S7-2). Permission push-provider.update. 404 — записи нет.
+         * Replace a Push Provider's params
+         * @description Replace semantics: params fully replaces the existing set (ADR-032 S7-2). Permission push-provider.update. 404 — record absent.
          */
         put: operations["updatePushProvider"];
         post?: never;
         /**
-         * Удалить Push-Provider
-         * @description Удаляет запись Push-Provider-а (ADR-032 S7-2). Permission push-provider.delete. 404 — записи нет.
+         * Delete a Push Provider
+         * @description Deletes a Push Provider record (ADR-032 S7-2). Permission push-provider.delete. 404 — record absent.
          */
         delete: operations["deletePushProvider"];
         options?: never;
@@ -1336,8 +1416,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список push-прогонов (paged)
-         * @description Глобальный реестр push-прогонов с фильтрами status/ssh_provider и пагинацией (UI-4). Permission incarnation.history. Read-only, без audit.
+         * List push runs (paged)
+         * @description Global registry of push runs with status/ssh_provider filters and pagination (UI-4). Permission incarnation.history. Read-only, no audit.
          */
         get: operations["listPushRuns"];
         put?: never;
@@ -1358,8 +1438,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Запустить push-прогон Destiny по SSH
-         * @description Async push-orchestrator (Variant C, ADR-004 push-flow). 202 + apply_id, далее опрос GET /v1/push/{apply_id}. Permission push.apply. Блокируется Toll при cluster:degraded (503).
+         * Run a Destiny push over SSH
+         * @description Async push-orchestrator (Variant C, ADR-004 push-flow). 202 + apply_id, then poll GET /v1/push/{apply_id}. Permission push.apply. Blocked by Toll on cluster:degraded (503).
          */
         post: operations["pushApply"];
         delete?: never;
@@ -1376,8 +1456,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Состояние push-прогона
-         * @description Текущее состояние push-прогона по apply_id (ADR-004 push-flow). Permission push.read. Read-only, без audit (recovery-friendly при degraded).
+         * Push run status
+         * @description Current state of a push run by apply_id (ADR-004 push-flow). Permission push.read. Read-only, no audit (recovery-friendly when degraded).
          */
         get: operations["pushGet"];
         put?: never;
@@ -1396,14 +1476,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список ролей
-         * @description Каталог RBAC-ролей с развёрнутыми permissions и составом операторов (ADR-022). Permission role.list. Read-only, без audit.
+         * List roles
+         * @description Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. Read-only, no audit.
          */
         get: operations["listRoles"];
         put?: never;
         /**
-         * Создать роль
-         * @description Создаёт RBAC-роль с набором permissions (ADR-022). Permission role.create. 409 — name уже занят.
+         * Create role
+         * @description Creates RBAC role with set of permissions (ADR-022). Permission role.create. 409 — name already taken.
          */
         post: operations["createRole"];
         delete?: never;
@@ -1423,8 +1503,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Удалить роль
-         * @description Удаляет RBAC-роль каскадом (permissions + membership). Permission role.delete. 409 — builtin/last-admin.
+         * Delete role
+         * @description Deletes RBAC role cascade (permissions + membership). Permission role.delete. 409 — builtin/last-admin.
          */
         delete: operations["deleteRole"];
         options?: never;
@@ -1442,8 +1522,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Привязать оператора к роли
-         * @description Идемпотентно (повтор — no-op). Permission role.grant-operator. 404 — роль/оператор не найдены.
+         * Bind operator to role
+         * @description Idempotent (repeat — no-op). Permission role.grant-operator. 404 — role/operator not found.
          */
         post: operations["grantRoleOperator"];
         delete?: never;
@@ -1463,8 +1543,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Отвязать оператора от роли
-         * @description Снимает membership-строку (name, aid). Permission role.revoke-operator. 409 — last-admin lock-out.
+         * Unbind operator from role
+         * @description Removes membership entry (name, aid). Permission role.revoke-operator. 409 — last-admin lock-out.
          */
         delete: operations["revokeRoleOperator"];
         options?: never;
@@ -1486,8 +1566,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Заменить permissions роли
-         * @description Replace-семантика: набор полностью заменяет существующий (ADR-022). Permission role.update. 409 — builtin/last-admin.
+         * Replace role permissions
+         * @description Replace semantics: set completely replaces existing (ADR-022). Permission role.update. 409 — builtin/last-admin.
          */
         patch: operations["updateRolePermissions"];
         trace?: never;
@@ -1500,8 +1580,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Глобальный список прогонов (paged)
-         * @description Свёртка apply_runs по apply_id ЧЕРЕЗ ВСЕ инкарнации: статус прогона (applying/success/failed/cancelled), инкарнация-владелец, границы времени, инициатор. Прогон (apply_run) — НЕ Voyage. Сортировка колонок — sort/sort_dir (стабильный tie-break apply_id). Видимость scoped по RBAC (ADR-047, fail-closed: пустой scope → пустой список). Permission incarnation.history. Read-only.
+         * Global run list (paged)
+         * @description Folds apply_runs by apply_id ACROSS ALL incarnations: run status (applying/success/failed/cancelled), owner incarnation, time bounds, initiator. A run (apply_run) is NOT a Voyage. Sorting by column - sort/sort_dir (stable tie-break on apply_id). Visibility scoped by RBAC (ADR-047, fail-closed: empty scope -> empty list). Permission incarnation.history. Read-only.
          */
         get: operations["listRuns"];
         put?: never;
@@ -1520,8 +1600,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Сводные счётчики прогонов
-         * @description Счётчики прогонов по агрегатному статусу (total/applying/success/failed/cancelled) за всё время и за последние 24 часа, в границах RBAC-scope (fail-closed: пустой scope → нулевой агрегат). Permission incarnation.history. Read-only.
+         * Run summary counters
+         * @description Run counters by aggregate status (total/applying/success/failed/cancelled) for all time and for the last 24 hours, within the RBAC scope (fail-closed: empty scope -> zero aggregate). Permission incarnation.history. Read-only.
          */
         get: operations["getRunsStats"];
         put?: never;
@@ -1540,14 +1620,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Service-ов
-         * @description Реестр Service-ов (sort name ASC, ADR-028). Permission service.list. Read-only, без audit.
+         * List of Services
+         * @description Registry of Services (sort name ASC, ADR-028). Permission service.list. Read-only, no audit.
          */
         get: operations["listServices"];
         put?: never;
         /**
-         * Зарегистрировать Service
-         * @description Заносит Service в реестр service_registry (ADR-028). Permission service.register. 409 — name занят. 404 — caller AID отсутствует в реестре операторов.
+         * Register a Service
+         * @description Registers the Service in the service_registry (ADR-028). Permission service.register. 409 - name taken. 404 - caller AID missing from the operator registry.
          */
         post: operations["registerService"];
         delete?: never;
@@ -1564,22 +1644,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Service-а
-         * @description Метаданные одной записи реестра по имени (ADR-028). Permission service.list. Read-only, без audit.
+         * Service card
+         * @description Metadata of a single registry entry by name (ADR-028). Permission service.list. Read-only, no audit.
          */
         get: operations["getService"];
         put?: never;
         post?: never;
         /**
-         * Удалить Service из реестра
-         * @description Удаляет запись реестра по имени + инвалидирует кеши (ADR-028). Permission service.deregister. 404 — записи нет.
+         * Remove a Service from the registry
+         * @description Deletes the registry entry by name + invalidates caches (ADR-028). Permission service.deregister. 404 - entry absent.
          */
         delete: operations["deregisterService"];
         options?: never;
         head?: never;
         /**
-         * Обновить Service (replace mutable-полей)
-         * @description Replace-семантика git/ref/refresh, name immutable (ADR-028). Permission service.update. 404 — записи нет.
+         * Update a Service (replace mutable-fields)
+         * @description Replace semantics for git/ref/refresh, name is immutable (ADR-028). Permission service.update. 404 - entry absent.
          */
         patch: operations["updateService"];
         trace?: never;
@@ -1592,10 +1672,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * git-зависимости Service-а
-         * @description Задекларированные в service.yml destiny-кирпичики + custom-модули со своими git-ref-ами для UI Service Detail (ADR-007/028). Permission service.list. Read-only, без audit. 502 — loader упал.
+         * git dependencies of a Service
+         * @description Destiny building blocks + custom modules declared in service.yml with their own git refs, for the UI Service Detail (ADR-007/028). Permission service.list. Read-only, no audit. 502 - loader failed.
          */
         get: operations["listServiceDependencies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/services/{name}/directives": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * catalog of valid redis.conf directives by version
+         * @description Catalog of valid service directive names (essence.redis_directives, major.minor series map -> names) for the UI redis_settings editor (ADR-042). Permission service.list. Read-only, no audit. ?version=X.Y.Z narrows to the series. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for a pinned commit-SHA ref, otherwise no-cache (branch/tag mutable - revalidation via ETag/304). Service without a catalog -> directives:{} + 200. 502 - loader failed.
+         */
+        get: operations["listServiceDirectives"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1612,8 +1712,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * git-tag-и + branch-и Service-а
-         * @description Список git-ref-ов remote-репозитория Service-а для UI Upgrade-modal (ADR-028). Permission service.list. Read-only, без audit. 502 — git-источник unreachable.
+         * git tags + branches of a Service
+         * @description List of git refs of the Service remote repository for the UI Upgrade-modal (ADR-028). Permission service.list. Read-only, no audit. 502 - git source unreachable.
          */
         get: operations["listServiceRefs"];
         put?: never;
@@ -1632,8 +1732,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * scenario из снапшота Service-репо
-         * @description Список scenario из материализованного снапшота git-репо Service-а для UI Run-modal (ADR-028). Permission service.list. Read-only, без audit. 502 — loader упал.
+         * scenario from a snapshot of the Service repo
+         * @description List of scenarios from a materialized snapshot of the Service git repo for the UI Run-modal (ADR-028). Permission service.list. Read-only, no audit. 502 - loader failed.
          */
         get: operations["listServiceScenarios"];
         put?: never;
@@ -1652,10 +1752,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * state_schema-метаданные Service-а
-         * @description state_schema-версия + декларация структуры + цепочка миграций (metadata-only) для UI Schema explorer (ADR-019/028). Permission service.list. Read-only, без audit. 502 — loader упал.
+         * state_schema metadata of a Service
+         * @description state_schema version + structure declaration + migration chain (metadata-only) for the UI Schema explorer (ADR-019/028). Permission service.list. Read-only, no audit. 502 - loader failed.
          */
         get: operations["listServiceStateSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/services/{name}/telemetry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * default host-vitals telemetry config of a Service + allowed collectors
+         * @description Effective default (per-service, without essence/incarnation) host-vitals config of the service (enabled/interval_sec/collectors) from the manifest `telemetry:` + known_collectors (full allowed set for the UI, ADR-042 backend-driven, ADR-072). Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for pinned commit-SHA ref, otherwise no-cache (mutable branch/tag). A service without a telemetry block -> manifest defaults (enabled=true, interval_sec=30, all collectors) + 200. 502 - loader failed. Not to be confused with /v1/incarnations/{name}/telemetry (runtime host-vitals from Redis, NIM-86).
+         */
+        get: operations["getServiceTelemetry"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1672,14 +1792,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список active-ключей подписи Sigil
-         * @description Active trust-anchor-ключи подписи (primary первым, без vault_ref, ADR-026(h)). Permission sigil.key-list. Read-only, без audit.
+         * List of active Sigil signing keys
+         * @description Active trust-anchor signing keys (primary first, without vault_ref, ADR-026(h)). Permission sigil.key-list. Read-only, no audit.
          */
         get: operations["listSigilKeys"];
         put?: never;
         /**
-         * Ввести ключ подписи Sigil
-         * @description Генерирует ed25519-пару, пишет приватник в Vault, вводит публичную часть в реестр trust-anchor-ов (ADR-026(h)). Permission sigil.key-introduce. Возвращает pubkey, НЕ приватник.
+         * Introduce a Sigil signing key
+         * @description Generates an ed25519 pair, writes the private key into Vault, introduces the public part into the trust-anchor registry (ADR-026(h)). Permission sigil.key-introduce. Returns pubkey, NOT the private key.
          */
         post: operations["introduceSigilKey"];
         delete?: never;
@@ -1699,8 +1819,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Вывести ключ подписи из active
-         * @description Помечает ключ retired (ADR-026(h)). Permission sigil.key-retire. 404 — active-записи нет; 409 — последний active либо primary (сперва SetPrimary другому).
+         * Retire a signing key from active
+         * @description Marks the key retired (ADR-026(h)). Permission sigil.key-retire. 404 - no active record; 409 - last active or primary (SetPrimary to another key first).
          */
         delete: operations["retireSigilKey"];
         options?: never;
@@ -1718,8 +1838,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Сделать ключ подписи primary
-         * @description Назначает active-ключ primary (новые Sigil-ы подписываются им, ADR-026(h)). Permission sigil.key-set-primary. 404 — ключа нет; 409 — retired/гонка.
+         * Make a signing key primary
+         * @description Sets an active key as primary (new Sigils are signed with it, ADR-026(h)). Permission sigil.key-set-primary. 404 - key not found; 409 - retired/race.
          */
         post: operations["setPrimarySigilKey"];
         delete?: never;
@@ -1736,14 +1856,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Soul-ов (paged, scoped)
-         * @description Реестр souls со scoped-видимостью (ADR-047) и фильтрами coven/status/transport. offset-fast-path либо keyset (режим выбирает сервер из Purview). Permission soul.list. Read-only, без audit.
+         * List of Souls (paged, scoped)
+         * @description Registry of souls with scoped visibility (ADR-047) and coven/status/transport filters. offset-fast-path or keyset (mode chosen server-side from Purview). Permission soul.list. Read-only, no audit.
          */
         get: operations["listSouls"];
         put?: never;
         /**
-         * Зарегистрировать Soul
-         * @description Онбординг хоста в реестр souls (status: pending). Для transport=agent выпускается bootstrap-токен. Permission soul.create. 409 — SID занят.
+         * Register Soul
+         * @description Onboarding host to souls registry (status: pending). For transport=agent, bootstrap token is issued. Permission soul.create. 409 — SID taken.
          */
         post: operations["createSoul"];
         delete?: never;
@@ -1762,8 +1882,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Массовое назначение Coven-меток
-         * @description Bulk append/remove одной метки либо replace набора на хостах под selector ∩ scope (ADR-008). Permission soul.coven-assign. partial → 200 status:partial.
+         * Bulk assign Coven tags
+         * @description Bulk append/remove single label or replace set on hosts under selector ∩ scope (ADR-008). Permission soul.coven-assign. partial → 200 status:partial.
          */
         post: operations["assignSoulCoven"];
         delete?: never;
@@ -1780,8 +1900,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Агрегат реестра Souls (Overview)
-         * @description Сводка по status/transport/coven + total + stale_count для Souls Overview со scoped-видимостью (ADR-047). transport — agent/ssh (UI маппит на pull/push). stale_count — по mark_disconnected.stale_after. Permission soul.list. Read-only, без audit.
+         * Souls registry aggregate (Overview)
+         * @description Summary by status/transport/coven + total + stale_count for Souls Overview with scoped visibility (ADR-047). transport - agent/ssh (UI maps to pull/push). stale_count - by mark_disconnected.stale_after. Permission soul.list. Read-only, no audit.
          */
         get: operations["getSoulsStats"];
         put?: never;
@@ -1802,9 +1922,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Массовое назначение trait-меток (deprecated)
+         * Bulk assignment of trait-tags (deprecated)
          * @deprecated
-         * @description DEPRECATED (ADR-060): используйте PUT /v1/incarnations/{name}/traits (incarnation.traits — источник истины, проецируется в souls.traits). Bulk merge/replace/remove operator-set trait-меток (souls.traits jsonb) на хостах под selector ∩ coven-scope. Per-soul write перетирается проекцией incarnation.traits. Permission soul.traits-assign. partial → 200 status:partial.
+         * @description DEPRECATED (ADR-060): use PUT /v1/incarnations/{name}/traits (incarnation.traits - source of truth, projected into souls.traits). Bulk merge/replace/remove operator-set trait-tags (souls.traits jsonb) on hosts under selector ∩ coven-scope. Per-soul write is overwritten by the incarnation.traits projection. Permission soul.traits-assign. partial -> 200 status:partial.
          */
         post: operations["assignSoulTraits"];
         delete?: never;
@@ -1821,8 +1941,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Soul-а
-         * @description Одна строка реестра souls для detail-page (ADR-047 scoped). Permission soul.list. Вне scope → 404. Read-only, без audit.
+         * Soul card
+         * @description One registry row of souls for the detail page (ADR-047 scoped). Permission soul.list. Outside scope -> 404. Read-only, no audit.
          */
         get: operations["getSoul"];
         put?: never;
@@ -1843,8 +1963,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Запустить Errand на Soul-е
-         * @description Pull-ad-hoc exec модуля на одном хосте (ADR-033). 200 sync (терминал до server-cap 30s) либо 202 + Location async-escalation. Permission errand.run. 404 — Soul не подключён.
+         * Run Errand on a Soul
+         * @description Pull ad-hoc module exec on a single host (ADR-033). 200 sync (terminal up to server-cap 30s) or 202 + Location async-escalation. Permission errand.run. 404 - Soul not connected.
          */
         post: operations["ErrandExec"];
         delete?: never;
@@ -1861,8 +1981,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * История прогонов Soul-а (paged)
-         * @description Per-host timeline (scenario apply_runs + ad-hoc errands) со scope-гейтом. Permission soul.list. Read-only, без audit.
+         * Soul run history (paged)
+         * @description Per-host timeline (scenario apply_runs + ad-hoc errands) with a scope gate. Permission soul.list. Read-only, no audit.
          */
         get: operations["getSoulHistory"];
         put?: never;
@@ -1883,8 +2003,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Перевыпустить bootstrap-токен
-         * @description Повторная выписка bootstrap-токена для transport=agent (?force=true истекает активный). Permission soul.issue-token. 409 — активный токен без force.
+         * Reissue bootstrap token
+         * @description Reissue of the bootstrap token for transport=agent (?force=true expires the active one). Permission soul.issue-token. 409 - active token without force.
          */
         post: operations["issueSoulToken"];
         delete?: never;
@@ -1901,8 +2021,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Soulprint Soul-а
-         * @description Последний typed-SoulprintReport (ADR-018) со scope-гейтом. Permission soul.list. 410 — soulprint ни разу не приходил. Read-only, без audit.
+         * Soul soulprint
+         * @description The latest typed SoulprintReport (ADR-018) with a scope gate. Permission soul.list. 410 - soulprint has never arrived. Read-only, no audit.
          */
         get: operations["getSoulprint"];
         put?: never;
@@ -1922,8 +2042,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Обновить SSH-реквизиты Soul-а
-         * @description Per-host SSH-реквизиты push-flow (ADR-032 S7-1). Replace-семантика (полный набор). Permission soul.ssh-target-update. 404 — нет soul.
+         * Update Soul SSH requisites
+         * @description Per-host SSH requisites for push-flow (ADR-032 S7-1). Replace semantics (full set). Permission soul.ssh-target-update. 404 - no soul.
          */
         put: operations["updateSoulSSHTarget"];
         post?: never;
@@ -1941,8 +2061,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Host-vitals Soul-а
-         * @description Последний снимок утилизации хоста (CPU/load/mem/disk) + окно для спарклайнов из Redis (NIM-86, ADR-006), со scope-гейтом. Permission soul.list. stale=true если снимок протух или данных нет (старый агент → graceful). Read-only, без audit.
+         * Host-vitals of a Soul
+         * @description Latest host utilization snapshot (CPU/load/mem/disk) + a window for sparklines from Redis (NIM-86, ADR-006), with a scope gate. Permission soul.list. stale=true if the snapshot is stale or there is no data (old agent -> graceful). Read-only, no audit.
          */
         get: operations["getSoulTelemetry"];
         put?: never;
@@ -1961,14 +2081,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Synod-групп
-         * @description Каталог Synod-групп с bundle ролей и составом членов (ADR-049). Permission synod.list. Read-only, без audit.
+         * List Synod groups
+         * @description Catalog of Synod groups with role bundle and member roster (ADR-049). Permission synod.list. Read-only, no audit.
          */
         get: operations["listSynods"];
         put?: never;
         /**
-         * Создать Synod-группу
-         * @description Заносит Synod-группу (группа архонов, bundle ролей) в реестр (ADR-049). Permission synod.create. 409 — name занят.
+         * Create a Synod group
+         * @description Registers a Synod group (a group of archons, a role bundle) in the registry (ADR-049). Permission synod.create. 409 - name taken.
          */
         post: operations["createSynod"];
         delete?: never;
@@ -1988,15 +2108,15 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Удалить Synod-группу
-         * @description Удаляет Synod каскадно (membership + bundle, ADR-049). Permission synod.delete. 409 — builtin/last-admin lock-out.
+         * Delete a Synod group
+         * @description Deletes the Synod cascadingly (membership + bundle, ADR-049). Permission synod.delete. 409 - builtin/last-admin lock-out.
          */
         delete: operations["deleteSynod"];
         options?: never;
         head?: never;
         /**
-         * Обновить описание Synod-группы
-         * @description Меняет ТОЛЬКО description (name immutable, ADR-049 amend). Permission synod.update. 404 — записи нет.
+         * Update a Synod group description
+         * @description Changes ONLY the description (name immutable, ADR-049 amend). Permission synod.update. 404 - entry absent.
          */
         patch: operations["updateSynod"];
         trace?: never;
@@ -2011,8 +2131,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Добавить архонта в Synod-группу
-         * @description Член получает весь bundle ролей группы (ADR-049). Идемпотентно. Permission synod.add-operator. 403 — least-privilege.
+         * Add an archon to a Synod group
+         * @description The member receives the group's full role bundle (ADR-049). Idempotent. Permission synod.add-operator. 403 - least-privilege.
          */
         post: operations["addSynodOperator"];
         delete?: never;
@@ -2032,8 +2152,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Убрать архонта из Synod-группы
-         * @description Снимает membership-строку (name, aid). Permission synod.remove-operator. 409 — last-admin lock-out.
+         * Remove an archon from a Synod group
+         * @description Removes the membership row (name, aid). Permission synod.remove-operator. 409 - last-admin lock-out.
          */
         delete: operations["removeSynodOperator"];
         options?: never;
@@ -2051,8 +2171,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Добавить роль в bundle Synod-группы
-         * @description Все члены группы получают эффективные права роли (ADR-049). Идемпотентно. Permission synod.grant-role. 403 — least-privilege.
+         * Add a role to a Synod group bundle
+         * @description All group members receive the role's effective permissions (ADR-049). Idempotent. Permission synod.grant-role. 403 - least-privilege.
          */
         post: operations["grantSynodRole"];
         delete?: never;
@@ -2072,8 +2192,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Снять роль из bundle Synod-группы
-         * @description Права роли снимаются у всех членов группы (ADR-049). Permission synod.revoke-role. 409 — last-admin lock-out.
+         * Remove a role from a Synod group bundle
+         * @description The role's permissions are revoked from all group members (ADR-049). Permission synod.revoke-role. 409 - last-admin lock-out.
          */
         delete: operations["revokeSynodRole"];
         options?: never;
@@ -2089,14 +2209,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Tiding-правил (paged)
-         * @description Реестр Tiding-правил с пагинацией (ADR-052). Permission tiding.list. По умолчанию скрывает разовые (include_ephemeral=true отдаёт все). Read-only, без audit.
+         * List Tiding rules (paged)
+         * @description Tiding rule registry with pagination (ADR-052). Permission tiding.list. Hides ephemeral rules by default (include_ephemeral=true returns all). Read-only, no audit.
          */
         get: operations["listTidings"];
         put?: never;
         /**
-         * Создать Tiding-правило
-         * @description Заносит постоянное Tiding-правило подписки (ADR-052). Permission tiding.create. 404 — Herald-канал не существует. 409 — name занят.
+         * Create Tiding rule
+         * @description Registers a permanent Tiding subscription rule (ADR-052). Permission tiding.create. 404 — Herald channel does not exist. 409 — name taken.
          */
         post: operations["createTiding"];
         delete?: never;
@@ -2113,19 +2233,19 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Tiding-правила
-         * @description Метаданные одного Tiding-правила по имени (ADR-052). Permission tiding.read. Read-only, без audit.
+         * Tiding rule card
+         * @description Metadata of a single Tiding rule by name (ADR-052). Permission tiding.read. Read-only, no audit.
          */
         get: operations["getTiding"];
         /**
-         * Обновить Tiding-правило (replace)
-         * @description Replace-семантика: поля полностью заменяют существующие, name immutable (ADR-052). Permission tiding.update. 404 — записи/Herald нет.
+         * Update Tiding rule (replace)
+         * @description Replace semantics: fields fully replace the existing ones, name immutable (ADR-052). Permission tiding.update. 404 — record/Herald absent.
          */
         put: operations["updateTiding"];
         post?: never;
         /**
-         * Удалить Tiding-правило
-         * @description Снимает Tiding-правило подписки по имени (ADR-052). Permission tiding.delete. 404 — записи нет.
+         * Delete Tiding rule
+         * @description Removes the Tiding subscription rule by name (ADR-052). Permission tiding.delete. 404 — record absent.
          */
         delete: operations["deleteTiding"];
         options?: never;
@@ -2141,14 +2261,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Vigil-ов (paged)
-         * @description Реестр Vigil-ов с пагинацией (ADR-030). Permission vigil.list. Read-only, без audit.
+         * List of Vigils (paged)
+         * @description Vigil registry with pagination (ADR-030). Permission vigil.list. Read-only, no audit.
          */
         get: operations["listVigils"];
         put?: never;
         /**
-         * Создать Vigil
-         * @description Заносит Vigil (Soul-side проверку) в реестр oracle (ADR-030). Permission vigil.create. 409 — name занят.
+         * Create Vigil
+         * @description Registers a Vigil (Soul-side check) in the oracle registry (ADR-030). Permission vigil.create. 409 -- name taken.
          */
         post: operations["createVigil"];
         delete?: never;
@@ -2165,15 +2285,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Карточка Vigil-а
-         * @description Метаданные одного Vigil-а по имени (ADR-030). Permission vigil.list (read покрыт list-правом). Read-only, без audit.
+         * Vigil card
+         * @description Metadata of a single Vigil by name (ADR-030). Permission vigil.list (read is covered by the list permission). Read-only, no audit.
          */
         get: operations["getVigil"];
         put?: never;
         post?: never;
         /**
-         * Удалить Vigil
-         * @description Удаляет Vigil из реестра oracle (ADR-030). Permission vigil.delete. 404 — записи нет.
+         * Delete Vigil
+         * @description Deletes a Vigil from the oracle registry (ADR-030). Permission vigil.delete. 404 -- record absent.
          */
         delete: operations["deleteVigil"];
         options?: never;
@@ -2189,14 +2309,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список Voyage-прогонов (paged)
-         * @description Список прогонов с фильтрами kind/status и пагинацией (ADR-043). target_resolved НЕ раскрывается (UI читает scope_size). Permission incarnation.history. Read-only, без audit.
+         * List Voyage runs (paged)
+         * @description List of runs with kind/status filters and pagination (ADR-043). target_resolved is NOT exposed (UI reads scope_size). Permission incarnation.history. Read-only, no audit.
          */
         get: operations["listVoyages"];
         put?: never;
         /**
-         * Создать Voyage
-         * @description Унифицированный батчевый прогон (ADR-043). RBAC-by-kind: scenario→incarnation.run, command→errand.run (fail-closed, в handler-е). Tempo per-AID rate-limit.
+         * Create a Voyage
+         * @description Unified batch run (ADR-043). RBAC-by-kind: scenario->incarnation.run, command->errand.run (fail-closed, in the handler). Tempo per-AID rate-limit.
          */
         post: operations["createVoyage"];
         delete?: never;
@@ -2216,7 +2336,7 @@ export interface paths {
         put?: never;
         /**
          * Dry-resolve scope Voyage
-         * @description Предпоказ числа единиц/батчей БЕЗ создания Voyage (ADR-043 amendment §4). Та же валидация/резолв/RBAC, что Create. Без раскрытия SID-списка. Read-like — без audit.
+         * @description Preview of the number of units/batches WITHOUT creating a Voyage (ADR-043 amendment 4). Same validation/resolve/RBAC as Create. Without revealing the SID list. Read-like - no audit.
          */
         post: operations["previewVoyage"];
         delete?: never;
@@ -2233,15 +2353,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Snapshot Voyage-прогона
-         * @description Detail + summary одного прогона (ADR-043). Permission incarnation.history. Read-only, без audit.
+         * Snapshot of a Voyage run
+         * @description Detail + summary of a single run (ADR-043). Permission incarnation.history. Read-only, no audit.
          */
         get: operations["getVoyage"];
         put?: never;
         post?: never;
         /**
-         * Отменить Voyage-прогон
-         * @description Cancel pending/scheduled (running-abort — post-MVP). RBAC-by-kind в handler-е. 409 — running/terminal. Permission по kind.
+         * Cancel a Voyage run
+         * @description Cancel pending/scheduled (running-abort - post-MVP). RBAC-by-kind in the handler. 409 - running/terminal. Permission by kind.
          */
         delete: operations["cancelVoyage"];
         options?: never;
@@ -2257,8 +2377,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * All-runs drill Voyage-прогона
-         * @description Per-target batch/status/back-link одного прогона (ADR-043). Permission incarnation.history. Read-only, без audit.
+         * All-runs drill for a Voyage run
+         * @description Per-target batch/status/back-link of a single run (ADR-043). Permission incarnation.history. Read-only, no audit.
          */
         get: operations["listVoyageTargets"];
         put?: never;
@@ -2294,6 +2414,23 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        AuthMethodsReply: {
+            /** @description federated LDAP login is configured */
+            ldap: boolean;
+            /** @description federated OIDC login is configured */
+            oidc: boolean;
+            /** @description local login (always available) */
+            password: boolean;
+        };
+        AuthTokenReply: {
+            /**
+             * Format: date-time
+             * @description expiration moment of the issued Bearer
+             */
+            expires_at: string;
+            /** @description short Bearer JWT for Authorization on /v1 */
+            token: string;
+        };
         Cadence: {
             /** @enum {string} */
             batch_mode?: "barrier" | "window";
@@ -2301,7 +2438,7 @@ export interface components {
             batch_percent?: number;
             /** Format: int64 */
             batch_size?: number;
-            /** @description ULID расписания */
+            /** @description ULID of schedule */
             cadence_id: string;
             /** Format: int64 */
             concurrency?: number;
@@ -2332,26 +2469,26 @@ export interface components {
             scenario_name?: string;
             /** @enum {string} */
             schedule_kind: "interval" | "cron";
-            /** @description декларативный таргет прогона (declarative, отдаётся as-is) */
+            /** @description declarative run target (declarative, passed through as-is) */
             target?: components["schemas"]["VoyageTarget"];
             /** Format: date-time */
             updated_at: string;
         };
         CadenceCreateReply: {
-            /** @description ULID созданного расписания */
+            /** @description ULID of created schedule */
             cadence_id: string;
             enabled: boolean;
-            /** @description относительный URL ресурса */
+            /** @description relative resource URL */
             location: string;
             name: string;
             /**
              * Format: date-time
-             * @description RFC3339 время следующего запуска
+             * @description RFC3339 time of next run
              */
             next_run_at?: string;
         };
         CadenceCreateRequest: {
-            /** @description размер батча: N хостов/инкарнаций или N% */
+            /** @description batch size: N hosts/incarnations or N% */
             batch?: string;
             batch_mode?: string;
             /** Format: int64 */
@@ -2360,13 +2497,13 @@ export interface components {
             batch_size?: number;
             /** Format: int64 */
             concurrency?: number;
-            /** @description cron-выражение для schedule_kind=cron */
+            /** @description cron expression for schedule_kind=cron */
             cron_expr?: string;
-            /** @description вкл/выкл планировщика (default true) */
+            /** @description enable/disable scheduler (default true) */
             enabled?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
-            /** @description параметры рецепта */
+            /** @description recipe parameters */
             input?: {
                 [key: string]: unknown;
             };
@@ -2376,37 +2513,37 @@ export interface components {
             inter_unit_interval_ms?: number;
             /**
              * Format: int64
-             * @description период для schedule_kind=interval (минимум 30с — абсолютный poll_floor, ADR-046/048)
+             * @description period for schedule_kind=interval (minimum 30s — absolute poll_floor, ADR-046/048)
              */
             interval_seconds?: number;
             /**
-             * @description тип рецепта прогона
+             * @description run recipe type
              * @enum {string}
              */
             kind: "scenario" | "command";
-            /** @description порог провалов: N абсолют или N% */
+            /** @description failure threshold: N absolute or N% */
             max_failures?: string;
-            /** @description модуль для kind=command */
+            /** @description module for kind=command */
             module?: string;
-            /** @description человекочитаемое имя расписания */
+            /** @description human-readable schedule name */
             name: string;
-            /** @description подписки на уведомления о прогонах этого расписания */
+            /** @description subscriptions to run notifications for this schedule */
             notify?: components["schemas"]["VoyageNotify"][] | null;
             on_failure?: string;
             /**
-             * @description политика наложения прогонов
+             * @description overlap policy for runs
              * @enum {string}
              */
             overlap_policy: "skip" | "queue" | "parallel";
             require_alive?: boolean;
-            /** @description имя сценария для kind=scenario */
+            /** @description scenario name for kind=scenario */
             scenario_name?: string;
             /**
-             * @description тип расписания
+             * @description schedule type
              * @enum {string}
              */
             schedule_kind: "interval" | "cron";
-            /** @description таргет прогона (резолвится на спавне) */
+            /** @description run target (resolved on spawn) */
             target: components["schemas"]["VoyageTarget"];
         };
         CadenceEnabledReply: {
@@ -2414,26 +2551,26 @@ export interface components {
             enabled: boolean;
         };
         CadenceListReply: {
-            /** @description страница расписаний */
+            /** @description page of schedules */
             items: components["schemas"]["Cadence"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
             /**
              * Format: int32
-             * @description сдвиг от начала набора
+             * @description offset from start of set
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число записей в наборе
+             * @description total number of entries in set
              */
             total: number;
         };
         CadencePatchRequest: {
-            /** @description размер батча: N хостов/инкарнаций или N% */
+            /** @description batch size: N hosts/incarnations or N% */
             batch?: string;
             batch_mode?: string;
             /** Format: int64 */
@@ -2442,43 +2579,43 @@ export interface components {
             batch_size?: number;
             /** Format: int64 */
             concurrency?: number;
-            /** @description cron-выражение (пустая строка → очистить) */
+            /** @description cron expression (empty string → clear) */
             cron_expr?: string;
-            /** @description вкл/выкл планировщика */
+            /** @description enable/disable scheduler */
             enabled?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
-            /** @description параметры рецепта */
+            /** @description recipe parameters */
             input?: {
                 [key: string]: unknown;
             };
             /**
              * Format: int64
-             * @description период для schedule_kind=interval (минимум 30с — абсолютный poll_floor, ADR-046/048)
+             * @description period for schedule_kind=interval (minimum 30s — absolute poll_floor, ADR-046/048)
              */
             interval_seconds?: number;
-            /** @description порог провалов: N абсолют или N% */
+            /** @description failure threshold: N absolute or N% */
             max_failures?: string;
-            /** @description модуль для kind=command (пустая строка → очистить) */
+            /** @description module for kind=command (empty string → clear) */
             module?: string;
-            /** @description человекочитаемое имя расписания */
+            /** @description human-readable schedule name */
             name?: string;
-            /** @description abort|continue (пустая строка → очистить) */
+            /** @description abort|continue (empty string → clear) */
             on_failure?: string;
             /**
-             * @description политика наложения прогонов
+             * @description overlap policy for runs
              * @enum {string}
              */
             overlap_policy?: "skip" | "queue" | "parallel";
             require_alive?: boolean;
-            /** @description имя сценария (пустая строка → очистить) */
+            /** @description scenario name (empty string → clear) */
             scenario_name?: string;
             /**
-             * @description тип расписания
+             * @description schedule type
              * @enum {string}
              */
             schedule_kind?: "interval" | "cron";
-            /** @description таргет прогона */
+            /** @description run target */
             target?: components["schemas"]["VoyageTarget"];
         };
         Choir: {
@@ -2494,18 +2631,18 @@ export interface components {
             min_size: number | null;
         };
         ChoirCreateRequest: {
-            /** @description имя Choir-а (^[a-z][a-z0-9_-]*$) */
+            /** @description Choir name (^[a-z][a-z0-9_-]*$) */
             choir_name: string;
-            /** @description человекочитаемое описание */
+            /** @description human-readable description */
             description?: string;
             /**
              * Format: int64
-             * @description верхний лимит размера партии (≥ min_size)
+             * @description upper batch size bound (>= min_size)
              */
             max_size?: number;
             /**
              * Format: int64
-             * @description нижний лимит размера партии (> 0)
+             * @description lower batch size bound (> 0)
              */
             min_size?: number;
         };
@@ -2533,25 +2670,25 @@ export interface components {
             self_kid: string;
         };
         DecreeCreateRequest: {
-            /** @description вход сценария (vault-ref едет как есть) */
+            /** @description scenario input (vault-ref passed through as-is) */
             action_input?: unknown;
-            /** @description named scenario (whitelist; raw-команда отвергнута) */
+            /** @description named scenario (whitelist; raw command rejected) */
             action_scenario: string;
-            /** @description минимальный интервал между срабатываниями per-(decree, subject) */
+            /** @description minimum interval between triggers per-(decree, subject) */
             cooldown?: string;
-            /** @description субъект-метки coven (XOR с sid) */
+            /** @description subject Coven tags (XOR with sid) */
             coven?: string[];
-            /** @description активно ли правило (по умолчанию true) */
+            /** @description whether the rule is active (default true) */
             enabled?: boolean;
-            /** @description таргет-incarnation реакции (обязательно) */
+            /** @description target incarnation of the reaction (required) */
             incarnation_name: string;
-            /** @description имя Decree-а (kebab-case, 1..63) */
+            /** @description Decree name (kebab-case, 1..63) */
             name: string;
-            /** @description имя Vigil-а, на чей Portent правило реагирует */
+            /** @description Vigil name whose Portent the rule reacts to */
             on_beacon: string;
-            /** @description субъект — один конкретный SID (XOR с coven) */
+            /** @description subject — single specific SID (XOR with coven) */
             sid?: string;
-            /** @description опц. CEL-предикат над event.data; compile-проверяется */
+            /** @description opt. CEL predicate over event.data; compile-checked */
             where?: string;
         };
         DecreeListReply: {
@@ -2626,10 +2763,10 @@ export interface components {
             module: string;
         };
         ErrandAccepted: {
-            /** @description ULID запущенного Errand-а */
+            /** @description ULID of the started Errand */
             errand_id: string;
             /**
-             * @description строка ещё выполняется (async-escalation)
+             * @description string still running (async-escalation)
              * @enum {string}
              */
             status: "running";
@@ -2667,17 +2804,17 @@ export interface components {
             stdout_truncated?: boolean;
         };
         ErrandRunRequest: {
-            /** @description только для PlanReadSafe-модулей; verb-модуль (shell/exec) → 400 */
+            /** @description only for PlanReadSafe modules; verb module (shell/exec) -> 400 */
             dry_run?: boolean;
-            /** @description input для модуля (валидируется против input_schema) */
+            /** @description input for the module (validated against input_schema) */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description fully-qualified <ns>.<name>.<state> (core.cmd.shell / core.exec.run / ErrandReadSafe-модуль) */
+            /** @description fully-qualified <ns>.<name>.<state> (core.cmd.shell / core.exec.run / ErrandReadSafe module) */
             module: string;
             /**
              * Format: int64
-             * @description полный timeout Errand-а [1..300]; 0/опущено → дефолт 30s; > server-cap (30s) → 202 + Location
+             * @description total Errand timeout [1..300]; 0/omitted -> default 30s; > server-cap (30s) -> 202 + Location
              */
             timeout_seconds?: number;
         };
@@ -2711,7 +2848,7 @@ export interface components {
             status: "applying" | "success" | "failed" | "cancelled";
         };
         GrantOperatorRequest: {
-            /** @description AID архонта, назначаемого в роль/группу (naming-rules.md) */
+            /** @description AID of the archon being assigned to a role/group (naming-rules.md) */
             aid: string;
         };
         Herald: {
@@ -2729,20 +2866,20 @@ export interface components {
             updated_at: string;
         };
         HeraldCreateRequest: {
-            /** @description per-type config (форма зависит от type; см. каталог GET /v1/herald-types). Секрет канала (bot_token/webhook_url/header_secret) — dual-mode: значение (plaintext) ИЛИ *_ref (vault-путь) */
+            /** @description per-type config (form depends on type; see catalog GET /v1/herald-types). Channel secret (bot_token/webhook_url/header_secret) — dual-mode: value (plaintext) OR *_ref (vault path) */
             config: {
                 [key: string]: unknown;
             };
-            /** @description канал включён (опущено → true) */
+            /** @description channel enabled (omitted → true) */
             enabled?: boolean;
-            /** @description имя Herald-канала (kebab-case, 1..63), уникальное в кластере */
+            /** @description Herald channel name (kebab-case, 1..63), unique in the cluster */
             name: string;
-            /** @description опц. plaintext webhook signing-token (dual-mode, ADR-064): keeper пишет его в Vault сам; XOR с secret_ref. Требует TLS-фронта (secret_ingest.accept_plaintext) */
+            /** @description opt. plaintext webhook signing-token (dual-mode, ADR-064): keeper writes it into Vault itself; XOR with secret_ref. Requires TLS-front (secret_ingest.accept_plaintext) */
             secret?: string;
-            /** @description опц. vault-ref на webhook signing-token (vault:<mount>/<path>); XOR с secret */
+            /** @description opt. vault-ref on webhook signing-token (vault:<mount>/<path>); XOR with secret */
             secret_ref?: string;
             /**
-             * @description тип канала (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email); значение вне enum → 422
+             * @description channel type (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email); value outside the enum -> 422
              * @enum {string}
              */
             type: "custom" | "discord" | "email" | "mattermost" | "slack" | "telegram" | "webhook";
@@ -2773,18 +2910,18 @@ export interface components {
             secret: boolean;
         };
         HeraldUpdateRequest: {
-            /** @description per-type config (replace — полностью заменяет существующий). Секрет канала — dual-mode: значение (plaintext) ИЛИ *_ref */
+            /** @description per-type config (replace — fully replaces the existing one). Channel secret — dual-mode: value (plaintext) OR *_ref */
             config: {
                 [key: string]: unknown;
             };
-            /** @description канал включён (опущено → true) */
+            /** @description channel enabled (omitted → true) */
             enabled?: boolean;
-            /** @description опц. plaintext webhook signing-token (dual-mode, ADR-064): keeper перезаписывает его в Vault по тому же пути; XOR с secret_ref */
+            /** @description opt. plaintext webhook signing-token (dual-mode, ADR-064): keeper overwrites it in Vault at the same path; XOR with secret_ref */
             secret?: string;
-            /** @description опц. vault-ref на signing-token; XOR с secret; отсутствие обоих очищает подпись */
+            /** @description opt. vault-ref on signing-token; XOR with secret; absence of both clears the signature */
             secret_ref?: string;
             /**
-             * @description тип канала (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email)
+             * @description channel type (closed-enum: webhook|telegram|slack|mattermost|discord|custom|email)
              * @enum {string}
              */
             type: "custom" | "discord" | "email" | "mattermost" | "slack" | "telegram" | "webhook";
@@ -2805,7 +2942,7 @@ export interface components {
             type: string;
         };
         IncarnationCheckDriftRequest: {
-            /** @description override converge-параметров (ADR-031 Slice B) */
+            /** @description override converge parameters (ADR-031 Slice B) */
             input?: {
                 [key: string]: unknown;
             };
@@ -2815,19 +2952,19 @@ export interface components {
             incarnation: string;
         };
         IncarnationCreateRequest: {
-            /** @description declared environment-теги (ADR-008 amendment a) */
+            /** @description declared environment tags (ADR-008 amendment a) */
             covens?: string[] | null;
-            /** @description имя стартового сценария (механизм нескольких create, scenario с create:true). Пусто: сервис предлагает create-сценарии → 422 create_scenario_required; сервис без них → bare-инкарнация (ready без прогона) */
+            /** @description name of start scenario (mechanism for multiple creates, scenario with create:true). Empty: service offers create scenarios → 422 create_scenario_required; service without them → bare incarnation (ready without run) */
             create_scenario?: string;
-            /** @description input для выбранного create-сценария */
+            /** @description input for selected create scenario */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description имя нового instance (kebab-case), корневая Coven-метка */
+            /** @description new instance name (kebab-case), root Coven tag */
             name: string;
-            /** @description имя сервиса из реестра (ADR-029) */
+            /** @description service name from registry (ADR-029) */
             service: string;
-            /** @description operator-set trait-метки (ключ → scalar|list of scalars), ADR-060 */
+            /** @description operator-set trait labels (key → scalar|list of scalars), ADR-060 */
             traits?: {
                 [key: string]: unknown;
             };
@@ -2836,7 +2973,7 @@ export interface components {
             apply_id: string;
         };
         IncarnationFormPrefillReply: {
-            /** @description field → текущее значение из incarnation.state (prefill-hint) */
+            /** @description field → current value from incarnation.state (prefill-hint) */
             values: {
                 [key: string]: unknown;
             };
@@ -2873,40 +3010,40 @@ export interface components {
             updated_at: string;
         };
         IncarnationHistoryReply: {
-            /** @description страница записей state_history */
+            /** @description page of state_history entries */
             items: components["schemas"]["StateHistoryEntry"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
             /**
              * Format: int32
-             * @description сдвиг от начала набора
+             * @description offset from start of set
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число записей в наборе
+             * @description total number of entries in set
              */
             total: number;
         };
         IncarnationListReply: {
-            /** @description страница инкарнаций */
+            /** @description page of incarnations */
             items: components["schemas"]["IncarnationGetReply"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
             /**
              * Format: int32
-             * @description сдвиг от начала набора
+             * @description offset from start of set
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число записей в наборе
+             * @description total number of entries in set
              */
             total: number;
         };
@@ -2916,8 +3053,32 @@ export interface components {
             scenario: string;
         };
         IncarnationRerunLastRequest: {
-            /** @description свободный текст подтверждения */
+            /** @description free text confirmation */
             reason: string;
+        };
+        IncarnationRevealSecretReply: {
+            /** @description plaintext value of the secret */
+            value: string;
+        };
+        IncarnationRevealSecretRequest: {
+            /** @description element key of the current-state enumerate array (element.name) */
+            key: string;
+            /** @description id of the revealable secret (revealable_secrets of the service manifest) */
+            secret_id: string;
+        };
+        IncarnationRevealableSecretItem: {
+            /** @description allowed keys (element.name of the current state) */
+            keys: string[] | null;
+            /** @description label for UI */
+            label: string;
+            /** @description id of the secret (passed as secret_id on reveal) */
+            secret_id: string;
+            /** @description state path of the array (tail enumerate, e.g. redis_users) */
+            state_path: string;
+        };
+        IncarnationRevealableSecretsReply: {
+            /** @description revealable secrets of the incarnation */
+            items: components["schemas"]["IncarnationRevealableSecretItem"][] | null;
         };
         IncarnationRunReply: {
             apply_id: string;
@@ -2925,55 +3086,55 @@ export interface components {
             scenario: string;
         };
         IncarnationRunRequest: {
-            /** @description input scenario */
+            /** @description scenario input */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description echo path-name (игнорируется) */
+            /** @description echo path-name (ignored) */
             name?: string;
-            /** @description echo path-scenario (игнорируется) */
+            /** @description echo path-scenario (ignored) */
             scenario?: string;
         };
         IncarnationRunsReply: {
-            /** @description страница прогонов инкарнации (свёртка apply_runs) */
+            /** @description page of incarnation runs (apply_runs fold) */
             items: components["schemas"]["RunSummaryEntry"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
             /**
              * Format: int32
-             * @description сдвиг от начала набора
+             * @description offset from start of set
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число прогонов инкарнации
+             * @description total number of incarnation runs
              */
             total: number;
         };
         IncarnationSetTraitsRequest: {
-            /** @description полный набор trait-меток (ключ → scalar|list of scalars); пустой/опущен = очистить (ADR-060) */
+            /** @description full set of trait-tags (key -> scalar|list of scalars); empty/omitted = clear (ADR-060) */
             traits?: {
                 [key: string]: unknown;
             };
         };
         IncarnationSpecHost: {
-            /** @description declared-роль (kebab-case 1..63) или null */
+            /** @description declared role (kebab-case 1..63) or null */
             role?: string;
-            /** @description SID (FQDN) хоста — обязан существовать в souls */
+            /** @description SID (FQDN) of the host - must already exist in souls */
             sid: string;
         };
         /**
-         * @description Статус runtime-инстанса. В proto константы имеют family-prefix (INCARNATION_STATUS_READY), в JSON API — короткие формы. `drift` — информационный статус Scry (ADR-031), НЕ блокирующий: remediation = обычный apply, который при успехе вернёт incarnation в `ready`.
+         * @description Runtime instance status. In proto the constants have a family-prefix (INCARNATION_STATUS_READY), in the JSON API - short forms. `drift` - an informational Scry status (ADR-031), NOT blocking: remediation = a regular apply, which on success returns the incarnation to `ready`.
          * @enum {string}
          */
         IncarnationStatus: "provisioning" | "ready" | "applying" | "error_locked" | "migration_failed" | "drift" | "destroying" | "destroy_failed";
         IncarnationTelemetryReply: {
             hosts: components["schemas"]["HostTelemetry"][] | null;
             incarnation: string;
-            /** @description true если флот ковена превысил cap и список хостов усечён (обзорный glance) */
+            /** @description true if the coven's souls exceeded the cap and the host list is truncated (overview glance) */
             truncated: boolean;
         };
         IncarnationUnlockReply: {
@@ -2985,16 +3146,16 @@ export interface components {
             unlocked_by_aid: string;
         };
         IncarnationUnlockRequest: {
-            /** @description echo path-name (игнорируется) */
+            /** @description echo path-name (ignored) */
             name?: string;
-            /** @description свободный текст подтверждения */
+            /** @description free text confirmation */
             reason: string;
         };
         IncarnationUpdateHostsRequest: {
-            /** @description список hosts для mode-операции (пустой legitimate для replace) */
+            /** @description host list for mode operation (empty legitimate for replace) */
             hosts: components["schemas"]["IncarnationSpecHost"][] | null;
             /**
-             * @description тип операции над spec.hosts[]
+             * @description operation type over spec.hosts[]
              * @enum {string}
              */
             mode: "replace" | "append" | "remove";
@@ -3011,9 +3172,9 @@ export interface components {
             run_apply_id?: string;
         };
         IncarnationUpgradeRequest: {
-            /** @description echo path-name (игнорируется) */
+            /** @description echo path-name (ignored) */
             name?: string;
-            /** @description целевая версия сервиса (git-ref) */
+            /** @description target service version (git-ref) */
             to_version: string;
         };
         IssueTokenReply: {
@@ -3025,10 +3186,10 @@ export interface components {
         LDAPLoginRequest: {
             /**
              * Format: password
-             * @description пароль (не логируется, не возвращается)
+             * @description password (never logged, never returned)
              */
             password: string;
-            /** @description имя пользователя для LDAP search-bind */
+            /** @description username for LDAP search-bind */
             username: string;
         };
         ModuleCatalogItem: {
@@ -3044,9 +3205,9 @@ export interface components {
             items: components["schemas"]["ModuleCatalogItem"][] | null;
         };
         ModuleFormPrepChoirSource: {
-            /** @description имя incarnation Choir-а */
+            /** @description incarnation name of the Choir */
             incarnation: string;
-            /** @description имя Choir-а */
+            /** @description Choir name */
             name: string;
         };
         ModuleFormPrepReply: {
@@ -3054,15 +3215,15 @@ export interface components {
             truncated: boolean;
         };
         ModuleFormPrepRequest: {
-            /** @description префикс SID для автокомплита (LIKE prefix%) */
+            /** @description SID prefix for autocomplete (LIKE prefix%) */
             prefix?: string;
-            /** @description дискриминатор source-каталога (ровно один из incarnation_hosts/choir) */
+            /** @description source-catalog discriminator (exactly one of incarnation_hosts/choir) */
             source: components["schemas"]["ModuleFormPrepSource"];
         };
         ModuleFormPrepSource: {
-            /** @description координаты Choir-source (incarnation + имя Choir-а) */
+            /** @description coordinates of the Choir source (incarnation + Choir name) */
             choir?: components["schemas"]["ModuleFormPrepChoirSource"];
-            /** @description имя incarnation — live SID-ы её хостов */
+            /** @description incarnation name — live SIDs of its hosts */
             incarnation_hosts?: string;
         };
         ModuleInputSource: {
@@ -3100,14 +3261,14 @@ export interface components {
             permissions: components["schemas"]["MyPermission"][] | null;
         };
         OmenCreateRequest: {
-            /** @description vault-ref на master-credential (vault:<mount>/<path>); сам секрет не хранится */
+            /** @description vault-ref on master-credential (vault:<mount>/<path>); the secret itself is not stored */
             auth_ref: string;
-            /** @description URL внешней системы (не секрет) */
+            /** @description external system URL (not a secret) */
             endpoint: string;
-            /** @description имя Omen-а (kebab-case, 1..63) */
+            /** @description Omen name (kebab-case, 1..63) */
             name: string;
             /**
-             * @description тип внешней системы; значение вне enum → 422
+             * @description external system type; a value outside the enum -> 422
              * @enum {string}
              */
             source_type: "vault" | "prometheus" | "elk";
@@ -3156,34 +3317,34 @@ export interface components {
             roles?: string[];
         };
         OperatorCreateRequest: {
-            /** @description AID нового Архонта (naming-rules.md) */
+            /** @description AID of the new Archon (naming-rules.md) */
             aid: string;
-            /** @description человекочитаемое имя для UI/аудита */
+            /** @description human-readable name for UI/audit */
             display_name?: string;
-            /** @description опц. список ролей для atomic create+grant (онбординг одним вызовом); ошибка роли → rollback */
+            /** @description opt. list of roles for atomic create+grant (onboarding in one call); role error -> rollback */
             roles?: string[] | null;
         };
         OperatorListReply: {
-            /** @description страница операторов */
+            /** @description page of operators */
             items: components["schemas"]["Operator"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
             /**
              * Format: int32
-             * @description сдвиг от начала набора
+             * @description offset from start of set
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число записей в наборе
+             * @description total number of entries in set
              */
             total: number;
         };
         OperatorRevokeRequest: {
-            /** @description свободный текст причины для audit-trail (optional) */
+            /** @description free-text reason for audit-trail (optional) */
             reason?: string;
         };
         PermissionAction: {
@@ -3204,11 +3365,11 @@ export interface components {
             sha256: string;
         };
         PluginSigilAllowRequest: {
-            /** @description имя плагина (как в manifest.name) */
+            /** @description plugin name (as in manifest.name) */
             name: string;
-            /** @description namespace плагина (тип — cloud/ssh/mod) */
+            /** @description plugin namespace (type — cloud/ssh/mod) */
             namespace: string;
-            /** @description git-tag-ref допуска (стабильная метка, без слешей) */
+            /** @description git-tag-ref of the release (stable tag, no slashes) */
             ref: string;
         };
         PluginSigilListReply: {
@@ -3237,15 +3398,15 @@ export interface components {
             provider: string;
         };
         ProfileCreateRequest: {
-            /** @description сырая cloud-init userdata (опц.) */
+            /** @description raw cloud-init userdata (optional) */
             cloud_init?: string;
-            /** @description имя Cloud-Profile-а (kebab) */
+            /** @description Cloud Profile name (kebab) */
             name: string;
-            /** @description opaque VM-spec (валидируется против CloudDriver.Schema на scenario-слое) */
+            /** @description opaque VM-spec (validated against CloudDriver.Schema at the scenario layer) */
             params?: {
                 [key: string]: unknown;
             };
-            /** @description имя существующего Cloud-Provider-а */
+            /** @description name of an existing Cloud Provider */
             provider: string;
         };
         ProfileListReply: {
@@ -3268,19 +3429,19 @@ export interface components {
             type: string;
         };
         ProviderCreateRequest: {
-            /** @description опц. plaintext cloud-credentials (dual-mode, ADR-064): напр. {access_key, secret_key}; keeper пишет их в Vault сам; XOR с credentials_ref. Требует TLS-фронта (secret_ingest.accept_plaintext) */
+            /** @description opt. plaintext cloud-credentials (dual-mode, ADR-064): e.g. {access_key, secret_key}; keeper writes them to Vault itself; XOR with credentials_ref. Requires TLS front (secret_ingest.accept_plaintext) */
             credentials?: {
                 [key: string]: unknown;
             };
-            /** @description vault-ref до credentials (vault:<path>); XOR с credentials. Значение НЕ резолвится */
+            /** @description vault-ref to credentials (vault:<path>); XOR with credentials. Value is NOT resolved */
             credentials_ref?: string;
-            /** @description суффикс FQDN VM (self-onboard: keeper предсказывает FQDN=<name>-<index>.<fqdn_suffix>). Опущено → self-onboard недоступен */
+            /** @description VM FQDN suffix (self-onboard: keeper predicts FQDN=<name>-<index>.<fqdn_suffix>). If omitted, self-onboard is unavailable */
             fqdn_suffix?: string;
-            /** @description имя Cloud-Provider-а (kebab) */
+            /** @description Cloud Provider name (kebab) */
             name: string;
-            /** @description регион провайдера */
+            /** @description provider region */
             region: string;
-            /** @description имя CloudDriver-плагина (= plugins.cloud_drivers[].name) */
+            /** @description CloudDriver plugin name (= plugins.cloud_drivers[].name) */
             type: string;
         };
         ProviderListReply: {
@@ -3297,24 +3458,24 @@ export interface components {
             policy_set: boolean;
         };
         ProvisioningPolicyUpdateRequest: {
-            /** @description разрешённые способы создания оператора (anti-lockout: непустой список из {user,ldap,oidc}) */
+            /** @description allowed operator creation methods (anti-lockout: non-empty list from {user,ldap,oidc}) */
             allowed_methods: ("user" | "ldap" | "oidc")[] | null;
         };
         PushApplyReply: {
             apply_id: string;
         };
         PushApplyRequest: {
-            /** @description удалить устаревшие версии soul-бинаря/модулей в той же SSH-сессии */
+            /** @description remove stale soul-binary/module versions in the same SSH session */
             cleanup_stale_versions?: boolean;
-            /** @description ссылка на Destiny в форме <name>@<ref> */
+            /** @description reference to Destiny in the form <name>@<ref> */
             destiny: string;
-            /** @description input для destiny */
+            /** @description input for destiny */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description список SID (FQDN) target-хостов (transport: ssh) */
+            /** @description list of target SID (FQDN) hosts (transport: ssh) */
             inventory: string[] | null;
-            /** @description имя SshProvider; по умолчанию первый зарегистрированный */
+            /** @description SshProvider name; defaults to the first registered one */
             ssh_provider?: string;
         };
         PushApplyView: {
@@ -3349,9 +3510,9 @@ export interface components {
             updated_by_aid?: string;
         };
         PushProviderCreateRequest: {
-            /** @description имя Push-Provider-а (= plugins.ssh_providers[].name) */
+            /** @description Push Provider name (= plugins.ssh_providers[].name) */
             name: string;
-            /** @description opaque params; sensitive — vault-refs (значения не логируются) */
+            /** @description opaque params; sensitive — vault-refs (values are not logged) */
             params?: {
                 [key: string]: unknown;
             };
@@ -3366,7 +3527,7 @@ export interface components {
             total: number;
         };
         PushProviderUpdateRequest: {
-            /** @description полный новый набор params (replace); sensitive — vault-refs */
+            /** @description full new set of params (replace); sensitive — vault-refs */
             params: {
                 [key: string]: unknown;
             };
@@ -3403,22 +3564,22 @@ export interface components {
             total?: number;
         };
         RiteCreateRequest: {
-            /** @description allow-list; форма по source_type Omen-а (передаётся как есть) */
+            /** @description allow-list; shape depends on Omen source_type (passed through as-is) */
             allow: unknown;
-            /** @description субъект-grant по Coven-метке (XOR с sid) */
+            /** @description grant subject by Coven label (XOR with sid) */
             coven?: string;
-            /** @description false — брокер (MVP-1); true — делегация (MVP-2) */
+            /** @description false - broker (MVP-1); true - delegation (MVP-2) */
             delegate?: boolean;
-            /** @description Omen, к которому относится grant */
+            /** @description Omen the grant belongs to */
             omen: string;
-            /** @description субъект-grant по конкретному SID (XOR с coven) */
+            /** @description grant subject by specific SID (XOR with coven) */
             sid?: string;
             /**
              * Format: int64
-             * @description лимит использований токена; только vault-delegate
+             * @description token use-count limit; vault-delegate only
              */
             token_num_uses?: number;
-            /** @description TTL минтуемого scoped-токена; только vault-delegate */
+            /** @description TTL of the minted scoped token; vault-delegate only */
             token_ttl?: string;
         };
         RiteListReply: {
@@ -3440,23 +3601,23 @@ export interface components {
             token_ttl?: string;
         };
         RoleCreateRequest: {
-            /** @description селектор scope роли формы key=v1,v2,… (service/coven/incarnation/host); omitted/null → роль без scope */
+            /** @description role scope selector of form key=v1,v2,… (service/coven/incarnation/host); omitted/null → role without scope */
             default_scope?: string;
-            /** @description человекочитаемое описание роли для UI/аудита */
+            /** @description human-readable role description for UI/audit */
             description?: string;
-            /** @description имя роли (kebab-case), уникальное в кластере */
+            /** @description role name (kebab-case), unique in cluster */
             name: string;
-            /** @description набор permission-строк роли (например incarnation.run, soul.*, *) */
+            /** @description set of permission strings for role (e.g., incarnation.run, soul.*, *) */
             permissions?: string[] | null;
         };
         RoleListReply: {
-            /** @description каталог ролей (метаданные + permissions + operators) */
+            /** @description role catalog (metadata + permissions + operators) */
             items: components["schemas"]["RoleView"][] | null;
         };
         RolePermissionsUpdateRequest: {
-            /** @description селектор scope: omitted → scope не трогается; присутствует (вкл. null) → заменяет (null снимает scope) */
+            /** @description scope selector: omitted → scope untouched; present (incl. null) → replaces (null removes scope) */
             default_scope?: string | null;
-            /** @description полный новый набор permission-строк (replace) */
+            /** @description complete new set of permission strings (replace) */
             permissions: string[] | null;
         };
         RoleView: {
@@ -3490,7 +3651,7 @@ export interface components {
             failed_task_idx?: number;
             /** Format: int64 */
             passage: number;
-            /** @description FQDN хоста ЛИБО синтетический sid прогона (keeper=on:keeper, __run__=run-sentinel аборта до dispatch), не адресующий Soul (NIM-36) */
+            /** @description host FQDN OR synthetic run sid (keeper=on:keeper, __run__=run-sentinel abort to dispatch), not addressing a Soul (NIM-36) */
             sid: string;
             status: string;
         };
@@ -3528,7 +3689,7 @@ export interface components {
             output?: {
                 [key: string]: unknown;
             };
-            /** @description FQDN хоста ЛИБО синтетический sid прогона (keeper=on:keeper) */
+            /** @description host FQDN OR synthetic run sid (keeper=on:keeper) */
             sid: string;
             /** @enum {string} */
             status: "TASK_STATUS_UNSPECIFIED" | "TASK_STATUS_OK" | "TASK_STATUS_CHANGED" | "TASK_STATUS_SKIPPED" | "TASK_STATUS_FAILED" | "TASK_STATUS_TIMED_OUT" | "TASK_STATUS_CANCELLED";
@@ -3537,55 +3698,55 @@ export interface components {
             tasks: components["schemas"]["RunTaskEntry"][] | null;
         };
         RunsListReply: {
-            /** @description страница прогонов через все инкарнации (свёртка apply_runs) */
+            /** @description page of runs across all incarnations (apply_runs fold) */
             items: components["schemas"]["GlobalRunEntry"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
             /**
              * Format: int32
-             * @description сдвиг от начала набора
+             * @description offset from start of set
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число прогонов под фильтрами/scope
+             * @description total number of runs under filters/scope
              */
             total: number;
         };
         RunsStatsBucket: {
             /**
              * Format: int64
-             * @description прогоны в процессе
+             * @description runs in progress
              */
             applying: number;
             /**
              * Format: int64
-             * @description отменённые прогоны
+             * @description cancelled runs
              */
             cancelled: number;
             /**
              * Format: int64
-             * @description упавшие прогоны (включая orphaned-хосты)
+             * @description failed runs (including orphaned hosts)
              */
             failed: number;
             /**
              * Format: int64
-             * @description успешные прогоны
+             * @description successful runs
              */
             success: number;
             /**
              * Format: int64
-             * @description всего прогонов в корзине
+             * @description total runs in the bucket
              */
             total: number;
         };
         RunsStatsReply: {
-            /** @description за всё время */
+            /** @description all time */
             all: components["schemas"]["RunsStatsBucket"];
-            /** @description прогоны, стартовавшие за последние 24 часа */
+            /** @description runs started in the last 24 hours */
             last_24h: components["schemas"]["RunsStatsBucket"];
         };
         Scenario: {
@@ -3631,6 +3792,14 @@ export interface components {
             name: string;
             ref: string;
         };
+        ServiceDirectivesReply: {
+            directives: {
+                [key: string]: string[] | null;
+            };
+            ref: string;
+            service: string;
+            sha1: string;
+        };
         ServiceListReply: {
             items: components["schemas"]["ServiceView"][] | null;
         };
@@ -3639,21 +3808,21 @@ export interface components {
             service: string;
         };
         ServiceRegisterRequest: {
-            /** @description git-источник service-репо (URL; не секрет) */
+            /** @description git source of the service repo (URL; not a secret) */
             git: string;
-            /** @description имя Service-а (kebab-case) */
+            /** @description Service name (kebab-case) */
             name: string;
-            /** @description git ref (tag/branch) — версия Service-а (ADR-007) */
+            /** @description git ref (tag/branch) - Service version (ADR-007) */
             ref: string;
-            /** @description опц. duration авто-refresh ('5m'); опущено — без авто-refresh */
+            /** @description opt. auto-refresh duration ('5m'); omitted - no auto-refresh */
             refresh?: string;
         };
         ServiceScenariosListReply: {
-            /** @description git-ref, на котором составлен listing */
+            /** @description git-ref the listing was produced from */
             ref: string;
-            /** @description scenario из снапшота git-репо Service-а */
+            /** @description scenario from the Service git-repo snapshot */
             scenarios: components["schemas"]["Scenario"][] | null;
-            /** @description имя Service-а (дубль path-параметра) */
+            /** @description Service name (duplicate of path parameter) */
             service: string;
         };
         ServiceStateSchemaReply: {
@@ -3666,12 +3835,22 @@ export interface components {
             /** Format: int64 */
             state_schema_version: number;
         };
-        ServiceUpdateRequest: {
-            /** @description новый git-источник */
-            git: string;
-            /** @description новый git ref */
+        ServiceTelemetryReply: {
+            collectors: string[] | null;
+            enabled: boolean;
+            /** Format: int32 */
+            interval_sec: number;
+            known_collectors: string[] | null;
             ref: string;
-            /** @description опц. duration авто-refresh ('5m') */
+            service: string;
+            sha1: string;
+        };
+        ServiceUpdateRequest: {
+            /** @description new git source */
+            git: string;
+            /** @description new git ref */
+            ref: string;
+            /** @description opt. auto-refresh duration ('5m') */
             refresh?: string;
         };
         ServiceView: {
@@ -3695,7 +3874,7 @@ export interface components {
             status: string;
         };
         SigilKeyIntroduceRequest: {
-            /** @description сделать новый ключ primary (новые Sigil-ы подписываются им); default false */
+            /** @description make the new key primary (new Sigils are signed with it); default false */
             make_primary?: boolean;
         };
         SigilKeyListReply: {
@@ -3711,54 +3890,54 @@ export interface components {
         SoulCovenAssignReply: {
             /**
              * Format: int32
-             * @description сколько строк фактически изменено
+             * @description number of rows actually changed
              */
             changed: number;
-            /** @description dry-run-прогон без записи */
+            /** @description dry-run without writing */
             dry_run: boolean;
-            /** @description применённая метка для append/remove (зеркало input) */
+            /** @description applied label for append/remove (mirror input) */
             label: string;
-            /** @description применённый набор меток для replace (зеркало input) */
+            /** @description applied set tokens for replace (mirror input) */
             labels?: string[] | null;
             /**
              * Format: int32
-             * @description сколько хостов попало под selector ∩ scope
+             * @description number of hosts matching selector ∩ scope
              */
             matched: number;
-            /** @description тип операции над covens[] */
+            /** @description operation type on covens[] */
             mode: string;
             /**
-             * @description completed — все чанки закоммичены; partial — фейл середины
+             * @description completed — all chunks committed; partial — mid-run failure
              * @enum {string}
              */
             status: "completed" | "partial";
         };
         SoulCovenAssignRequest: {
-            /** @description посчитать matched без UPDATE */
+            /** @description count matched without UPDATE */
             dry_run?: boolean;
-            /** @description метка для append/remove (запрещена для replace) */
+            /** @description label for append/remove (forbidden for replace) */
             label?: string;
-            /** @description набор для replace (может быть пустым = снять все; запрещён для append/remove) */
+            /** @description set for replace (may be empty = remove all; forbidden for append/remove) */
             labels?: string[] | null;
             /**
-             * @description append — добавить метку; remove — снять; replace — заменить набор
+             * @description append — add label; remove — remove; replace — replace set
              * @enum {string}
              */
             mode: "append" | "remove" | "replace";
-            /** @description таргетинг (хотя бы один критерий; комбинации AND) */
+            /** @description targeting (at least one criterion; AND combinations) */
             selector: components["schemas"]["SoulCovenAssignSelector"];
         };
         SoulCovenAssignSelector: {
-            /** @description без host-фильтра (весь реестр ∩ scope) */
+            /** @description no host filter (entire registry ∩ scope) */
             all?: boolean;
-            /** @description хосты с этой Coven-меткой */
+            /** @description hosts with this Coven tag */
             coven?: string;
-            /** @description хосты этой incarnation (корневая Coven-метка) */
+            /** @description hosts of this incarnation (root Coven tag) */
             incarnation?: string;
-            /** @description точечный список хостов (SID = FQDN) */
+            /** @description point list of hosts (SID = FQDN) */
             sids?: string[] | null;
             /**
-             * @description статус Soul в реестре
+             * @description Soul status in registry
              * @enum {string}
              */
             status?: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
@@ -3776,14 +3955,14 @@ export interface components {
             transport: components["schemas"]["SoulTransport"];
         };
         SoulCreateRequest: {
-            /** @description стабильные Coven-метки хоста (kebab-case, ADR-008) */
+            /** @description stable Coven tags of host (kebab-case, ADR-008) */
             covens?: string[] | null;
-            /** @description server-only заметка (souls.note) */
+            /** @description server-only note (souls.note) */
             note?: string;
-            /** @description SID нового хоста = FQDN */
+            /** @description SID of new host = FQDN */
             sid: string;
             /**
-             * @description способ доставки: agent (mTLS gRPC stream) / ssh (push без агента)
+             * @description delivery method: agent (mTLS gRPC stream) / ssh (push without agent)
              * @enum {string}
              */
             transport: "agent" | "ssh";
@@ -3829,46 +4008,46 @@ export interface components {
             requested_at: string | null;
             sid: string;
             status: components["schemas"]["SoulStatus"];
-            /** @description operator-set key→value метки (ADR-060); значение — scalar или list of scalars; bare-soul → {} */
+            /** @description operator-set key→value labels (ADR-060); value - scalar or list of scalars; bare-soul → {} */
             traits: {
                 [key: string]: unknown;
             };
             transport: components["schemas"]["SoulTransport"];
         };
         SoulListReply: {
-            /** @description страница реестра souls */
+            /** @description page of the souls registry */
             items: components["schemas"]["SoulListEntry"][] | null;
             /**
              * Format: int32
-             * @description размер страницы
+             * @description page size
              */
             limit: number;
-            /** @description opaque keyset-курсор следующей страницы (keyset-режим); отсутствует в offset-режиме и когда набор исчерпан */
+            /** @description opaque keyset cursor for the next page (keyset mode); absent in offset mode and when the set is exhausted */
             next_cursor?: string;
             /**
              * Format: int32
-             * @description сдвиг от начала набора (offset-режим)
+             * @description offset from start of set (offset mode)
              */
             offset: number;
             /**
              * Format: int32
-             * @description общее число записей; значимо только в offset-режиме
+             * @description total record count; meaningful only in offset mode
              */
             total: number;
-            /** @description total НЕ точен (keyset-режим); в offset-режиме опущено */
+            /** @description total is NOT exact (keyset mode); omitted in offset mode */
             total_approximate?: boolean;
         };
         SoulSshTarget: {
-            /** @description абсолютный путь установки soul-бинаря (начинается с /) */
+            /** @description absolute install path of the soul binary (starts with /) */
             soul_path: string;
             /**
              * Format: int64
-             * @description SSH-порт [1..65535]
+             * @description SSH port [1..65535]
              */
             ssh_port: number;
-            /** @description опц. имя SshProvider (3-tier routing); пусто → coven/cluster default */
+            /** @description opt. SshProvider name (3-tier routing); empty -> coven/cluster default */
             ssh_provider?: string;
-            /** @description SSH-пользователь */
+            /** @description SSH user */
             ssh_user: string;
         };
         SoulSshTargetReply: {
@@ -3891,79 +4070,79 @@ export interface components {
             total: number;
         };
         /**
-         * @description Статус Soul в реестре.
+         * @description Soul status in the registry.
          * @enum {string}
          */
         SoulStatus: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
         SoulTelemetryReply: {
             /**
              * Format: date-time
-             * @description Soul-side момент сбора
+             * @description Soul-side collection moment
              */
             collected_at?: string;
-            /** @description последний снимок (nil если данных нет) */
+            /** @description the latest snapshot (nil if there is no data) */
             latest?: components["schemas"]["UtilizationLatest"];
             /**
              * Format: date-time
-             * @description Keeper-side момент приёма
+             * @description Keeper-side receive moment
              */
             received_at?: string;
-            /** @description SID (FQDN) Soul-а */
+            /** @description SID (FQDN) of the Soul */
             sid: string;
-            /** @description true если снимок протух (возраст > TTL) или данных нет */
+            /** @description true if the snapshot is stale (age > TTL) or there is no data */
             stale: boolean;
-            /** @description окно точек для спарклайнов, newest-first */
+            /** @description a window of points for sparklines, newest-first */
             window?: components["schemas"]["UtilizationWindowPoint"][] | null;
         };
         SoulTraitsAssignReply: {
             /**
              * Format: int32
-             * @description сколько строк фактически изменено
+             * @description number of rows actually changed
              */
             changed: number;
-            /** @description dry-run-прогон без записи */
+            /** @description dry-run without writing */
             dry_run: boolean;
-            /** @description затронутые trait-ключи (зеркало input) */
+            /** @description affected trait keys (mirror input) */
             keys: string[] | null;
             /**
              * Format: int32
-             * @description сколько хостов попало под selector ∩ scope
+             * @description number of hosts matching selector ∩ scope
              */
             matched: number;
-            /** @description режим операции (merge/replace/remove) */
+            /** @description operation mode (merge/replace/remove) */
             mode: string;
             /**
-             * @description completed — все чанки закоммичены; partial — фейл середины
+             * @description completed — all chunks committed; partial — mid-run failure
              * @enum {string}
              */
             status: "completed" | "partial";
         };
         SoulTraitsAssignRequest: {
-            /** @description посчитать matched без UPDATE */
+            /** @description count matched without UPDATE */
             dry_run?: boolean;
-            /** @description список имён ключей для remove (kebab-case); запрещён для merge/replace */
+            /** @description list of key names for remove (kebab-case); forbidden for merge/replace */
             keys?: string[] | null;
             /**
-             * @description merge (дефолт) — set/overwrite ключи; replace — заменить весь map; remove — удалить ключи из keys
+             * @description merge (default) - set/overwrite keys; replace - replace the whole map; remove - delete keys from keys
              * @enum {string}
              */
             mode?: "merge" | "replace" | "remove";
-            /** @description таргетинг (хотя бы один критерий; комбинации AND) */
+            /** @description targeting (at least one criterion; AND combinations) */
             selector: components["schemas"]["SoulCovenAssignSelector"];
-            /** @description набор ключ→значение для merge/replace (значение — scalar или list of scalars); запрещён для remove */
+            /** @description key->value set for merge/replace (value - scalar or list of scalars); forbidden for remove */
             traits?: {
                 [key: string]: unknown;
             };
         };
         /**
-         * @description Способ доставки конфигурации. agent — демон soul поверх mTLS gRPC stream; ssh — push без агента.
+         * @description Configuration delivery method. agent — soul daemon on top of mTLS gRPC stream; ssh — agentless push.
          * @enum {string}
          */
         SoulTransport: "agent" | "ssh";
         SoulprintCpuFacts: {
             /**
              * Format: int32
-             * @description количество logical CPUs (с учётом HT/SMT)
+             * @description number of logical CPUs (accounting for HT/SMT)
              */
             count?: number;
             model?: string;
@@ -3971,21 +4150,21 @@ export interface components {
         };
         SoulprintFacts: {
             cpu?: components["schemas"]["SoulprintCpuFacts"];
-            /** @description короткое имя хоста, uname -n */
+            /** @description short hostname, uname -n */
             hostname?: string;
             kernel?: components["schemas"]["SoulprintKernelFacts"];
-            /** @description объёмы памяти в МБ */
+            /** @description memory amounts in MB */
             memory?: components["schemas"]["SoulprintMemoryFacts"];
             network?: components["schemas"]["SoulprintNetworkFacts"];
-            /** @description факты об операционной системе (ADR-018) */
+            /** @description operating-system facts (ADR-018) */
             os?: components["schemas"]["SoulprintOsFacts"];
-            /** @description echo SID для логов; authority — mTLS peer cert */
+            /** @description echo SID for logs; authority - mTLS peer cert */
             sid?: string;
         };
         SoulprintKernelFacts: {
-            /** @description только версия ядра (5.15.0) */
+            /** @description kernel version only (5.15.0) */
             release?: string;
-            /** @description полная версия с dist-suffix (5.15.0-101-generic) */
+            /** @description full version with dist-suffix (5.15.0-101-generic) */
             version?: string;
         };
         SoulprintMemoryFacts: {
@@ -3999,11 +4178,11 @@ export interface components {
         SoulprintNetworkFacts: {
             fqdn?: string;
             interfaces?: components["schemas"]["SoulprintNetworkInterface"][];
-            /** @description основной IPv4 (интерфейс с default-route) */
+            /** @description primary IPv4 (interface with default route) */
             primary_ip?: string;
         };
         SoulprintNetworkInterface: {
-            /** @description IPv4-адреса в CIDR (10.0.0.1/24) */
+            /** @description IPv4 addresses in CIDR (10.0.0.1/24) */
             ipv4?: string[];
             ipv6?: string[];
             mac?: string;
@@ -4027,17 +4206,17 @@ export interface components {
         SoulprintReadReply: {
             /**
              * Format: date-time
-             * @description Soul-side timestamp момента сбора фактов
+             * @description Soul-side timestamp of fact collection
              */
             collected_at?: string;
             /**
              * Format: date-time
-             * @description Keeper-side timestamp приёма стрима
+             * @description Keeper-side timestamp of stream receipt
              */
             received_at?: string;
-            /** @description SID (FQDN) Soul-а */
+            /** @description SID (FQDN) of Soul */
             sid: string;
-            /** @description typed-факты Soulprint (ADR-018); byte-passthrough JSONB на wire, форма по proto SoulprintFacts */
+            /** @description typed Soulprint facts (ADR-018); byte-passthrough JSONB on wire, shaped per proto SoulprintFacts */
             typed_facts: components["schemas"]["SoulprintFacts"];
         };
         StateHistoryEntry: {
@@ -4062,20 +4241,20 @@ export interface components {
             to: number;
         };
         SynodCreateRequest: {
-            /** @description человекочитаемое описание группы для UI/аудита */
+            /** @description human-readable group description for UI/audit */
             description?: string;
-            /** @description имя Synod-группы (kebab-case), уникальное в кластере */
+            /** @description Synod group name (kebab-case), unique cluster-wide */
             name: string;
         };
         SynodGrantRoleRequest: {
-            /** @description имя роли, добавляемой в bundle группы */
+            /** @description name of the role being added to the group bundle */
             role: string;
         };
         SynodListReply: {
             items: components["schemas"]["SynodView"][] | null;
         };
         SynodUpdateRequest: {
-            /** @description новое человекочитаемое описание группы для UI/аудита */
+            /** @description new human-readable group description for UI/audit */
             description: string;
         };
         SynodView: {
@@ -4115,29 +4294,29 @@ export interface components {
             voyage_id?: string;
         };
         TidingCreateRequest: {
-            /** @description статические поля оператора, мержатся в тело webhook ключом annotations */
+            /** @description static operator fields, merged into the webhook body under the annotations key */
             annotations?: {
                 [key: string]: unknown;
             };
-            /** @description опц. селектор привязки к Cadence-расписанию-источнику */
+            /** @description opt. selector binding to the source Cadence schedule */
             cadence?: string;
-            /** @description правило включено (опущено → true) */
+            /** @description rule enabled (omitted → true) */
             enabled?: boolean;
-            /** @description список event-types в scope прогонов (area-glob или точный); пустой → 422 */
+            /** @description list of event-types in run scope (area-glob or exact); empty -> 422 */
             event_types: string[] | null;
-            /** @description имя Herald-канала доставки (FK на heralds.name) */
+            /** @description Herald channel name for delivery (FK on heralds.name) */
             herald: string;
-            /** @description опц. селектор привязки к инкарнации-источнику */
+            /** @description opt. selector binding to the source incarnation */
             incarnation?: string;
-            /** @description имя Tiding-правила (kebab-case, 1..63) */
+            /** @description Tiding rule name (kebab-case, 1..63) */
             name: string;
-            /** @description доставлять только при изменениях (опущено → false) */
+            /** @description deliver only on changes (omitted → false) */
             only_changes?: boolean;
-            /** @description доставлять только провалы (опущено → false) */
+            /** @description deliver only failures (omitted → false) */
             only_failures?: boolean;
-            /** @description allow-list путей payload; пусто/опущено — полная форма */
+            /** @description allow-list of payload paths; empty/omitted — full form */
             projection?: string[];
-            /** @description опц. селектор подписки на конкретную задачу (register ∪ id из changed_tasks) */
+            /** @description opt. selector subscribing to a specific task (register ∪ id from changed_tasks) */
             task?: string;
         };
         TidingListReply: {
@@ -4150,27 +4329,27 @@ export interface components {
             total: number;
         };
         TidingUpdateRequest: {
-            /** @description статические поля оператора (replace — отсутствие очищает) */
+            /** @description static operator fields (replace — absence clears) */
             annotations?: {
                 [key: string]: unknown;
             };
-            /** @description опц. селектор привязки к Cadence; отсутствие очищает */
+            /** @description opt. selector binding to the Cadence; absence clears it */
             cadence?: string;
-            /** @description правило включено (опущено → true) */
+            /** @description rule enabled (omitted → true) */
             enabled?: boolean;
-            /** @description список event-types в scope прогонов (replace) */
+            /** @description list of event-types in run scope (replace) */
             event_types: string[] | null;
-            /** @description имя Herald-канала доставки (FK) */
+            /** @description Herald channel name for delivery (FK) */
             herald: string;
-            /** @description опц. селектор привязки к инкарнации; отсутствие очищает */
+            /** @description opt. selector binding to the incarnation; absence clears it */
             incarnation?: string;
-            /** @description доставлять только при изменениях (опущено → false) */
+            /** @description deliver only on changes (omitted → false) */
             only_changes?: boolean;
-            /** @description доставлять только провалы (опущено → false) */
+            /** @description deliver only failures (omitted → false) */
             only_failures?: boolean;
-            /** @description allow-list путей payload (replace — отсутствие = полная форма) */
+            /** @description allow-list of payload paths (replace — absence = full form) */
             projection?: string[];
-            /** @description опц. селектор подписки на задачу; отсутствие очищает */
+            /** @description opt. selector subscribing to a task; absence clears it */
             task?: string;
         };
         UpgradePathRef: {
@@ -4224,19 +4403,19 @@ export interface components {
             mem_used_mb: number;
         };
         VigilCreateRequest: {
-            /** @description адрес core-beacon (напр. 'core.beacon.file_changed') */
+            /** @description core-beacon address (e.g. 'core.beacon.file_changed') */
             check: string;
-            /** @description субъект-метки coven (XOR с sid) */
+            /** @description subject Coven tags (XOR with sid) */
             coven?: string[];
-            /** @description активна ли проверка (по умолчанию true) */
+            /** @description whether the check is active (default true) */
             enabled?: boolean;
-            /** @description частота проверки (duration-конвенция, напр. '30s') */
+            /** @description check frequency (duration convention, e.g. '30s') */
             interval: string;
-            /** @description имя Vigil-а (kebab-case, 1..63) */
+            /** @description Vigil name (kebab-case, 1..63) */
             name: string;
-            /** @description параметры проверки; форма зависит от check (передаётся как есть) */
+            /** @description check parameters; shape depends on check (passed through as-is) */
             params?: unknown;
-            /** @description субъект — один конкретный SID (XOR с coven) */
+            /** @description subject — single specific SID (XOR with coven) */
             sid?: string;
         };
         VigilListReply: {
@@ -4276,12 +4455,12 @@ export interface components {
         VoiceAddRequest: {
             /**
              * Format: int64
-             * @description порядковый индекс в партии (≥ 0)
+             * @description ordinal index in the batch (>= 0)
              */
             position?: number;
-            /** @description declared-роль (kebab-case, 1..63) */
+            /** @description declared-role (kebab-case, 1..63) */
             role?: string;
-            /** @description SID (FQDN) хоста — член инкарнации */
+            /** @description SID (FQDN) of a host - a member of the incarnation */
             sid: string;
         };
         VoiceListReply: {
@@ -4344,7 +4523,7 @@ export interface components {
             voyage_id: string;
         };
         VoyageCreateRequest: {
-            /** @description размер батча: N хостов или N% */
+            /** @description batch size: N hosts or N% */
             batch?: string;
             /** @description barrier (default) | window */
             batch_mode?: string;
@@ -4357,7 +4536,7 @@ export interface components {
             dry_run?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
-            /** @description параметры рецепта */
+            /** @description recipe parameters */
             input?: {
                 [key: string]: unknown;
             };
@@ -4366,27 +4545,27 @@ export interface components {
             /** Format: int64 */
             inter_unit_interval_ms?: number;
             /**
-             * @description тип рецепта прогона
+             * @description recipe type of the run
              * @enum {string}
              */
             kind: "scenario" | "command";
-            /** @description порог провалов: N абсолют или N% */
+            /** @description failure threshold: N absolute or N% */
             max_failures?: string;
-            /** @description модуль для kind=command */
+            /** @description module for kind=command */
             module?: string;
-            /** @description разовые подписки на ЭТОТ прогон (ephemeral) */
+            /** @description one-time subscriptions for THIS run (ephemeral) */
             notify?: components["schemas"]["VoyageNotify"][] | null;
             /** @description abort | continue (default) */
             on_failure?: string;
             require_alive?: boolean;
-            /** @description имя сценария для kind=scenario */
+            /** @description scenario name for kind=scenario */
             scenario_name?: string;
             /**
              * Format: date-time
-             * @description RFC3339 отложенный старт
+             * @description RFC3339 deferred start
              */
             schedule_at?: string;
-            /** @description декларативный таргет (резолвится в snapshot единиц) */
+            /** @description declarative target (resolved into a snapshot of units) */
             target: components["schemas"]["VoyageTarget"];
         };
         VoyageListReply: {
@@ -4402,9 +4581,9 @@ export interface components {
             annotations?: {
                 [key: string]: unknown;
             };
-            /** @description имя канала-герольда */
+            /** @description herald channel name */
             herald: string;
-            /** @description терминалы/типы событий: completed|failed|partial */
+            /** @description terminal event types: completed|failed|partial */
             on?: string[] | null;
             only_changes?: boolean;
             only_failures?: boolean;
@@ -4433,15 +4612,15 @@ export interface components {
             total: number;
         };
         VoyageTarget: {
-            /** @description coven-метки (env-тег scenario / метка хоста command) */
+            /** @description coven labels (scenario env-tag / command host label) */
             coven?: string[] | null;
-            /** @description имена инкарнаций (scenario-режим) */
+            /** @description incarnation names (scenario mode) */
             incarnations?: string[] | null;
-            /** @description имя сервиса (scenario-режим) */
+            /** @description service name (scenario mode) */
             service?: string;
-            /** @description SID-ы хостов (command-режим) */
+            /** @description host SIDs (command mode) */
             sids?: string[] | null;
-            /** @description CEL-предикат как ДОПОЛНЕНИЕ к sids/coven (command-режим) */
+            /** @description CEL predicate as an ADDITION to sids/coven (command mode) */
             where?: string;
         };
         VoyageTargetEntry: {
@@ -4536,14 +4715,43 @@ export interface operations {
             };
         };
     };
+    authMethods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthMethodsReply"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     oidcCallback: {
         parameters: {
             query?: {
-                /** @description authorization code от IdP */
+                /** @description authorization code from the IdP */
                 code?: string;
-                /** @description opaque CSRF-state, выданный на /auth/oidc/login */
+                /** @description opaque CSRF-state, issued at /auth/oidc/login */
                 state?: string;
-                /** @description код ошибки от IdP (если аутентификация отклонена) */
+                /** @description error code from the IdP (if authentication was rejected) */
                 error?: string;
             };
             header?: never;
@@ -4645,28 +4853,97 @@ export interface operations {
             };
         };
     };
+    authTokenExchange: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Sec-Fetch-Site"?: string;
+            };
+            path?: never;
+            cookie?: {
+                soul_session?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthTokenReply"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listAuditEvents: {
         parameters: {
             query?: {
-                /** @description multi-value ?type=X&type=Y — exact-match OR по event_type */
+                /** @description multi-value ?type=X&type=Y - exact-match OR by event_type */
                 type?: string[] | null;
-                /** @description multi-value ?source=api&source=mcp — exact-match OR; значение вне enum → 422 */
+                /** @description multi-value ?source=api&source=mcp - exact-match OR; value outside enum -> 422 */
                 source?: ("signal" | "api" | "mcp" | "keeper_internal" | "soul_grpc" | "background" | "config_bootstrap")[] | null;
-                /** @description AID Архонта-инициатора (case-insensitive substring, ILIKE) */
+                /** @description AID of the initiating Archon (case-insensitive substring, ILIKE) */
                 archon_aid?: string;
-                /** @description ULID цепочки связанных событий (case-insensitive substring, ILIKE) */
+                /** @description ULID of the related event chain (case-insensitive substring, ILIKE) */
                 correlation_id?: string;
-                /** @description имя Herald-канала из payload->>'herald' (exact match) */
+                /** @description Herald channel name from payload->>'herald' (exact match) */
                 payload_herald?: string;
-                /** @description voyage_id из payload->>'voyage_id' (exact match) */
+                /** @description voyage_id from payload->>'voyage_id' (exact match) */
                 payload_voyage?: string;
-                /** @description created_at >= started_after (RFC3339, включающая); bad-value → 400 */
+                /** @description created_at >= started_after (RFC3339, inclusive); bad-value -> 400 */
                 started_after?: string;
-                /** @description created_at <= started_before (RFC3339, включающая); bad-value → 400 */
+                /** @description created_at <= started_before (RFC3339, inclusive); bad-value -> 400 */
                 started_before?: string;
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -4725,9 +5002,9 @@ export interface operations {
     listOmens: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -4857,7 +5134,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Omen-а */
+                /** @description Omen name */
                 name: string;
             };
             cookie?: never;
@@ -4916,7 +5193,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Omen-а */
+                /** @description Omen name */
                 name: string;
             };
             cookie?: never;
@@ -4971,7 +5248,7 @@ export interface operations {
     listRites: {
         parameters: {
             query?: {
-                /** @description фильтр by-omen (обязателен в MVP); пустой/битый → 422 */
+                /** @description by-omen filter (required in MVP); empty/broken -> 422 */
                 omen?: string;
             };
             header?: never;
@@ -5092,7 +5369,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description числовой id Rite-а */
+                /** @description numeric Rite id */
                 id: string;
             };
             cookie?: never;
@@ -5147,13 +5424,13 @@ export interface operations {
     listCadences: {
         parameters: {
             query?: {
-                /** @description фильтр по enabled: true → только включённые, false → все (без фильтра); опущен → все */
+                /** @description filter by enabled: true -> only enabled, false -> all (no filter); omitted -> all */
                 enabled?: "true" | "false";
-                /** @description фильтр по типу рецепта (exact); вне набора → 422 */
+                /** @description filter by recipe type (exact); outside enum -> 422 */
                 kind?: "scenario" | "command";
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -5275,7 +5552,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID расписания */
+                /** @description ULID of schedule */
                 id: string;
             };
             cookie?: never;
@@ -5334,7 +5611,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID расписания */
+                /** @description ULID of schedule */
                 id: string;
             };
             cookie?: never;
@@ -5391,7 +5668,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID расписания */
+                /** @description ULID of schedule */
                 id: string;
             };
             cookie?: never;
@@ -5463,7 +5740,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID расписания */
+                /** @description ULID of schedule */
                 id: string;
             };
             cookie?: never;
@@ -5522,7 +5799,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID расписания */
+                /** @description ULID of schedule */
                 id: string;
             };
             cookie?: never;
@@ -5579,16 +5856,16 @@ export interface operations {
     listCadenceRuns: {
         parameters: {
             query?: {
-                /** @description multi-value ?status=X&status=Y — exact-match OR; значение вне enum → 422 */
+                /** @description multi-value ?status=X&status=Y — exact-match OR; value outside enum → 422 */
                 status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[] | null;
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
             path: {
-                /** @description ULID расписания */
+                /** @description ULID of schedule */
                 id: string;
             };
             cookie?: never;
@@ -5692,9 +5969,9 @@ export interface operations {
     listDecrees: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -5824,7 +6101,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Decree-а */
+                /** @description Decree name */
                 name: string;
             };
             cookie?: never;
@@ -5883,7 +6160,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Decree-а */
+                /** @description Decree name */
                 name: string;
             };
             cookie?: never;
@@ -5938,17 +6215,17 @@ export interface operations {
     listErrands: {
         parameters: {
             query?: {
-                /** @description фильтр по целевому Soul (FQDN); битый формат → 422 */
+                /** @description filter by target Soul (FQDN); malformed -> 422 */
                 sid?: string;
-                /** @description фильтр по статусу Errand-а; значение вне enum → 422 */
+                /** @description filter by Errand status; value outside enum -> 422 */
                 status?: "running" | "success" | "failed" | "timed_out" | "cancelled" | "module_not_allowed";
-                /** @description фильтр по началу (started_at > value, RFC3339); bad value → 400 */
+                /** @description filter by start (started_at > value, RFC3339); bad value -> 400 */
                 started_after?: string;
-                /** @description multi-value exact-match OR по имени модуля (?module=X&module=Y) */
+                /** @description multi-value exact-match OR by module name (?module=X&module=Y) */
                 module?: string[] | null;
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -6009,7 +6286,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID Errand-а */
+                /** @description ULID of Errand */
                 errand_id: string;
             };
             cookie?: never;
@@ -6077,7 +6354,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID Errand-а */
+                /** @description ULID of Errand */
                 errand_id: string;
             };
             cookie?: never;
@@ -6199,9 +6476,9 @@ export interface operations {
     listHeralds: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -6331,7 +6608,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Herald-канала */
+                /** @description Herald channel name */
                 name: string;
             };
             cookie?: never;
@@ -6390,7 +6667,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Herald-канала (immutable) */
+                /** @description Herald channel name (immutable) */
                 name: string;
             };
             cookie?: never;
@@ -6462,7 +6739,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Herald-канала */
+                /** @description Herald channel name */
                 name: string;
             };
             cookie?: never;
@@ -6517,19 +6794,19 @@ export interface operations {
     listIncarnations: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
-                /** @description фильтр по имени сервиса */
+                /** @description filter by service name */
                 service?: string;
-                /** @description фильтр по статусу (ready/applying/error_locked/migration_failed); невалидный → 422 */
+                /** @description filter by status (ready/applying/error_locked/migration_failed); invalid → 422 */
                 status?: string;
-                /** @description exact-match по covens[] (ADR-008); невалидная метка → 422 */
+                /** @description exact-match by covens[] (ADR-008); invalid label → 422 */
                 coven?: string;
-                /** @description поле сортировки (created_at/name/status/service или state.<field>) */
+                /** @description sort field (created_at/name/status/service or state.<field>) */
                 sort?: string;
-                /** @description направление сортировки (asc/desc) */
+                /** @description sort direction (asc/desc) */
                 sort_dir?: string;
             };
             header?: never;
@@ -6659,7 +6936,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -6716,12 +6993,12 @@ export interface operations {
     destroyIncarnation: {
         parameters: {
             query: {
-                /** @description confirmation-flag: true → destroy без teardown */
+                /** @description confirmation-flag: true -> destroy without teardown */
                 allow_destroy: boolean;
             };
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -6798,7 +7075,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -6870,7 +7147,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -6920,7 +7197,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -7001,9 +7278,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description имя Choir-а */
+                /** @description Choir name */
                 choir: string;
             };
             cookie?: never;
@@ -7060,9 +7337,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description имя Choir-а */
+                /** @description Choir name */
                 choir: string;
             };
             cookie?: never;
@@ -7112,9 +7389,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description имя Choir-а */
+                /** @description Choir name */
                 choir: string;
             };
             cookie?: never;
@@ -7195,11 +7472,11 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description имя Choir-а */
+                /** @description Choir name */
                 choir: string;
-                /** @description SID (FQDN) хоста */
+                /** @description SID (FQDN) of a host */
                 sid: string;
             };
             cookie?: never;
@@ -7254,16 +7531,16 @@ export interface operations {
     getIncarnationHistory: {
         parameters: {
             query?: {
-                /** @description опц. ULID-фильтр по state_history.apply_id; не-ULID → 400 */
+                /** @description opt. ULID filter by state_history.apply_id; non-ULID → 400 */
                 apply_id?: string;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -7331,7 +7608,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -7412,7 +7689,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -7482,14 +7759,14 @@ export interface operations {
     listIncarnationRuns: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -7557,9 +7834,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description ULID прогона; не-ULID → 400 */
+                /** @description run ULID; non-ULID → 400 */
                 apply_id: string;
             };
             cookie?: never;
@@ -7627,16 +7904,16 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description ULID прогона; чужой/несуществующий → 403 (anti-enum) */
+                /** @description run ULID; someone else's/nonexistent -> 403 (anti-enum) */
                 apply_id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description SSE-поток apply-событий прогона */
+            /** @description SSE stream of apply events for the run */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7697,9 +7974,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description ULID прогона; не-ULID → 400 */
+                /** @description run ULID; non-ULID → 400 */
                 apply_id: string;
             };
             cookie?: never;
@@ -7767,9 +8044,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description имя сценария */
+                /** @description scenario name */
                 scenario: string;
             };
             cookie?: never;
@@ -7859,9 +8136,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
-                /** @description имя сценария */
+                /** @description scenario name */
                 scenario: string;
             };
             cookie?: never;
@@ -7915,12 +8192,134 @@ export interface operations {
             };
         };
     };
+    incarnationRevealSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationRevealSecretRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationRevealSecretReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    incarnationRevealableSecrets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationRevealableSecretsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     getIncarnationTelemetry: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации (корневой Coven-label хостов) */
+                /** @description incarnation name (root Coven-label of hosts) */
                 name: string;
             };
             cookie?: never;
@@ -7970,7 +8369,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -8042,7 +8441,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -8123,7 +8522,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -8202,12 +8601,12 @@ export interface operations {
     getIncarnationUpgradePaths: {
         parameters: {
             query?: {
-                /** @description опц. целевой git-ref для on-demand анализа одной цели; пусто → список тегов реестра + is_current */
+                /** @description opt. target git-ref for on-demand analysis of single target; empty → list of registry tags + is_current */
                 to?: string;
             };
             header?: never;
             path: {
-                /** @description имя инкарнации */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;
@@ -8302,7 +8701,7 @@ export interface operations {
     listModules: {
         parameters: {
             query?: {
-                /** @description только модули с хотя бы одним errand-safe state (для Run→Command whitelist) */
+                /** @description only modules with at least one errand-safe state (for the Run->Command whitelist) */
                 errand_safe?: boolean;
             };
             header?: never;
@@ -8354,7 +8753,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description полное имя модуля без state-суффикса */
+                /** @description full module name without the state suffix */
                 name: string;
             };
             cookie?: never;
@@ -8413,7 +8812,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description полное имя модуля (per-module контракт, при резолве не используется) */
+                /** @description full module name (per-module contract, not used during resolve) */
                 name: string;
             };
             cookie?: never;
@@ -8474,15 +8873,15 @@ export interface operations {
     listOperators: {
         parameters: {
             query?: {
-                /** @description фильтр по форме credential; значение вне enum → 422 */
+                /** @description filter by credential form; value outside enum -> 422 */
                 auth_method?: "jwt" | "mtls" | "combined" | "ldap" | "oidc";
-                /** @description включать ревокнутых (false — только активные); bad-value → 400 */
+                /** @description include revoked (false - active only); bad-value -> 400 */
                 revoked?: boolean;
-                /** @description свободный поиск по display_name/aid (substring, регистронезависимо); пусто → без фильтра */
+                /** @description free search over display_name/aid (substring, case-insensitive); empty -> no filter */
                 q?: string;
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -8621,7 +9020,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description AID Архонта */
+                /** @description AID of the Archon */
                 aid: string;
             };
             cookie?: never;
@@ -8680,7 +9079,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description AID Архонта, для которого выпускается новый JWT */
+                /** @description AID of the Archon for whom a new JWT is issued */
                 aid: string;
             };
             cookie?: never;
@@ -8748,7 +9147,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description AID Архонта для отзыва */
+                /** @description AID of the Archon to revoke */
                 aid: string;
             };
             cookie?: never;
@@ -8963,11 +9362,11 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description namespace плагина */
+                /** @description plugin namespace */
                 namespace: string;
-                /** @description имя плагина */
+                /** @description plugin name */
                 name: string;
-                /** @description git-tag-ref допуска */
+                /** @description git-tag-ref of the release */
                 ref: string;
             };
             cookie?: never;
@@ -9022,11 +9421,11 @@ export interface operations {
     listProfiles: {
         parameters: {
             query?: {
-                /** @description фильтр по имени Provider-а (опц.) */
+                /** @description filter by Provider name (optional) */
                 provider?: string;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -9156,7 +9555,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Cloud-Profile-а */
+                /** @description Cloud Profile name */
                 name: string;
             };
             cookie?: never;
@@ -9215,7 +9614,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Cloud-Profile-а */
+                /** @description Cloud Profile name */
                 name: string;
             };
             cookie?: never;
@@ -9270,9 +9669,9 @@ export interface operations {
     listProviders: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -9402,7 +9801,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Cloud-Provider-а */
+                /** @description Cloud Provider name */
                 name: string;
             };
             cookie?: never;
@@ -9461,7 +9860,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Cloud-Provider-а */
+                /** @description Cloud Provider name */
                 name: string;
             };
             cookie?: never;
@@ -9632,11 +10031,11 @@ export interface operations {
     listPushProviders: {
         parameters: {
             query?: {
-                /** @description LIKE-prefix-фильтр по имени (опц.) */
+                /** @description LIKE-prefix filter by name (optional) */
                 name_pattern?: string;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -9766,7 +10165,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Push-Provider-а */
+                /** @description Push Provider name */
                 name: string;
             };
             cookie?: never;
@@ -9825,7 +10224,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Push-Provider-а */
+                /** @description Push Provider name */
                 name: string;
             };
             cookie?: never;
@@ -9897,7 +10296,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Push-Provider-а */
+                /** @description Push Provider name */
                 name: string;
             };
             cookie?: never;
@@ -9952,13 +10351,13 @@ export interface operations {
     listPushRuns: {
         parameters: {
             query?: {
-                /** @description multi-value ?status=X&status=Y — exact-match OR; значение вне enum → 422 */
+                /** @description multi-value ?status=X&status=Y — exact-match OR; value outside enum → 422 */
                 status?: ("pending" | "running" | "success" | "partial_failed" | "failed" | "cancelled")[] | null;
-                /** @description exact-match по push_runs.ssh_provider */
+                /** @description exact-match on push_runs.ssh_provider */
                 ssh_provider?: string;
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -10079,7 +10478,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID push-прогона */
+                /** @description ULID of the push run */
                 apply_id: string;
             };
             cookie?: never;
@@ -10234,7 +10633,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя роли */
+                /** @description role name */
                 name: string;
             };
             cookie?: never;
@@ -10300,7 +10699,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя роли */
+                /** @description role name */
                 name: string;
             };
             cookie?: never;
@@ -10370,9 +10769,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя роли */
+                /** @description role name */
                 name: string;
-                /** @description AID оператора-члена роли */
+                /** @description AID of operator member of role */
                 aid: string;
             };
             cookie?: never;
@@ -10438,7 +10837,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя роли */
+                /** @description role name */
                 name: string;
             };
             cookie?: never;
@@ -10515,25 +10914,25 @@ export interface operations {
     listRuns: {
         parameters: {
             query?: {
-                /** @description фильтр по агрегатному статусу прогона (applying/success/failed/cancelled); невалидный → 422 */
+                /** @description filter by aggregate run status (applying/success/failed/cancelled); invalid -> 422 */
                 status?: string;
-                /** @description фильтр по имени инкарнации; невалидное имя → 422 */
+                /** @description filter by incarnation name; invalid name -> 422 */
                 incarnation?: string;
-                /** @description фильтр по сервису инкарнации-владельца (точное совпадение); длиннее 128 символов → 422 */
+                /** @description filter by the incarnation's owner service (exact match); longer than 128 characters -> 422 */
                 service?: string;
-                /** @description свободный поиск (substring, регистронезависимо) по incarnation/scenario/service/started_by; длиннее 128 символов → 422 */
+                /** @description free-text search (substring, case-insensitive) over incarnation/scenario/service/started_by; longer than 128 characters -> 422 */
                 q?: string;
-                /** @description фильтр: время старта прогона ≥ (RFC3339, inclusive); невалидное → 422 */
+                /** @description filter: run start time >= (RFC3339, inclusive); invalid -> 422 */
                 started_after?: string;
-                /** @description фильтр: время старта прогона ≤ (RFC3339, inclusive); невалидное → 422 */
+                /** @description filter: run start time <= (RFC3339, inclusive); invalid -> 422 */
                 started_before?: string;
-                /** @description поле сортировки (started_at/finished_at/status/incarnation/service/scenario; дефолт started_at); невалидное → 422 */
+                /** @description sort field (started_at/finished_at/status/incarnation/service/scenario; default started_at); invalid -> 422 */
                 sort?: string;
-                /** @description направление сортировки (asc/desc; дефолт desc); невалидное → 422 */
+                /** @description sort direction (asc/desc; default desc); invalid -> 422 */
                 sort_dir?: string;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..100 (out-of-range → 400) */
+                /** @description page size 1..100 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -10748,7 +11147,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Service-а */
+                /** @description Service name */
                 name: string;
             };
             cookie?: never;
@@ -10807,7 +11206,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Service-а */
+                /** @description Service name */
                 name: string;
             };
             cookie?: never;
@@ -10864,7 +11263,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Service-а (immutable) */
+                /** @description Service name (immutable) */
                 name: string;
             };
             cookie?: never;
@@ -10934,12 +11333,12 @@ export interface operations {
     listServiceDependencies: {
         parameters: {
             query?: {
-                /** @description опц. git-ref override (опущено → ref из реестра) */
+                /** @description opt. git-ref override (omitted → ref from registry) */
                 ref?: string;
             };
             header?: never;
             path: {
-                /** @description имя Service-а */
+                /** @description Service name */
                 name: string;
             };
             cookie?: never;
@@ -11002,12 +11401,90 @@ export interface operations {
             };
         };
     };
+    listServiceDirectives: {
+        parameters: {
+            query?: {
+                /** @description opt. git-ref override (omitted → ref from registry) */
+                ref?: string;
+                /** @description opt. version (e.g. 8.2.2) - narrow the catalog to the major.minor series */
+                version?: string;
+            };
+            header?: {
+                /** @description conditional GET: 304 if it matches the ETag (snapshot SHA1) */
+                "If-None-Match"?: string;
+            };
+            path: {
+                /** @description Service name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceDirectivesReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listServiceRefs: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Service-а */
+                /** @description Service name */
                 name: string;
             };
             cookie?: never;
@@ -11073,12 +11550,12 @@ export interface operations {
     listServiceScenarios: {
         parameters: {
             query?: {
-                /** @description опц. git-ref override (опущено → ref из реестра) */
+                /** @description opt. git-ref override (omitted → ref from registry) */
                 ref?: string;
             };
             header?: never;
             path: {
-                /** @description имя Service-а */
+                /** @description Service name */
                 name: string;
             };
             cookie?: never;
@@ -11144,12 +11621,12 @@ export interface operations {
     listServiceStateSchema: {
         parameters: {
             query?: {
-                /** @description опц. git-ref override (опущено → ref из реестра) */
+                /** @description opt. git-ref override (omitted → ref from registry) */
                 ref?: string;
             };
             header?: never;
             path: {
-                /** @description имя Service-а */
+                /** @description Service name */
                 name: string;
             };
             cookie?: never;
@@ -11163,6 +11640,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceStateSchemaReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getServiceTelemetry: {
+        parameters: {
+            query?: {
+                /** @description optional git-ref override (omitted -> ref from registry) */
+                ref?: string;
+            };
+            header?: {
+                /** @description conditional GET: 304 if it matches ETag (snapshot SHA1) */
+                "If-None-Match"?: string;
+            };
+            path: {
+                /** @description Service name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceTelemetryReply"];
                 };
             };
             /** @description Forbidden */
@@ -11324,7 +11877,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description key_id ключа подписи для вывода (SHA-256(SPKI), 64 hex) */
+                /** @description key_id of the signing key to retire (SHA-256(SPKI), 64 hex) */
                 key_id: string;
             };
             cookie?: never;
@@ -11390,7 +11943,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description key_id ключа подписи (SHA-256(SPKI), 64 hex) */
+                /** @description key_id of the signing key (SHA-256(SPKI), 64 hex) */
                 key_id: string;
             };
             cookie?: never;
@@ -11454,17 +12007,17 @@ export interface operations {
     listSouls: {
         parameters: {
             query?: {
-                /** @description фильтр по Coven-метке (AND внутри scope) */
+                /** @description filter by Coven label (AND within scope) */
                 coven?: string;
-                /** @description фильтр по статусу; вне enum → 422 */
+                /** @description filter by status; outside enum -> 422 */
                 status?: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";
-                /** @description фильтр по transport; вне enum → 422 */
+                /** @description filter by transport; outside enum -> 422 */
                 transport?: "agent" | "ssh";
-                /** @description keyset-курсор продолжения (regex-режим scope) */
+                /** @description keyset continuation cursor (regex-mode scope) */
                 cursor?: string;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400; offset+cursor → 422) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400; offset+cursor → 422) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -11592,7 +12145,7 @@ export interface operations {
     assignSoulCoven: {
         parameters: {
             query?: {
-                /** @description посчитать matched без UPDATE (OR с body.dry_run) */
+                /** @description count matched without UPDATE (OR with body.dry_run) */
                 dry_run?: boolean;
             };
             header?: never;
@@ -11693,7 +12246,7 @@ export interface operations {
     assignSoulTraits: {
         parameters: {
             query?: {
-                /** @description посчитать matched без UPDATE (OR с body.dry_run) */
+                /** @description count matched without UPDATE (OR with body.dry_run) */
                 dry_run?: boolean;
             };
             header?: never;
@@ -11758,7 +12311,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description SID (FQDN) Soul-а */
+                /** @description SID (FQDN) of Soul */
                 sid: string;
             };
             cookie?: never;
@@ -11817,7 +12370,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description SID (FQDN) целевого Soul-а */
+                /** @description SID (FQDN) of the target Soul */
                 sid: string;
             };
             cookie?: never;
@@ -11897,18 +12450,18 @@ export interface operations {
     getSoulHistory: {
         parameters: {
             query?: {
-                /** @description multi-value ?type=X&type=Y — OR по источнику; вне enum → 422 */
+                /** @description multi-value ?type=X&type=Y - OR by source; outside enum -> 422 */
                 type?: ("scenario" | "errand")[] | null;
                 /** @description started_at > since (RFC3339); bad value → 400 */
                 since?: string;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
             path: {
-                /** @description SID (FQDN) Soul-а */
+                /** @description SID (FQDN) of Soul */
                 sid: string;
             };
             cookie?: never;
@@ -11974,12 +12527,12 @@ export interface operations {
     issueSoulToken: {
         parameters: {
             query?: {
-                /** @description истечь активный токен и выписать новый */
+                /** @description expire the active token and issue a new one */
                 force?: boolean;
             };
             header?: never;
             path: {
-                /** @description SID (FQDN) Soul-а */
+                /** @description SID (FQDN) of Soul */
                 sid: string;
             };
             cookie?: never;
@@ -12047,7 +12600,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description SID (FQDN) Soul-а */
+                /** @description SID (FQDN) of Soul */
                 sid: string;
             };
             cookie?: never;
@@ -12115,7 +12668,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description SID (FQDN) Soul-а */
+                /** @description SID (FQDN) of Soul */
                 sid: string;
             };
             cookie?: never;
@@ -12187,7 +12740,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description SID (FQDN) Soul-а */
+                /** @description SID (FQDN) of the Soul */
                 sid: string;
             };
             cookie?: never;
@@ -12351,7 +12904,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Synod-группы */
+                /** @description Synod group name */
                 name: string;
             };
             cookie?: never;
@@ -12417,7 +12970,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Synod-группы (immutable) */
+                /** @description Synod group name (immutable) */
                 name: string;
             };
             cookie?: never;
@@ -12487,7 +13040,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Synod-группы */
+                /** @description Synod group name */
                 name: string;
             };
             cookie?: never;
@@ -12557,9 +13110,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Synod-группы */
+                /** @description Synod group name */
                 name: string;
-                /** @description AID архонта-члена группы */
+                /** @description AID of the group member archon */
                 aid: string;
             };
             cookie?: never;
@@ -12625,7 +13178,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Synod-группы */
+                /** @description Synod group name */
                 name: string;
             };
             cookie?: never;
@@ -12695,9 +13248,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Synod-группы */
+                /** @description Synod group name */
                 name: string;
-                /** @description имя роли в bundle группы */
+                /** @description role name in the group bundle */
                 role_name: string;
             };
             cookie?: never;
@@ -12761,11 +13314,11 @@ export interface operations {
     listTidings: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (совпадает с shared/api.ParsePage; out-of-range → 400) */
+                /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
                 limit?: number;
-                /** @description отдавать разовые (ephemeral) правила (отладка); опущено → false скрывает разовые (ADR-052(g)) */
+                /** @description include ephemeral (one-off) rules (debugging); omitted → false hides ephemeral ones (ADR-052(g)) */
                 include_ephemeral?: boolean;
             };
             header?: never;
@@ -12904,7 +13457,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Tiding-правила */
+                /** @description Tiding rule name */
                 name: string;
             };
             cookie?: never;
@@ -12963,7 +13516,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Tiding-правила (immutable) */
+                /** @description Tiding rule name (immutable) */
                 name: string;
             };
             cookie?: never;
@@ -13035,7 +13588,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Tiding-правила */
+                /** @description Tiding rule name */
                 name: string;
             };
             cookie?: never;
@@ -13090,9 +13643,9 @@ export interface operations {
     listVigils: {
         parameters: {
             query?: {
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -13222,7 +13775,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Vigil-а */
+                /** @description Vigil name */
                 name: string;
             };
             cookie?: never;
@@ -13281,7 +13834,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description имя Vigil-а */
+                /** @description Vigil name */
                 name: string;
             };
             cookie?: never;
@@ -13336,13 +13889,13 @@ export interface operations {
     listVoyages: {
         parameters: {
             query?: {
-                /** @description фильтр по kind; вне enum → 422 */
+                /** @description filter by kind; outside enum -> 422 */
                 kind?: "scenario" | "command";
-                /** @description multi-value ?status=X&status=Y OR; вне enum → 422 */
+                /** @description multi-value ?status=X&status=Y OR; outside enum -> 422 */
                 status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[] | null;
-                /** @description сдвиг от начала набора, ≥0 (out-of-range → 400) */
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
-                /** @description размер страницы 1..1000 (out-of-range → 400) */
+                /** @description page size 1..1000 (out-of-range → 400) */
                 limit?: number;
             };
             header?: never;
@@ -13560,7 +14113,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID Voyage-прогона */
+                /** @description ULID of Voyage run */
                 id: string;
             };
             cookie?: never;
@@ -13619,7 +14172,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID Voyage-прогона */
+                /** @description ULID of Voyage run */
                 id: string;
             };
             cookie?: never;
@@ -13687,7 +14240,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description ULID Voyage-прогона */
+                /** @description ULID of Voyage run */
                 id: string;
             };
             cookie?: never;

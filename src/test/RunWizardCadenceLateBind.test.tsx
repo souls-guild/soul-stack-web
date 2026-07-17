@@ -125,10 +125,10 @@ function setupFetch(
 
 /** Navigation: Step1 Command -> select coven -> Step3 -> Step4 + cadence-fields */
 async function navigateToStep4CommandCadence(user: ReturnType<typeof userEvent.setup>) {
-  // Step 1: select Command + "Regular" mode
+  // Step 1: select Command + "Recurring" mode
   await user.click(screen.getByLabelText('Command'));
-  await user.click(screen.getByLabelText('Регулярно'));
-  await user.click(screen.getByRole('button', { name: /Далее/ }));
+  await user.click(screen.getByLabelText('Recurring'));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
 
   // Step 2: enter coven. ChipsInput: aria-label on the div container, input is nested.
   const covenChip = await screen.findByLabelText('Coven labels');
@@ -143,18 +143,18 @@ async function navigateToStep4CommandCadence(user: ReturnType<typeof userEvent.s
 
   // Next button should become enabled after resolution
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled(),
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled(),
   );
 
   // Go to Step 3
-  await user.click(screen.getByRole('button', { name: /Далее/ }));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
 
   // Step 3: wait for the module field, fill in cmd
   await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
   await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
   // Go to Step 4
-  await user.click(screen.getByRole('button', { name: /Далее/ }));
+  await user.click(screen.getByRole('button', { name: /Next/ }));
   await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
 }
 
@@ -172,7 +172,7 @@ beforeEach(() => {
 });
 
 describe('Command+Cadence late-binding guard', () => {
-  it('Cadence с coven → POST /v1/cadences body.target.coven == ["web-prod"], НЕ sids', async () => {
+  it('Cadence with coven → POST /v1/cadences body.target.coven == ["web-prod"], NOT sids', async () => {
     const { posts } = setupFetch([{ sid: 'host-01.example.com', covens: ['web-prod'] }]);
     renderWizard();
     const user = userEvent.setup();
@@ -181,7 +181,7 @@ describe('Command+Cadence late-binding guard', () => {
 
     await user.clear(screen.getByTestId('cadence-name'));
     await user.type(screen.getByTestId('cadence-name'), 'web-hourly');
-    await user.click(screen.getByRole('button', { name: /Создать расписание/ }));
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
     await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
 
     const cadPosts = posts.filter((p) => (p.url as string).includes('/v1/cadences'));
@@ -196,14 +196,14 @@ describe('Command+Cadence late-binding guard', () => {
     expect(target!.coven).toEqual(['web-prod']);
   });
 
-  it('Command Voyage (разовый) с coven → body.target.sids == resolvedSids (snapshot сохранён)', async () => {
+  it('Command Voyage (one-off) with coven → body.target.sids == resolvedSids (snapshot preserved)', async () => {
     const { posts } = setupFetch([{ sid: 'host-01.example.com', covens: ['web-prod'] }]);
     renderWizard();
     const user = userEvent.setup();
 
     // Step 1: Command + "Once" mode (default)
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Step 2: enter coven
     const covenChip = await screen.findByLabelText('Coven labels');
@@ -215,19 +215,19 @@ describe('Command+Cadence late-binding guard', () => {
       expect(screen.getByLabelText('Host preview').textContent).toMatch(/\d+ hosts match/),
     );
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Далее/ })).not.toBeDisabled(),
+      expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled(),
     );
 
     // Go to Step 3
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
 
     // Step 4
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Запустить/ })).not.toBeDisabled());
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Run/ })).not.toBeDisabled());
 
-    await user.click(screen.getByRole('button', { name: /Запустить/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
     await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
 
     const voyPosts = posts.filter((p) => (p.url as string).includes('/v1/voyages'));
@@ -242,15 +242,15 @@ describe('Command+Cadence late-binding guard', () => {
     expect(target!.coven).toBeUndefined();
   });
 
-  it('Cadence + coven + sidRegex → плашка cadence-early-binding-warn видна', async () => {
+  it('Cadence + coven + sidRegex → cadence-early-binding-warn banner visible', async () => {
     setupFetch([{ sid: 'host-01.example.com', covens: ['web-prod'] }]);
     renderWizard();
     const user = userEvent.setup();
 
-    // Step 1: Command + Regular
+    // Step 1: Command + Recurring
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByLabelText('Регулярно'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByLabelText('Recurring'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Step 2: enter coven + sidRegex
     const covenChip = await screen.findByLabelText('Coven labels');
@@ -266,15 +266,15 @@ describe('Command+Cadence late-binding guard', () => {
     expect(screen.queryByTestId('cadence-snapshot-only-warn')).not.toBeInTheDocument();
   });
 
-  it('Cadence + только sidRegex (без coven) → плашка cadence-snapshot-only-warn видна', async () => {
+  it('Cadence + sidRegex only (no coven) → cadence-snapshot-only-warn banner visible', async () => {
     setupFetch([{ sid: 'host-01.example.com', covens: ['web-prod'] }]);
     renderWizard();
     const user = userEvent.setup();
 
-    // Step 1: Command + Regular
+    // Step 1: Command + Recurring
     await user.click(screen.getByLabelText('Command'));
-    await user.click(screen.getByLabelText('Регулярно'));
-    await user.click(screen.getByRole('button', { name: /Далее/ }));
+    await user.click(screen.getByLabelText('Recurring'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
 
     // Step 2: only sidRegex, no coven
     await waitFor(() => screen.getByLabelText('SID regex'));

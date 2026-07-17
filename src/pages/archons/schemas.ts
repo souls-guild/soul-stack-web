@@ -16,7 +16,7 @@ export const AID_PATTERN = /^[a-z0-9][a-z0-9._@-]{1,127}$/;
 
 export const createArchonSchema = z.object({
   aid: z.string().regex(AID_PATTERN, 'aid_pattern_error'),
-  display_name: z.string().min(1, 'обязательное поле').max(128, 'максимум 128 символов'),
+  display_name: z.string().min(1, 'required field').max(128, 'maximum 128 characters'),
   auth_method: z.enum(['jwt']),
   roles: z.array(z.string()).optional().default([]),
 });

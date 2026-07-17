@@ -12,7 +12,7 @@ describe('PluginRegisterForm', () => {
     tokenStore.clear();
   });
 
-  it('Zod-валидация не пускает невалидные namespace/name/ref', async () => {
+  it('Zod validation rejects invalid namespace/name/ref', async () => {
     installFetchMock([
       { method: 'POST', url: '/v1/plugins/sigils', status: 201, body: {} },
     ]);
@@ -27,7 +27,7 @@ describe('PluginRegisterForm', () => {
     await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'BAD_NS');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'good-name');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
-    await user.click(screen.getByRole('button', { name: /Допустить/i }));
+    await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
       // "kebab-case" appears both in hint and in error-message; should become
       // at least two (hint always + error from the Zod resolver on BAD_NS).
@@ -36,7 +36,7 @@ describe('PluginRegisterForm', () => {
     });
   });
 
-  it('успешный POST → показывает sha256 и кнопки навигации', async () => {
+  it('successful POST shows sha256 and navigation buttons', async () => {
     installFetchMock([
       {
         method: 'POST',
@@ -60,17 +60,17 @@ describe('PluginRegisterForm', () => {
     await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'mod');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
-    await user.click(screen.getByRole('button', { name: /Допустить/i }));
+    await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Плагин допущен/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Plugin allowed/i })).toBeInTheDocument();
     });
     expect(
       screen.getByText('abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /К записи/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Go to record/i })).toBeInTheDocument();
   });
 
-  it('422 показывает validation-prettyprint', async () => {
+  it('422 shows validation prettyprint', async () => {
     installFetchMock([
       {
         method: 'POST',
@@ -89,13 +89,13 @@ describe('PluginRegisterForm', () => {
     await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'mod');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
-    await user.click(screen.getByRole('button', { name: /Допустить/i }));
+    await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
       expect(screen.getByText(/Validation:/i)).toBeInTheDocument();
     });
   });
 
-  it('404 объясняет про "плагин не в кеше"', async () => {
+  it('404 explains "plugin not in cache"', async () => {
     installFetchMock([
       {
         method: 'POST',
@@ -114,9 +114,9 @@ describe('PluginRegisterForm', () => {
     await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'mod');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
-    await user.click(screen.getByRole('button', { name: /Допустить/i }));
+    await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Плагин не найден в кеше host-а/i)).toBeInTheDocument();
+      expect(screen.getByText(/Plugin not found in the host's cache/i)).toBeInTheDocument();
     });
   });
 });

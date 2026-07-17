@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
-// Initializes i18n for tests (default locale ru). Without this t() returns
-// raw keys. Tests match ru strings as the default output.
+// Initializes i18n for tests (default locale en). Without this t() returns
+// raw keys. Tests match en strings as the default output.
 import i18n, { DEFAULT_LANG } from '../i18n';
 
 afterEach(() => {

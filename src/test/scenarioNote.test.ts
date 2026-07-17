@@ -6,20 +6,20 @@ import { splitScenarioNote } from '../pages/run/scenarioNote';
 // about pre-seeding the password) and the rest (muted, below the fields). folded-YAML
 // paragraphs are separated by \n.
 describe('splitScenarioNote', () => {
-  it('делит описание на ведущий абзац (callout) и остаток (тускло)', () => {
+  it('splits description into a lead paragraph (callout) and the rest (dim)', () => {
     const { lead, rest } = splitScenarioNote(
-      '★ Перед запуском засей пароль добавляемого юзера в Vault\n\nДобавить или переопределить одного ACL-пользователя на работающем Redis без рестарта.\nПароль берётся из Vault',
+      '★ Before running, seed the password of the user being added into Vault\n\nAdd or override a single ACL user on a running Redis without a restart.\nThe password is taken from Vault',
     );
-    expect(lead).toBe('★ Перед запуском засей пароль добавляемого юзера в Vault');
-    expect(rest).toContain('Добавить или переопределить одного ACL-пользователя на работающем Redis без рестарта.');
-    expect(rest).toContain('Пароль берётся из Vault');
+    expect(lead).toBe('★ Before running, seed the password of the user being added into Vault');
+    expect(rest).toContain('Add or override a single ACL user on a running Redis without a restart.');
+    expect(rest).toContain('The password is taken from Vault');
   });
 
-  it('однопараграфное описание → всё в lead, rest пуст', () => {
+  it('single-paragraph description → all in lead, rest empty', () => {
     expect(splitScenarioNote('init')).toEqual({ lead: 'init', rest: '' });
   });
 
-  it('пустое / undefined / только пробелы → пустые строки (callout не рендерится)', () => {
+  it('empty / undefined / whitespace-only → empty strings (callout not rendered)', () => {
     expect(splitScenarioNote(undefined)).toEqual({ lead: '', rest: '' });
     expect(splitScenarioNote('')).toEqual({ lead: '', rest: '' });
     expect(splitScenarioNote('   ')).toEqual({ lead: '', rest: '' });
