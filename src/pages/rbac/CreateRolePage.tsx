@@ -74,7 +74,14 @@ export function CreateRolePage() {
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <section className={styles.section}>
-          <div className={styles.formFields}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(220px, 300px) minmax(0, 1fr)',
+              gap: 'var(--s-4)',
+              alignItems: 'start',
+            }}
+          >
             <Input
               label="Name"
               mono
@@ -86,12 +93,21 @@ export function CreateRolePage() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 13 }}>{t('admin:rbacDescription')}</span>
               <textarea
-                rows={2}
+                rows={3}
                 placeholder={t('admin:rbacDescriptionPlaceholder')}
                 spellCheck={false}
                 aria-invalid={errors.description ? 'true' : undefined}
                 {...register('description')}
+                // Grow downward as the description gets longer, then scroll past the cap.
+                onInput={(e) => {
+                  const el = e.currentTarget;
+                  el.style.height = 'auto';
+                  el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
+                }}
                 style={{
+                  width: '100%',
+                  minHeight: 84,
+                  maxHeight: 320,
                   padding: 10,
                   borderRadius: 'var(--radius)',
                   border: `1px solid ${errors.description ? 'var(--danger)' : 'var(--border)'}`,
@@ -99,6 +115,7 @@ export function CreateRolePage() {
                   fontFamily: 'inherit',
                   fontSize: 13,
                   resize: 'vertical',
+                  overflowY: 'auto',
                 }}
               />
               {errors.description ? (

@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — C · Command Builder</title>
+<style>
+  :root{
+    --bg:#fafaf9; --surface:#fff; --surface-2:#f5f5f4; --border:#e7e5e4; --border-strong:#d6d3d1;
+    --text:#1c1917; --text-muted:#57534e; --text-faint:#a8a29e;
+    --accent:#0d9488; --accent-fg:#fff; --success:#10b981; --warning:#d97706; --danger:#dc2626; --info:#2563eb;
+    --radius:8px; --radius-lg:12px; --radius-pill:100px;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --coven:#8b5cf6; --service:#0ea5e9; --incarnation:#0d9488; --host:#f59e0b;
+  }
+  [data-theme="dark"]{
+    --bg:#0a0a0a; --surface:#161615; --surface-2:#1f1f1e; --border:#2a2a28; --border-strong:#3a3a37;
+    --text:#fafaf9; --text-muted:#a8a29e; --text-faint:#6b6862;
+    --accent:#14b8a6; --accent-fg:#042f2c; --success:#34d399; --warning:#fbbf24; --danger:#f87171; --info:#60a5fa;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#14b8a6; --host:#fbbf24;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.45}
+  .mono{font-family:var(--font-mono)}
+  .app{display:flex;min-height:100vh}
+  .side{width:52px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0;flex-shrink:0}
+  .side .logo{width:26px;height:26px;border-radius:7px;background:var(--accent)}
+  .side .ico{width:22px;height:22px;border-radius:6px;background:var(--surface-2)} .side .ico.on{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .main{flex:1;min-width:0}
+  .topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface)}
+  .topbar .crumbs{color:var(--text-faint);font-size:12.5px}.topbar .crumbs b{color:var(--text-muted);font-weight:500}
+  .toggle{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer}
+  .wrap{padding:22px 26px 60px;max-width:1080px;margin:0 auto}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.025em;margin:0 0 2px}
+  .sub{color:var(--text-muted);font-size:13px;margin-bottom:20px}
+
+  /* identity — clean full-width card */
+  .identity{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px;margin-bottom:18px;display:grid;grid-template-columns:320px 1fr;gap:24px}
+  .fld label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+  .fld input,.fld textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;font-family:inherit;font-size:15px;color:var(--text);resize:vertical}
+  .fld input.mono{font-family:var(--font-mono)}
+  .fld .hint{font-size:11.5px;color:var(--text-faint);margin-top:6px}
+
+  .layout{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+
+  /* command palette */
+  .palette{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .cmdbar{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--border)}
+  .cmdbar .k{font-family:var(--font-mono);color:var(--accent);font-size:16px}
+  .cmdbar input{flex:1;border:0;background:transparent;font-size:16px;color:var(--text);font-family:var(--font-mono);outline:none}
+  .cmdbar .kbd{font-size:11px;color:var(--text-faint);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:var(--font-mono)}
+
+  .quickrow{display:flex;gap:8px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+  .plabel{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);align-self:center;margin-right:2px}
+  .preset{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text-muted)}
+  .preset:hover,.preset.on{border-color:var(--accent);color:var(--accent)}
+
+  /* suggestion dropdown */
+  .sugg{border-bottom:1px solid var(--border)}
+  .sugg-h{padding:8px 18px;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);background:var(--surface-2)}
+  .srow{display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer}
+  .srow:hover,.srow.hl{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .srow .sn{font-family:var(--font-mono);font-size:13.5px}
+  .srow .sd{color:var(--text-faint);font-size:12px;margin-left:auto}
+  .srow .add{font-size:11px;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 40%,var(--border));border-radius:var(--radius-pill);padding:2px 9px}
+  .allchip{font-family:var(--font-mono);font-size:11px;color:var(--service);background:color-mix(in srgb,var(--service) 10%,transparent);border:1px solid color-mix(in srgb,var(--service) 30%,var(--border));border-radius:var(--radius-pill);padding:2px 8px}
+
+  /* granted set */
+  .granted{padding:16px 18px}
+  .granted-h{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .granted-h .num{color:var(--accent);font-family:var(--font-mono)}
+  .gg{margin-bottom:14px}
+  .gg-res{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);margin-bottom:7px;display:flex;align-items:center;gap:8px}
+  .gg-res .allmark{font-size:10px;color:var(--service);border:1px solid color-mix(in srgb,var(--service) 30%,var(--border));border-radius:var(--radius-pill);padding:1px 7px}
+  .permchips{display:flex;flex-wrap:wrap;gap:8px}
+  .pc{display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--radius-pill);overflow:hidden;background:var(--surface-2);font-size:12.5px}
+  .pc .base{padding:5px 10px;font-family:var(--font-mono)}
+  .pc .scope{padding:5px 10px;font-family:var(--font-mono);border-left:1px solid var(--border);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .pc .scope .d{width:7px;height:7px;border-radius:50%}
+  .pc .scope.coven{background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--coven)}
+  .pc .scope.host{background:color-mix(in srgb,var(--host) 14%,transparent);color:var(--host)}
+  .pc .scope.service{background:color-mix(in srgb,var(--service) 14%,transparent);color:var(--service)}
+  .pc .scope.add{color:var(--text-faint);border-left-style:dashed}
+  .pc .x{padding:5px 9px;border-left:1px solid var(--border);color:var(--text-faint);cursor:pointer}
+
+  /* scope popover (docked right) */
+  .popover{background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.10)}
+  .pop-h{padding:13px 16px;border-bottom:1px solid var(--border)}
+  .pop-h .t{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
+  .pop-h .p{font-family:var(--font-mono);font-size:13px;margin-top:4px}
+  .keytabs{display:flex;border-bottom:1px solid var(--border)}
+  .kt{flex:1;text-align:center;padding:9px;font-size:11.5px;cursor:pointer;color:var(--text-muted);border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px}
+  .kt:last-child{border-right:0}
+  .kt .dot{width:7px;height:7px;border-radius:50%}
+  .dot.coven{background:var(--coven)}.dot.service{background:var(--service)}.dot.incarnation{background:var(--incarnation)}.dot.host{background:var(--host)}
+  .kt.on[data-k="coven"]{color:var(--coven);font-weight:500;box-shadow:inset 0 -2px 0 var(--coven)}
+  .pop-body{padding:14px 16px}
+  .lead{font-size:12px;color:var(--text-muted);margin-bottom:11px;display:flex;align-items:center;gap:7px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:var(--radius-pill);font-size:12.5px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-muted)}
+  .chip .d{width:8px;height:8px;border-radius:50%;background:var(--coven)}
+  .chip.sel{border-color:var(--coven);background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--text)}
+  .preview{margin-top:13px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);background:var(--bg);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:9px 11px}
+  .preview b{color:var(--accent)}
+  .popbtns{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--radius);padding:7px 13px;font-size:12.5px;font-family:inherit;cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500}
+  .btn.acc{border-color:var(--accent);color:var(--accent)}
+
+  .footer{display:flex;gap:10px;margin-top:22px}
+  .footer .btn.primary{padding:9px 18px}
+  .callout{margin-top:18px;font-size:12px;color:var(--text-faint);border-left:2px solid var(--border-strong);padding-left:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side"><div class="logo"></div><div class="ico"></div><div class="ico"></div><div class="ico on"></div><div class="ico"></div></div>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">RBAC / <b>New role</b></div>
+      <button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ Тема</button>
+    </div>
+    <div class="wrap">
+      <h1>Create role</h1>
+      <div class="sub">Концепция C — Command-palette билдер: печатаешь → подсказки → чипы с прикреплённым scope</div>
+
+      <div class="identity">
+        <div class="fld">
+          <label>Role name</label>
+          <input class="mono" value="secrets-reader" />
+          <div class="hint">kebab-case, уникальное</div>
+        </div>
+        <div class="fld">
+          <label>Description</label>
+          <textarea rows="2">Read-only access to incarnation secrets across the payments coven for the audit team.</textarea>
+          <div class="hint">Свободный текст — в списке ролей и аудите</div>
+        </div>
+      </div>
+
+      <div class="layout">
+        <!-- LEFT: palette + granted -->
+        <div class="palette">
+          <div class="cmdbar">
+            <span class="k">⌕</span>
+            <input value="incarnation.view" />
+            <span class="kbd">↵ add</span>
+            <span class="kbd">esc</span>
+          </div>
+
+          <div class="quickrow">
+            <span class="plabel">Quick add</span>
+            <span class="preset on">＋ Read-only preset</span>
+            <span class="preset">＋ Operator preset</span>
+            <span class="preset">＋ all incarnation.*</span>
+            <span class="preset">＋ all service.*</span>
+            <span class="preset">Browse catalog…</span>
+          </div>
+
+          <div class="sugg">
+            <div class="sugg-h">Matches for “incarnation.view”</div>
+            <div class="srow hl">
+              <span class="sn">incarnation.view</span>
+              <span class="sd">Read spec, state & history</span>
+              <span class="add">↵ add</span>
+            </div>
+            <div class="srow">
+              <span class="sn">incarnation.view-secrets</span>
+              <span class="sd">Reveal Sigil secrets</span>
+              <span class="add">add</span>
+            </div>
+            <div class="srow">
+              <span class="sn">incarnation.*</span>
+              <span class="allchip">all 6 actions + future</span>
+              <span class="sd" style="margin-left:12px">Whole resource</span>
+              <span class="add">add</span>
+            </div>
+          </div>
+
+          <div class="granted">
+            <div class="granted-h">Granted <span class="num">4</span> permissions</div>
+
+            <div class="gg">
+              <div class="gg-res">incarnation</div>
+              <div class="permchips">
+                <span class="pc">
+                  <span class="base">view</span>
+                  <span class="scope coven"><span class="d" style="background:var(--coven)"></span>coven=payments</span>
+                  <span class="x">✕</span>
+                </span>
+                <span class="pc">
+                  <span class="base">view-secrets</span>
+                  <span class="scope coven"><span class="d" style="background:var(--coven)"></span>coven=payments</span>
+                  <span class="x">✕</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="gg">
+              <div class="gg-res">service <span class="allmark">✦ all actions</span></div>
+              <div class="permchips">
+                <span class="pc">
+                  <span class="base">service.*</span>
+                  <span class="scope add">＋ scope</span>
+                  <span class="x">✕</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="gg">
+              <div class="gg-res">errand</div>
+              <div class="permchips">
+                <span class="pc">
+                  <span class="base">run</span>
+                  <span class="scope host"><span class="d" style="background:var(--host)"></span>host=3 SID</span>
+                  <span class="x">✕</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: scope popover for the highlighted chip -->
+        <div class="popover">
+          <div class="pop-h">
+            <div class="t">Edit scope</div>
+            <div class="p">incarnation.view-secrets</div>
+          </div>
+          <div class="keytabs">
+            <span class="kt on" data-k="coven"><span class="dot coven"></span>coven</span>
+            <span class="kt" data-k="service"><span class="dot service"></span>service</span>
+            <span class="kt" data-k="incarnation"><span class="dot incarnation"></span>inc.</span>
+          </div>
+          <div class="pop-body">
+            <div class="lead"><span class="dot coven"></span> Match souls tagged with coven</div>
+            <div class="chips">
+              <span class="chip sel"><span class="d"></span>payments</span>
+              <span class="chip"><span class="d"></span>checkout</span>
+              <span class="chip"><span class="d"></span>ledger</span>
+              <span class="chip"><span class="d"></span>fraud</span>
+              <span class="chip" style="border-style:dashed">＋ label…</span>
+            </div>
+            <div class="preview">… <b>on coven=payments</b></div>
+          </div>
+          <div class="popbtns">
+            <button class="btn primary">Apply</button>
+            <button class="btn">Remove scope</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        Печатаешь <span class="mono">incarnation.view</span> → Enter добавляет чип; <span class="mono">incarnation.*</span> и пресеты — в один клик из подсказок. Каждый чип носит свой scope; клик по scope-хвосту открывает type-specialized поповер. Быстро для тех, кто знает имена; для новичков — «Browse catalog…». Компромисс: ниже discoverability без раскрытого дерева.
+      </div>
+
+      <div class="footer">
+        <button class="btn primary">Create role</button>
+        <button class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

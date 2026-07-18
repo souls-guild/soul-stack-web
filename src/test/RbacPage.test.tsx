@@ -220,10 +220,12 @@ describe('RbacPage', () => {
     await user.click(editButtons[1]);
 
     const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
-    // Catalog from GET /v1/permissions: uncheck soul.exec, check incarnation.read.
-    const soulExec = await within(dialog).findByRole('checkbox', { name: 'soul.exec' });
+    // Master-detail: select soul, uncheck soul.exec; select incarnation, check incarnation.read.
+    await user.click(await within(dialog).findByRole('button', { name: 'resource soul' }));
+    const soulExec = within(dialog).getByRole('checkbox', { name: 'soul.exec' });
     expect(soulExec).toBeChecked();
     await user.click(soulExec);
+    await user.click(within(dialog).getByRole('button', { name: 'resource incarnation' }));
     await user.click(within(dialog).getByRole('checkbox', { name: 'incarnation.read' }));
     await user.click(within(dialog).getByRole('button', { name: /Save/i }));
 
@@ -404,13 +406,14 @@ describe('RbacPage', () => {
     await user.click(editButtons[0]);
     const dialog = await screen.findByRole('dialog', { name: /Permissions: scoped-role/i });
 
-    // Wait for the catalog to load -- incarnation.run as indicator (findByRole with timeout).
-    const incRun = await within(dialog).findByRole('checkbox', { name: 'incarnation.run' });
+    // Master-detail: select incarnation → incarnation.run is checked.
+    await user.click(await within(dialog).findByRole('button', { name: 'resource incarnation' }));
+    const incRun = within(dialog).getByRole('checkbox', { name: 'incarnation.run' });
     expect(incRun).toBeChecked();
 
-    // soul.list on coven=ops -- base is in the catalog -> checked checkbox.
-    // Accessible name includes the scope-badge text ("soul.list coven=ops"), match by regex.
-    const soulList = await within(dialog).findByRole('checkbox', { name: /soul\.list/ });
+    // Select soul → soul.list on coven=ops parses to a checked checkbox (scope badge in name).
+    await user.click(within(dialog).getByRole('button', { name: 'resource soul' }));
+    const soulList = within(dialog).getByRole('checkbox', { name: /soul\.list/ });
     expect(soulList).toBeChecked();
   });
 

@@ -81,13 +81,18 @@ describe('PermissionsEditor — action-wildcard (NIM-79)', () => {
     expect(screen.queryByText(/Permissions outside the catalog/i)).not.toBeInTheDocument();
   });
 
-  it('with wildcard enabled the individual group checkboxes are disabled (suppressed)', () => {
+  it('with wildcard enabled the individual actions are hidden (covered incl. future)', async () => {
     renderWithProviders(
       <PermissionsEditor value={['incarnation.*']} onChange={vi.fn()} catalog={CATALOG} />,
     );
-    expect(screen.getByRole('checkbox', { name: 'incarnation.read' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'incarnation.destroy' })).toBeDisabled();
-    // The neighbouring group (service) is unaffected.
+    const user = userEvent.setup();
+    // incarnation is the active resource; wildcard on → individual actions are hidden.
+    expect(screen.queryByRole('checkbox', { name: 'incarnation.read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'incarnation.destroy' })).not.toBeInTheDocument();
+    // The wildcard checkbox itself stays checked.
+    expect(screen.getByRole('checkbox', { name: /incarnation\.\*/ })).toBeChecked();
+    // Switching to the neighbouring resource shows its actions, enabled.
+    await user.click(screen.getByRole('button', { name: 'resource service' }));
     expect(screen.getByRole('checkbox', { name: 'service.list' })).not.toBeDisabled();
   });
 
@@ -167,6 +172,7 @@ describe('PermissionsEditor — compatibility with plain actions', () => {
     renderWithProviders(<PermissionsEditor value={[]} onChange={onChange} catalog={CATALOG} />);
     const user = userEvent.setup();
 
+    await user.click(screen.getByRole('button', { name: 'resource service' }));
     const grp = screen.getByRole('checkbox', { name: 'service.read' });
     await user.click(grp);
     const arg = onChange.mock.lastCall?.[0] as string[];
@@ -193,6 +199,7 @@ describe('PermissionsEditor — review regressions (NIM-79)', () => {
     const onChange = vi.fn();
     renderWithProviders(<PermissionsEditor value={['*']} onChange={onChange} catalog={CATALOG} />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'resource service' }));
     await user.click(screen.getByRole('checkbox', { name: 'service.read' }));
     const arg = onChange.mock.lastCall?.[0] as string[];
     expect(arg.filter((p) => p === '*')).toHaveLength(1);
@@ -202,6 +209,7 @@ describe('PermissionsEditor — review regressions (NIM-79)', () => {
   it('#1: no accumulation of `*` duplicates across repeated edits (controlled)', async () => {
     renderWithProviders(<Controlled initial={['*']} catalog={CATALOG} />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'resource service' }));
     // Three toggles in a row — `*` must not multiply in the preserved chips.
     await user.click(screen.getByRole('checkbox', { name: 'service.read' }));
     await user.click(screen.getByRole('checkbox', { name: 'service.read' }));
@@ -220,6 +228,7 @@ describe('PermissionsEditor — review regressions (NIM-79)', () => {
     expect(screen.getByText(/Permissions outside the catalog/i)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /incarnation\.\*/ })).not.toBeChecked();
     // Touch an unrelated permission — both scoped wildcards are preserved (replace-safe).
+    await user.click(screen.getByRole('button', { name: 'resource service' }));
     await user.click(screen.getByRole('checkbox', { name: 'service.read' }));
     const arg = onChange.mock.lastCall?.[0] as string[];
     expect(arg).toContain('incarnation.* on service=redis');
@@ -227,10 +236,10 @@ describe('PermissionsEditor — review regressions (NIM-79)', () => {
     expect(arg).toContain('service.read');
   });
 
-  it('#8: clearing the wildcard re-enables the individual group checkboxes (controlled)', async () => {
+  it('#8: clearing the wildcard re-shows the individual actions (controlled)', async () => {
     renderWithProviders(<Controlled initial={['incarnation.*']} catalog={CATALOG} />);
     const user = userEvent.setup();
-    expect(screen.getByRole('checkbox', { name: 'incarnation.read' })).toBeDisabled();
+    expect(screen.queryByRole('checkbox', { name: 'incarnation.read' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: /incarnation\.\*/ }));
     expect(screen.getByRole('checkbox', { name: 'incarnation.read' })).not.toBeDisabled();
   });

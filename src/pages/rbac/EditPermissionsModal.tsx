@@ -56,6 +56,7 @@ export function EditPermissionsModal({ open, role, onClose, catalog }: Props) {
   return (
     <Modal
       open={open}
+      wide
       title={t('forms:editPermissionsTitle', { name: role.name })}
       onClose={close}
       footer={

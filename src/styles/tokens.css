@@ -28,6 +28,12 @@
   --danger:        #dc2626;     /* error_locked / disconnected / failed */
   --info:          #2563eb;     /* applying / provisioning */
 
+  /* ---------- RBAC scope-selector types (per-key accent) ---------- */
+  --scope-coven:       #8b5cf6;
+  --scope-service:     #0ea5e9;
+  --scope-incarnation: #0d9488;
+  --scope-host:        #f59e0b;
+
   /* ---------- Geometry ---------- */
   --radius:        8px;
   --radius-lg:     12px;
@@ -106,6 +112,10 @@
   --warning:       #fbbf24;
   --danger:        #f87171;
   --info:          #60a5fa;
+  --scope-coven:       #a78bfa;
+  --scope-service:     #38bdf8;
+  --scope-incarnation: #14b8a6;
+  --scope-host:        #fbbf24;
   color-scheme: dark;
 }
 

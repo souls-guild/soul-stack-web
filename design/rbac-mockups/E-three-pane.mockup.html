@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — E · Three-Pane Inspector</title>
+<style>
+  :root{
+    --bg:#fafaf9; --surface:#fff; --surface-2:#f5f5f4; --border:#e7e5e4; --border-strong:#d6d3d1;
+    --text:#1c1917; --text-muted:#57534e; --text-faint:#a8a29e;
+    --accent:#0d9488; --accent-fg:#fff; --success:#10b981; --warning:#d97706; --danger:#dc2626; --info:#2563eb;
+    --radius:8px; --radius-lg:12px; --radius-pill:100px;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --coven:#8b5cf6; --service:#0ea5e9; --incarnation:#0d9488; --host:#f59e0b;
+  }
+  [data-theme="dark"]{
+    --bg:#0a0a0a; --surface:#161615; --surface-2:#1f1f1e; --border:#2a2a28; --border-strong:#3a3a37;
+    --text:#fafaf9; --text-muted:#a8a29e; --text-faint:#6b6862;
+    --accent:#14b8a6; --accent-fg:#042f2c; --success:#34d399; --warning:#fbbf24; --danger:#f87171; --info:#60a5fa;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#14b8a6; --host:#fbbf24;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.45}
+  .mono{font-family:var(--font-mono)}
+  .app{display:flex;min-height:100vh}
+  /* fake sidebar */
+  .side{width:52px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0;flex-shrink:0}
+  .side .logo{width:26px;height:26px;border-radius:7px;background:var(--accent)}
+  .side .ico{width:22px;height:22px;border-radius:6px;background:var(--surface-2)}
+  .side .ico.on{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .main{flex:1;min-width:0}
+  .topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface)}
+  .topbar .crumbs{color:var(--text-faint);font-size:12.5px}
+  .topbar .crumbs b{color:var(--text-muted);font-weight:500}
+  .toggle{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer}
+  .wrap{padding:22px 26px 60px;max-width:1340px}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.025em;margin:0 0 2px}
+  .sub{color:var(--text-muted);font-size:13px;margin-bottom:20px}
+
+  /* identity card — Name/Description with air */
+  .identity{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:18px}
+  .fld label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+  .fld input,.fld textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;font-family:inherit;font-size:14px;color:var(--text);resize:vertical}
+  .fld input.mono{font-family:var(--font-mono)}
+  .fld .hint{font-size:11.5px;color:var(--text-faint);margin-top:6px}
+
+  /* three-pane */
+  .tp3{display:grid;grid-template-columns:260px 1fr 340px;gap:16px;align-items:start}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+
+  /* LEFT: search + resource list */
+  .search{position:relative;padding:10px}
+  .search input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px 8px 30px;font-size:13px;color:var(--text)}
+  .search .mag{position:absolute;left:20px;top:19px;color:var(--text-faint);font-size:13px}
+  .selall{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);font-size:12.5px;color:var(--text-muted)}
+  .reslist{max-height:560px;overflow:auto}
+  .resrow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+  .resrow:hover{background:var(--surface-2)}
+  .resrow.active{background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+  .resrow .nm{font-family:var(--font-mono);font-size:13px;flex:1}
+  .cnt{font-size:11px;color:var(--text-faint);font-family:var(--font-mono)}
+  .cnt.has{color:var(--accent);font-weight:500}
+  .miniall{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);font-size:10.5px;color:var(--text-muted);padding:2px 8px;cursor:pointer}
+  .resrow.active .miniall,.miniall.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .chk{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-strong);flex-shrink:0;display:grid;place-items:center;cursor:pointer}
+  .chk.on{background:var(--accent);border-color:var(--accent);color:#fff;font-size:11px}
+
+  /* CENTER: actions of selected resource */
+  .detail-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .detail-h .r{font-family:var(--font-mono);font-size:16px;font-weight:500}
+  .detail-h .keys{display:flex;gap:6px;margin-left:auto}
+  .keycap{font-size:10.5px;font-family:var(--font-mono);padding:2px 8px;border-radius:var(--radius-pill);border:1px solid var(--border)}
+  .allbar{display:flex;align-items:center;gap:10px;padding:11px 18px;background:var(--surface-2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--radius);padding:6px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn.acc{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .btn.tiny{padding:4px 9px;font-size:11.5px}
+
+  .acts{padding:6px 0}
+  .actrow{border-bottom:1px solid var(--border);cursor:pointer}
+  .actrow:last-child{border-bottom:0}
+  .actrow:hover{background:var(--surface-2)}
+  .actrow.active{background:color-mix(in srgb,var(--accent) 8%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+  .actmain{display:flex;align-items:center;gap:12px;padding:12px 18px}
+  .actname{font-family:var(--font-mono);font-size:13.5px}
+  .actdesc{color:var(--text-faint);font-size:12px;margin-left:auto}
+  .scoped-badge{font-family:var(--font-mono);font-size:11px;padding:2px 8px;border-radius:var(--radius-pill);background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));color:var(--accent)}
+
+  /* RIGHT: persistent Scope Inspector (sticky) */
+  .inspector{position:sticky;top:16px}
+  .insp-h{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+  .insp-h .lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
+  .insp-h .tgt{font-family:var(--font-mono);font-size:14px;font-weight:500;margin-top:3px;color:var(--accent)}
+  .insp-body{padding:14px 16px}
+  .tabset{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .tp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text-muted)}
+  .tp .dot{width:8px;height:8px;border-radius:50%}
+  .tp.on{border-width:1.5px}
+  .tp[data-k="coven"].on{border-color:var(--coven);color:var(--coven);background:color-mix(in srgb,var(--coven) 10%,transparent)}
+  .tp[data-k="service"].on{border-color:var(--service);color:var(--service);background:color-mix(in srgb,var(--service) 10%,transparent)}
+  .tp[data-k="incarnation"].on{border-color:var(--incarnation);color:var(--incarnation);background:color-mix(in srgb,var(--incarnation) 10%,transparent)}
+  .tp[data-k="host"].on{border-color:var(--host);color:var(--host);background:color-mix(in srgb,var(--host) 10%,transparent)}
+  .dot.coven{background:var(--coven)} .dot.service{background:var(--service)} .dot.incarnation{background:var(--incarnation)} .dot.host{background:var(--host)}
+
+  .picker{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+  .picker .lead{font-size:12px;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--radius-pill);font-size:12.5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-muted)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.sel[data-k="coven"]{border-color:var(--coven);background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="service"]{border-color:var(--service);background:color-mix(in srgb,var(--service) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="incarnation"]{border-color:var(--incarnation);background:color-mix(in srgb,var(--incarnation) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="host"]{border-color:var(--host);background:color-mix(in srgb,var(--host) 14%,transparent);color:var(--text)}
+
+  .hosthint{margin-top:12px;border:1px dashed var(--border-strong);border-radius:var(--radius);padding:10px 12px;background:var(--surface)}
+  .hosthint summary{cursor:pointer;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:7px;list-style:none}
+  .hosthint summary::-webkit-details-marker{display:none}
+  .hosthint .hh-body{margin-top:10px}
+  .hosthint .sidrow{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);padding:4px 0}
+  .hosthint .sid-d{width:7px;height:7px;border-radius:50%;background:var(--host)}
+
+  .scope-preview{margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);background:var(--bg);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:10px 12px}
+  .scope-preview b{color:var(--accent);font-weight:500}
+  .insp-actions{display:flex;gap:8px;margin-top:14px}
+
+  .footer{display:flex;gap:10px;margin-top:22px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500;padding:9px 18px}
+  .callout{margin-top:18px;font-size:12px;color:var(--text-faint);border-left:2px solid var(--border-strong);padding-left:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <div class="logo"></div>
+    <div class="ico"></div><div class="ico"></div><div class="ico on"></div><div class="ico"></div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">RBAC / <b>New role</b></div>
+      <button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ Тема</button>
+    </div>
+    <div class="wrap">
+      <h1>Create role</h1>
+      <div class="sub">Концепция E — Три панели: ресурсы+поиск+All | действия | постоянный Scope-инспектор справа</div>
+
+      <!-- Name / Description with air -->
+      <div class="identity">
+        <div class="fld">
+          <label>Role name</label>
+          <input class="mono" value="incarnation-operator" />
+          <div class="hint">kebab-case, уникальное имя роли</div>
+        </div>
+        <div class="fld">
+          <label>Description</label>
+          <textarea rows="2">Operators of the payments coven — manage incarnations and read secrets, no destroy.</textarea>
+          <div class="hint">Свободный текст для аудита и списка ролей</div>
+        </div>
+      </div>
+
+      <!-- Three-pane -->
+      <div class="tp3">
+        <!-- LEFT: resources -->
+        <div class="panel">
+          <div class="search">
+            <span class="mag">⌕</span>
+            <input placeholder="Search resources…" />
+          </div>
+          <label class="selall"><span class="chk" style="width:16px;height:16px"></span> Select all resources (grant everything)</label>
+          <div class="reslist">
+            <div class="resrow active">
+              <span class="chk on">✓</span>
+              <span class="nm">incarnation</span>
+              <span class="cnt has">3/6</span>
+              <span class="miniall on">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">service</span><span class="cnt">0/4</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk on" style="background:var(--warning);border-color:var(--warning)">✓</span><span class="nm">soul</span><span class="cnt has">1/3</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">errand</span><span class="cnt">0/3</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">role</span><span class="cnt">0/4</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">plugin</span><span class="cnt">0/3</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">audit</span><span class="cnt">0/1</span><span class="miniall">All</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CENTER: actions -->
+        <div class="panel">
+          <div class="detail-h">
+            <span class="r">incarnation</span>
+            <span style="color:var(--text-faint);font-size:12px">6 actions</span>
+            <div class="keys">
+              <span class="keycap" style="border-color:var(--service);color:var(--service)">service</span>
+              <span class="keycap" style="border-color:var(--coven);color:var(--coven)">coven</span>
+              <span class="keycap" style="border-color:var(--incarnation);color:var(--incarnation)">incarnation</span>
+            </div>
+          </div>
+          <div class="allbar">
+            <button class="btn acc tiny">☑ Select all</button>
+            <button class="btn tiny">☐ Clear</button>
+            <span style="width:1px;height:18px;background:var(--border)"></span>
+            <button class="btn tiny">✦ incarnation.* (all + future)</button>
+            <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">Bulk scope → checked</span>
+          </div>
+
+          <div class="acts">
+            <div class="actrow">
+              <div class="actmain">
+                <span class="chk on">✓</span>
+                <span class="actname">incarnation.view</span>
+                <span class="scoped-badge">coven=payments</span>
+                <span class="actdesc">Read spec, state &amp; history</span>
+              </div>
+            </div>
+
+            <div class="actrow">
+              <div class="actmain">
+                <span class="chk on">✓</span>
+                <span class="actname">incarnation.create</span>
+                <span class="scoped-badge">coven=payments</span>
+                <span class="actdesc">Provision new incarnations</span>
+              </div>
+            </div>
+
+            <!-- ACTIVE row → mirrored in the inspector on the right -->
+            <div class="actrow active">
+              <div class="actmain">
+                <span class="chk on">✓</span>
+                <span class="actname">incarnation.view-secrets</span>
+                <span class="scoped-badge">coven=payments</span>
+                <span class="actdesc">Reveal Sigil-managed secrets</span>
+              </div>
+            </div>
+
+            <div class="actrow">
+              <div class="actmain">
+                <span class="chk">·</span>
+                <span class="actname" style="color:var(--text-muted)">incarnation.upgrade</span>
+                <span class="actdesc">Migrate to a new service version</span>
+              </div>
+            </div>
+            <div class="actrow">
+              <div class="actmain">
+                <span class="chk">·</span>
+                <span class="actname" style="color:var(--text-muted)">incarnation.destroy</span>
+                <span class="actdesc">Tear down &amp; release resources</span>
+              </div>
+            </div>
+            <div class="actrow">
+              <div class="actmain">
+                <span class="chk">·</span>
+                <span class="actname" style="color:var(--text-muted)">incarnation.reincarnate</span>
+                <span class="actdesc">Restore from state backup</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: persistent Scope Inspector -->
+        <div class="panel inspector">
+          <div class="insp-h">
+            <div class="lbl">◔ Scope · инспектор</div>
+            <div class="tgt">incarnation.view-secrets</div>
+          </div>
+          <div class="insp-body">
+            <div class="tabset">
+              <span class="tp" data-k="incarnation"><span class="dot incarnation"></span>incarnation</span>
+              <span class="tp on" data-k="coven"><span class="dot coven"></span>coven</span>
+              <span class="tp" data-k="service"><span class="dot service"></span>service</span>
+              <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ any</span>
+            </div>
+
+            <div class="picker">
+              <div class="lead"><span class="dot coven" style="width:8px;height:8px;border-radius:50%"></span> Match souls tagged with coven</div>
+              <div class="chips">
+                <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>payments</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>checkout</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>ledger</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>fraud</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>edge</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>core</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>staging</span>
+                <span class="chip" data-k="coven" style="border-style:dashed">＋ label…</span>
+              </div>
+            </div>
+
+            <!-- host-mode preview, collapsed -->
+            <details class="hosthint">
+              <summary><span class="dot host" style="width:8px;height:8px;border-radius:50%"></span> Как выглядит host-режим (напр. для soul / errand)</summary>
+              <div class="hh-body">
+                <div style="font-size:11.5px;color:var(--text-faint);margin-bottom:6px">Ключ <span class="mono">host</span> сужает до конкретных SID:</div>
+                <div class="sidrow"><span class="sid-d"></span>01J8-KWZ3-EDGE-01</div>
+                <div class="sidrow"><span class="sid-d"></span>01J8-KWZ3-EDGE-02</div>
+                <div class="sidrow"><span class="sid-d"></span>01J8-MPX9-CORE-07</div>
+              </div>
+            </details>
+
+            <div class="scope-preview">incarnation.view-secrets <b>on coven=payments</b></div>
+
+            <div class="insp-actions">
+              <button class="btn acc tiny" style="flex:1;justify-content:center">Apply to checked</button>
+              <button class="btn tiny" style="flex:1;justify-content:center">Clear scope</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        Scope-инспектор всегда справа и не прыгает: клик по действию в центре меняет его содержимое, но позиция и размер стабильны (комфорт Master-Detail A + постоянный контекст, как инспектор в Figma). Плата — три колонки требуют ширины экрана; на узких инспектор уходит вниз под список действий.
+      </div>
+
+      <div class="footer">
+        <button class="btn primary">Create role</button>
+        <button class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

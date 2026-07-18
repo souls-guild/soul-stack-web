@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — D · Permission Matrix</title>
+<style>
+  :root{
+    --bg:#fafaf9; --surface:#fff; --surface-2:#f5f5f4; --border:#e7e5e4; --border-strong:#d6d3d1;
+    --text:#1c1917; --text-muted:#57534e; --text-faint:#a8a29e;
+    --accent:#0d9488; --accent-fg:#fff; --success:#10b981; --warning:#d97706; --danger:#dc2626; --info:#2563eb;
+    --radius:8px; --radius-lg:12px; --radius-pill:100px;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --coven:#8b5cf6; --service:#0ea5e9; --incarnation:#0d9488; --host:#f59e0b;
+  }
+  [data-theme="dark"]{
+    --bg:#0a0a0a; --surface:#161615; --surface-2:#1f1f1e; --border:#2a2a28; --border-strong:#3a3a37;
+    --text:#fafaf9; --text-muted:#a8a29e; --text-faint:#6b6862;
+    --accent:#14b8a6; --accent-fg:#042f2c; --success:#34d399; --warning:#fbbf24; --danger:#f87171; --info:#60a5fa;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#14b8a6; --host:#fbbf24;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.45}
+  .mono{font-family:var(--font-mono)}
+  .app{display:flex;min-height:100vh}
+  /* fake sidebar */
+  .side{width:52px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0;flex-shrink:0}
+  .side .logo{width:26px;height:26px;border-radius:7px;background:var(--accent)}
+  .side .ico{width:22px;height:22px;border-radius:6px;background:var(--surface-2)}
+  .side .ico.on{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .main{flex:1;min-width:0}
+  .topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface)}
+  .topbar .crumbs{color:var(--text-faint);font-size:12.5px}
+  .topbar .crumbs b{color:var(--text-muted);font-weight:500}
+  .toggle{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer}
+  .wrap{padding:22px 26px 60px;max-width:1240px}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.025em;margin:0 0 2px}
+  .sub{color:var(--text-muted);font-size:13px;margin-bottom:20px}
+
+  /* identity card — Name/Description with air */
+  .identity{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:18px}
+  .fld label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+  .fld input,.fld textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;font-family:inherit;font-size:14px;color:var(--text);resize:vertical}
+  .fld input.mono{font-family:var(--font-mono)}
+  .fld .hint{font-size:11.5px;color:var(--text-faint);margin-top:6px}
+
+  /* toolbar over matrix: search + presets */
+  .mtools{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+  .msearch{position:relative;flex:1;min-width:260px}
+  .msearch input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px 9px 32px;font-size:13px;color:var(--text)}
+  .msearch .mag{position:absolute;left:11px;top:9px;color:var(--text-faint);font-size:13px}
+  .presets{display:flex;gap:6px;align-items:center}
+  .presets .lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint);margin-right:2px}
+  .preset{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius-pill);font-size:12px;padding:5px 12px;cursor:pointer}
+  .preset.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);font-weight:500}
+
+  /* the matrix */
+  .mwrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface)}
+  table.mtx{border-collapse:separate;border-spacing:0;width:100%;min-width:760px}
+  .mtx th,.mtx td{border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+  .mtx tr td:last-child,.mtx tr th:last-child{border-right:0}
+  .mtx tbody tr:last-child th,.mtx tbody tr:last-child td{border-bottom:0}
+  .mtx thead th{position:sticky;top:0;z-index:2;background:var(--surface-2);border-bottom:1px solid var(--border-strong);vertical-align:bottom}
+  /* corner: select all */
+  .mcorner{text-align:left;padding:10px 14px;position:sticky;left:0;z-index:3}
+  .mcorner .sa{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;letter-spacing:.03em;color:var(--text-muted);cursor:pointer}
+  /* column headers */
+  .mcol{text-align:center;padding:10px 8px 9px}
+  .mcol .v{font-family:var(--font-mono);font-size:12px;color:var(--text);white-space:nowrap}
+  .mcol .v small{color:var(--text-faint);font-weight:400}
+  .mcol .miniall{margin-top:6px}
+  /* row header */
+  .mrow-h{text-align:left;padding:10px 14px;background:var(--surface);position:sticky;left:0;z-index:1}
+  .mrow-h .nm{font-family:var(--font-mono);font-size:13.5px}
+  .mrow-h .cnt{font-size:11px;font-family:var(--font-mono);color:var(--text-faint);margin:0 10px 0 2px}
+  .mrow-h .cnt.has{color:var(--accent);font-weight:500}
+  tr:hover .mrow-h{background:var(--surface-2)}
+  .miniall{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);font-size:10px;color:var(--text-muted);padding:2px 8px;cursor:pointer;display:inline-block}
+  .miniall.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  /* cells */
+  .mtx td{text-align:center;padding:9px 8px}
+  tr:hover td{background:color-mix(in srgb,var(--surface-2) 55%,transparent)}
+  .box{width:20px;height:20px;margin:0 auto;border-radius:5px;border:1.5px solid var(--border-strong);display:grid;place-items:center;cursor:pointer;position:relative;font-size:12px;color:#fff;background:var(--surface)}
+  .box:not(.on):not(.na){color:transparent}
+  .box.on{background:var(--accent);border-color:var(--accent)}
+  .box.na{border:1px dashed transparent;color:var(--text-faint);cursor:default;background:none}
+  .box.active{box-shadow:0 0 0 2px var(--accent),0 0 0 4px color-mix(in srgb,var(--accent) 28%,transparent)}
+  .box.scoped::after{content:'';position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--coven);border:2px solid var(--surface)}
+  .box.scoped.host::after{background:var(--host)}
+
+  /* spacious type-specialized scope drawer (reused visual language) */
+  .scope{margin:14px 0 0;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;border-top:2px solid var(--accent)}
+  .scope-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px}
+  .scope-h .tgt{font-family:var(--font-mono);text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent);font-size:12.5px;margin-left:2px}
+  .scope-sub{font-size:12px;color:var(--text-faint);margin-bottom:14px}
+  .tabset{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .tp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text-muted)}
+  .tp .dot{width:8px;height:8px;border-radius:50%}
+  .tp.on{border-width:1.5px}
+  .tp[data-k="coven"].on{border-color:var(--coven);color:var(--coven);background:color-mix(in srgb,var(--coven) 10%,transparent)}
+  .tp[data-k="service"].on{border-color:var(--service);color:var(--service);background:color-mix(in srgb,var(--service) 10%,transparent)}
+  .tp[data-k="incarnation"].on{border-color:var(--incarnation);color:var(--incarnation);background:color-mix(in srgb,var(--incarnation) 10%,transparent)}
+  .tp[data-k="host"].on{border-color:var(--host);color:var(--host);background:color-mix(in srgb,var(--host) 10%,transparent)}
+  .dot.coven{background:var(--coven)} .dot.service{background:var(--service)} .dot.incarnation{background:var(--incarnation)} .dot.host{background:var(--host)}
+
+  .scope-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  @media (max-width:820px){.scope-cols{grid-template-columns:1fr}}
+  .picker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+  .picker .lead{font-size:12px;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .picker .lead .tag{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint);margin-left:auto}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--radius-pill);font-size:12.5px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-muted)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.sel[data-k="coven"]{border-color:var(--coven);background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--text)}
+  .chip .st{width:6px;height:6px;border-radius:50%;background:var(--success)}
+  /* host soulprint picker */
+  .hsearch{position:relative;margin-bottom:9px}
+  .hsearch input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px 7px 28px;font-size:12px;color:var(--text);font-family:var(--font-mono)}
+  .hsearch .mag{position:absolute;left:9px;top:8px;color:var(--text-faint);font-size:12px}
+  .sidrow{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid var(--border)}
+  .sidrow:last-child{border-bottom:0}
+  .sidrow .sid{font-family:var(--font-mono);font-size:12.5px}
+  .sidrow .sp{font-size:11px;color:var(--text-faint);margin-left:auto;font-family:var(--font-mono)}
+  .cbx{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-strong);display:grid;place-items:center;flex-shrink:0;font-size:10px;color:#fff;cursor:pointer}
+  .cbx.on{background:var(--host);border-color:var(--host)}
+  .cbx.cv.on{background:var(--coven);border-color:var(--coven)}
+  .svc-note{font-size:11.5px;color:var(--text-faint);margin-top:10px}
+  .svc-note b{font-family:var(--font-mono);font-weight:500;color:var(--text-muted)}
+  .scope-preview{margin-top:14px;font-family:var(--font-mono);font-size:12.5px;color:var(--text-muted);background:var(--bg);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:10px 13px}
+  .scope-preview b{color:var(--accent);font-weight:500}
+
+  .footer{display:flex;gap:10px;margin-top:22px}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--radius);padding:9px 16px;font-size:13px;font-family:inherit;cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500;padding:9px 18px}
+  .callout{margin-top:18px;font-size:12px;color:var(--text-faint);border-left:2px solid var(--border-strong);padding-left:12px}
+  .callout .mono{color:var(--text-muted)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <div class="logo"></div>
+    <div class="ico"></div><div class="ico"></div><div class="ico on"></div><div class="ico"></div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">RBAC / <b>New role</b></div>
+      <button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ Тема</button>
+    </div>
+    <div class="wrap">
+      <h1>Create role</h1>
+      <div class="sub">Концепция D — Матрица resource × action: строки-ресурсы, столбцы-действия, All по строке и по столбцу</div>
+
+      <!-- Name / Description with air -->
+      <div class="identity">
+        <div class="fld">
+          <label>Role name</label>
+          <input class="mono" value="incarnation-operator" />
+          <div class="hint">kebab-case, уникальное имя роли</div>
+        </div>
+        <div class="fld">
+          <label>Description</label>
+          <textarea rows="2">Operators of the payments coven — manage incarnations and read secrets, no destroy.</textarea>
+          <div class="hint">Свободный текст для аудита и списка ролей</div>
+        </div>
+      </div>
+
+      <!-- toolbar -->
+      <div class="mtools">
+        <div class="msearch">
+          <span class="mag">⌕</span>
+          <input placeholder="Filter resources & actions…" />
+        </div>
+        <div class="presets">
+          <span class="lbl">Preset</span>
+          <span class="preset">Read-only</span>
+          <span class="preset">Operator</span>
+          <span class="preset">Full admin</span>
+          <span class="preset on">Custom</span>
+        </div>
+      </div>
+
+      <!-- MATRIX -->
+      <div class="mwrap">
+        <table class="mtx">
+          <thead>
+            <tr>
+              <th class="mcorner">
+                <span class="sa"><span class="box na" style="width:16px;height:16px;border:1.5px solid var(--border-strong);border-radius:4px;color:var(--text-faint)">–</span> Select all</span>
+              </th>
+              <th class="mcol"><div class="v">view</div><span class="miniall">All</span></th>
+              <th class="mcol"><div class="v">create <small>/ register</small></div><span class="miniall">All</span></th>
+              <th class="mcol"><div class="v">update <small>/ upgrade</small></div><span class="miniall">All</span></th>
+              <th class="mcol"><div class="v">delete <small>/ destroy</small></div><span class="miniall">All</span></th>
+              <th class="mcol"><div class="v">secrets</div><span class="miniall">All</span></th>
+              <th class="mcol"><div class="v">run</div><span class="miniall">All</span></th>
+              <th class="mcol"><div class="v">other</div><span class="miniall">All</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- incarnation -->
+            <tr>
+              <th class="mrow-h"><span class="nm">incarnation</span><span class="cnt has">3/6</span><span class="miniall">All</span></th>
+              <td><span class="box on scoped" title="incarnation.view · coven=payments">✓</span></td>
+              <td><span class="box on scoped" title="incarnation.create · coven=payments">✓</span></td>
+              <td><span class="box" title="incarnation.upgrade"></span></td>
+              <td><span class="box" title="incarnation.destroy"></span></td>
+              <td><span class="box on scoped active" title="incarnation.view-secrets · coven=payments">✓</span></td>
+              <td><span class="box na" title="n/a">·</span></td>
+              <td><span class="box" title="incarnation.reincarnate"></span></td>
+            </tr>
+            <!-- service -->
+            <tr>
+              <th class="mrow-h"><span class="nm">service</span><span class="cnt">0/4</span><span class="miniall">All</span></th>
+              <td><span class="box" title="service.view"></span></td>
+              <td><span class="box" title="service.register"></span></td>
+              <td><span class="box" title="service.update"></span></td>
+              <td><span class="box" title="service.delete"></span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+            </tr>
+            <!-- soul -->
+            <tr>
+              <th class="mrow-h"><span class="nm">soul</span><span class="cnt has">1/3</span><span class="miniall">All</span></th>
+              <td><span class="box on scoped host" title="soul.view · host=01J8-KWZ3-EDGE-01">✓</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box" title="soul.issue-token"></span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box" title="soul.assign-coven"></span></td>
+            </tr>
+            <!-- errand -->
+            <tr>
+              <th class="mrow-h"><span class="nm">errand</span><span class="cnt">0/3</span><span class="miniall">All</span></th>
+              <td><span class="box" title="errand.view"></span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box" title="errand.run"></span></td>
+              <td><span class="box" title="errand.cancel"></span></td>
+            </tr>
+            <!-- role -->
+            <tr>
+              <th class="mrow-h"><span class="nm">role</span><span class="cnt">0/4</span><span class="miniall">All</span></th>
+              <td><span class="box" title="role.view"></span></td>
+              <td><span class="box" title="role.create"></span></td>
+              <td><span class="box" title="role.update"></span></td>
+              <td><span class="box" title="role.delete"></span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+            </tr>
+            <!-- plugin -->
+            <tr>
+              <th class="mrow-h"><span class="nm">plugin</span><span class="cnt">0/3</span><span class="miniall">All</span></th>
+              <td><span class="box" title="plugin.view"></span></td>
+              <td><span class="box" title="plugin.register"></span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box" title="plugin.revoke"></span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+            </tr>
+            <!-- audit -->
+            <tr>
+              <th class="mrow-h"><span class="nm">audit</span><span class="cnt has">1/1</span><span class="miniall on">All</span></th>
+              <td><span class="box on" title="audit.view">✓</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+              <td><span class="box na">·</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- type-specialized scope panel for the active cell -->
+      <div class="scope">
+        <div class="scope-h">◔ Scope — restrict where this permission applies <span class="tgt">incarnation.view-secrets</span></div>
+        <div class="scope-sub">Активная ячейка обведена рамкой в матрице. Выберите тип и значения — право сузится до них.</div>
+        <div class="tabset">
+          <span class="tp" data-k="incarnation"><span class="dot incarnation"></span>incarnation</span>
+          <span class="tp on" data-k="coven"><span class="dot coven"></span>coven</span>
+          <span class="tp" data-k="service"><span class="dot service"></span>service</span>
+          <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ unscoped (any)</span>
+        </div>
+
+        <div class="scope-cols">
+          <!-- active: coven labels -->
+          <div class="picker">
+            <div class="lead"><span class="dot coven" style="width:8px;height:8px;border-radius:50%"></span> Match souls tagged with coven <span class="tag">active</span></div>
+            <div class="chips">
+              <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>payments <span class="st"></span></span>
+              <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>checkout</span>
+              <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>ledger</span>
+              <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>fraud</span>
+              <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>edge</span>
+              <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>core</span>
+              <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>staging</span>
+              <span class="chip" data-k="coven" style="border-style:dashed">＋ label…</span>
+            </div>
+            <div class="svc-note">Вкладка <b>service</b> сузила бы до образов: <b>nginx</b> · <b>postgres</b> · <b>redis</b> · <b>keeper</b>.</div>
+          </div>
+
+          <!-- host-keyed resources use soulprint picker -->
+          <div class="picker">
+            <div class="lead"><span class="dot host" style="width:8px;height:8px;border-radius:50%"></span> Host-keyed ресурсы (soul / errand) — по Soul-SID <span class="tag">host</span></div>
+            <div class="hsearch">
+              <span class="mag">⌕</span>
+              <input value="os.family=debian" />
+            </div>
+            <div class="sidrow"><span class="cbx on">✓</span><span class="sid">01J8-KWZ3-EDGE-01</span><span class="sp">kernel 6.6</span></div>
+            <div class="sidrow"><span class="cbx"></span><span class="sid">01J8-KWZ3-EDGE-02</span><span class="sp">kernel 6.6</span></div>
+            <div class="sidrow"><span class="cbx"></span><span class="sid">01J8-MPX9-CORE-07</span><span class="sp">kernel 6.1</span></div>
+          </div>
+        </div>
+
+        <div class="scope-preview">incarnation.view-secrets <b>on coven=payments</b></div>
+      </div>
+
+      <div class="footer">
+        <button class="btn primary">Create role</button>
+        <button class="btn">Cancel</button>
+      </div>
+
+      <div class="callout">
+        Матрица показывает весь каталог целиком: где право выдано (<span class="mono">✓</span>), где ещё нет, а где действие неприменимо (<span class="mono">·</span>). «All» по строке = <span class="mono">resource.*</span>, «All» по столбцу выдаёт глагол сразу по всем ресурсам — минимум кликов. Обратная сторона: при большом числе действий столбцы становятся широкими, а часть ячеек всегда неприменима (пустоты), и точечный scope виден только когда ячейка выбрана.
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

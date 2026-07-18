@@ -99,13 +99,17 @@ describe('CreateRolePage (NIM-80)', () => {
     tokenStore.clear();
   });
 
-  it('renders the form and the permissions catalog grouped', async () => {
+  it('renders the form and the permission catalog (master-detail)', async () => {
     recordingFetch();
     renderPage();
+    const user = userEvent.setup();
     expect(screen.getByRole('heading', { name: /Create role/i })).toBeInTheDocument();
+    // audit sorts first → its action shows by default in the right panel.
     expect(await screen.findByRole('checkbox', { name: 'audit.read' })).toBeInTheDocument();
-    // Wildcard rows per group.
+    // Selecting a resource in the left rail reveals its action-wildcard.
+    await user.click(screen.getByRole('button', { name: 'resource incarnation' }));
     expect(screen.getByRole('checkbox', { name: /incarnation\.\*/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'resource soul' }));
     expect(screen.getByRole('checkbox', { name: /soul\.\*/ })).toBeInTheDocument();
   });
 
@@ -115,7 +119,8 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'inc-admin');
-    const wildcard = await screen.findByRole('checkbox', { name: /incarnation\.\*/ });
+    await user.click(await screen.findByRole('button', { name: 'resource incarnation' }));
+    const wildcard = screen.getByRole('checkbox', { name: /incarnation\.\*/ });
     await user.click(wildcard);
     await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
@@ -137,7 +142,8 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'soul-ops');
-    const cb = await screen.findByRole('checkbox', { name: 'soul.list' });
+    await user.click(await screen.findByRole('button', { name: 'resource soul' }));
+    const cb = screen.getByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
     const keySelect = await screen.findByRole('combobox', { name: /^scope selector key$/i });
     await user.selectOptions(keySelect, 'coven');
@@ -195,7 +201,8 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'scoped-role');
-    const cb = await screen.findByRole('checkbox', { name: 'soul.list' });
+    await user.click(await screen.findByRole('button', { name: 'resource soul' }));
+    const cb = screen.getByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
     const keySelect = await screen.findByRole('combobox', { name: /^scope selector key$/i });
     await user.selectOptions(keySelect, 'coven');

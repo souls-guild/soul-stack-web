@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — F · Catalog → Basket</title>
+<style>
+  :root{
+    --bg:#fafaf9; --surface:#fff; --surface-2:#f5f5f4; --border:#e7e5e4; --border-strong:#d6d3d1;
+    --text:#1c1917; --text-muted:#57534e; --text-faint:#a8a29e;
+    --accent:#0d9488; --accent-fg:#fff; --success:#10b981; --warning:#d97706; --danger:#dc2626; --info:#2563eb;
+    --radius:8px; --radius-lg:12px; --radius-pill:100px;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --coven:#8b5cf6; --service:#0ea5e9; --incarnation:#0d9488; --host:#f59e0b;
+  }
+  [data-theme="dark"]{
+    --bg:#0a0a0a; --surface:#161615; --surface-2:#1f1f1e; --border:#2a2a28; --border-strong:#3a3a37;
+    --text:#fafaf9; --text-muted:#a8a29e; --text-faint:#6b6862;
+    --accent:#14b8a6; --accent-fg:#042f2c; --success:#34d399; --warning:#fbbf24; --danger:#f87171; --info:#60a5fa;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#14b8a6; --host:#fbbf24;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.45}
+  .mono{font-family:var(--font-mono)}
+  .app{display:flex;min-height:100vh}
+  /* fake sidebar */
+  .side{width:52px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0;flex-shrink:0}
+  .side .logo{width:26px;height:26px;border-radius:7px;background:var(--accent)}
+  .side .ico{width:22px;height:22px;border-radius:6px;background:var(--surface-2)}
+  .side .ico.on{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .main{flex:1;min-width:0}
+  .topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface)}
+  .topbar .crumbs{color:var(--text-faint);font-size:12.5px}
+  .topbar .crumbs b{color:var(--text-muted);font-weight:500}
+  .toggle{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer}
+  .wrap{padding:22px 26px 60px;max-width:1320px}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.025em;margin:0 0 2px}
+  .sub{color:var(--text-muted);font-size:13px;margin-bottom:20px}
+
+  /* identity card — Name/Description with air */
+  .identity{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:18px}
+  .fld label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+  .fld input,.fld textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;font-family:inherit;font-size:14px;color:var(--text);resize:vertical}
+  .fld input.mono{font-family:var(--font-mono)}
+  .fld .hint{font-size:11.5px;color:var(--text-faint);margin-top:6px}
+
+  /* two-column catalog / basket */
+  .cb{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;align-items:start}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .panel-h{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .panel-h .ttl{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)}
+  .panel-h .ct{font-family:var(--font-mono);font-size:12px;color:var(--text-faint)}
+  .panel-h .ct b{color:var(--accent);font-weight:600}
+
+  /* LEFT catalog: search + presets */
+  .search{position:relative;padding:12px 14px 8px}
+  .search input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px 8px 30px;font-size:13px;color:var(--text)}
+  .search .mag{position:absolute;left:24px;top:21px;color:var(--text-faint);font-size:13px}
+  .presets{display:flex;flex-wrap:wrap;gap:7px;padding:2px 14px 12px}
+  .preset{border:1px solid var(--border);background:var(--surface-2);color:var(--text-muted);border-radius:var(--radius-pill);font-size:11.5px;padding:4px 11px;cursor:pointer}
+  .preset.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .preset:hover{border-color:var(--border-strong)}
+
+  .cat{max-height:640px;overflow:auto}
+  .catres{border-top:1px solid var(--border)}
+  .catres-h{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface-2)}
+  .catres-h .nm{font-family:var(--font-mono);font-size:13.5px;font-weight:500}
+  .catres-h .cnt{font-size:11px;color:var(--text-faint);font-family:var(--font-mono)}
+  .catres-h .cnt.has{color:var(--accent);font-weight:500}
+  .allpill{margin-left:auto;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);font-size:10.5px;color:var(--text-muted);padding:2px 9px;cursor:pointer}
+  .allpill.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .catacts{display:flex;flex-wrap:wrap;gap:6px 8px;padding:9px 16px 12px 16px}
+  .actchk{display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);font-size:12.5px;cursor:pointer;color:var(--text-muted)}
+  .actchk:hover{border-color:var(--border-strong)}
+  .actchk .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-strong);display:grid;place-items:center;font-size:10px;flex-shrink:0}
+  .actchk.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);color:var(--text)}
+  .actchk.on .box{background:var(--accent);border-color:var(--accent);color:#fff}
+  .actchk .an{font-family:var(--font-mono);font-size:12.5px}
+
+  /* RIGHT basket */
+  .basket{padding:12px;display:flex;flex-direction:column;gap:14px;max-height:700px;overflow:auto}
+  .bgroup{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .bgroup-h{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+  .bgroup-h .r{font-family:var(--font-mono);font-size:13.5px;font-weight:500}
+  .bgroup-h .keys{display:flex;gap:5px;margin-left:auto}
+  .keycap{font-size:10px;font-family:var(--font-mono);padding:2px 7px;border-radius:var(--radius-pill);border:1px solid var(--border)}
+
+  .brow{padding:12px 14px;border-bottom:1px solid var(--border)}
+  .brow:last-child{border-bottom:0}
+  .brow-top{display:flex;align-items:center;gap:10px}
+  .brow-top .an{font-family:var(--font-mono);font-size:13.5px}
+  .badge-all{font-family:var(--font-mono);font-size:11px;padding:2px 9px;border-radius:var(--radius-pill);background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));color:var(--accent)}
+  .brow-desc{color:var(--text-faint);font-size:12px;margin-left:2px}
+  .rm{margin-left:auto;border:1px solid var(--border);background:var(--surface);color:var(--text-faint);width:24px;height:24px;border-radius:var(--radius);cursor:pointer;font-size:12px;line-height:1;flex-shrink:0}
+  .rm:hover{border-color:var(--danger);color:var(--danger)}
+
+  /* inline scope editor per basket row */
+  .scope{margin-top:11px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 13px}
+  .tabset{display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap}
+  .tp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:4px 11px;font-size:11.5px;cursor:pointer;color:var(--text-muted)}
+  .tp .dot{width:8px;height:8px;border-radius:50%}
+  .tp.on{border-width:1.5px}
+  .tp[data-k="coven"].on{border-color:var(--coven);color:var(--coven);background:color-mix(in srgb,var(--coven) 10%,transparent)}
+  .tp[data-k="service"].on{border-color:var(--service);color:var(--service);background:color-mix(in srgb,var(--service) 10%,transparent)}
+  .tp[data-k="incarnation"].on{border-color:var(--incarnation);color:var(--incarnation);background:color-mix(in srgb,var(--incarnation) 10%,transparent)}
+  .tp[data-k="host"].on{border-color:var(--host);color:var(--host);background:color-mix(in srgb,var(--host) 10%,transparent)}
+  .dot.coven{background:var(--coven)} .dot.service{background:var(--service)} .dot.incarnation{background:var(--incarnation)} .dot.host{background:var(--host)}
+
+  .picker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px}
+  .picker .lead{font-size:11.5px;color:var(--text-muted);margin-bottom:9px;display:flex;align-items:center;gap:7px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--radius-pill);font-size:12px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-muted)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.sel[data-k="coven"]{border-color:var(--coven);background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="service"]{border-color:var(--service);background:color-mix(in srgb,var(--service) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="host"]{border-color:var(--host);background:color-mix(in srgb,var(--host) 14%,transparent);color:var(--text)}
+
+  /* host mode: soulprint search + SID list */
+  .sidsearch{position:relative;margin-bottom:9px}
+  .sidsearch input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px 7px 28px;font-size:12px;color:var(--text);font-family:var(--font-mono)}
+  .sidsearch .mag{position:absolute;left:9px;top:8px;color:var(--text-faint);font-size:12px}
+  .sidlist{display:flex;flex-direction:column;gap:6px}
+  .sidrow{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2);font-size:12px}
+  .sidrow .box{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-strong);display:grid;place-items:center;font-size:10px;flex-shrink:0}
+  .sidrow.sel{border-color:var(--host);background:color-mix(in srgb,var(--host) 12%,transparent)}
+  .sidrow.sel .box{background:var(--host);border-color:var(--host);color:#3a2a05}
+  .sidrow .sid{font-family:var(--font-mono);color:var(--text)}
+  .sidrow .sp{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text-faint)}
+
+  .scope-preview{margin-top:10px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);background:var(--bg);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:8px 11px}
+  .scope-preview b{color:var(--accent);font-weight:500}
+
+  .empty{padding:18px;border:1px dashed var(--border-strong);border-radius:var(--radius);color:var(--text-faint);font-size:12.5px;text-align:center}
+
+  .footer{display:flex;gap:10px;margin-top:22px}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--radius);padding:6px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500;padding:9px 18px}
+  .callout{margin-top:18px;font-size:12px;color:var(--text-faint);border-left:2px solid var(--border-strong);padding-left:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <div class="logo"></div>
+    <div class="ico"></div><div class="ico"></div><div class="ico on"></div><div class="ico"></div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">RBAC / <b>New role</b></div>
+      <button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ Тема</button>
+    </div>
+    <div class="wrap">
+      <h1>Create role</h1>
+      <div class="sub">Концепция F — Каталог слева (поиск+All+пресеты), корзина выбранных прав справа с просторным scope на каждой строке</div>
+
+      <!-- Name / Description with air -->
+      <div class="identity">
+        <div class="fld">
+          <label>Role name</label>
+          <input class="mono" value="incarnation-operator" />
+          <div class="hint">kebab-case, уникальное имя роли</div>
+        </div>
+        <div class="fld">
+          <label>Description</label>
+          <textarea rows="2">Operators of the payments coven — manage incarnations and run errands on edge hosts.</textarea>
+          <div class="hint">Свободный текст для аудита и списка ролей</div>
+        </div>
+      </div>
+
+      <!-- catalog / basket -->
+      <div class="cb">
+        <!-- LEFT: CATALOG -->
+        <div class="panel">
+          <div class="panel-h">
+            <span class="ttl">Catalog</span>
+            <span class="ct"><b>6</b> выбрано · 24 действия</span>
+          </div>
+          <div class="search">
+            <span class="mag">⌕</span>
+            <input placeholder="Filter…" />
+          </div>
+          <div class="presets">
+            <span style="font-size:11px;color:var(--text-faint);align-self:center">Пресеты:</span>
+            <span class="preset">Read-only</span>
+            <span class="preset on">Operator</span>
+            <span class="preset">Full admin</span>
+          </div>
+
+          <div class="cat">
+            <!-- incarnation -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">incarnation</span>
+                <span class="cnt has">2/6</span>
+                <span class="allpill">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk on"><span class="box">✓</span><span class="an">view</span></span>
+                <span class="actchk on"><span class="box">✓</span><span class="an">create</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">upgrade</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">destroy</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">view-secrets</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">reincarnate</span></span>
+              </div>
+            </div>
+
+            <!-- service (All) -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">service</span>
+                <span class="cnt has">All</span>
+                <span class="allpill on">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk on"><span class="box">✓</span><span class="an">view</span></span>
+                <span class="actchk on"><span class="box">✓</span><span class="an">register</span></span>
+                <span class="actchk on"><span class="box">✓</span><span class="an">update</span></span>
+                <span class="actchk on"><span class="box">✓</span><span class="an">delete</span></span>
+              </div>
+            </div>
+
+            <!-- soul -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">soul</span>
+                <span class="cnt">0/3</span>
+                <span class="allpill">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk"><span class="box"></span><span class="an">view</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">issue-token</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">assign-coven</span></span>
+              </div>
+            </div>
+
+            <!-- errand -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">errand</span>
+                <span class="cnt has">1/3</span>
+                <span class="allpill">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk"><span class="box"></span><span class="an">view</span></span>
+                <span class="actchk on"><span class="box">✓</span><span class="an">run</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">cancel</span></span>
+              </div>
+            </div>
+
+            <!-- role -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">role</span>
+                <span class="cnt">0/4</span>
+                <span class="allpill">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk"><span class="box"></span><span class="an">view</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">create</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">update</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">delete</span></span>
+              </div>
+            </div>
+
+            <!-- plugin -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">plugin</span>
+                <span class="cnt">0/3</span>
+                <span class="allpill">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk"><span class="box"></span><span class="an">view</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">register</span></span>
+                <span class="actchk"><span class="box"></span><span class="an">revoke</span></span>
+              </div>
+            </div>
+
+            <!-- audit -->
+            <div class="catres">
+              <div class="catres-h">
+                <span class="nm">audit</span>
+                <span class="cnt">0/1</span>
+                <span class="allpill">All</span>
+              </div>
+              <div class="catacts">
+                <span class="actchk"><span class="box"></span><span class="an">view</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: BASKET -->
+        <div class="panel">
+          <div class="panel-h">
+            <span class="ttl">Basket / Granted</span>
+            <span class="ct"><b>4</b> права</span>
+          </div>
+          <div class="basket">
+
+            <!-- incarnation group -->
+            <div class="bgroup">
+              <div class="bgroup-h">
+                <span class="r">incarnation</span>
+                <div class="keys">
+                  <span class="keycap" style="border-color:var(--service);color:var(--service)">service</span>
+                  <span class="keycap" style="border-color:var(--coven);color:var(--coven)">coven</span>
+                  <span class="keycap" style="border-color:var(--incarnation);color:var(--incarnation)">incarnation</span>
+                </div>
+              </div>
+
+              <div class="brow">
+                <div class="brow-top">
+                  <span class="an">incarnation.view</span>
+                  <span class="brow-desc">Read spec, state & history</span>
+                  <button class="rm">✕</button>
+                </div>
+                <div class="scope">
+                  <div class="tabset">
+                    <span class="tp on" data-k="coven"><span class="dot coven"></span>coven</span>
+                    <span class="tp" data-k="service"><span class="dot service"></span>service</span>
+                    <span class="tp" data-k="incarnation"><span class="dot incarnation"></span>incarnation</span>
+                    <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ unscoped</span>
+                  </div>
+                  <div class="picker">
+                    <div class="lead"><span class="dot coven"></span> Souls с меткой coven — одна или несколько</div>
+                    <div class="chips">
+                      <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>payments</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>checkout</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>ledger</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>fraud</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>edge</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>core</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>staging</span>
+                    </div>
+                    <div class="scope-preview">incarnation.view <b>on coven=payments</b></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="brow">
+                <div class="brow-top">
+                  <span class="an">incarnation.create</span>
+                  <span class="brow-desc">Provision new incarnations</span>
+                  <button class="rm">✕</button>
+                </div>
+                <div class="scope">
+                  <div class="tabset">
+                    <span class="tp on" data-k="coven"><span class="dot coven"></span>coven</span>
+                    <span class="tp" data-k="service"><span class="dot service"></span>service</span>
+                    <span class="tp" data-k="incarnation"><span class="dot incarnation"></span>incarnation</span>
+                    <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ unscoped</span>
+                  </div>
+                  <div class="picker">
+                    <div class="lead"><span class="dot coven"></span> Souls с меткой coven — одна или несколько</div>
+                    <div class="chips">
+                      <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>payments</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>checkout</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>ledger</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>fraud</span>
+                      <span class="chip" data-k="coven" style="border-style:dashed">＋ new label…</span>
+                    </div>
+                    <div class="scope-preview">incarnation.create <b>on coven=payments</b></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- service group — all actions -->
+            <div class="bgroup">
+              <div class="bgroup-h">
+                <span class="r">service</span>
+                <div class="keys">
+                  <span class="keycap" style="border-color:var(--service);color:var(--service)">service</span>
+                </div>
+              </div>
+              <div class="brow">
+                <div class="brow-top">
+                  <span class="an">service.*</span>
+                  <span class="badge-all">all actions</span>
+                  <span class="brow-desc">view · register · update · delete</span>
+                  <button class="rm">✕</button>
+                </div>
+                <div class="scope">
+                  <div class="tabset">
+                    <span class="tp" data-k="service"><span class="dot service"></span>service</span>
+                    <span class="tp on" style="border-style:dashed;color:var(--text-faint);border-color:var(--border-strong)">＋ unscoped (any)</span>
+                  </div>
+                  <div class="scope-preview">service.* <b>unscoped</b> — все services</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- errand group — host mode -->
+            <div class="bgroup">
+              <div class="bgroup-h">
+                <span class="r">errand</span>
+                <div class="keys">
+                  <span class="keycap" style="border-color:var(--coven);color:var(--coven)">coven</span>
+                  <span class="keycap" style="border-color:var(--host);color:var(--host)">host</span>
+                </div>
+              </div>
+              <div class="brow">
+                <div class="brow-top">
+                  <span class="an">errand.run</span>
+                  <span class="brow-desc">Execute errands on targets</span>
+                  <button class="rm">✕</button>
+                </div>
+                <div class="scope">
+                  <div class="tabset">
+                    <span class="tp" data-k="coven"><span class="dot coven"></span>coven</span>
+                    <span class="tp on" data-k="host"><span class="dot host"></span>host</span>
+                    <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ unscoped</span>
+                  </div>
+                  <div class="picker">
+                    <div class="lead"><span class="dot host"></span> SID хостов — поиск по soulprint</div>
+                    <div class="sidsearch">
+                      <span class="mag">⌕</span>
+                      <input value="os.family=debian" />
+                    </div>
+                    <div class="sidlist">
+                      <div class="sidrow sel"><span class="box">✓</span><span class="sid">01J8-KWZ3-EDGE-01</span><span class="sp">os.family=debian</span></div>
+                      <div class="sidrow sel"><span class="box">✓</span><span class="sid">01J8-KWZ3-EDGE-02</span><span class="sp">os.family=debian</span></div>
+                      <div class="sidrow"><span class="box"></span><span class="sid">01J8-MPX9-CORE-07</span><span class="sp">os.family=ubuntu</span></div>
+                    </div>
+                    <div class="scope-preview">errand.run <b>on host∈{2 SID}</b> · soulprint os.family=debian</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        Чистое разделение: <span class="mono">что</span> выбрать — слева (быстрые чекбоксы, без scope), <span class="mono">как</span> ограничить — справа, а корзина даёт обзор итога роли. Минус: при большом наборе правая колонка становится длинной и глаза прыгают лево↔право.
+      </div>
+
+      <div class="footer">
+        <button class="btn primary">Create role</button>
+        <button class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
