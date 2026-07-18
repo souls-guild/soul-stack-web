@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — Boolean Scope Builder</title>
+<style>
+  :root{
+    --bg:#fafaf9; --surface:#fff; --surface-2:#f5f5f4; --border:#e7e5e4; --border-strong:#d6d3d1;
+    --text:#1c1917; --text-muted:#57534e; --text-faint:#a8a29e;
+    --accent:#0d9488; --accent-fg:#fff; --danger:#dc2626;
+    --radius:8px; --radius-lg:12px; --radius-pill:100px;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --coven:#8b5cf6; --service:#0ea5e9; --incarnation:#0d9488; --host:#f59e0b; --trait:#ec4899;
+  }
+  [data-theme="dark"]{
+    --bg:#0a0a0a; --surface:#161615; --surface-2:#1f1f1e; --border:#2a2a28; --border-strong:#3a3a37;
+    --text:#fafaf9; --text-muted:#a8a29e; --text-faint:#6b6862;
+    --accent:#14b8a6; --accent-fg:#042f2c; --danger:#f87171;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#14b8a6; --host:#fbbf24; --trait:#f472b6;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.45}
+  .mono{font-family:var(--font-mono)}
+  .topbar{height:46px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface)}
+  .crumbs{color:var(--text-faint);font-size:12.5px}.crumbs b{color:var(--text-muted);font-weight:500}
+  .toggle{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer}
+  .wrap{padding:24px 28px 70px;max-width:920px;margin:0 auto}
+  h1{font-size:24px;font-weight:600;letter-spacing:-.025em;margin:0 0 2px}
+  .sub{color:var(--text-muted);font-size:13px;margin-bottom:22px}
+
+  .scope-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .sc-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+  .sc-head .t{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
+  .sc-head .p{font-family:var(--font-mono);font-size:14px}
+  .modebar{display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+  .mode{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:5px 14px;font-size:12.5px;cursor:pointer;color:var(--text-muted)}
+  .mode.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);font-weight:500}
+
+  .builder{padding:16px}
+  /* group */
+  .group{border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--surface-2)}
+  .group.nested{margin-left:0;background:var(--surface);border-style:dashed}
+  .group-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .joiner{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-pill);overflow:hidden;font-size:12px}
+  .joiner button{border:0;background:var(--surface);color:var(--text-muted);padding:4px 14px;cursor:pointer;font-family:inherit;font-size:12px}
+  .joiner button.on{background:var(--accent);color:var(--accent-fg);font-weight:600}
+  .group-head .lead{font-size:12px;color:var(--text-muted)}
+  .rm{margin-left:auto;border:0;background:transparent;color:var(--text-faint);cursor:pointer;font-size:14px;padding:2px 6px}
+
+  .rows{display:flex;flex-direction:column;gap:8px}
+  .cond{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+  .keysel{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius);padding:5px 9px;font-size:12.5px;font-family:var(--font-mono);cursor:pointer;background:var(--surface-2)}
+  .keysel .dot{width:8px;height:8px;border-radius:50%}
+  .dot.coven{background:var(--coven)}.dot.service{background:var(--service)}.dot.incarnation{background:var(--incarnation)}.dot.host{background:var(--host)}.dot.trait{background:var(--trait)}
+  .op{border:1px solid var(--border);border-radius:var(--radius);padding:5px 9px;font-size:12px;background:var(--surface);color:var(--text-muted);cursor:pointer}
+  .val{flex:1;min-width:180px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .txt{flex:1;min-width:140px;border:1px solid var(--border);border-radius:var(--radius);padding:6px 9px;font-size:12.5px;font-family:var(--font-mono);background:var(--surface-2);color:var(--text)}
+  .eqk{color:var(--text-faint);font-family:var(--font-mono);font-size:12px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:var(--radius-pill);font-size:12px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-muted)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.sel[data-k=coven]{border-color:var(--coven);background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k=service]{border-color:var(--service);background:color-mix(in srgb,var(--service) 14%,transparent);color:var(--text)}
+  .condrm{border:0;background:transparent;color:var(--text-faint);cursor:pointer;font-size:13px}
+  .ex{font-size:11px;color:var(--text-faint);font-family:var(--font-mono)}
+
+  .addrow{display:flex;gap:8px;margin-top:10px}
+  .add{border:1px dashed var(--border-strong);background:transparent;border-radius:var(--radius);padding:6px 12px;font-size:12px;color:var(--text-muted);cursor:pointer}
+  .add.acc{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+
+  .preview{margin-top:16px;border-top:1px solid var(--border);padding-top:14px}
+  .preview .lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px}
+  .expr{font-family:var(--font-mono);font-size:13px;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius);padding:12px 14px;line-height:1.6;color:var(--text)}
+  .expr .k{font-weight:500}
+  .expr .kc{color:var(--coven)}.expr .ks{color:var(--service)}.expr .kh{color:var(--host)}.expr .kt{color:var(--trait)}.expr .ki{color:var(--incarnation)}
+  .expr .op{color:var(--accent);font-weight:600;background:none;border:0;padding:0}
+  .expr .par{color:var(--text-faint)}
+
+  .callout{margin-top:20px;font-size:12px;color:var(--text-faint);border-left:2px solid var(--border-strong);padding-left:12px;line-height:1.55}
+  .keymenu{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .km{font-size:11px;font-family:var(--font-mono);padding:2px 8px;border-radius:var(--radius-pill);border:1px solid var(--border);color:var(--text-muted)}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="crumbs">RBAC / role / <b>scope builder</b></div>
+    <button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ Тема</button>
+  </div>
+  <div class="wrap">
+    <h1>Scope builder</h1>
+    <div class="sub">Булева сборка условий (AND / OR / группировка) над 5 типами: coven · service · incarnation · host · trait</div>
+
+    <div class="scope-card">
+      <div class="sc-head">
+        <span class="t">Scope for</span>
+        <span class="p">incarnation.view-secrets</span>
+      </div>
+      <div class="modebar">
+        <span class="mode">Unrestricted (any)</span>
+        <span class="mode on">Restrict by conditions</span>
+      </div>
+
+      <div class="builder">
+        <!-- ROOT GROUP (AND) -->
+        <div class="group">
+          <div class="group-head">
+            <span class="group-head lead">Match</span>
+            <span class="joiner"><button class="on">ALL (AND)</button><button>ANY (OR)</button></span>
+            <span class="lead">of:</span>
+          </div>
+          <div class="rows">
+            <!-- coven — is any of (chips, OR within key) -->
+            <div class="cond">
+              <span class="keysel"><span class="dot coven"></span>coven ▾</span>
+              <span class="op">is any of ▾</span>
+              <span class="val">
+                <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>payments</span>
+                <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>checkout</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>ledger</span>
+                <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>fraud</span>
+              </span>
+              <button class="condrm" title="remove">✕</button>
+            </div>
+
+            <!-- host — matches glob -->
+            <div class="cond">
+              <span class="keysel"><span class="dot host"></span>host ▾</span>
+              <span class="op">matches ▾</span>
+              <span class="val">
+                <input class="txt" value="redis-*" />
+                <span class="ex">glob по SID/hostname</span>
+              </span>
+              <button class="condrm" title="remove">✕</button>
+            </div>
+
+            <!-- NESTED GROUP (OR) — parentheses -->
+            <div class="group nested">
+              <div class="group-head">
+                <span class="lead">(  Match</span>
+                <span class="joiner"><button>ALL (AND)</button><button class="on">ANY (OR)</button></span>
+                <span class="lead">of:</span>
+                <button class="rm" title="remove group">✕</button>
+              </div>
+              <div class="rows">
+                <div class="cond">
+                  <span class="keysel"><span class="dot trait"></span>trait ▾</span>
+                  <span class="op">key = value ▾</span>
+                  <span class="val">
+                    <input class="txt" style="max-width:120px" value="owner" />
+                    <span class="eqk">=</span>
+                    <input class="txt" style="max-width:120px" value="dba" />
+                  </span>
+                  <button class="condrm" title="remove">✕</button>
+                </div>
+                <div class="cond">
+                  <span class="keysel"><span class="dot trait"></span>trait ▾</span>
+                  <span class="op">key = value ▾</span>
+                  <span class="val">
+                    <input class="txt" style="max-width:120px" value="owner" />
+                    <span class="eqk">=</span>
+                    <input class="txt" style="max-width:120px" value="platform" />
+                  </span>
+                  <button class="condrm" title="remove">✕</button>
+                </div>
+              </div>
+              <div class="addrow">
+                <button class="add">＋ Condition</button>
+              </div>
+              <span class="lead" style="display:block;margin-top:8px;color:var(--text-faint)">)</span>
+            </div>
+          </div>
+
+          <div class="addrow">
+            <button class="add acc">＋ Condition</button>
+            <button class="add">＋ Group ( … )</button>
+          </div>
+        </div>
+
+        <!-- live preview -->
+        <div class="preview">
+          <div class="lbl">Итоговое правило</div>
+          <div class="expr">
+            <span class="k kc">coven</span> <span class="op">in</span> <span class="par">(</span>payments, checkout<span class="par">)</span>
+            <span class="op">AND</span>
+            <span class="k kh">host</span> <span class="op">matches</span> "redis-*"
+            <span class="op">AND</span>
+            <span class="par">(</span> <span class="k kt">trait.owner</span> = dba <span class="op">OR</span> <span class="k kt">trait.owner</span> = platform <span class="par">)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      Пять типов, каждый со своим type-specialized вводом: <span style="color:var(--coven)">coven</span>/<span style="color:var(--service)">service</span>/<span style="color:var(--incarnation)">incarnation</span> — точные значения/списки (чипы, OR внутри ключа); <span style="color:var(--host)">host</span> — точное или glob-паттерн (<span class="mono">redis-*</span>); <span style="color:var(--trait)">trait</span> — пара <span class="mono">key=value</span>. Условия объединяются <b>ALL (AND)</b> / <b>ANY (OR)</b>, группы дают скобки для вложенной логики. Внизу — живой предпросмотр итогового правила.
+      <br><br>
+      <b>Что за этим на бэкенде:</b> новый грамматический слой (AST вместо одного <span class="mono">key=value</span>), matcher под AND/OR, и — главное — least-privilege проверка <span class="mono">subset.go</span> над булевым выражением (иначе эскалация привилегий). Гейтится архитектором (ADR-0047 propose-and-wait). Удаляются <span class="mono">regex / soulprint / state</span>.
+    </div>
+  </div>
+</body>
+</html>
