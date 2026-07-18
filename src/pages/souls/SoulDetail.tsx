@@ -18,12 +18,15 @@ import { soulHistoryStatusTone, soulHistoryIsRunning } from './status';
 import { IssueTokenModal } from './IssueTokenModal';
 import { CovenAssignModal } from './CovenAssignModal';
 import { TraitsAssignModal } from './TraitsAssignModal';
+import { SoulUtilizationTab, SoulUtilizationStrip } from './SoulUtilizationTab';
+import { useNow } from '../../hooks/useNow';
+import { ageSeconds } from '../incarnations/hostVitals';
 import styles from '../common.module.css';
 
 const HISTORY_LIMIT = 50;
 const HISTORY_TYPES: readonly SoulHistoryType[] = ['scenario', 'errand'];
 
-type Tab = 'overview' | 'soulprint' | 'history';
+type Tab = 'overview' | 'soulprint' | 'utilization' | 'history';
 
 // Skew between collected_at (Soul-side) and received_at (Keeper-side). Per ADR-018
 // -- warn if the difference is > 10 minutes (NTP drift or a long path to Keeper).
@@ -39,10 +42,23 @@ function skewWarning(collectedAt?: string, receivedAt?: string): string | null {
   return i18n.t('souls:skewWarning', { minutes: Math.floor(diff / 60000) });
 }
 
+// Live relative age of a timestamp (e.g. "13h ago") using the shared souls:timeAgo* keys.
+function relativeAge(iso: string | undefined, now: number): string {
+  const sec = ageSeconds(iso, now);
+  if (sec == null) return '—';
+  if (sec < 60) return i18n.t('souls:timeAgoSeconds', { n: sec });
+  const m = Math.floor(sec / 60);
+  if (m < 60) return i18n.t('souls:timeAgoMinutes', { n: m });
+  const h = Math.floor(m / 60);
+  if (h < 24) return i18n.t('souls:timeAgoHours', { n: h });
+  return i18n.t('souls:timeAgoDays', { n: Math.floor(h / 24) });
+}
+
 export function SoulDetail() {
   const { t } = useTranslation();
   const { sid = '' } = useParams<{ sid: string }>();
   const [tab, setTab] = useState<Tab>('overview');
+  const now = useNow(1000);
   const [tokenOpen, setTokenOpen] = useState(false);
   const [covenOpen, setCovenOpen] = useState(false);
   const [traitsOpen, setTraitsOpen] = useState(false);
@@ -154,6 +170,15 @@ export function SoulDetail() {
         <button
           type="button"
           role="tab"
+          aria-selected={tab === 'utilization'}
+          className={`${styles.tab} ${tab === 'utilization' ? styles.tabActive : ''}`}
+          onClick={() => setTab('utilization')}
+        >
+          Utilization
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === 'history'}
           className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`}
           onClick={() => setTab('history')}
@@ -165,19 +190,39 @@ export function SoulDetail() {
       {tab === 'overview' ? (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Overview</h2>
+          <SoulUtilizationStrip sid={row.sid} enabled={tab === 'overview'} />
           <div className={styles.meta}>
             <span className={styles.metaKey}>SID</span>
             <span className={styles.metaVal}>{row.sid}</span>
             <span className={styles.metaKey}>Status</span>
-            <span className={styles.metaVal}>{row.status}</span>
+            <span className={styles.metaVal} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Dot kind={soulDot(row.status)} title={row.status} />
+              <Badge tone={soulTone(row.status)}>{row.status}</Badge>
+            </span>
             <span className={styles.metaKey}>Transport</span>
-            <span className={styles.metaVal}>{row.transport}</span>
+            <span className={styles.metaVal}>
+              <Badge tone="muted">{row.transport}</Badge>
+            </span>
             <span className={styles.metaKey}>Covens</span>
-            <span className={styles.metaVal}>{row.covens?.join(', ') || '—'}</span>
+            <span className={styles.metaVal}>
+              {row.covens && row.covens.length > 0 ? (
+                <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4 }}>
+                  {row.covens.map((c) => (
+                    <Badge key={c} tone="info">{c}</Badge>
+                  ))}
+                </span>
+              ) : (
+                '—'
+              )}
+            </span>
             <span className={styles.metaKey}>Registered</span>
-            <span className={styles.metaVal}>{row.registered_at}</span>
+            <span className={styles.metaVal} title={row.registered_at}>
+              {relativeAge(row.registered_at, now)}
+            </span>
             <span className={styles.metaKey}>Last seen</span>
-            <span className={styles.metaVal}>{row.last_seen_at ?? '—'}</span>
+            <span className={styles.metaVal} title={row.last_seen_at ?? undefined}>
+              {row.last_seen_at ? relativeAge(row.last_seen_at, now) : '—'}
+            </span>
             <span className={styles.metaKey}>Last seen by KID</span>
             <span className={styles.metaVal}>{row.last_seen_by_kid ?? '—'}</span>
           </div>
@@ -200,6 +245,8 @@ export function SoulDetail() {
       ) : null}
 
       {tab === 'soulprint' ? <SoulprintTab query={soulprintQ} /> : null}
+
+      {tab === 'utilization' ? <SoulUtilizationTab sid={row.sid} enabled={tab === 'utilization'} /> : null}
 
       {tab === 'history' ? <SoulHistoryTab sid={row.sid} /> : null}
     </div>

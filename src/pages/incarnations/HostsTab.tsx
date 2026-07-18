@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Play, Plus, Server, Trash2 } from 'lucide-react';
-import { Badge, Button, Dot } from '../../components/primitives';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Server, Trash2 } from 'lucide-react';
+import { Button } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
-import { keeperApi, type SoulListEntry } from '../../api/keeper';
-import { soulDot, soulTone } from '../../components/status';
+import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { AddHostModal } from './AddHostModal';
 import { RemoveHostModal } from './RemoveHostModal';
@@ -22,8 +20,8 @@ import styles from '../common.module.css';
 //      the AddHostModal (select SID from the souls registry + opt. role); Remove —
 //      a per-row button. spec arrives as opaque jsonb (Record<string,unknown>),
 //      hosts[] is extracted manually (extractDeclaredHosts).
-//   2. Connected souls — derived view: souls with coven=incarnation.name (see ADR-008,
-//      incarnation.name is the root Coven label).
+//   2. Connected souls ⋈ utilization — the HostUtilizationPanel owns this unified section:
+//      souls with coven=incarnation.name (derived view, ADR-008) left-joined with host vitals.
 
 interface DeclaredHost {
   sid: string;
@@ -92,15 +90,6 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
 
   // Editing spec.hosts is unavailable during destroy — backend returns 409. Hide the UI preemptively.
   const editingBlocked = status === 'destroying' || status === 'destroy_failed';
-
-  // Connected souls — filter souls by coven=incarnation.name.
-  // This is a derived view, not an authoritative list; the real correspondence is checked
-  // by the probe scenario (ADR-008).
-  const connected = useQuery({
-    queryKey: ['incarnation-souls', incarnationName],
-    queryFn: () => keeperApi.souls.list({ coven: [incarnationName], limit: 200 }),
-    enabled: Boolean(incarnationName),
-  });
 
   const removeMu = useMutation({
     mutationFn: (sid: string) =>
@@ -213,73 +202,6 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         }}
         onConfirm={(sid) => removeMu.mutate(sid)}
       />
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: 16,
-          gap: 12,
-        }}
-      >
-        <h2 className={styles.sectionTitle} style={{ margin: 0 }}>
-          Connected souls
-        </h2>
-        <Link
-          to={`/run?workload=command&target_coven=${encodeURIComponent(incarnationName)}`}
-          aria-label={t('incarnations:runCommandOnHosts')}
-        >
-          <Button type="button" variant="primary">
-            <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            {t('incarnations:runCommandOnHosts')}
-          </Button>
-        </Link>
-      </div>
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-        Souls <code className="mono">coven = {incarnationName}</code>. {t('incarnations:connectedSoulsDesc')}
-      </p>
-
-      {connected.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
-      {connected.error ? (
-        <div className={styles.errorBox}>
-          {t('incarnations:hostsLoadFailed', { detail: String(connected.error) })}
-        </div>
-      ) : null}
-      {connected.data && (connected.data.items ?? []).length === 0 ? (
-        <div className={styles.empty}>
-          {t('incarnations:noConnectedSouls', { name: incarnationName })}
-        </div>
-      ) : null}
-      {connected.data && (connected.data.items ?? []).length > 0 ? (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>SID</th>
-              <th>Status</th>
-              <th>Covens</th>
-              <th>Transport</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(connected.data.items ?? []).map((s: SoulListEntry) => (
-              <tr key={s.sid}>
-                <td className="mono">
-                  <KeeperSidCell sid={s.sid} />
-                </td>
-                <td>
-                  <span className={styles.statusCell}>
-                    <Dot kind={soulDot(s.status)} />
-                    <Badge tone={soulTone(s.status)}>{s.status}</Badge>
-                  </span>
-                </td>
-                <td className="mono">{(s.covens ?? []).join(', ') || '—'}</td>
-                <td className="mono">{s.transport ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : null}
 
       <HostUtilizationPanel incarnationName={incarnationName} />
 

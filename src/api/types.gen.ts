@@ -3134,7 +3134,7 @@ export interface components {
         IncarnationTelemetryReply: {
             hosts: components["schemas"]["HostTelemetry"][] | null;
             incarnation: string;
-            /** @description true if the coven's souls exceeded the cap and the host list is truncated (overview glance) */
+            /** @description true if the incarnation's members exceeded the cap and the host list is truncated (overview glance) */
             truncated: boolean;
         };
         IncarnationUnlockReply: {
@@ -4265,6 +4265,10 @@ export interface components {
             roles: string[] | null;
         };
         TelemetryDisk: {
+            /** Format: int64 */
+            inodes_total: number;
+            /** Format: int64 */
+            inodes_used: number;
             mount: string;
             /** Format: int64 */
             total_mb: number;
@@ -4375,6 +4379,8 @@ export interface components {
             /** Format: double */
             cpu_pct: number;
             disks?: components["schemas"]["TelemetryDisk"][] | null;
+            /** Format: int32 */
+            interval_sec: number;
             /** Format: double */
             load1: number;
             /** Format: double */
@@ -4385,6 +4391,12 @@ export interface components {
             mem_total_mb: number;
             /** Format: int64 */
             mem_used_mb: number;
+            /** Format: int64 */
+            net_err_ps: number;
+            /** Format: int64 */
+            net_rx_bps: number;
+            /** Format: int64 */
+            net_tx_bps: number;
             /** Format: int64 */
             swap_used_mb: number;
             /** Format: int64 */
@@ -4401,6 +4413,10 @@ export interface components {
             mem_total_mb: number;
             /** Format: int64 */
             mem_used_mb: number;
+            /** Format: int64 */
+            net_rx_bps: number;
+            /** Format: int64 */
+            net_tx_bps: number;
         };
         VigilCreateRequest: {
             /** @description core-beacon address (e.g. 'core.beacon.file_changed') */
@@ -8319,7 +8335,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name (root Coven-label of hosts) */
+                /** @description incarnation name */
                 name: string;
             };
             cookie?: never;

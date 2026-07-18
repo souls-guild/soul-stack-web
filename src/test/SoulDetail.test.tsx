@@ -41,7 +41,13 @@ describe('SoulDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'host01.example.com' })).toBeInTheDocument();
     });
-    expect(screen.getByText('prod, redis-prod')).toBeInTheDocument();
+    // covens render as individual chips now
+    expect(screen.getByText('prod')).toBeInTheDocument();
+    expect(screen.getByText('redis-prod')).toBeInTheDocument();
+    // status shown as a badge (English-identical enum value)
+    expect(screen.getAllByText('connected').length).toBeGreaterThan(0);
+    // registered timestamp humanized to relative age (raw ISO only in the title tooltip)
+    expect(screen.queryByText('2026-05-01T00:00:00Z')).toBeNull();
   });
 
   it('Soulprint tab renders typed_facts.os.family', async () => {
