@@ -7,11 +7,12 @@ import { z } from 'zod';
 
 const ROLE_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-// permission string: "*", "namespace.*", "namespace.verb",
-// "namespace.verb on key=value", "namespace.verb on key=v1,v2".
-// Minimal filter — empty string and whitespace are rejected. A malformed permission
-// will be caught by the server (422 validation-failed), we show it as-is.
-const PERMISSION = /^[A-Za-z0-9._*-]+( on [a-z]+=\S+)?$/;
+// permission string: "*", "namespace.*", "namespace.verb", or with a boolean scope
+// "namespace.verb on <scope-expr>" (NIM-128) — the scope expression may contain
+// spaces, parentheses, quotes and AND/OR, so the tail is left permissive. The server
+// (rbac.ParsePermission) is the source of truth and returns 422 on a bad scope; we
+// only reject an empty base here.
+const PERMISSION = /^[A-Za-z0-9._*-]+( on .+)?$/;
 
 // Messages — i18n keys in namespace `admin`; rendered via t(fieldError.message).
 export const roleCreateSchema = z.object({

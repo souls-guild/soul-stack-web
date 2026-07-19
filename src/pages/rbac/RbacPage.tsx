@@ -7,9 +7,7 @@ import { keeperApi, type RoleView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { DeleteRoleModal } from './DeleteRoleModal';
-import { EditPermissionsModal } from './EditPermissionsModal';
 import { AssignRoleModal } from './AssignRoleModal';
-import { normalizePermissionCatalog } from './permissions';
 import { prettyRbacError } from './errors';
 import styles from '../common.module.css';
 
@@ -278,9 +276,11 @@ export function RbacPage() {
   const { t } = useTranslation();
   const nav = useNavigate();
   const [tab, setTab] = useState<Tab>('roles');
-  const [editing, setEditing] = useState<RoleView | null>(null);
   const [deleting, setDeleting] = useState<RoleView | null>(null);
   const [assigningAid, setAssigningAid] = useState<string | null>(null);
+
+  // Edit is a dedicated page (was a cramped modal) — same layout as Create.
+  const editRole = (r: RoleView) => nav(`/rbac/roles/${encodeURIComponent(r.name)}/edit`);
 
   const rolesQ = useQuery({
     queryKey: ['rbac.roles'],
@@ -297,18 +297,6 @@ export function RbacPage() {
 
   const roles = useMemo(() => rolesQ.data?.items ?? [], [rolesQ.data]);
   const operators = operatorsQ.data?.items ?? [];
-
-  // Permission catalog — from the backend. Unavailable/empty -> graceful (picker
-  // shows a hint, save still preserves existing permissions via preserved).
-  const permsQ = useQuery({
-    queryKey: ['rbac.permissions'],
-    queryFn: () => keeperApi.permissions.list(),
-    retry: false,
-  });
-  const catalog = useMemo(
-    () => normalizePermissionCatalog(permsQ.data?.items ?? undefined),
-    [permsQ.data],
-  );
 
   return (
     <div className={styles.page}>
@@ -371,10 +359,10 @@ export function RbacPage() {
       {roles.length > 0 ? (
         <>
           {tab === 'roles' ? (
-            <RolesTab roles={roles} onEdit={setEditing} onDelete={setDeleting} />
+            <RolesTab roles={roles} onEdit={editRole} onDelete={setDeleting} />
           ) : null}
           {tab === 'permissions' ? (
-            <PermissionsTab roles={roles} onEdit={setEditing} />
+            <PermissionsTab roles={roles} onEdit={editRole} />
           ) : null}
           {tab === 'members' ? (
             <MembersTab roles={roles} operators={operators} onAssign={setAssigningAid} />
@@ -382,14 +370,6 @@ export function RbacPage() {
         </>
       ) : null}
 
-      {editing ? (
-        <EditPermissionsModal
-          open={true}
-          role={editing}
-          catalog={catalog}
-          onClose={() => setEditing(null)}
-        />
-      ) : null}
       {deleting ? (
         <DeleteRoleModal
           open={true}

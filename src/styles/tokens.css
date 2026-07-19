@@ -28,11 +28,15 @@
   --danger:        #dc2626;     /* error_locked / disconnected / failed */
   --info:          #2563eb;     /* applying / provisioning */
 
-  /* ---------- RBAC scope-selector types (per-key accent) ---------- */
-  --scope-coven:       #8b5cf6;
-  --scope-service:     #0ea5e9;
+  /* ---------- RBAC scope-selector types (per-dimension accent) ---------- */
+  --scope-coven:       #7c3aed;
+  --scope-service:     #0284c7;
   --scope-incarnation: #0d9488;
-  --scope-host:        #f59e0b;
+  --scope-host:        #d97706;
+  --scope-trait:       #db2777;
+  /* boolean scope rail: teal = ALL/AND, amber = ANY/OR */
+  --rail-and:          #0d9488;
+  --rail-or:           #f59e0b;
 
   /* ---------- Geometry ---------- */
   --radius:        8px;
@@ -114,8 +118,11 @@
   --info:          #60a5fa;
   --scope-coven:       #a78bfa;
   --scope-service:     #38bdf8;
-  --scope-incarnation: #14b8a6;
+  --scope-incarnation: #2dd4bf;
   --scope-host:        #fbbf24;
+  --scope-trait:       #f472b6;
+  --rail-and:          #14b8a6;
+  --rail-or:           #fbbf24;
   color-scheme: dark;
 }
 

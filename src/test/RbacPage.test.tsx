@@ -208,61 +208,25 @@ describe('RbacPage', () => {
     expect(screen.queryByRole('dialog', { name: /Create role/i })).not.toBeInTheDocument();
   });
 
-  it('Edit permissions: PATCH /v1/roles/{name}/permissions with the new set', async () => {
-    const calls = recordingFetch({ rolesList: SAMPLE });
-    renderWithProviders(<RbacPage />, '/rbac');
+  it('Edit permissions: navigates to dedicated page /rbac/roles/{name}/edit (NIM-128), not a modal', async () => {
+    // Permission editing moved from a modal to a full page (RoleEditPage.test.tsx
+    // covers the edit form itself). RbacPage only navigates.
+    recordingFetch({ rolesList: SAMPLE });
+    renderWithProviders(
+      <Routes>
+        <Route path="/rbac" element={<RbacPage />} />
+        <Route path="/rbac/roles/:name/edit" element={<div>ROLE-EDIT-PAGE</div>} />
+      </Routes>,
+      '/rbac',
+    );
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
 
-    // Edit button is next to soul-operator (second table row).
+    // Edit button next to soul-operator (second table row).
     const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
-    // soul-operator -- second role; editButtons[1] corresponds to it.
     await user.click(editButtons[1]);
-
-    const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
-    // Master-detail: select soul, uncheck soul.exec; select incarnation, check incarnation.read.
-    await user.click(await within(dialog).findByRole('button', { name: 'resource soul' }));
-    const soulExec = within(dialog).getByRole('checkbox', { name: 'soul.exec' });
-    expect(soulExec).toBeChecked();
-    await user.click(soulExec);
-    await user.click(within(dialog).getByRole('button', { name: 'resource incarnation' }));
-    await user.click(within(dialog).getByRole('checkbox', { name: 'incarnation.read' }));
-    await user.click(within(dialog).getByRole('button', { name: /Save/i }));
-
-    await waitFor(() => {
-      const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
-      expect(patch).toBeDefined();
-      expect(patch!.url).toBe('/v1/roles/soul-operator/permissions');
-      // soul.exec removed, incarnation.read added.
-      expect(patch!.body).toContain('incarnation.read');
-      expect(patch!.body).not.toContain('soul.exec');
-    });
-  });
-
-  it('Edit permissions builtin: 409 role-builtin → pretty-error', async () => {
-    recordingFetch({
-      rolesList: SAMPLE,
-      conflict: {
-        path: /\/v1\/roles\/cluster-admin\/permissions$/,
-        method: 'PATCH',
-        status: 409,
-        type: 'https://soul-stack.io/errors/role-builtin',
-        detail: 'cluster-admin is builtin',
-      },
-    });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('cluster-admin')).toBeInTheDocument());
-
-    // Edit on cluster-admin (first role). The button is not set disabled
-    // for builtin (submit is blocked internally instead), so we land in Modal.
-    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
-    await user.click(editButtons[0]);
-    const dialog = await screen.findByRole('dialog', { name: /Permissions: cluster-admin/i });
-    // Submit button is disabled for builtin -- verify explicitly.
-    expect(within(dialog).getByRole('button', { name: /Save/i })).toBeDisabled();
-    // And the "editing blocked" warning is visible.
-    expect(within(dialog).getByText(/Editing is disabled/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('ROLE-EDIT-PAGE')).toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: /Permissions:/i })).not.toBeInTheDocument();
   });
 
   it('Delete role: confirm-modal → DELETE /v1/roles/{name}', async () => {
@@ -360,61 +324,6 @@ describe('RbacPage', () => {
       );
       expect(del).toBeDefined();
     });
-  });
-
-  it('Permissions-picker: catalog unavailable (404) → graceful, role permissions preserved', async () => {
-    // /v1/permissions returns 599 (no handler) -- recordingFetch with an empty catalog.
-    const calls = recordingFetch({ rolesList: SAMPLE, permissions: { items: [] } });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('soul-operator')).toBeInTheDocument());
-
-    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
-    await user.click(editButtons[1]);
-    const dialog = await screen.findByRole('dialog', { name: /Permissions: soul-operator/i });
-    // Catalog is empty -- hint is visible, existing permissions shown as preserved chips.
-    expect(within(dialog).getByText(/Permission catalog is unavailable/i)).toBeInTheDocument();
-    expect(within(dialog).getByText('soul.exec')).toBeInTheDocument();
-    // Save without a catalog doesn't drop existing permissions (replace semantics).
-    await user.click(within(dialog).getByRole('button', { name: /Save/i }));
-    await waitFor(() => {
-      const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
-      expect(patch).toBeDefined();
-      expect(patch!.body).toContain('soul.exec');
-    });
-  });
-
-  it('Scope-builder: parsing an existing scoped role permission → checked checkbox', async () => {
-    // Role has a scoped permission -- base soul.list is in the catalog -> checked checkbox.
-    const sample = {
-      items: [
-        {
-          name: 'scoped-role',
-          description: '',
-          builtin: false,
-          permissions: ['soul.list on coven=ops', 'incarnation.run'],
-          operators: [] as string[],
-        },
-      ],
-    };
-    recordingFetch({ rolesList: sample });
-    renderWithProviders(<RbacPage />, '/rbac');
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('scoped-role')).toBeInTheDocument());
-
-    const editButtons = screen.getAllByRole('button', { name: /edit permissions/i });
-    await user.click(editButtons[0]);
-    const dialog = await screen.findByRole('dialog', { name: /Permissions: scoped-role/i });
-
-    // Master-detail: select incarnation → incarnation.run is checked.
-    await user.click(await within(dialog).findByRole('button', { name: 'resource incarnation' }));
-    const incRun = within(dialog).getByRole('checkbox', { name: 'incarnation.run' });
-    expect(incRun).toBeChecked();
-
-    // Select soul → soul.list on coven=ops parses to a checked checkbox (scope badge in name).
-    await user.click(within(dialog).getByRole('button', { name: 'resource soul' }));
-    const soulList = within(dialog).getByRole('checkbox', { name: /soul\.list/ });
-    expect(soulList).toBeChecked();
   });
 
   // -- Guard tests: clickable links --------------------------------------------

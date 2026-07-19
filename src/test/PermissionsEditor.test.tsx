@@ -103,64 +103,126 @@ describe('PermissionsEditor — action-wildcard (NIM-79)', () => {
     );
     const user = userEvent.setup();
 
-    // The scope picker under the wildcard uses the resource union selector_keys = ['service'].
-    const keySelect = screen.getByRole('combobox', { name: /^scope selector key$/i });
-    await user.selectOptions(keySelect, 'service');
-    const valueInput = screen.getByRole('textbox', { name: /value for service$/i });
-    await user.type(valueInput, 'redis');
+    // The boolean builder under the wildcard: switch to conditions, pick service, add "redis".
+    const builder = screen.getByRole('group', { name: 'scope for incarnation.*' });
+    await user.click(within(builder).getByTestId('scope-mode-on'));
+    await user.selectOptions(within(builder).getByTestId('scope-dim'), 'service');
+    await user.type(within(builder).getByTestId('scope-add-value'), 'redis{Enter}');
 
     expect(onChange).toHaveBeenLastCalledWith(['incarnation.* on service=redis']);
   });
 
-  it('full "*" stays a read-only preserved chip (does not turn into a checkbox)', () => {
+  it('full "*" adopts into the Full-access toggle (not a read-only preserved chip)', () => {
     renderWithProviders(<PermissionsEditor value={['*']} onChange={vi.fn()} catalog={CATALOG} />);
-    expect(screen.getByText(/Permissions outside the catalog/i)).toBeInTheDocument();
-    // No checkbox named exactly "*".
-    expect(screen.queryByRole('checkbox', { name: '*' })).not.toBeInTheDocument();
+    const toggle = screen.getByTestId('perm-full-access-toggle') as HTMLInputElement;
+    expect(toggle).toBeChecked();
+    // Not routed to the read-only preserved section.
+    expect(screen.queryByText(/Permissions outside the catalog/i)).not.toBeInTheDocument();
+    // Unscoped `*` → the scope builder is in "No restriction" (cluster-admin).
+    const builder = screen.getByRole('group', { name: 'scope for *' });
+    expect(within(builder).getByTestId('scope-mode-off')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
-describe('PermissionsEditor — bulk-scope (NIM-79)', () => {
+describe('PermissionsEditor — Full access `*` (NIM-128 amendment)', () => {
   beforeEach(() => mockScopeEndpoints());
 
-  it('bulk-apply: 2 checked permissions → shared scope coven=ops applied to all', async () => {
+  it('enabling Full access → `*` enters the set', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<PermissionsEditor value={[]} onChange={onChange} catalog={CATALOG} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('perm-full-access-toggle'));
+    expect(onChange).toHaveBeenLastCalledWith(['*']);
+  });
+
+  it('disabling Full access removes `*` from the set', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<PermissionsEditor value={['*']} onChange={onChange} catalog={CATALOG} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('perm-full-access-toggle'));
+    expect(onChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('adding a condition → "* on coven=a" (scoped super-admin)', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<PermissionsEditor value={['*']} onChange={onChange} catalog={CATALOG} />);
+    const user = userEvent.setup();
+    const builder = screen.getByRole('group', { name: 'scope for *' });
+    await user.click(within(builder).getByTestId('scope-mode-on'));
+    // Default dimension is coven; add the value "a".
+    await user.type(within(builder).getByTestId('scope-add-value'), 'a{Enter}');
+    expect(onChange).toHaveBeenLastCalledWith(['* on coven=a']);
+  });
+
+  it('loading a role with "* on coven=a" → toggle on + builder tree (conditions mode)', () => {
+    renderWithProviders(
+      <PermissionsEditor value={['* on coven=a']} onChange={vi.fn()} catalog={CATALOG} />,
+    );
+    expect(screen.getByTestId('perm-full-access-toggle')).toBeChecked();
+    const builder = screen.getByRole('group', { name: 'scope for *' });
+    expect(within(builder).getByTestId('scope-mode-on')).toHaveAttribute('aria-pressed', 'true');
+    expect(within(builder).getByTestId('scope-preview-code')).toHaveTextContent('coven = a');
+    // Scoped `*` is adopted, not routed to preserved.
+    expect(screen.queryByText(/Permissions outside the catalog/i)).not.toBeInTheDocument();
+  });
+
+  it('switching Full access to "No restriction" → bare "*" (cluster-admin)', async () => {
     const onChange = vi.fn();
     renderWithProviders(
-      <PermissionsEditor value={['soul.list', 'soul.read']} onChange={onChange} catalog={SOUL_CATALOG} />,
+      <PermissionsEditor value={['* on coven=a']} onChange={onChange} catalog={CATALOG} />,
+    );
+    const user = userEvent.setup();
+    const builder = screen.getByRole('group', { name: 'scope for *' });
+    await user.click(within(builder).getByTestId('scope-mode-off'));
+    expect(onChange).toHaveBeenLastCalledWith(['*']);
+  });
+});
+
+describe('PermissionsEditor — boolean scope-builder (NIM-128)', () => {
+  beforeEach(() => mockScopeEndpoints());
+
+  it('applying a scope to a checked action → "soul.list on coven=ops"', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <PermissionsEditor value={['soul.list']} onChange={onChange} catalog={SOUL_CATALOG} />,
     );
     const user = userEvent.setup();
 
-    // The bulk bar appears with ≥2 checked and non-empty selector_keys.
-    const bulkKey = screen.getByRole('combobox', { name: /scope selector key for selected/i });
-    await user.selectOptions(bulkKey, 'coven');
-    const bulkValue = screen.getByRole('textbox', { name: /value coven for selected/i });
-    await user.type(bulkValue, 'ops');
-    await user.click(screen.getByRole('button', { name: /Apply/i }));
+    const builder = screen.getByRole('group', { name: 'scope for soul.list' });
+    await user.click(within(builder).getByTestId('scope-mode-on'));
+    // Default dimension is coven; add the value "ops".
+    await user.type(within(builder).getByTestId('scope-add-value'), 'ops{Enter}');
 
-    expect(onChange).toHaveBeenLastCalledWith(['soul.list on coven=ops', 'soul.read on coven=ops']);
+    expect(onChange).toHaveBeenLastCalledWith(['soul.list on coven=ops']);
   });
 
-  it('bulk bar is hidden with <2 checked permissions', () => {
+  it('an existing scoped permission round-trips into the builder (conditions mode on)', () => {
     renderWithProviders(
-      <PermissionsEditor value={['soul.list']} onChange={vi.fn()} catalog={SOUL_CATALOG} />,
+      <PermissionsEditor
+        value={['soul.list on coven=ops']}
+        onChange={vi.fn()}
+        catalog={SOUL_CATALOG}
+      />,
     );
-    expect(
-      screen.queryByRole('combobox', { name: /scope selector key for selected/i }),
-    ).not.toBeInTheDocument();
+    const builder = screen.getByRole('group', { name: 'scope for soul.list' });
+    // Loaded scope → conditions mode is active, and the preview shows the expression.
+    expect(within(builder).getByTestId('scope-mode-on')).toHaveAttribute('aria-pressed', 'true');
+    expect(within(builder).getByTestId('scope-preview-code')).toHaveTextContent('coven = ops');
   });
 
-  it('bulk-clear: resets scope of the checked group permissions', async () => {
+  it('switching back to "No restriction" clears the scope → bare permission', async () => {
     const onChange = vi.fn();
     renderWithProviders(
       <PermissionsEditor
-        value={['soul.list on coven=ops', 'soul.read on coven=ops']}
+        value={['soul.list on coven=ops']}
         onChange={onChange}
         catalog={SOUL_CATALOG}
       />,
     );
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Clear/i }));
-    expect(onChange).toHaveBeenLastCalledWith(['soul.list', 'soul.read']);
+    const builder = screen.getByRole('group', { name: 'scope for soul.list' });
+    await user.click(within(builder).getByTestId('scope-mode-off'));
+    expect(onChange).toHaveBeenLastCalledWith(['soul.list']);
   });
 });
 
@@ -206,17 +268,17 @@ describe('PermissionsEditor — review regressions (NIM-79)', () => {
     expect(arg).toContain('service.read');
   });
 
-  it('#1: no accumulation of `*` duplicates across repeated edits (controlled)', async () => {
+  it('#1: no accumulation of `*` across repeated edits (controlled)', async () => {
     renderWithProviders(<Controlled initial={['*']} catalog={CATALOG} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'resource service' }));
-    // Three toggles in a row — `*` must not multiply in the preserved chips.
+    // Three toggles in a row — Full access stays on and `*` must not multiply.
     await user.click(screen.getByRole('checkbox', { name: 'service.read' }));
     await user.click(screen.getByRole('checkbox', { name: 'service.read' }));
     await user.click(screen.getByRole('checkbox', { name: 'service.list' }));
-    // A single preserved `*` chip (text exactly "*" in the mono chip).
-    const stars = screen.getAllByText('*');
-    expect(stars).toHaveLength(1);
+    expect(screen.getByTestId('perm-full-access-toggle')).toBeChecked();
+    // A single literal "*" badge in the Full-access banner (no duplicated grant).
+    expect(screen.getAllByText('*')).toHaveLength(1);
   });
 
   it('#2: two scoped wildcards of the same base round-trip through preserved (not lost)', async () => {
@@ -244,22 +306,20 @@ describe('PermissionsEditor — review regressions (NIM-79)', () => {
     expect(screen.getByRole('checkbox', { name: 'incarnation.read' })).not.toBeDisabled();
   });
 
-  it('#8: bulk applies a key only to the actions that support it (heterogeneous selector_keys)', async () => {
+  it('#8: unchecking an action drops its scope (does not leak into other permissions)', async () => {
     const onChange = vi.fn();
     renderWithProviders(
-      <PermissionsEditor value={['thing.alpha', 'thing.beta']} onChange={onChange} catalog={HETERO_CATALOG} />,
+      <PermissionsEditor
+        value={['thing.alpha on coven=ops', 'thing.beta']}
+        onChange={onChange}
+        catalog={HETERO_CATALOG}
+      />,
     );
     const user = userEvent.setup();
-    // union = ['coven','sid']; 'coven' is supported only by thing.alpha.
-    const bulkKey = screen.getByRole('combobox', { name: /scope selector key for selected/i });
-    await user.selectOptions(bulkKey, 'coven');
-    const bulkValue = screen.getByRole('textbox', { name: /value coven for selected/i });
-    await user.type(bulkValue, 'ops');
-    await user.click(screen.getByRole('button', { name: /Apply/i }));
-
+    // thing.alpha is checked with a scope; unchecking removes it entirely, thing.beta stays bare.
+    await user.click(screen.getByRole('checkbox', { name: /thing\.alpha/ }));
     const arg = onChange.mock.lastCall?.[0] as string[];
-    expect(arg).toContain('thing.alpha on coven=ops'); // applied
-    expect(arg).toContain('thing.beta');               // skipped — stayed bare
-    expect(arg.some((p) => p.startsWith('thing.beta on'))).toBe(false);
+    expect(arg).toContain('thing.beta');
+    expect(arg.some((p) => p.startsWith('thing.alpha'))).toBe(false);
   });
 });

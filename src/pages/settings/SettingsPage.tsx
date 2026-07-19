@@ -4,8 +4,9 @@
 //   provisioning-policy — operator creation methods (ADR-058)
 // Future: TLS policies, Redis topology, LDAP/OIDC configs, etc.
 
-import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { X } from 'lucide-react';
 import { ProvisioningPolicy } from '../archons/ProvisioningPolicy';
 import { AppearanceSettings } from './AppearanceSettings';
 import styles from './SettingsPage.module.css';
@@ -36,9 +37,17 @@ const SECTIONS: Section[] = [
 export function SettingsPage() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Determine the active tab from the current path.
   const activePath = location.pathname.replace(/^\/settings\/?/, '').split('/')[0];
+
+  // Close settings → return to the remembered non-settings screen (set by the
+  // Topbar), or the default landing as a fallback. Explicit target, not
+  // navigate(-1), so repeated gear clicks / sub-tab switches don't get stuck.
+  const closeSettings = () => {
+    navigate(sessionStorage.getItem('settings.returnTo') || '/overview');
+  };
 
   return (
     <div className={commonStyles.page}>
@@ -47,6 +56,28 @@ export function SettingsPage() {
           <h1 className={commonStyles.title}>{t('admin:settingsTitle')}</h1>
           <div className={commonStyles.crumbs}>{t('admin:settingsCrumbs')}</div>
         </div>
+        <button
+          type="button"
+          onClick={closeSettings}
+          data-testid="settings-close"
+          aria-label={t('close')}
+          title={t('close')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface)',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+        >
+          <X size={14} />
+          {t('close')}
+        </button>
       </div>
 
       <nav className={styles.subNav} aria-label={t('admin:settingsNavAria')}>

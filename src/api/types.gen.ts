@@ -3251,10 +3251,7 @@ export interface components {
             wildcard?: boolean;
         };
         MyPermissionScope: {
-            covens?: string[];
-            regex?: string[];
-            soulprint?: string[];
-            state?: string[];
+            exprs?: string[];
             unrestricted: boolean;
         };
         MyPermissionsReply: {
@@ -3601,7 +3598,7 @@ export interface components {
             token_ttl?: string;
         };
         RoleCreateRequest: {
-            /** @description role scope selector of form key=v1,v2,… (service/coven/incarnation/host); omitted/null → role without scope */
+            /** @description role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted/null → role without scope */
             default_scope?: string;
             /** @description human-readable role description for UI/audit */
             description?: string;
@@ -3615,13 +3612,14 @@ export interface components {
             items: components["schemas"]["RoleView"][] | null;
         };
         RolePermissionsUpdateRequest: {
-            /** @description scope selector: omitted → scope untouched; present (incl. null) → replaces (null removes scope) */
+            /** @description scope: boolean predicate over coven/service/incarnation/host/trait; omitted → scope untouched; present (incl. null) → replaces (null removes scope) */
             default_scope?: string | null;
             /** @description complete new set of permission strings (replace) */
             permissions: string[] | null;
         };
         RoleView: {
             builtin: boolean;
+            /** @description role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted → role without scope */
             default_scope?: string;
             description?: string;
             name: string;

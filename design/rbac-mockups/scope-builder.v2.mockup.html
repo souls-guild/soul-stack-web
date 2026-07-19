@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — Scope Builder v2 (approved)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root{
+    --bg:#f6f6f5; --surface:#ffffff; --surface-2:#fafaf9; --surface-3:#f4f4f2;
+    --border:#eae8e4; --border-2:#dedbd5; --ring:rgba(13,148,136,.35);
+    --text:#1c1917; --muted:#6b6560; --faint:#a29d97;
+    --accent:#0d9488; --accent-ink:#0b7d72; --accent-soft:#e6f5f3;
+    --and:#0d9488; --or:#f59e0b;
+    --danger:#dc2626;
+    --coven:#7c3aed; --service:#0284c7; --incarnation:#0d9488; --host:#d97706; --trait:#db2777;
+    --shadow:0 1px 2px rgba(28,25,23,.04), 0 4px 16px -6px rgba(28,25,23,.10);
+    --shadow-sm:0 1px 2px rgba(28,25,23,.06);
+    --r:9px; --r-lg:14px; --r-pill:100px;
+    --sans:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  [data-theme="dark"]{
+    --bg:#0c0c0d; --surface:#161617; --surface-2:#1b1b1d; --surface-3:#212123;
+    --border:#2a2a2d; --border-2:#37373b; --ring:rgba(20,184,166,.4);
+    --text:#f4f4f3; --muted:#a8a29e; --faint:#6b6660;
+    --accent:#14b8a6; --accent-ink:#5eead4; --accent-soft:#0f2b28;
+    --and:#14b8a6; --or:#fbbf24;
+    --danger:#f87171;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#2dd4bf; --host:#fbbf24; --trait:#f472b6;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.5);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .top{height:52px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .crumbs{font-size:12.5px;color:var(--faint)} .crumbs b{color:var(--muted);font-weight:600}
+  .tbtn{border:1px solid var(--border-2);background:var(--surface-2);color:var(--muted);
+    border-radius:var(--r);padding:6px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+  .wrap{max-width:880px;margin:0 auto;padding:26px 22px 80px}
+  h1{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0 0 3px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--border)}
+  .card-h .lab{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .card-h .perm{font-family:var(--mono);font-size:13px;font-weight:500;background:var(--surface-3);
+    border:1px solid var(--border);border-radius:var(--r-pill);padding:4px 12px}
+
+  .modes{display:inline-flex;gap:3px;margin:14px 18px 0;padding:3px;background:var(--surface-3);
+    border:1px solid var(--border);border-radius:var(--r-pill)}
+  .modes button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;
+    font-weight:500;padding:6px 15px;border-radius:var(--r-pill);cursor:pointer}
+  .modes button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+
+  .builder{padding:16px 18px 4px}
+
+  /* group: joiner-colored left rail (teal=ALL/AND, amber=ANY/OR) */
+  .group{position:relative;border-radius:var(--r);padding:14px 14px 14px 16px;
+    background:var(--surface-2);border:1px solid var(--border)}
+  .group::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;
+    background:var(--and)}
+  .group[data-join="or"]::before{background:var(--or)}
+  .group.nested{background:var(--surface-3);margin:2px 0}
+  .g-head{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .seg{display:inline-flex;background:var(--surface-3);border:1px solid var(--border);
+    border-radius:var(--r-pill);padding:2px;font-size:11.5px;font-weight:600}
+  .seg button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;
+    padding:4px 12px;border-radius:var(--r-pill);cursor:pointer;letter-spacing:.02em}
+  .seg[data-j="and"] button.and{background:var(--and);color:#fff}
+  .seg[data-j="or"]  button.or {background:var(--or);color:#2b1a00}
+  [data-theme="dark"] .seg[data-j="and"] button.and{color:#04211d}
+  .g-head .of{font-size:12.5px;color:var(--muted)}
+  .g-rm{margin-left:auto;border:0;background:transparent;color:var(--faint);cursor:pointer;
+    width:26px;height:26px;border-radius:7px;font-size:15px}
+  .g-rm:hover{background:var(--surface);color:var(--danger)}
+
+  .rows{display:flex;flex-direction:column}
+  .join{display:flex;align-items:center;gap:8px;padding:3px 0 3px 2px}
+  .join .lbl{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;
+    color:var(--and);background:var(--accent-soft);border-radius:var(--r-pill);padding:2px 9px}
+  .group[data-join="or"] .join .lbl{color:var(--or);background:color-mix(in srgb,var(--or) 14%,transparent)}
+  .join .line{flex:1;height:1px;background:var(--border)}
+
+  /* condition row: type-accent left edge */
+  .cond{display:flex;align-items:center;gap:9px;padding:9px 11px 9px 12px;background:var(--surface);
+    border:1px solid var(--border);border-left:3px solid var(--c,#ccc);border-radius:var(--r);
+    box-shadow:var(--shadow-sm)}
+  .cond[data-t="coven"]{--c:var(--coven)} .cond[data-t="service"]{--c:var(--service)}
+  .cond[data-t="incarnation"]{--c:var(--incarnation)} .cond[data-t="host"]{--c:var(--host)}
+  .cond[data-t="trait"]{--c:var(--trait)}
+  .key{display:inline-flex;align-items:center;gap:7px;min-width:104px;font-family:var(--mono);
+    font-size:12.5px;font-weight:500;border:1px solid var(--border);border-radius:8px;
+    padding:6px 10px;background:var(--surface-2);cursor:pointer}
+  .key .dot{width:8px;height:8px;border-radius:50%;background:var(--c)}
+  .key .car{margin-left:auto;color:var(--faint);font-size:10px}
+  .op{font-size:12px;color:var(--muted);border:1px solid var(--border);background:var(--surface-2);
+    border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+  .val{flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:170px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;border-radius:var(--r-pill);
+    padding:5px 11px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);cursor:pointer}
+  .chip .cd{width:7px;height:7px;border-radius:50%}
+  .chip.on{color:var(--text);font-weight:500}
+  .chip.on[data-k=coven]{border-color:color-mix(in srgb,var(--coven) 55%,var(--border));
+    background:color-mix(in srgb,var(--coven) 13%,transparent)}
+  .chip.on .cd{background:var(--coven)}
+  .txt{flex:1;min-width:120px;font-family:var(--mono);font-size:12.5px;border:1px solid var(--border);
+    border-radius:8px;padding:6px 10px;background:var(--surface-2);color:var(--text)}
+  .txt:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+  .hint{font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .c-rm{border:0;background:transparent;color:var(--faint);cursor:pointer;width:24px;height:24px;
+    border-radius:6px;font-size:13px}
+  .c-rm:hover{background:var(--surface-3);color:var(--danger)}
+
+  .adds{display:flex;gap:8px;margin-top:12px}
+  .add{border:1px dashed var(--border-2);background:transparent;color:var(--muted);font:inherit;
+    font-size:12px;font-weight:500;border-radius:8px;padding:7px 13px;cursor:pointer}
+  .add.pri{color:var(--accent-ink);border-color:color-mix(in srgb,var(--accent) 45%,var(--border));
+    background:var(--accent-soft)}
+  .add:hover{border-style:solid}
+
+  .prev{margin:18px 0 4px;border:1px solid var(--border-2);border-radius:var(--r);overflow:hidden;
+    background:var(--surface-3)}
+  .prev-h{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border)}
+  .prev-h .t{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .copy{margin-left:auto;border:1px solid var(--border);background:var(--surface);color:var(--muted);
+    font:inherit;font-size:11px;border-radius:7px;padding:4px 10px;cursor:pointer}
+  .code{font-family:var(--mono);font-size:12.5px;line-height:1.75;padding:13px 15px;color:var(--text);
+    white-space:pre-wrap}
+  .code .kc{color:var(--coven);font-weight:600}.code .ks{color:var(--service);font-weight:600}
+  .code .kh{color:var(--host);font-weight:600}.code .kt{color:var(--trait);font-weight:600}
+  .code .op{color:var(--accent-ink);font-weight:700}
+  .code .par{color:var(--faint)}
+
+  .note{margin-top:18px;font-size:12px;color:var(--muted);line-height:1.6;
+    border-left:2px solid var(--border-2);padding-left:13px}
+  .swatch{display:inline-flex;align-items:center;gap:5px;margin-right:10px;font-size:11.5px}
+  .swatch i{width:9px;height:9px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="crumbs">RBAC / role &nbsp;·&nbsp; <b>scope builder</b></div>
+    <button class="tbtn" onclick="var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Тема</button>
+  </div>
+  <div class="wrap">
+    <h1>Область действия права</h1>
+    <div class="sub">Булева сборка условий над пятью типами. Слева цветной рельс группы показывает
+      связку ALL / ANY, между строками — явная метка AND / OR.</div>
+
+    <div class="card">
+      <div class="card-h">
+        <span class="lab">Scope for</span>
+        <span class="perm">incarnation.view-secrets</span>
+      </div>
+      <div class="modes">
+        <button>Без ограничений</button>
+        <button class="on">По условиям</button>
+      </div>
+
+      <div class="builder">
+        <div class="group" data-join="and">
+          <div class="g-head">
+            <span class="of">Совпадает</span>
+            <span class="seg" data-j="and"><button class="and">ALL · AND</button><button class="or">ANY · OR</button></span>
+            <span class="of">условий:</span>
+          </div>
+          <div class="rows">
+
+            <div class="cond" data-t="coven">
+              <span class="key"><span class="dot"></span>coven<span class="car">▾</span></span>
+              <span class="op">любой из ▾</span>
+              <span class="val">
+                <span class="chip on" data-k="coven"><span class="cd"></span>payments</span>
+                <span class="chip on" data-k="coven"><span class="cd"></span>checkout</span>
+                <span class="chip" data-k="coven"><span class="cd"></span>ledger</span>
+                <span class="chip" data-k="coven"><span class="cd"></span>+ добавить</span>
+              </span>
+              <button class="c-rm" title="убрать">✕</button>
+            </div>
+
+            <div class="join"><span class="lbl">AND</span><span class="line"></span></div>
+
+            <div class="cond" data-t="host">
+              <span class="key"><span class="dot"></span>host<span class="car">▾</span></span>
+              <span class="op">совпадает ▾</span>
+              <span class="val">
+                <input class="txt" value="redis-*" />
+                <span class="hint">glob по SID/hostname</span>
+              </span>
+              <button class="c-rm" title="убрать">✕</button>
+            </div>
+
+            <div class="join"><span class="lbl">AND</span><span class="line"></span></div>
+
+            <div class="group nested" data-join="or">
+              <div class="g-head">
+                <span class="of">Совпадает</span>
+                <span class="seg" data-j="or"><button class="and">ALL · AND</button><button class="or">ANY · OR</button></span>
+                <span class="of">условий:</span>
+                <button class="g-rm" title="убрать группу">✕</button>
+              </div>
+              <div class="rows">
+                <div class="cond" data-t="trait">
+                  <span class="key"><span class="dot"></span>trait.owner<span class="car">▾</span></span>
+                  <span class="op">=</span>
+                  <span class="val"><input class="txt" style="max-width:150px" value="dba" /></span>
+                  <button class="c-rm" title="убрать">✕</button>
+                </div>
+                <div class="join"><span class="lbl">OR</span><span class="line"></span></div>
+                <div class="cond" data-t="trait">
+                  <span class="key"><span class="dot"></span>trait.owner<span class="car">▾</span></span>
+                  <span class="op">=</span>
+                  <span class="val"><input class="txt" style="max-width:150px" value="platform" /></span>
+                  <button class="c-rm" title="убрать">✕</button>
+                </div>
+              </div>
+              <div class="adds"><button class="add">+ Условие</button></div>
+            </div>
+
+          </div>
+          <div class="adds">
+            <button class="add pri">+ Условие</button>
+            <button class="add">+ Группа ( … )</button>
+          </div>
+        </div>
+
+        <div class="prev">
+          <div class="prev-h"><span class="t">Итоговое правило</span>
+            <button class="copy">Копировать</button></div>
+          <div class="code"><span class="kc">coven</span> <span class="op">in</span> <span class="par">(</span>payments, checkout<span class="par">)</span>
+<span class="op">AND</span> <span class="kh">host</span> <span class="op">matches</span> "redis-*"
+<span class="op">AND</span> <span class="par">(</span><span class="kt">trait.owner</span> = dba <span class="op">OR</span> <span class="kt">trait.owner</span> = platform<span class="par">)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <div style="margin-bottom:7px">
+        <span class="swatch"><i style="background:var(--coven)"></i>coven</span>
+        <span class="swatch"><i style="background:var(--service)"></i>service</span>
+        <span class="swatch"><i style="background:var(--incarnation)"></i>incarnation</span>
+        <span class="swatch"><i style="background:var(--host)"></i>host</span>
+        <span class="swatch"><i style="background:var(--trait)"></i>trait</span>
+      </div>
+      NIM-128 approved visual (v2). AND/OR rail per group, explicit AND/OR chips between rows,
+      type-accent left edge, tinted surfaces over borders, segmented controls, syntax-highlighted
+      preview panel with copy. Set the group's seg[data-j] and group[data-join] together to switch
+      the rail/label colour.
+    </div>
+  </div>
+</body>
+</html>

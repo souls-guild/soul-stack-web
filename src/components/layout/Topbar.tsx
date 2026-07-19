@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -19,6 +19,27 @@ export function Topbar() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const onSettings = location.pathname.startsWith('/settings');
+
+  // Remember the last NON-settings screen so exiting settings always returns
+  // there — robust to repeated gear clicks and switching settings sub-tabs
+  // (navigate(-1) would land on a previous /settings/* entry and appear stuck).
+  useEffect(() => {
+    if (!onSettings) {
+      sessionStorage.setItem('settings.returnTo', location.pathname + location.search);
+    }
+  }, [onSettings, location.pathname, location.search]);
+
+  // Gear is a toggle: on a settings screen → return to the remembered screen
+  // (default landing as a fallback); otherwise → open settings.
+  function toggleSettings() {
+    if (onSettings) {
+      navigate(sessionStorage.getItem('settings.returnTo') || '/overview');
+    } else {
+      navigate('/settings/appearance');
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -46,15 +67,17 @@ export function Topbar() {
         <span className={styles.sub}>Keeper UI</span>
       </div>
       <div className={styles.right}>
-        <Link
-          to="/settings/appearance"
+        <button
+          type="button"
+          onClick={toggleSettings}
           className={styles.settingsLink}
           title={t('common:settings')}
           aria-label={t('common:settings')}
+          aria-pressed={onSettings}
           data-testid="topbar-settings-link"
         >
           <Settings size={16} />
-        </Link>
+        </button>
         {identity ? (
           <div className={styles.menu} ref={menuRef}>
             <button

@@ -116,6 +116,10 @@
   border-radius: var(--radius);
   color: var(--text-muted);
   text-decoration: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 
 .settingsLink:hover {

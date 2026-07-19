@@ -18,45 +18,37 @@ export function normalizePermissionCatalog(
     .sort((a, b) => a.resource.localeCompare(b.resource));
 }
 
-// --- Scoped-permission string (backend contract) ---
-// Formats: "resource.action" | "resource.action on key=value" | "resource.action on key=v1,v2"
+// --- Scoped-permission string (backend contract, NIM-128) ---
+// Format: "resource.action" | "resource.action on <scope-expr>", where <scope-expr>
+// is the CANONICAL boolean scope string (see scopeExpr.ts) — e.g.
+// `incarnation.run on coven in (a, b) AND host matches "redis-*"`.
+// The scope is treated as an opaque whole here; scopeExpr.ts parses/serializes it.
 
 export interface ParsedPermission {
-  /** Base permission: "resource.action" */
+  /** Base permission: "resource.action" | "resource.*" | "*". */
   base: string;
-  /** Scope key (incarnation / service / coven / host) or undefined */
-  scopeKey?: string;
-  /** Scope values (one or more, comma-separated) */
-  scopeValues?: string[];
+  /** Canonical scope expression (everything after ` on `) or undefined. */
+  scope?: string;
 }
 
 /**
- * Parses a permission string into a structure.
- * Unknown format -> base = the original string, scope = undefined.
+ * Splits a permission string on the first ` on ` into base + scope expression.
+ * No ` on ` (or an empty scope) -> just the base.
  */
 export function parsePermission(perm: string): ParsedPermission {
   const onIdx = perm.indexOf(' on ');
   if (onIdx === -1) return { base: perm };
   const base = perm.slice(0, onIdx);
-  const scopePart = perm.slice(onIdx + 4); // after " on "
-  const eqIdx = scopePart.indexOf('=');
-  if (eqIdx === -1) return { base: perm }; // cannot parse -> return as-is
-  const scopeKey = scopePart.slice(0, eqIdx).trim();
-  const scopeValues = scopePart
-    .slice(eqIdx + 1)
-    .split(',')
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return { base, scopeKey, scopeValues: scopeValues.length > 0 ? scopeValues : undefined };
+  const scope = perm.slice(onIdx + 4).trim(); // after " on "
+  return scope ? { base, scope } : { base };
 }
 
 /**
- * Builds a permission string from the structure.
- * If scopeKey/scopeValues are empty — returns the bare base.
+ * Builds a permission string. An empty scope -> the bare base.
  */
 export function buildPermission(parsed: ParsedPermission): string {
-  if (!parsed.scopeKey || !parsed.scopeValues?.length) return parsed.base;
-  return `${parsed.base} on ${parsed.scopeKey}=${parsed.scopeValues.join(',')}`;
+  const scope = parsed.scope?.trim();
+  return scope ? `${parsed.base} on ${scope}` : parsed.base;
 }
 
 /** Extracts selector_keys for the given base permission from the catalog. */

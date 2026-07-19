@@ -1,12 +1,14 @@
-import { useId, useState, type CSSProperties } from 'react';
+import { memo, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { keeperApi, type PermissionResource } from '../../api/keeper';
+import type { PermissionResource } from '../../api/keeper';
 import {
   parsePermission,
   buildPermission,
   unionSelectorKeys,
 } from './permissions';
+import { ScopeBuilder } from './ScopeBuilder';
+import { pruneScope } from './scopeBuilderModel';
+import { parseScope, serializeScope, type ScopeNode } from './scopeExpr';
 
 interface Props {
   value: string[];
@@ -15,379 +17,350 @@ interface Props {
   ariaLabel?: string;
 }
 
-// State of the scope picker for a single action.
-interface ScopeState {
-  key: string;
-  value: string;
+// Per-base scope editor state: a parsed boolean tree (ScopeBuilder) or, when an
+// existing scope string doesn't parse, a raw-string textarea fallback (graceful
+// degradation — NIM-128).
+type ScopeSlot = { kind: 'tree'; node: ScopeNode | null } | { kind: 'raw'; text: string };
+
+function slotScopeString(slot: ScopeSlot | undefined): string {
+  if (!slot) return '';
+  if (slot.kind === 'raw') return slot.text.trim();
+  return serializeScope(pruneScope(slot.node));
 }
 
-// Per-key accent for the scope pickers (visual specialization by selector type).
-function scopeColor(key: string): string {
-  return `var(--scope-${key}, var(--accent))`;
-}
-
-// Autocomplete values by scope key (sourced from existing APIs).
-function useAutocompleteOptions(scopeKey: string): string[] {
-  const incQ = useQuery({
-    queryKey: ['rbac.scope-ac.incarnations'],
-    queryFn: () => keeperApi.incarnations.list({ limit: 200 }),
-    enabled: scopeKey === 'incarnation',
-    staleTime: 60_000,
-  });
-  const svcQ = useQuery({
-    queryKey: ['rbac.scope-ac.services'],
-    queryFn: () => keeperApi.services.list(),
-    enabled: scopeKey === 'service',
-    staleTime: 60_000,
-  });
-  const soulsQ = useQuery({
-    queryKey: ['rbac.scope-ac.souls'],
-    queryFn: () => keeperApi.souls.list({ limit: 200 }),
-    enabled: scopeKey === 'host',
-    staleTime: 60_000,
-  });
-  // coven — no direct endpoint; collect unique covens from /v1/souls.
-  const covenSoulsQ = useQuery({
-    queryKey: ['rbac.scope-ac.covens'],
-    queryFn: () => keeperApi.souls.list({ limit: 500 }),
-    enabled: scopeKey === 'coven',
-    staleTime: 60_000,
-  });
-
-  if (scopeKey === 'incarnation') {
-    return (incQ.data?.items ?? []).map((i) => i.name).filter(Boolean);
+// Reads an existing scoped permission into a slot; a scope that fails to parse
+// becomes a raw slot the user can still edit verbatim.
+function slotFromScope(scope: string | undefined): ScopeSlot | undefined {
+  if (!scope) return undefined;
+  try {
+    return { kind: 'tree', node: parseScope(scope) };
+  } catch {
+    return { kind: 'raw', text: scope };
   }
-  if (scopeKey === 'service') {
-    return (svcQ.data?.items ?? []).map((s) => s.name).filter(Boolean);
-  }
-  if (scopeKey === 'host') {
-    return (soulsQ.data?.items ?? []).map((s) => s.sid).filter(Boolean);
-  }
-  if (scopeKey === 'coven') {
-    const all = covenSoulsQ.data?.items ?? [];
-    const uniq = new Set<string>();
-    for (const s of all) {
-      for (const c of s.covens ?? []) uniq.add(c);
-    }
-    return Array.from(uniq).sort();
-  }
-  return [];
 }
 
-const inputStyle: CSSProperties = {
-  fontSize: 13,
-  padding: '5px 8px',
-  borderRadius: 'var(--radius)',
-  border: '1px solid var(--border)',
-  background: 'var(--surface)',
-  color: 'var(--text)',
-};
-
-// Clickable value chip (autocomplete option) — fills the scope value. Coloured by type.
-function valueChip(selected: boolean, color: string): CSSProperties {
-  return {
-    fontFamily: 'var(--font-mono)',
-    fontSize: 12,
-    padding: '3px 10px',
-    borderRadius: 'var(--radius-pill)',
-    border: `1px solid ${selected ? color : 'var(--border)'}`,
-    background: selected ? `color-mix(in srgb, ${color} 16%, transparent)` : 'var(--surface)',
-    color: selected ? 'var(--text)' : 'var(--text-muted)',
-    cursor: 'pointer',
-  };
+// Assemble the flat permission list from the current selection + scopes + preserved.
+// Module-level (pure) so the editor's mutation handlers can stay referentially stable.
+function buildValue(
+  bases: Set<string>,
+  scopes: Map<string, ScopeSlot>,
+  currentPreserved: string[],
+): string[] {
+  const result: string[] = [...currentPreserved];
+  for (const base of bases) {
+    const scope = slotScopeString(scopes.get(base));
+    result.push(buildPermission({ base, scope: scope || undefined }));
+  }
+  return result;
 }
 
-// Spacious, type-specialized scope picker. Rendered under a checked action (or the
-// wildcard) when selector_keys exist. Key = <select>; value = free-text input plus
-// clickable autocomplete chips coloured by the selector type.
-function ScopePicker({
-  selectorKeys,
-  scope,
-  onChange,
-}: {
-  selectorKeys: string[];
-  scope: ScopeState | null;
-  onChange: (next: ScopeState | null) => void;
-}) {
-  const { t } = useTranslation();
-  const currentKey = scope?.key ?? '';
-  const options = useAutocompleteOptions(currentKey);
-  const datalistId = useId();
-  const color = currentKey ? scopeColor(currentKey) : 'var(--accent)';
-
-  const handleKeyChange = (k: string) => {
-    if (!k) { onChange(null); return; }
-    onChange({ key: k, value: scope?.value ?? '' });
-  };
-  const handleValueChange = (v: string) => {
-    if (!currentKey) return;
-    onChange({ key: currentKey, value: v });
-  };
-
-  return (
-    <div
-      style={{
-        marginTop: 8,
-        marginLeft: 26,
-        padding: '12px 14px',
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--border)',
-        borderLeft: currentKey ? `3px solid ${color}` : '1px solid var(--border)',
-        background: 'var(--surface-2)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-          {t('admin:rbacScopeLabel')}
-        </span>
-        <select
-          value={currentKey}
-          onChange={(e) => handleKeyChange(e.target.value)}
-          aria-label={t('admin:rbacScopeKeyAria')}
-          style={{ ...inputStyle, cursor: 'pointer' }}
-        >
-          <option value="">{t('admin:rbacScopeNone')}</option>
-          {selectorKeys.map((k) => (
-            <option key={k} value={k}>
-              {t(`admin:rbacScopeKey_${k}`, { defaultValue: k })}
-            </option>
-          ))}
-        </select>
-        {currentKey ? (
-          <>
-            <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>=</span>
-            <input
-              type="text"
-              list={options.length > 0 ? datalistId : undefined}
-              value={scope?.value ?? ''}
-              onChange={(e) => handleValueChange(e.target.value)}
-              placeholder={t('admin:rbacScopeValuePlaceholder')}
-              aria-label={t('admin:rbacScopeValueAria', { key: currentKey })}
-              style={{ ...inputStyle, minWidth: 160, maxWidth: 260, flex: 1 }}
-            />
-          </>
-        ) : null}
-      </div>
-
-      {currentKey && options.length > 0 ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-          {options.slice(0, 16).map((o) => (
-            <button
-              key={o}
-              type="button"
-              onClick={() => handleValueChange(o)}
-              style={valueChip(o === scope?.value, color)}
-            >
-              {o}
-            </button>
-          ))}
-          <datalist id={datalistId}>
-            {options.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-        </div>
-      ) : null}
-
-      {currentKey && !options.length ? (
-        <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 8 }}>
-          {t('admin:rbacScopeFreeText')}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-// Scope badge for display next to a checked action and in the preserved-permissions list.
-function ScopeBadge({ scopeKey, scopeValues }: { scopeKey: string; scopeValues: string[] }) {
-  const { t } = useTranslation();
-  const color = scopeColor(scopeKey);
+// Small mono chip showing the current scope expression next to a checked action.
+function ScopeChip({ text }: { text: string }) {
   return (
     <span
-      title={`on ${scopeKey}=${scopeValues.join(',')}`}
+      title={text}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 3,
-        padding: '1px 6px',
-        background: `color-mix(in srgb, ${color} 14%, var(--surface))`,
-        border: `1px solid color-mix(in srgb, ${color} 34%, var(--border))`,
+        maxWidth: 320,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        padding: '1px 8px',
+        background: 'color-mix(in srgb, var(--accent) 12%, var(--surface))',
+        border: '1px solid color-mix(in srgb, var(--accent) 32%, var(--border))',
         borderRadius: 'var(--radius-pill)',
         fontSize: 11,
         fontFamily: 'var(--font-mono)',
-        whiteSpace: 'nowrap',
       }}
     >
-      {t(`admin:rbacScopeKey_${scopeKey}`, { defaultValue: scopeKey })}={scopeValues.join(',')}
+      {text}
     </span>
   );
 }
 
-// Bulk-scope bar: sets a shared scope on all checked permissions of the resource at once
-// (NIM-79). Appears when ≥2 actions are checked and the resource has selector_keys.
-function BulkScopeBar({
-  selectorKeys,
-  draft,
-  onDraftChange,
-  onApply,
-  onClear,
+// Raw-string fallback for a scope that couldn't be parsed into the builder.
+function RawScopeFallback({
+  text,
+  onChange,
+  onReset,
+  ariaLabel,
 }: {
-  selectorKeys: string[];
-  draft: { key: string; value: string };
-  onDraftChange: (next: { key: string; value: string }) => void;
-  onApply: (key: string, value: string) => void;
-  onClear: () => void;
+  text: string;
+  onChange: (text: string) => void;
+  onReset: () => void;
+  ariaLabel: string;
 }) {
   const { t } = useTranslation();
-  const { key, value } = draft;
-  const options = useAutocompleteOptions(key);
-  const datalistId = useId();
-  const color = key ? scopeColor(key) : 'var(--accent)';
-
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        marginBottom: 10,
-        padding: '10px 12px',
+        marginTop: 8,
+        padding: '12px 14px',
         borderRadius: 'var(--radius)',
-        background: 'var(--surface-2)',
-        border: '1px dashed var(--border)',
+        border: '1px solid color-mix(in srgb, var(--warning) 30%, var(--border))',
+        background: 'color-mix(in srgb, var(--warning) 7%, var(--surface))',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-          {t('admin:rbacBulkScopeLabel')}
-        </span>
-        <select
-          value={key}
-          onChange={(e) => onDraftChange({ key: e.target.value, value })}
-          aria-label={t('admin:rbacBulkScopeKeyAria')}
-          style={{ ...inputStyle, cursor: 'pointer' }}
-        >
-          <option value="">{t('admin:rbacScopeNone')}</option>
-          {selectorKeys.map((k) => (
-            <option key={k} value={k}>
-              {t(`admin:rbacScopeKey_${k}`, { defaultValue: k })}
-            </option>
-          ))}
-        </select>
-        {key ? (
-          <>
-            <span style={{ fontSize: 13, color: 'var(--text-faint)' }}>=</span>
-            <input
-              type="text"
-              list={options.length > 0 ? datalistId : undefined}
-              value={value}
-              onChange={(e) => onDraftChange({ key, value: e.target.value })}
-              placeholder={t('admin:rbacScopeValuePlaceholder')}
-              aria-label={t('admin:rbacBulkScopeValueAria', { key })}
-              style={{ ...inputStyle, minWidth: 160, maxWidth: 260, flex: 1 }}
-            />
-          </>
-        ) : null}
-        <span style={{ flex: 1 }} />
-        <button
-          type="button"
-          onClick={() => { if (key) onApply(key, value); }}
-          disabled={!key}
-          style={{
-            fontSize: 12,
-            padding: '4px 12px',
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--accent)',
-            background: 'transparent',
-            color: key ? 'var(--accent)' : 'var(--text-faint)',
-            cursor: key ? 'pointer' : 'not-allowed',
-          }}
-        >
-          {t('admin:rbacBulkApply')}
-        </button>
-        <button
-          type="button"
-          onClick={() => { onDraftChange({ key: '', value: '' }); onClear(); }}
-          style={{
-            fontSize: 12,
-            padding: '4px 12px',
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)',
-            background: 'transparent',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-          }}
-        >
-          {t('admin:rbacBulkClear')}
-        </button>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+        {t('admin:rbacScopeRawParseFail')}
       </div>
-      {key && options.length > 0 ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {options.slice(0, 16).map((o) => (
-            <button
-              key={o}
-              type="button"
-              onClick={() => onDraftChange({ key, value: o })}
-              style={valueChip(o === value, color)}
-            >
-              {o}
-            </button>
-          ))}
-          <datalist id={datalistId}>
-            {options.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-        </div>
-      ) : null}
+      <textarea
+        rows={2}
+        value={text}
+        spellCheck={false}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: '100%',
+          padding: 8,
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          background: 'var(--surface)',
+          color: 'var(--text)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12.5,
+          resize: 'vertical',
+        }}
+      />
+      <button
+        type="button"
+        onClick={onReset}
+        style={{
+          marginTop: 8,
+          fontSize: 12,
+          padding: '4px 10px',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          background: 'var(--surface)',
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+        }}
+      >
+        {t('admin:rbacScopeResetBuilder')}
+      </button>
     </div>
   );
 }
 
+// --- left rail (searchable resource list) ---
+
+// Per-resource selection summary the rail needs to draw a row. Recomputed by the
+// parent only when the selection or filter actually changes (memoized), so a scope
+// keystroke — which changes the permission strings but not which bases are selected
+// — leaves this array referentially stable and the memoized rail skips re-render.
+interface ResourceMeta {
+  res: PermissionResource;
+  wildcardOn: boolean;
+  n: number;
+  total: number;
+  has: boolean;
+  isActive: boolean;
+}
+
+// Memoized so editing a scope (which re-renders the parent every keystroke) does NOT
+// re-render the 100+ resource catalog. Props are all primitives / referentially-stable
+// (items via useMemo, handlers via useCallback) → React.memo bails on scope edits.
+const ResourceRail = memo(function ResourceRail({
+  search,
+  onSearch,
+  items,
+  allResourcesWild,
+  onSelectAllResources,
+  onActivate,
+  onToggleWildcard,
+}: {
+  search: string;
+  onSearch: (s: string) => void;
+  items: readonly ResourceMeta[];
+  allResourcesWild: boolean;
+  onSelectAllResources: (on: boolean) => void;
+  onActivate: (resource: string) => void;
+  onToggleWildcard: (res: PermissionResource, on: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      style={{
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        background: 'var(--surface)',
+      }}
+    >
+      <div style={{ padding: 10, borderBottom: '1px solid var(--border)' }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder={t('admin:rbacSearchResources')}
+          aria-label={t('admin:rbacSearchResources')}
+          style={{
+            width: '100%',
+            fontSize: 13,
+            padding: '5px 8px',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            color: 'var(--text)',
+          }}
+        />
+      </div>
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface-2)',
+          fontSize: 12.5,
+          color: 'var(--text-muted)',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={allResourcesWild}
+          onChange={(e) => onSelectAllResources(e.target.checked)}
+          aria-label={t('admin:rbacSelectAllResources')}
+          style={{ accentColor: 'var(--accent)' }}
+        />
+        {t('admin:rbacSelectAllResources')}
+      </label>
+
+      <div style={{ maxHeight: 460, overflow: 'auto' }}>
+        {items.length === 0 ? (
+          <div style={{ padding: 14, fontSize: 12.5, color: 'var(--text-faint)' }}>
+            {t('admin:rbacNoResourceMatch')}
+          </div>
+        ) : (
+          items.map(({ res, wildcardOn, n, total, has, isActive }) => (
+            <div
+              key={res.resource}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '9px 12px',
+                borderBottom: '1px solid var(--border)',
+                background: isActive ? 'color-mix(in srgb, var(--accent) 9%, transparent)' : 'transparent',
+                boxShadow: isActive ? 'inset 3px 0 0 var(--accent)' : 'none',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  flexShrink: 0,
+                  background: has ? 'var(--accent)' : 'var(--border-strong)',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => onActivate(res.resource)}
+                aria-label={t('admin:rbacSelectResourceAria', { resource: res.resource })}
+                aria-pressed={isActive}
+                style={{
+                  flex: 1,
+                  textAlign: 'left',
+                  border: 0,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                  color: 'var(--text)',
+                  padding: 0,
+                }}
+              >
+                {res.resource}
+              </button>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'var(--font-mono)',
+                  color: has ? 'var(--accent)' : 'var(--text-faint)',
+                }}
+              >
+                {wildcardOn ? t('admin:rbacCountAll') : `${n}/${total}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => onToggleWildcard(res, !wildcardOn)}
+                aria-label={t('admin:rbacToggleAllAria', { resource: res.resource })}
+                aria-pressed={wildcardOn}
+                style={{
+                  fontSize: 10.5,
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: `1px solid ${wildcardOn ? 'var(--accent)' : 'var(--border)'}`,
+                  background: wildcardOn ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--surface)',
+                  color: wildcardOn ? 'var(--accent)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                {t('admin:rbacAllPill')}
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+});
+
 // Grouped permission-picker over the real catalog GET /v1/permissions (ADR-042), laid out
 // as a master-detail: a searchable resource rail on the left, the selected resource's
-// actions on the right with a spacious, type-specialized scope editor. The first control
-// of a resource is the action-wildcard `resource.*` ("all actions", incl. future ones) —
-// when it is on, the individual actions are HIDDEN (the wildcard covers everything now and
-// in future updates). A full permission = `resource.action` | `resource.*` | `… on key=value`.
+// actions on the right, each with a boolean scope condition-builder (NIM-128). The first
+// control of a resource is the action-wildcard `resource.*` ("all actions", incl. future
+// ones) — when on, individual actions are HIDDEN. A full permission =
+// `resource.action` | `resource.*` | `… on <scope-expr>`.
 // Permissions outside the catalog (full `*`, legacy) — read-only chips.
+//
+// Perf (NIM-128): the left rail is a memoized child fed referentially-stable props, so
+// typing in a scope builder (which re-renders this component on every keystroke) does not
+// re-render the whole 100+ resource catalog. Mutation handlers read the latest state via
+// a ref, so they stay stable across renders too.
 export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props) {
   const { t } = useTranslation();
   const groupId = useId();
 
-  // scopeStates: Map base permission → current scope picker state.
-  const [scopeStates, setScopeStates] = useState<Map<string, ScopeState | null>>(() => {
-    const m = new Map<string, ScopeState | null>();
+  // scopeStates: Map base permission → current scope slot.
+  const [scopeStates, setScopeStates] = useState<Map<string, ScopeSlot>>(() => {
+    const m = new Map<string, ScopeSlot>();
     for (const perm of value) {
-      const parsed = parsePermission(perm);
-      if (parsed.scopeKey && parsed.scopeValues) {
-        m.set(parsed.base, { key: parsed.scopeKey, value: parsed.scopeValues.join(',') });
-      }
+      const { base, scope } = parsePermission(perm);
+      const slot = slotFromScope(scope);
+      if (slot) m.set(base, slot);
     }
     return m;
   });
 
-  // Drafts of the bulk-scope pickers, keyed by resource — survive the bar unmounting.
-  const [bulkDrafts, setBulkDrafts] = useState<Map<string, { key: string; value: string }>>(
-    new Map(),
-  );
-
   const [search, setSearch] = useState('');
   const [activeResource, setActiveResource] = useState<string | null>(null);
 
-  const catalogBases = new Set<string>();
-  const catalogResources = new Set<string>();
-  for (const res of catalog) {
-    catalogResources.add(res.resource);
-    for (const act of (res.actions ?? [])) catalogBases.add(`${res.resource}.${act.action}`);
-  }
+  const { catalogBases, catalogResources } = useMemo(() => {
+    const bases = new Set<string>();
+    const resources = new Set<string>();
+    for (const res of catalog) {
+      resources.add(res.resource);
+      for (const act of (res.actions ?? [])) bases.add(`${res.resource}.${act.action}`);
+    }
+    return { catalogBases: bases, catalogResources: resources };
+  }, [catalog]);
 
   const isResourceWildcard = (base: string) =>
     base.endsWith('.*') && catalogResources.has(base.slice(0, -2));
-  const isRepresentable = (base: string) => catalogBases.has(base) || isResourceWildcard(base);
+  // Bare `*` = full access. Cluster-admin when unscoped, scoped super-admin when
+  // paired with a scope (`* on <expr>`) — NIM-128 amendment. Adopted (editable via the
+  // Full-access toggle), never a read-only preserved chip.
+  const isRepresentable = (base: string) =>
+    base === '*' || catalogBases.has(base) || isResourceWildcard(base);
 
   // A base with a single occurrence is edited via checkbox+scope; the same base with two
-  // different scopes doesn't fit a single ScopeState — kept verbatim in preserved.
+  // different scopes doesn't fit one slot — kept verbatim in preserved.
   const baseCounts = new Map<string, number>();
   for (const perm of value) {
     const { base } = parsePermission(perm);
@@ -404,40 +377,37 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
   // preserved: everything the editor didn't adopt — round-tripped verbatim.
   const preserved = value.filter((p) => !isAdopted(parsePermission(p).base));
 
-  function buildValue(
-    bases: Set<string>,
-    scopes: Map<string, ScopeState | null>,
-    currentPreserved: string[],
-  ): string[] {
-    const result: string[] = [...currentPreserved];
-    for (const base of bases) {
-      const scope = scopes.get(base);
-      if (scope?.key && scope.value.trim()) {
-        result.push(buildPermission({ base, scopeKey: scope.key, scopeValues: [scope.value.trim()] }));
-      } else {
-        result.push(base);
-      }
-    }
-    return result;
-  }
+  // Latest state for the (stable) mutation handlers below. Keeping the handlers
+  // referentially stable is what lets the memoized rail / builders bail on scope edits.
+  const ctxRef = useRef({ selected, scopeStates, preserved, onChange });
+  ctxRef.current = { selected, scopeStates, preserved, onChange };
 
-  function toggle(base: string, on: boolean) {
+  const toggle = useCallback((base: string, on: boolean) => {
+    const { selected, scopeStates, preserved, onChange } = ctxRef.current;
     const next = new Set(selected);
-    if (on) next.add(base);
-    else { next.delete(base); setScopeStates((prev) => { const m = new Map(prev); m.delete(base); return m; }); }
-    onChange(buildValue(next, scopeStates, preserved));
-  }
+    const nextScopes = new Map(scopeStates);
+    if (on) {
+      next.add(base);
+    } else {
+      next.delete(base);
+      nextScopes.delete(base);
+    }
+    setScopeStates(nextScopes);
+    onChange(buildValue(next, nextScopes, preserved));
+  }, []);
 
-  function updateScope(base: string, scope: ScopeState | null) {
+  const updateScope = useCallback((base: string, slot: ScopeSlot) => {
+    const { selected, scopeStates, preserved, onChange } = ctxRef.current;
     const next = new Map(scopeStates);
-    next.set(base, scope);
+    next.set(base, slot);
     setScopeStates(next);
     onChange(buildValue(selected, next, preserved));
-  }
+  }, []);
 
   // Wildcard `resource.*` — "all actions". Enabling removes the resource's individual
   // actions from the set (covered) → the result is `["resource.*"]`, not an enumeration.
-  function toggleWildcard(res: PermissionResource, on: boolean) {
+  const toggleWildcard = useCallback((res: PermissionResource, on: boolean) => {
+    const { selected, scopeStates, preserved, onChange } = ctxRef.current;
     const wc = `${res.resource}.*`;
     const next = new Set(selected);
     const nextScopes = new Map(scopeStates);
@@ -454,11 +424,11 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     }
     setScopeStates(nextScopes);
     onChange(buildValue(next, nextScopes, preserved));
-  }
+  }, []);
 
-  // Select-all-actions of a resource without the wildcard — enumerate current actions
-  // (does NOT cover future ones; that's what the wildcard is for).
-  function selectAllActions(res: PermissionResource) {
+  // Select-all-actions of a resource without the wildcard — enumerate current actions.
+  const selectAllActions = useCallback((res: PermissionResource) => {
+    const { selected, scopeStates, preserved, onChange } = ctxRef.current;
     const wc = `${res.resource}.*`;
     const next = new Set(selected);
     const nextScopes = new Map(scopeStates);
@@ -467,9 +437,10 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     for (const act of (res.actions ?? [])) next.add(`${res.resource}.${act.action}`);
     setScopeStates(nextScopes);
     onChange(buildValue(next, nextScopes, preserved));
-  }
+  }, []);
 
-  function clearActions(res: PermissionResource) {
+  const clearActions = useCallback((res: PermissionResource) => {
+    const { selected, scopeStates, preserved, onChange } = ctxRef.current;
     const next = new Set(selected);
     const nextScopes = new Map(scopeStates);
     next.delete(`${res.resource}.*`);
@@ -481,10 +452,11 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     }
     setScopeStates(nextScopes);
     onChange(buildValue(next, nextScopes, preserved));
-  }
+  }, []);
 
   // Grant every resource as a wildcard (all current + future actions of the whole catalog).
-  function selectAllResources(on: boolean) {
+  const selectAllResources = useCallback((on: boolean) => {
+    const { selected, scopeStates, preserved, onChange } = ctxRef.current;
     const next = new Set(selected);
     const nextScopes = new Map(scopeStates);
     for (const res of catalog) {
@@ -503,35 +475,54 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
     }
     setScopeStates(nextScopes);
     onChange(buildValue(next, nextScopes, preserved));
-  }
+  }, [catalog]);
 
-  function applyBulkScope(res: PermissionResource, key: string, value: string) {
-    const next = new Map(scopeStates);
-    const v = value.trim();
-    for (const act of (res.actions ?? [])) {
-      const b = `${res.resource}.${act.action}`;
-      if (!selected.has(b)) continue;
-      if (!(act.selector_keys ?? []).includes(key)) continue;
-      next.set(b, v ? { key, value: v } : null);
+  // Stable per-base onChange for ScopeBuilder — cached so an unrelated keystroke doesn't
+  // hand every mounted builder a fresh closure (which would defeat their React.memo).
+  const scopeOnChangeCache = useRef(new Map<string, (node: ScopeNode | null) => void>());
+  const scopeOnChange = useCallback((base: string) => {
+    const cache = scopeOnChangeCache.current;
+    let fn = cache.get(base);
+    if (!fn) {
+      fn = (node) => updateScope(base, { kind: 'tree', node });
+      cache.set(base, fn);
     }
-    setScopeStates(next);
-    onChange(buildValue(selected, next, preserved));
-  }
+    return fn;
+  }, [updateScope]);
 
-  function clearBulkScope(res: PermissionResource) {
-    const next = new Map(scopeStates);
-    for (const act of (res.actions ?? [])) next.delete(`${res.resource}.${act.action}`);
-    setScopeStates(next);
-    onChange(buildValue(selected, next, preserved));
-  }
+  // Scope editor under a checked action / wildcard: builder, or raw fallback on a
+  // scope string that didn't parse.
+  const scopeEditor = (base: string) => {
+    const slot = scopeStates.get(base);
+    if (slot?.kind === 'raw') {
+      return (
+        <RawScopeFallback
+          text={slot.text}
+          ariaLabel={t('admin:rbacScopeRawLabel', { base })}
+          onChange={(text) => updateScope(base, { kind: 'raw', text })}
+          onReset={() => updateScope(base, { kind: 'tree', node: null })}
+        />
+      );
+    }
+    return (
+      <ScopeBuilder
+        value={slot?.kind === 'tree' ? slot.node : null}
+        onChange={scopeOnChange(base)}
+        ariaLabel={t('admin:rbacScopeBuilderForAria', { base })}
+        base={base}
+      />
+    );
+  };
 
   // --- Derived view state (search + active resource) ---
   const q = search.trim().toLowerCase();
-  const matches = (res: PermissionResource) =>
-    !q
-    || res.resource.toLowerCase().includes(q)
-    || (res.actions ?? []).some((a) => `${res.resource}.${a.action}`.toLowerCase().includes(q));
-  const filtered = catalog.filter(matches);
+  const filtered = useMemo(() => {
+    const matches = (res: PermissionResource) =>
+      !q
+      || res.resource.toLowerCase().includes(q)
+      || (res.actions ?? []).some((a) => `${res.resource}.${a.action}`.toLowerCase().includes(q));
+    return catalog.filter(matches);
+  }, [catalog, q]);
 
   const effectiveActive =
     activeResource && filtered.some((r) => r.resource === activeResource)
@@ -539,14 +530,99 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
       : (filtered[0]?.resource ?? null);
   const activeRes = catalog.find((r) => r.resource === effectiveActive) ?? null;
 
-  const resourceCount = (res: PermissionResource) => {
-    const wildcardOn = selected.has(`${res.resource}.*`);
-    const n = (res.actions ?? []).filter((a) => selected.has(`${res.resource}.${a.action}`)).length;
-    return { wildcardOn, n, total: (res.actions ?? []).length, has: wildcardOn || n > 0 };
-  };
+  // Signature of the current selection — cheap to compute, drives the rail memo. Changing
+  // a scope doesn't change which bases are selected, so this stays constant across a
+  // scope keystroke and `resourceMeta` (hence the rail) stays referentially stable.
+  const selectedSig = Array.from(selected).sort().join('');
+
+  const resourceMeta = useMemo<ResourceMeta[]>(
+    () =>
+      filtered.map((res) => {
+        const wildcardOn = selected.has(`${res.resource}.*`);
+        const n = (res.actions ?? []).filter((a) => selected.has(`${res.resource}.${a.action}`)).length;
+        const total = (res.actions ?? []).length;
+        return { res, wildcardOn, n, total, has: wildcardOn || n > 0, isActive: res.resource === effectiveActive };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered, selectedSig, effectiveActive],
+  );
 
   const allResourcesWild =
     catalog.length > 0 && catalog.every((r) => selected.has(`${r.resource}.*`));
+
+  // Full access `*` — cluster-admin (unscoped) or scoped super-admin (`* on <expr>`).
+  const fullAccessOn = selected.has('*');
+
+  // Distinct from "Select all resources" (N× resource.*): a single `*` grant that also
+  // covers future resources. Its scope builder decides cluster-admin vs scoped admin.
+  const fullAccessNode = (
+    <div
+      data-testid="perm-full-access"
+      style={{
+        marginBottom: 14,
+        border: `1px solid ${fullAccessOn ? 'color-mix(in srgb, var(--accent) 42%, var(--border))' : 'var(--border)'}`,
+        borderRadius: 'var(--radius-lg)',
+        background: fullAccessOn
+          ? 'color-mix(in srgb, var(--accent) 7%, var(--surface))'
+          : 'var(--surface)',
+        overflow: 'hidden',
+      }}
+    >
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          padding: '12px 16px',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          data-testid="perm-full-access-toggle"
+          checked={fullAccessOn}
+          onChange={(e) => toggle('*', e.target.checked)}
+          aria-label={`${t('admin:rbacFullAccessLabel')} (*)`}
+          style={{ accentColor: 'var(--accent)', marginTop: 2, flexShrink: 0 }}
+        />
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 13,
+                padding: '1px 7px',
+                borderRadius: 'var(--radius-pill)',
+                background: 'color-mix(in srgb, var(--accent) 14%, var(--surface-2))',
+                border: '1px solid color-mix(in srgb, var(--accent) 30%, var(--border))',
+              }}
+            >
+              *
+            </span>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>
+              {t('admin:rbacFullAccessLabel')}
+            </span>
+            <span
+              style={{
+                fontSize: 10.5,
+                color: 'var(--text-faint)',
+                textTransform: 'uppercase',
+                letterSpacing: '.06em',
+              }}
+            >
+              {t('admin:rbacFullAccessSub')}
+            </span>
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {t('admin:rbacFullAccessHint')}
+          </span>
+        </span>
+      </label>
+      {fullAccessOn ? (
+        <div style={{ padding: '0 16px 14px' }}>{scopeEditor('*')}</div>
+      ) : null}
+    </div>
+  );
 
   const preservedNode = preserved.length > 0 ? (
     <div style={{ marginTop: 14 }}>
@@ -572,9 +648,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
               }}
             >
               {parsed.base}
-              {parsed.scopeKey && parsed.scopeValues ? (
-                <ScopeBadge scopeKey={parsed.scopeKey} scopeValues={parsed.scopeValues} />
-              ) : null}
+              {parsed.scope ? <ScopeChip text={parsed.scope} /> : null}
             </span>
           );
         })}
@@ -585,6 +659,7 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
   if (catalog.length === 0) {
     return (
       <div aria-label={ariaLabel}>
+        {fullAccessNode}
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           {t('admin:rbacPermCatalogEmpty')}
         </div>
@@ -595,139 +670,35 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
 
   return (
     <div aria-label={ariaLabel}>
+      {fullAccessNode}
+      {fullAccessOn ? (
+        <div
+          data-testid="perm-catalog-dimmed-note"
+          style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--text-faint)', marginBottom: 8 }}
+        >
+          {t('admin:rbacFullAccessCatalogDimmed')}
+        </div>
+      ) : null}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(210px, 250px) 1fr',
           gap: 14,
           alignItems: 'start',
+          opacity: fullAccessOn ? 0.5 : 1,
+          transition: 'opacity .15s ease',
         }}
       >
-        {/* LEFT RAIL — search + resource list */}
-        <div
-          style={{
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            background: 'var(--surface)',
-          }}
-        >
-          <div style={{ padding: 10, borderBottom: '1px solid var(--border)' }}>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('admin:rbacSearchResources')}
-              aria-label={t('admin:rbacSearchResources')}
-              style={{ ...inputStyle, width: '100%' }}
-            />
-          </div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 12px',
-              borderBottom: '1px solid var(--border)',
-              background: 'var(--surface-2)',
-              fontSize: 12.5,
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={allResourcesWild}
-              onChange={(e) => selectAllResources(e.target.checked)}
-              aria-label={t('admin:rbacSelectAllResources')}
-              style={{ accentColor: 'var(--accent)' }}
-            />
-            {t('admin:rbacSelectAllResources')}
-          </label>
-
-          <div style={{ maxHeight: 460, overflow: 'auto' }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: 14, fontSize: 12.5, color: 'var(--text-faint)' }}>
-                {t('admin:rbacNoResourceMatch')}
-              </div>
-            ) : (
-              filtered.map((res) => {
-                const { wildcardOn, n, total, has } = resourceCount(res);
-                const isActive = res.resource === effectiveActive;
-                return (
-                  <div
-                    key={res.resource}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '9px 12px',
-                      borderBottom: '1px solid var(--border)',
-                      background: isActive ? 'color-mix(in srgb, var(--accent) 9%, transparent)' : 'transparent',
-                      boxShadow: isActive ? 'inset 3px 0 0 var(--accent)' : 'none',
-                    }}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        flexShrink: 0,
-                        background: has ? 'var(--accent)' : 'var(--border-strong)',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setActiveResource(res.resource)}
-                      aria-label={t('admin:rbacSelectResourceAria', { resource: res.resource })}
-                      aria-pressed={isActive}
-                      style={{
-                        flex: 1,
-                        textAlign: 'left',
-                        border: 0,
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 13,
-                        color: 'var(--text)',
-                        padding: 0,
-                      }}
-                    >
-                      {res.resource}
-                    </button>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontFamily: 'var(--font-mono)',
-                        color: has ? 'var(--accent)' : 'var(--text-faint)',
-                      }}
-                    >
-                      {wildcardOn ? t('admin:rbacCountAll') : `${n}/${total}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => toggleWildcard(res, !wildcardOn)}
-                      aria-label={t('admin:rbacToggleAllAria', { resource: res.resource })}
-                      aria-pressed={wildcardOn}
-                      style={{
-                        fontSize: 10.5,
-                        padding: '2px 8px',
-                        borderRadius: 'var(--radius-pill)',
-                        border: `1px solid ${wildcardOn ? 'var(--accent)' : 'var(--border)'}`,
-                        background: wildcardOn ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--surface)',
-                        color: wildcardOn ? 'var(--accent)' : 'var(--text-muted)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {t('admin:rbacAllPill')}
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+        {/* LEFT RAIL — memoized: scope keystrokes don't re-render the resource catalog */}
+        <ResourceRail
+          search={search}
+          onSearch={setSearch}
+          items={resourceMeta}
+          allResourcesWild={allResourcesWild}
+          onSelectAllResources={selectAllResources}
+          onActivate={setActiveResource}
+          onToggleWildcard={toggleWildcard}
+        />
 
         {/* RIGHT PANEL — actions of the active resource */}
         <div
@@ -746,18 +717,9 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
               const wildcardId = `${groupId}-${wildcardBase}`;
               const wildcardOn = selected.has(wildcardBase);
               const unionKeys = unionSelectorKeys(res);
-              const wildcardScope = scopeStates.get(wildcardBase) ?? null;
-              const wildcardKeys =
-                wildcardScope?.key && !unionKeys.includes(wildcardScope.key)
-                  ? [...unionKeys, wildcardScope.key]
-                  : unionKeys;
               const shownActions = (res.actions ?? []).filter(
                 (act) => !q || `${res.resource}.${act.action}`.toLowerCase().includes(q) || res.resource.toLowerCase().includes(q),
               );
-              const selectedActions = (res.actions ?? []).filter(
-                (act) => selected.has(`${res.resource}.${act.action}`),
-              ).length;
-              const showBulk = !wildcardOn && selectedActions >= 2 && unionKeys.length > 0;
 
               return (
                 <>
@@ -776,25 +738,6 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
                     <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
                       {t('admin:rbacActionCount', { count: (res.actions ?? []).length })}
                     </span>
-                    {unionKeys.length > 0 ? (
-                      <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
-                        {unionKeys.map((k) => (
-                          <span
-                            key={k}
-                            style={{
-                              fontSize: 10.5,
-                              fontFamily: 'var(--font-mono)',
-                              padding: '2px 8px',
-                              borderRadius: 'var(--radius-pill)',
-                              border: `1px solid color-mix(in srgb, ${scopeColor(k)} 40%, var(--border))`,
-                              color: scopeColor(k),
-                            }}
-                          >
-                            {t(`admin:rbacScopeKey_${k}`, { defaultValue: k })}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
 
                   {/* all-bar */}
@@ -911,36 +854,18 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
                           </div>
                         </div>
                       </div>
-                      {wildcardKeys.length > 0 ? (
-                        <ScopePicker
-                          selectorKeys={wildcardKeys}
-                          scope={wildcardScope}
-                          onChange={(s) => updateScope(wildcardBase, s)}
-                        />
-                      ) : null}
+                      {unionKeys.length > 0 ? scopeEditor(wildcardBase) : null}
                     </div>
                   ) : (
                     /* INDIVIDUAL ACTIONS */
                     <div style={{ padding: '12px 16px' }}>
-                      {showBulk ? (
-                        <BulkScopeBar
-                          selectorKeys={unionKeys}
-                          draft={bulkDrafts.get(res.resource) ?? { key: '', value: '' }}
-                          onDraftChange={(d) =>
-                            setBulkDrafts((prev) => new Map(prev).set(res.resource, d))
-                          }
-                          onApply={(k, v) => applyBulkScope(res, k, v)}
-                          onClear={() => clearBulkScope(res)}
-                        />
-                      ) : null}
-
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {shownActions.map((act) => {
                           const base = `${res.resource}.${act.action}`;
                           const id = `${groupId}-${base}`;
                           const isChecked = selected.has(base);
                           const hasSelectorKeys = (act.selector_keys ?? []).length > 0;
-                          const currentScope = scopeStates.get(base) ?? null;
+                          const summary = isChecked ? slotScopeString(scopeStates.get(base)) : '';
 
                           return (
                             <div key={base}>
@@ -963,20 +888,9 @@ export function PermissionsEditor({ value, onChange, catalog, ariaLabel }: Props
                                   style={{ accentColor: 'var(--accent)' }}
                                 />
                                 {base}
-                                {isChecked && currentScope?.key && currentScope.value ? (
-                                  <ScopeBadge
-                                    scopeKey={currentScope.key}
-                                    scopeValues={[currentScope.value]}
-                                  />
-                                ) : null}
+                                {summary ? <ScopeChip text={summary} /> : null}
                               </label>
-                              {isChecked && hasSelectorKeys ? (
-                                <ScopePicker
-                                  selectorKeys={act.selector_keys ?? []}
-                                  scope={currentScope}
-                                  onChange={(s) => updateScope(base, s)}
-                                />
-                              ) : null}
+                              {isChecked && hasSelectorKeys ? scopeEditor(base) : null}
                             </div>
                           );
                         })}

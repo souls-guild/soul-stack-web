@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
@@ -145,10 +145,9 @@ describe('CreateRolePage (NIM-80)', () => {
     await user.click(await screen.findByRole('button', { name: 'resource soul' }));
     const cb = screen.getByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
-    const keySelect = await screen.findByRole('combobox', { name: /^scope selector key$/i });
-    await user.selectOptions(keySelect, 'coven');
-    const valueInput = await screen.findByRole('textbox', { name: /value for coven$/i });
-    await user.type(valueInput, 'ops');
+    const builder = screen.getByRole('group', { name: 'scope for soul.list' });
+    await user.click(within(builder).getByTestId('scope-mode-on'));
+    await user.type(within(builder).getByTestId('scope-add-value'), 'ops{Enter}');
     await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
     await waitFor(() => {
@@ -195,24 +194,27 @@ describe('CreateRolePage (NIM-80)', () => {
     expect(calls.find((c) => c.url === '/v1/roles' && c.method === 'POST')).toBeUndefined();
   });
 
-  it('#3: invalid scope (space in value) → permission error visible, POST is not sent', async () => {
+  it('#3: a boolean scope on a checked action → POST carries "soul.list on coven=ops"', async () => {
+    // NIM-128: the scope is now a boolean expression built via ScopeBuilder; the
+    // loosened client regex accepts it (spaces/quotes allowed), the server validates.
     const calls = recordingFetch();
     renderPage();
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'scoped-role');
     await user.click(await screen.findByRole('button', { name: 'resource soul' }));
-    const cb = screen.getByRole('checkbox', { name: 'soul.list' });
-    await user.click(cb);
-    const keySelect = await screen.findByRole('combobox', { name: /^scope selector key$/i });
-    await user.selectOptions(keySelect, 'coven');
-    const valueInput = await screen.findByRole('textbox', { name: /value for coven$/i });
-    await user.type(valueInput, 'ops team'); // space → 'soul.list on coven=ops team' fails the regex
+    await user.click(screen.getByRole('checkbox', { name: 'soul.list' }));
+
+    const builder = screen.getByRole('group', { name: 'scope for soul.list' });
+    await user.click(within(builder).getByTestId('scope-mode-on'));
+    await user.type(within(builder).getByTestId('scope-add-value'), 'ops{Enter}');
     await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
-    // Client validation catches the broken permission string — alert visible, POST not sent.
-    expect(await screen.findByText(/invalid/i)).toBeInTheDocument();
-    expect(calls.find((c) => c.url === '/v1/roles' && c.method === 'POST')).toBeUndefined();
+    await waitFor(() => {
+      const post = calls.find((c) => c.url === '/v1/roles' && c.method === 'POST');
+      expect(post).toBeDefined();
+      expect(post!.body).toContain('soul.list on coven=ops');
+    });
   });
 
   it('Cancel → back to /rbac without POST', async () => {

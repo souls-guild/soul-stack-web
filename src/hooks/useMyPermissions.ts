@@ -41,5 +41,43 @@ export function useMyPermissions() {
     );
   }
 
-  return { hasPermission, isLoading: q.isLoading };
+  /**
+   * The caller's own inherited scope ceiling for a base permission `resource.action`
+   * (or `resource.*`). Least-privilege: the server caps any grant to a subset of
+   * what the caller holds (403 on exceeding it) — this exposes that ceiling so the
+   * UI can show it up front. Returns null when the ceiling is unknown (still loading,
+   * fetch failed, or no matching held permission) → callers hide the block.
+   */
+  function ceilingFor(base: string): { unrestricted: boolean; exprs: string[] } | null {
+    if (!q.data) return null;
+    const perms = q.data.permissions ?? [];
+
+    // The wildcard entry is the ceiling for the full-access base `*` and the
+    // fallback ceiling for any base with no more-specific held permission. A
+    // BARE `*` (or an unrestricted-scope wildcard) → unrestricted; a scoped
+    // `* on X` (NIM-128) → its own predicates cap every grant.
+    const wild = perms.find((p) => p.wildcard);
+    const wildCeiling = wild
+      ? !wild.scope || wild.scope.unrestricted
+        ? { unrestricted: true, exprs: [] }
+        : { unrestricted: false, exprs: wild.scope.exprs ?? [] }
+      : null;
+
+    if (base === '*') return wildCeiling;
+
+    const dot = base.indexOf('.');
+    if (dot === -1) return wildCeiling;
+    const resource = base.slice(0, dot);
+    const action = base.slice(dot + 1);
+
+    const match = perms.find(
+      (p) => !p.wildcard && p.resource === resource && (p.action === action || p.action === '*' || action === '*'),
+    );
+    if (!match) return wildCeiling;
+    const scope = match.scope;
+    if (!scope || scope.unrestricted) return { unrestricted: true, exprs: [] };
+    return { unrestricted: false, exprs: scope.exprs ?? [] };
+  }
+
+  return { hasPermission, ceilingFor, isLoading: q.isLoading };
 }
