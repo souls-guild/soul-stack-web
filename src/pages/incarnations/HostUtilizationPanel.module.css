@@ -1,0 +1,167 @@
+.metricCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 74px;
+}
+
+.metricValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.meterOuter {
+  height: 5px;
+  width: 100%;
+  max-width: 92px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.meterInner {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.meter_ok {
+  background: var(--success);
+}
+.meter_warn {
+  background: var(--warning);
+}
+.meter_danger {
+  background: var(--danger);
+}
+
+.freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.netPair {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.netPair svg {
+  color: var(--text-faint);
+  flex: none;
+}
+
+.sortTh {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortTh:hover {
+  color: var(--text);
+}
+
+.caret {
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.inodeBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inodeValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.mutedCell {
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.sparkRow > td {
+  background: var(--surface);
+}
+
+.trends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-2);
+}
+
+.trendsHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+
+.trendsTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.trendsSpan {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Five trend charts in one row across the full expanded width; wrap on narrow. */
+.trendGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-4);
+}
+
+.sparkLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.skew {
+  align-self: center;
+  padding: var(--s-3) var(--s-4);
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, var(--border));
+  border-radius: var(--radius);
+  color: var(--warning);
+  font-size: 12.5px;
+}
+
+.sparkLoading,
+.sparkMuted {
+  padding: var(--s-3);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.sparkError {
+  padding: var(--s-3);
+  font-size: 12.5px;
+  color: var(--danger);
+}

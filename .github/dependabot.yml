@@ -1,0 +1,19 @@
+# Dependabot for Soul Stack Web. Raises PRs for dependency updates on a schedule.
+# This repo is a single npm package (React 19 + Vite) — one npm entry at the root.
+#
+# open-pull-requests-limit: 5. If it gets noisy, lower to 2-3, but during the beta
+# it's better to see everything.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # GitHub Actions update themselves — actions/checkout@v4, the CLA action, etc.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

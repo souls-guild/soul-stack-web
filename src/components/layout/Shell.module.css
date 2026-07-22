@@ -1,0 +1,47 @@
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    'topbar topbar'
+    'sidebar main'
+    'sidebar footer';
+  /* Fixed viewport height — the sidebar doesn't stretch downward
+     with long/wide content (Audit tables and so on).
+     overflow: auto on .main scrolls the content, not the layout. */
+  height: 100vh;
+  transition: grid-template-columns var(--dur-fast);
+}
+
+.shell.collapsed {
+  grid-template-columns: 56px 1fr;
+}
+
+.topbar {
+  grid-area: topbar;
+}
+
+.sidebar {
+  grid-area: sidebar;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: var(--s-4) 0;
+  /* Fixed width (set by grid-template-columns);
+     overflow-y: auto lets the sidebar scroll its own content
+     independently of the main area — width and position stay put. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.main {
+  grid-area: main;
+  padding: var(--s-6) var(--s-8);
+  overflow: auto;
+  background: var(--bg);
+}
+
+.footerWrap {
+  grid-area: footer;
+  padding: var(--s-3) var(--s-8) var(--s-4);
+  background: var(--bg);
+}

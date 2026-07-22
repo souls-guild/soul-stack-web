@@ -1,0 +1,298 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: var(--t-page-title-size);
+  font-weight: var(--t-page-title-weight);
+  letter-spacing: var(--t-page-title-track);
+  margin: 0;
+  line-height: 1;
+}
+
+.crumbs {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  margin-bottom: 6px;
+}
+
+.crumbs a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.crumbs a:hover {
+  color: var(--text);
+}
+
+.filters {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+/* For create/edit forms: fields are top-aligned,
+   so cells of different heights (with hint / without) don't form a staircase. */
+.formFields {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.table {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.table a {
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--font-mono);
+}
+
+.table a:hover {
+  text-decoration: underline;
+}
+
+.empty {
+  padding: var(--s-8);
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.loading {
+  padding: var(--s-6);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+.errorBox {
+  padding: var(--s-4);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.deprecationBanner {
+  padding: var(--s-3) var(--s-4);
+  background: color-mix(in srgb, var(--warn, #b58900) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn, #b58900) 30%, var(--border));
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.deprecationBanner a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.deprecationBanner a:hover {
+  text-decoration: underline;
+}
+
+.statusCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 10px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tabActive {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.sectionTitle {
+  font-size: var(--t-h2-size);
+  font-weight: var(--t-h2-weight);
+  letter-spacing: var(--t-h2-track);
+  margin: 0;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  font-size: 13px;
+  align-items: baseline;
+}
+
+.metaKey {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.metaVal {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.timelineItem {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--s-3) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timelineHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-3);
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.summaryCard:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.summaryCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.summaryCardLabel {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.summaryCardValue {
+  font-size: 18px;
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.summaryCardHint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.loadMoreCenter {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* RolesPicker — aligned with Input.field (flex-column, gap 6px, label font-size) */
+.rolesPickerField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--t-label-size);
+  font-weight: var(--t-label-weight);
+  color: var(--text);
+  min-width: 280px;
+}

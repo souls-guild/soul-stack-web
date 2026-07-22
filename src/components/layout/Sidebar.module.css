@@ -1,0 +1,168 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: 0 var(--s-3);
+  height: 100%;
+}
+
+.sidebar.collapsed {
+  padding: 0 var(--s-2);
+  align-items: stretch;
+}
+
+.group {
+  font-size: var(--t-stat-label-size);
+  font-weight: var(--t-stat-label-weight);
+  letter-spacing: var(--t-stat-label-track);
+  text-transform: var(--t-stat-label-case);
+  color: var(--text-muted);
+  padding: var(--s-3) var(--s-3) var(--s-2);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--s-2) var(--s-1);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.collapsed .link {
+  justify-content: center;
+  padding: 8px;
+}
+
+.link:hover {
+  background: var(--surface-2);
+}
+
+.linkActive {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.linkActive .icon {
+  color: var(--accent);
+}
+
+.label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Logo + collapse container at the top of the sidebar.
+   Expanded — logo on the left, collapse button on the right.
+   Collapsed — both icon-only, centered vertically in the column. */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
+}
+
+.collapsed .toggleRow {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--s-1);
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+.logoMark {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.logoMarkOnly {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.logoText {
+  white-space: nowrap;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 0;
+}
+
+.toggle:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* Bottom section (Help) — pinned to the bottom of the sidebar. */
+.bottom {
+  margin-top: auto;
+  padding-bottom: var(--s-2);
+}
+
+.helpBtn {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}

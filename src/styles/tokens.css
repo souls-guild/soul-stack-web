@@ -1,0 +1,179 @@
+/* ============================================================
+   Soul Stack — design tokens
+   System-agnostic CSS custom properties: no product- or db-specific brand
+   colours; role-specific apply/drift tokens; IBM Plex Sans + JetBrains Mono.
+   Light is the default; [data-theme="dark"] on <html> switches themes.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ---------- Surfaces & ink ---------- */
+  --bg:            #fafaf9;
+  --surface:       #ffffff;
+  --surface-2:     #f5f5f4;
+  --border:        #e7e5e4;
+  --border-strong: #d6d3d1;
+  --text:          #1c1917;
+  --text-muted:    #57534e;
+  --text-faint:    #a8a29e;
+
+  /* ---------- Brand & semantic ---------- */
+  --accent:        #0d9488;     /* Keeper accent (teal) */
+  --accent-fg:     #ffffff;
+  --success:       #10b981;     /* ready / connected */
+  --warning:       #d97706;     /* drift / migration_failed informational */
+  --danger:        #dc2626;     /* error_locked / disconnected / failed */
+  --info:          #2563eb;     /* applying / provisioning */
+
+  /* ---------- RBAC scope-selector types (per-dimension accent) ---------- */
+  --scope-coven:       #7c3aed;
+  --scope-service:     #0284c7;
+  --scope-incarnation: #0d9488;
+  --scope-host:        #d97706;
+  --scope-trait:       #db2777;
+  /* boolean scope rail: teal = ALL/AND, amber = ANY/OR */
+  --rail-and:          #0d9488;
+  --rail-or:           #f59e0b;
+
+  /* ---------- Geometry ---------- */
+  --radius:        8px;
+  --radius-lg:     12px;
+  --radius-pill:   100px;
+
+  /* ---------- Spacing ---------- */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  28px;
+  --s-8:  32px;
+  --s-9:  36px;
+  --s-10: 48px;
+  --s-11: 64px;
+
+  /* ---------- Type ---------- */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* UI font — a selector separate from the theme (Settings → Appearance → Font).
+     Default = --font-sans; [data-font="..."] on <html> overrides it below. */
+  --app-font-family: var(--font-sans);
+
+  --t-page-title-size:   30px;
+  --t-page-title-weight: 600;
+  --t-page-title-track:  -0.025em;
+  --t-stat-value-size:   28px;
+  --t-stat-value-weight: 600;
+  --t-stat-value-track:  -0.025em;
+  --t-cell-val-size:     26px;
+  --t-cell-val-weight:   600;
+  --t-cell-val-track:    -0.025em;
+  --t-h2-size:           15px;
+  --t-h2-weight:         600;
+  --t-h2-track:          -0.01em;
+  --t-body-size:         14px;
+  --t-body-weight:       400;
+  --t-label-size:        13px;
+  --t-label-weight:      500;
+  --t-cell-name-size:    12.5px;
+  --t-cell-name-weight:  500;
+  --t-stat-label-size:   11px;
+  --t-stat-label-weight: 500;
+  --t-stat-label-track:  0.08em;
+  --t-stat-label-case:   uppercase;
+  --t-meta-size:         11.5px;
+  --t-meta-weight:       400;
+  --t-table-size:        13px;
+  --t-table-weight:      400;
+
+  /* ---------- Motion ---------- */
+  --dur-fast:   0.15s;
+  --dur-theme:  0.2s;
+  --pulse-dur:  2.4s;
+
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg:            #0a0a0a;
+  --surface:       #161615;
+  --surface-2:     #1f1f1e;
+  --border:        #2a2a28;
+  --border-strong: #3a3a37;
+  --text:          #fafaf9;
+  --text-muted:    #a8a29e;
+  --text-faint:    #6b6862;
+  --accent:        #14b8a6;
+  --accent-fg:     #042f2c;
+  --success:       #34d399;
+  --warning:       #fbbf24;
+  --danger:        #f87171;
+  --info:          #60a5fa;
+  --scope-coven:       #a78bfa;
+  --scope-service:     #38bdf8;
+  --scope-incarnation: #2dd4bf;
+  --scope-host:        #fbbf24;
+  --scope-trait:       #f472b6;
+  --rail-and:          #14b8a6;
+  --rail-or:           #fbbf24;
+  color-scheme: dark;
+}
+
+/* warm theme — a warm light theme (amber/cream) */
+[data-theme="warm"] {
+  --bg:            #fdf8f0;
+  --surface:       #fffcf5;
+  --surface-2:     #faf3e0;
+  --border:        #e8dcc8;
+  --border-strong: #d4c4a0;
+  --text:          #2c1a00;
+  --text-muted:    #7a5c2e;
+  --text-faint:    #b89a6a;
+  --accent:        #b45309;
+  --accent-fg:     #ffffff;
+  --success:       #15803d;
+  --warning:       #92400e;
+  --danger:        #b91c1c;
+  --info:          #1d4ed8;
+  color-scheme: light;
+}
+
+/* deep theme — a deep dark theme (bluish-violet accent) */
+[data-theme="deep"] {
+  --bg:            #04040a;
+  --surface:       #0d0d1a;
+  --surface-2:     #161628;
+  --border:        #1e1e35;
+  --border-strong: #2a2a4a;
+  --text:          #e8e8f5;
+  --text-muted:    #9090b8;
+  --text-faint:    #505078;
+  --accent:        #818cf8;
+  --accent-fg:     #0d0d1a;
+  --success:       #4ade80;
+  --warning:       #facc15;
+  --danger:        #f87171;
+  --info:          #60a5fa;
+  color-scheme: dark;
+}
+
+/* ---------- UI font (independent of the theme, see useFont.ts) ---------- */
+/* system — no override, --app-font-family is already = --font-sans */
+[data-font="mono"]       { --app-font-family: 'JetBrains Mono', var(--font-mono); }
+[data-font="serif"]      { --app-font-family: 'Merriweather', Georgia, 'Times New Roman', serif; }
+[data-font="manrope"]    { --app-font-family: 'Manrope', var(--font-sans); }
+[data-font="quicksand"]  { --app-font-family: 'Quicksand', var(--font-sans); }
+[data-font="unbounded"]  { --app-font-family: 'Unbounded', var(--font-sans); }
+[data-font="caveat"]     { --app-font-family: 'Caveat', var(--font-sans); }
+[data-font="comfortaa"]  { --app-font-family: 'Comfortaa', var(--font-sans); }
+[data-font="comic-neue"] { --app-font-family: 'Comic Neue', var(--font-sans); }
+
+@keyframes ss-pulse {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(2.5); opacity: 0;   }
+}

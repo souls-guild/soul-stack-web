@@ -1,0 +1,22 @@
+.viewer {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--s-3) var(--s-4);
+  overflow: auto;
+  max-height: 60vh;
+}
+
+.pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre;
+}
+
+.empty {
+  color: var(--text-faint);
+  font-style: italic;
+}

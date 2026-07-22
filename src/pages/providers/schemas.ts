@@ -1,0 +1,50 @@
+// Zod schema for the Provider create form. Regexes are synced with openapi.yaml
+// (ProviderCreateRequest.name/type kebab-case); server-side validation is the
+// source of truth (422 is shown as a server-error). Messages — i18n keys under
+// namespace `providers`; rendered via t(fieldError.message).
+
+import { z } from 'zod';
+
+const KEBAB = /^[a-z0-9-]{1,63}$/;
+
+/** Parses "key: value" line by line into a credentials object. Lines without ':' are ignored. */
+export function parseCredentialsKV(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of raw.split('\n')) {
+    const idx = line.indexOf(':');
+    if (idx === -1) continue;
+    const k = line.slice(0, idx).trim();
+    const v = line.slice(idx + 1).trim();
+    if (k) out[k] = v;
+  }
+  return out;
+}
+
+// credentials — dual-mode (ADR-064): value (KV) XOR credentials_ref. XOR
+// is structurally guaranteed by the toggle; refine requires the active mode to
+// be non-empty (client-side check "fill exactly one").
+export const providerCreateSchema = z
+  .object({
+    name: z.string().trim().min(1, 'providers:errNameRequired').regex(KEBAB, 'providers:errNamePattern'),
+    type: z.string().trim().min(1, 'providers:errTypeRequired').regex(KEBAB, 'providers:errTypePattern'),
+    region: z.string().trim().min(1, 'providers:errRegionRequired'),
+    fqdnSuffix: z.string().trim(),
+    credMode: z.enum(['value', 'ref']),
+    credValue: z.string(),
+    credRef: z.string(),
+  })
+  .superRefine((v, ctx) => {
+    const provided =
+      v.credMode === 'value'
+        ? Object.keys(parseCredentialsKV(v.credValue)).length > 0
+        : v.credRef.trim() !== '';
+    if (!provided) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'providers:errCredentialsRequired',
+        path: [v.credMode === 'value' ? 'credValue' : 'credRef'],
+      });
+    }
+  });
+
+export type ProviderCreateFormValues = z.infer<typeof providerCreateSchema>;
