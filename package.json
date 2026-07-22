@@ -47,7 +47,7 @@
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.5.1",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.19.1",
     "vite": "^6.0.7",
     "vitest": "^4.1.9",
