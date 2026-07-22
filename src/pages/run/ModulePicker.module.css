@@ -1,0 +1,110 @@
+.root {
+  position: relative;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.control:hover {
+  border-color: var(--accent);
+}
+
+.placeholder {
+  color: var(--text-faint);
+}
+
+.selectedRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.selectedDesc,
+.optDesc {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.dropdown {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.searchInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.searchInput:focus {
+  outline: none;
+}
+
+.options {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.option:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.optionActive {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+
+.optIcon {
+  width: 14px;
+  display: inline-flex;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.empty {
+  padding: 12px 10px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}

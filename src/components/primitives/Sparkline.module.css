@@ -1,0 +1,52 @@
+.svg {
+  display: block;
+  overflow: visible;
+}
+
+.line {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.dot {
+  stroke: none;
+}
+
+/* Tone: the polyline is colored via stroke, the marker via fill. */
+.line.ok {
+  stroke: var(--success);
+}
+.dot.ok {
+  fill: var(--success);
+}
+
+.line.warn {
+  stroke: var(--warning);
+}
+.dot.warn {
+  fill: var(--warning);
+}
+
+.line.danger {
+  stroke: var(--danger);
+}
+.dot.danger {
+  fill: var(--danger);
+}
+
+.line.accent {
+  stroke: var(--accent);
+}
+.dot.accent {
+  fill: var(--accent);
+}
+
+.line.muted {
+  stroke: var(--text-faint);
+}
+.dot.muted {
+  fill: var(--text-faint);
+}

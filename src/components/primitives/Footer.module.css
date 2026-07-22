@@ -1,0 +1,41 @@
+.footer {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--t-meta-size);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  position: relative;
+}
+
+.liveDot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--success);
+  animation: ss-pulse var(--pulse-dur) ease-out infinite;
+}
+
+.warn .liveDot {
+  background: var(--warning);
+}
+
+.warn .liveDot::after {
+  display: none;
+}

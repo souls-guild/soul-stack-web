@@ -1,0 +1,37 @@
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ok {
+  background: var(--success);
+}
+
+.ok::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--success);
+  animation: ss-pulse var(--pulse-dur) ease-out infinite;
+}
+
+.warn {
+  background: var(--warning);
+}
+
+.off {
+  background: var(--danger);
+}
+
+.info {
+  background: var(--info);
+}
+
+.idle {
+  background: var(--text-faint);
+}

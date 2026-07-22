@@ -1,0 +1,31 @@
+.group {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  background: var(--surface);
+  gap: 0;
+}
+
+.btn {
+  width: 28px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn:hover {
+  color: var(--text);
+}
+
+.btnActive {
+  background: var(--surface-2);
+  color: var(--text);
+}

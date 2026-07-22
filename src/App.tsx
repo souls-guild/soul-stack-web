@@ -1,0 +1,153 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './hooks/AuthProvider';
+import { ThemeProvider } from './hooks/useTheme';
+import { FontProvider } from './hooks/useFont';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Shell } from './components/layout';
+import { Login } from './pages/Login';
+import { IncarnationsList } from './pages/incarnations/IncarnationsList';
+import { IncarnationDetail } from './pages/incarnations/IncarnationDetail';
+import { IncarnationNewForm } from './pages/incarnations/IncarnationNewForm';
+import { RunDetail } from './pages/incarnations/RunDetail';
+import { SoulsList } from './pages/souls/SoulsList';
+import { SoulDetail } from './pages/souls/SoulDetail';
+import { AuditLog } from './pages/audit/AuditLog';
+import { ArchonsList } from './pages/archons/ArchonsList';
+import { ArchonDetail } from './pages/archons/ArchonDetail';
+import { SettingsPage } from './pages/settings/SettingsPage';
+import { PushApply } from './pages/push/PushApply';
+import { ErrandsList } from './pages/errands/ErrandsList';
+import { ErrandNewForm } from './pages/errands/ErrandNewForm';
+import { ErrandDetail } from './pages/errands/ErrandDetail';
+import { RbacPage } from './pages/rbac/RbacPage';
+import { CreateRolePage } from './pages/rbac/CreateRolePage';
+import { RoleEditPage } from './pages/rbac/RoleEditPage';
+import { ServicesList } from './pages/services/ServicesList';
+import { ServiceDetail } from './pages/services/ServiceDetail';
+import { PluginsList } from './pages/plugins/PluginsList';
+import { PluginDetail } from './pages/plugins/PluginDetail';
+import { PluginRegisterForm } from './pages/plugins/PluginRegisterForm';
+import { ProvidersList } from './pages/providers/ProvidersList';
+import { VigilsList } from './pages/beacons/VigilsList';
+import { VigilDetail } from './pages/beacons/VigilDetail';
+import { VigilNewForm } from './pages/beacons/VigilNewForm';
+import { DecreesList } from './pages/beacons/DecreesList';
+import { DecreeDetail } from './pages/beacons/DecreeDetail';
+import { DecreeNewForm } from './pages/beacons/DecreeNewForm';
+import { OracleFiresList } from './pages/beacons/OracleFiresList';
+import { PushRunsList } from './pages/pushRuns/PushRunsList';
+import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
+import { RunWizard } from './pages/run/RunWizard';
+import { RunsFeed } from './pages/runs/RunsFeed';
+import { VoyageDetail } from './pages/voyages/VoyageDetail';
+import { CadencesList } from './pages/cadences/CadencesList';
+import { CadenceDetail } from './pages/cadences/CadenceDetail';
+import { SynodsList } from './pages/synods/SynodsList';
+import { SynodDetail } from './pages/synods/SynodDetail';
+import { NotificationsPage } from './pages/notifications/NotificationsPage';
+import { HeraldDetail } from './pages/notifications/HeraldDetail';
+import { TidingDetail } from './pages/notifications/TidingDetail';
+import { OverviewPage } from './pages/overview/OverviewPage';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  },
+});
+
+function Protected({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <Shell>{children}</Shell>
+    </ProtectedRoute>
+  );
+}
+
+// Default landing — `/overview` (dashboard), with the option to remember a different
+// route in localStorage('landing'). We validate the saved value (known route only),
+// otherwise fallback to /overview.
+const KNOWN_LANDINGS = new Set(['/overview', '/runs', '/incarnations', '/run', '/souls']);
+function landingTarget(): string {
+  try {
+    const saved = localStorage.getItem('landing');
+    if (saved && KNOWN_LANDINGS.has(saved)) return saved;
+  } catch {
+    // localStorage unavailable — default.
+  }
+  return '/overview';
+}
+
+export function App() {
+  return (
+    <ThemeProvider>
+      <FontProvider>
+      <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter basename="/ui">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Navigate to={landingTarget()} replace />} />
+            <Route path="/overview" element={<Protected><OverviewPage /></Protected>} />
+            <Route path="/incarnations" element={<Protected><IncarnationsList /></Protected>} />
+            <Route path="/incarnations/new" element={<Protected><IncarnationNewForm /></Protected>} />
+            <Route path="/incarnations/:name" element={<Protected><IncarnationDetail /></Protected>} />
+            <Route path="/incarnations/:name/runs/:applyId" element={<Protected><RunDetail /></Protected>} />
+            <Route path="/souls" element={<Protected><SoulsList /></Protected>} />
+            <Route path="/souls/:sid" element={<Protected><SoulDetail /></Protected>} />
+            <Route path="/audit" element={<Protected><AuditLog /></Protected>} />
+            <Route path="/archons" element={<Protected><ArchonsList /></Protected>} />
+            <Route path="/archons/:aid" element={<Protected><ArchonDetail /></Protected>} />
+            {/* Redirect for backward-compat with old links */}
+            <Route path="/provisioning-policy" element={<Navigate to="/settings/provisioning-policy" replace />} />
+            <Route path="/settings/*" element={<Protected><SettingsPage /></Protected>} />
+            <Route path="/push" element={<Protected><PushApply /></Protected>} />
+            <Route path="/errands" element={<Protected><ErrandsList /></Protected>} />
+            <Route path="/errands/new" element={<Protected><ErrandNewForm /></Protected>} />
+            <Route path="/errands/:id" element={<Protected><ErrandDetail /></Protected>} />
+            <Route path="/errand" element={<Navigate to="/errands" replace />} />
+            <Route path="/errand/exec" element={<Navigate to="/errands/new" replace />} />
+            <Route path="/errand/history" element={<Navigate to="/errands" replace />} />
+            <Route path="/rbac" element={<Protected><RbacPage /></Protected>} />
+            <Route path="/rbac/roles/new" element={<Protected><CreateRolePage /></Protected>} />
+            <Route path="/rbac/roles/:name/edit" element={<Protected><RoleEditPage /></Protected>} />
+            <Route path="/services" element={<Protected><ServicesList /></Protected>} />
+            <Route path="/services/:name" element={<Protected><ServiceDetail /></Protected>} />
+            <Route path="/plugins" element={<Protected><PluginsList /></Protected>} />
+            <Route path="/plugins/register" element={<Protected><PluginRegisterForm /></Protected>} />
+            <Route path="/plugins/:namespace/:name/:ref" element={<Protected><PluginDetail /></Protected>} />
+            <Route path="/providers" element={<Protected><ProvidersList /></Protected>} />
+            <Route path="/vigils" element={<Protected><VigilsList /></Protected>} />
+            <Route path="/vigils/new" element={<Protected><VigilNewForm /></Protected>} />
+            <Route path="/vigils/:name" element={<Protected><VigilDetail /></Protected>} />
+            <Route path="/decrees" element={<Protected><DecreesList /></Protected>} />
+            <Route path="/decrees/new" element={<Protected><DecreeNewForm /></Protected>} />
+            <Route path="/decrees/:name" element={<Protected><DecreeDetail /></Protected>} />
+            <Route path="/oracle/fires" element={<Protected><OracleFiresList /></Protected>} />
+            <Route path="/push-runs" element={<Protected><PushRunsList /></Protected>} />
+            <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
+            <Route path="/run" element={<Protected><RunWizard /></Protected>} />
+            <Route path="/runs" element={<Protected><RunsFeed /></Protected>} />
+            {/* Merged into unified /runs (Scenario segment); redirect for backward-compat links */}
+            <Route path="/incarnation-runs" element={<Navigate to="/runs" replace />} />
+            <Route path="/voyages/:id" element={<Protected><VoyageDetail /></Protected>} />
+            <Route path="/cadences" element={<Protected><CadencesList /></Protected>} />
+            <Route path="/cadences/:id" element={<Protected><CadenceDetail /></Protected>} />
+            <Route path="/synods" element={<Protected><SynodsList /></Protected>} />
+            <Route path="/synods/:name" element={<Protected><SynodDetail /></Protected>} />
+            <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
+            <Route path="/notifications/heralds/:name" element={<Protected><HeraldDetail /></Protected>} />
+            <Route path="/notifications/tidings/:name" element={<Protected><TidingDetail /></Protected>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+      </QueryClientProvider>
+      </FontProvider>
+    </ThemeProvider>
+  );
+}

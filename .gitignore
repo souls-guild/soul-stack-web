@@ -1,0 +1,27 @@
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Generated TS types from openapi.yaml. Recreated via `npm run gen:api`.
+src/api/types.gen.ts
+
+# editor
+.DS_Store
+*.swp
+*.swo
+
+# Serena LSP project config (tool-specific, local)
+.serena/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# playwright ui-smoke (e2e/)
+/e2e/.auth/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

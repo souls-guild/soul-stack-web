@@ -1,0 +1,105 @@
+.trend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.now {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plot {
+  position: relative;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden; /* safety net: axis text can never paint past the frame */
+  cursor: crosshair;
+}
+
+.line {
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 0.5;
+  opacity: 0.6;
+}
+
+.axisLabel {
+  fill: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 6px;
+}
+
+.guide {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.hoverRing {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+/* Hover tooltip — floats above the hovered sample, follows x. Theme-aware. */
+.tooltip {
+  position: absolute;
+  top: -2px;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.tipValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tipTime {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}

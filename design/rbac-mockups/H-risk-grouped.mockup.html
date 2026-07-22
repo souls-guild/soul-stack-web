@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RBAC — H · Risk-Grouped</title>
+<style>
+  :root{
+    --bg:#fafaf9; --surface:#fff; --surface-2:#f5f5f4; --border:#e7e5e4; --border-strong:#d6d3d1;
+    --text:#1c1917; --text-muted:#57534e; --text-faint:#a8a29e;
+    --accent:#0d9488; --accent-fg:#fff; --success:#10b981; --warning:#d97706; --danger:#dc2626; --info:#2563eb;
+    --radius:8px; --radius-lg:12px; --radius-pill:100px;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --coven:#8b5cf6; --service:#0ea5e9; --incarnation:#0d9488; --host:#f59e0b;
+  }
+  [data-theme="dark"]{
+    --bg:#0a0a0a; --surface:#161615; --surface-2:#1f1f1e; --border:#2a2a28; --border-strong:#3a3a37;
+    --text:#fafaf9; --text-muted:#a8a29e; --text-faint:#6b6862;
+    --accent:#14b8a6; --accent-fg:#042f2c; --success:#34d399; --warning:#fbbf24; --danger:#f87171; --info:#60a5fa;
+    --coven:#a78bfa; --service:#38bdf8; --incarnation:#14b8a6; --host:#fbbf24;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.45}
+  .mono{font-family:var(--font-mono)}
+  .app{display:flex;min-height:100vh}
+  /* fake sidebar */
+  .side{width:52px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0;flex-shrink:0}
+  .side .logo{width:26px;height:26px;border-radius:7px;background:var(--accent)}
+  .side .ico{width:22px;height:22px;border-radius:6px;background:var(--surface-2)}
+  .side .ico.on{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .main{flex:1;min-width:0}
+  .topbar{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface)}
+  .topbar .crumbs{color:var(--text-faint);font-size:12.5px}
+  .topbar .crumbs b{color:var(--text-muted);font-weight:500}
+  .toggle{border:1px solid var(--border);background:var(--surface);color:var(--text-muted);border-radius:var(--radius);padding:5px 10px;font-size:12px;cursor:pointer}
+  .wrap{padding:22px 26px 60px;max-width:1240px}
+  h1{font-size:26px;font-weight:600;letter-spacing:-.025em;margin:0 0 2px}
+  .sub{color:var(--text-muted);font-size:13px;margin-bottom:20px}
+
+  /* identity card — Name/Description with air */
+  .identity{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:18px}
+  .fld label{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin-bottom:7px}
+  .fld input,.fld textarea{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;font-family:inherit;font-size:14px;color:var(--text);resize:vertical}
+  .fld input.mono{font-family:var(--font-mono)}
+  .fld .hint{font-size:11.5px;color:var(--text-faint);margin-top:6px}
+
+  /* master-detail */
+  .md{display:grid;grid-template-columns:296px 1fr;gap:16px;align-items:start}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .panel-h{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .panel-h .ttl{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)}
+
+  /* left: search + resource list */
+  .search{position:relative;padding:10px}
+  .search input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px 8px 30px;font-size:13px;color:var(--text)}
+  .search .mag{position:absolute;left:20px;top:19px;color:var(--text-faint);font-size:13px}
+  .selall{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-2);font-size:12.5px;color:var(--text-muted)}
+  .reslist{max-height:560px;overflow:auto}
+  .resrow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer}
+  .resrow:hover{background:var(--surface-2)}
+  .resrow.active{background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+  .resrow .nm{font-family:var(--font-mono);font-size:13px;flex:1}
+  .cnt{font-size:11px;color:var(--text-faint);font-family:var(--font-mono)}
+  .cnt.has{color:var(--accent);font-weight:500}
+  .miniall{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);font-size:10.5px;color:var(--text-muted);padding:2px 8px;cursor:pointer}
+  .resrow.active .miniall,.miniall.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+
+  /* right: actions of selected resource */
+  .detail-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  .detail-h .r{font-family:var(--font-mono);font-size:16px;font-weight:500}
+  .detail-h .keys{display:flex;gap:6px;margin-left:auto}
+  .keycap{font-size:10.5px;font-family:var(--font-mono);padding:2px 8px;border-radius:var(--radius-pill);border:1px solid var(--border)}
+  .allbar{display:flex;align-items:center;gap:10px;padding:11px 18px;background:var(--surface-2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:var(--radius);padding:6px 12px;font-size:12.5px;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn.acc{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  .btn.tiny{padding:4px 9px;font-size:11.5px}
+
+  .chk{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-strong);flex-shrink:0;display:grid;place-items:center;cursor:pointer}
+  .chk.on{background:var(--accent);border-color:var(--accent);color:#fff;font-size:11px}
+  .actname{font-family:var(--font-mono);font-size:13.5px}
+  .actdesc{color:var(--text-faint);font-size:12px;margin-left:auto}
+  .scoped-badge{font-family:var(--font-mono);font-size:11px;padding:2px 8px;border-radius:var(--radius-pill);background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));color:var(--accent)}
+
+  /* risk groups */
+  .groups{padding:14px 0 4px}
+  .rgroup{border:1px solid var(--border);border-radius:var(--radius);margin:0 18px 14px;overflow:hidden}
+  .rgroup.read{box-shadow:inset 4px 0 0 var(--success)}
+  .rgroup.write{box-shadow:inset 4px 0 0 var(--info)}
+  .rgroup.destr{box-shadow:inset 4px 0 0 var(--danger)}
+  .rgroup-h{display:flex;align-items:center;gap:9px;padding:10px 15px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+  .rgdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .rgdot.read{background:var(--success)} .rgdot.write{background:var(--info)} .rgdot.destr{background:var(--danger)}
+  .rgttl{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .rgttl.read{color:var(--success)} .rgttl.write{color:var(--info)} .rgttl.destr{color:var(--danger)}
+  .rgcnt{font-size:11px;color:var(--text-faint);font-family:var(--font-mono)}
+  .rgwarn{font-size:11px;font-family:var(--font-mono);display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:var(--radius-pill);color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent);border:1px solid color-mix(in srgb,var(--danger) 28%,var(--border))}
+  .rgall{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text-muted);cursor:pointer;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:3px 10px}
+  .rgall .gchk{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--border-strong);display:grid;place-items:center;font-size:9px}
+  .rgall.read.on{border-color:var(--success);color:var(--success);background:color-mix(in srgb,var(--success) 10%,transparent)}
+  .rgall.read.on .gchk{background:var(--success);border-color:var(--success);color:#fff}
+  .rgall.write.on{border-color:var(--info);color:var(--info);background:color-mix(in srgb,var(--info) 10%,transparent)}
+  .rgall.write.on .gchk{background:var(--info);border-color:var(--info);color:#fff}
+  .rgall.destr.part{border-color:var(--danger);color:var(--danger);background:color-mix(in srgb,var(--danger) 8%,transparent)}
+  .rgall.destr.part .gchk{background:var(--danger);border-color:var(--danger);color:#fff}
+
+  .actrow{border-bottom:1px solid var(--border)}
+  .actrow:last-child{border-bottom:0}
+  .actmain{display:flex;align-items:center;gap:12px;padding:11px 15px}
+  .chk.rd.on{background:var(--success);border-color:var(--success)}
+  .chk.wr.on{background:var(--info);border-color:var(--info)}
+  .chk.ds.on{background:var(--danger);border-color:var(--danger)}
+
+  /* spacious type-specialized scope drawer */
+  .scope{margin:0 15px 14px 43px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+  .scope-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px}
+  .tabset{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+  .tp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-pill);padding:5px 12px;font-size:12px;cursor:pointer;color:var(--text-muted)}
+  .tp .dot{width:8px;height:8px;border-radius:50%}
+  .tp.on{border-width:1.5px}
+  .tp[data-k="coven"].on{border-color:var(--coven);color:var(--coven);background:color-mix(in srgb,var(--coven) 10%,transparent)}
+  .tp[data-k="service"].on{border-color:var(--service);color:var(--service);background:color-mix(in srgb,var(--service) 10%,transparent)}
+  .tp[data-k="incarnation"].on{border-color:var(--incarnation);color:var(--incarnation);background:color-mix(in srgb,var(--incarnation) 10%,transparent)}
+  .tp[data-k="host"].on{border-color:var(--host);color:var(--host);background:color-mix(in srgb,var(--host) 10%,transparent)}
+  .dot.coven{background:var(--coven)} .dot.service{background:var(--service)} .dot.incarnation{background:var(--incarnation)} .dot.host{background:var(--host)}
+
+  .picker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+  .picker .lead{font-size:12px;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--radius-pill);font-size:12.5px;border:1px solid var(--border);background:var(--surface-2);cursor:pointer;color:var(--text-muted)}
+  .chip .d{width:7px;height:7px;border-radius:50%}
+  .chip.sel[data-k="coven"]{border-color:var(--coven);background:color-mix(in srgb,var(--coven) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="service"]{border-color:var(--service);background:color-mix(in srgb,var(--service) 14%,transparent);color:var(--text)}
+  .chip.sel[data-k="incarnation"]{border-color:var(--incarnation);background:color-mix(in srgb,var(--incarnation) 14%,transparent);color:var(--text)}
+  .chip .st{width:6px;height:6px;border-radius:50%;background:var(--success)}
+  .svc-glyph,.inc-glyph{font-family:var(--font-mono);font-weight:600;opacity:.6}
+
+  /* host mode — SID list with soulprint search */
+  .hostsearch{position:relative;margin-bottom:10px}
+  .hostsearch input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px 7px 28px;font-size:12.5px;color:var(--text);font-family:var(--font-mono)}
+  .hostsearch .mag{position:absolute;left:9px;top:8px;color:var(--text-faint);font-size:12px}
+  .sidrow{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px solid var(--border)}
+  .sidrow:last-child{border-bottom:0}
+  .sidrow .schk{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-strong);display:grid;place-items:center;font-size:9px;flex-shrink:0}
+  .sidrow.sel .schk{background:var(--host);border-color:var(--host);color:#111}
+  .sidrow .sid{font-family:var(--font-mono);font-size:12.5px}
+  .sidrow .sp{font-size:11px;color:var(--text-faint);margin-left:auto;font-family:var(--font-mono)}
+
+  .scope-preview{margin-top:12px;font-family:var(--font-mono);font-size:12px;color:var(--text-muted);background:var(--bg);border:1px dashed var(--border-strong);border-radius:var(--radius);padding:9px 12px}
+  .scope-preview b{color:var(--accent);font-weight:500}
+
+  .footer{display:flex;gap:10px;margin-top:22px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);font-weight:500;padding:9px 18px}
+  .callout{margin-top:18px;font-size:12px;color:var(--text-faint);border-left:2px solid var(--border-strong);padding-left:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="side">
+    <div class="logo"></div>
+    <div class="ico"></div><div class="ico"></div><div class="ico on"></div><div class="ico"></div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">RBAC / <b>New role</b></div>
+      <button class="toggle" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">◐ Theme</button>
+    </div>
+    <div class="wrap">
+      <h1>Create role</h1>
+      <div class="sub">Concept H — Master-detail, but actions are grouped by risk (Read / Write / Destructive) with group-level All</div>
+
+      <!-- Name / Description with air -->
+      <div class="identity">
+        <div class="fld">
+          <label>Role name</label>
+          <input class="mono" value="incarnation-operator" />
+          <div class="hint">kebab-case, unique role name</div>
+        </div>
+        <div class="fld">
+          <label>Description</label>
+          <textarea rows="2">Operators of the payments coven — manage incarnations and read secrets, no destroy.</textarea>
+          <div class="hint">Free text for the audit trail and role list</div>
+        </div>
+      </div>
+
+      <!-- Master-detail -->
+      <div class="md">
+        <!-- LEFT -->
+        <div class="panel">
+          <div class="search">
+            <span class="mag">⌕</span>
+            <input placeholder="Search resources…" />
+          </div>
+          <label class="selall"><span class="chk" style="width:16px;height:16px"></span> Select all resources (grant everything)</label>
+          <div class="reslist">
+            <div class="resrow active">
+              <span class="chk on">✓</span>
+              <span class="nm">incarnation</span>
+              <span class="cnt has">4/6</span>
+              <span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">service</span><span class="cnt">0/4</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk on" style="background:var(--success);border-color:var(--success)">✓</span><span class="nm">soul</span><span class="cnt has">1/3</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">errand</span><span class="cnt">0/3</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">role</span><span class="cnt">0/4</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">plugin</span><span class="cnt">0/3</span><span class="miniall">All</span>
+            </div>
+            <div class="resrow">
+              <span class="chk"></span><span class="nm">audit</span><span class="cnt">0/1</span><span class="miniall">All</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="panel">
+          <div class="detail-h">
+            <span class="r">incarnation</span>
+            <span style="color:var(--text-faint);font-size:12px">6 actions · 3 risk groups</span>
+            <div class="keys">
+              <span class="keycap" style="border-color:var(--service);color:var(--service)">service</span>
+              <span class="keycap" style="border-color:var(--coven);color:var(--coven)">coven</span>
+              <span class="keycap" style="border-color:var(--incarnation);color:var(--incarnation)">incarnation</span>
+            </div>
+          </div>
+          <div class="allbar">
+            <button class="btn tiny">☑ Select all actions</button>
+            <button class="btn tiny">☐ Clear</button>
+            <span style="width:1px;height:18px;background:var(--border)"></span>
+            <button class="btn acc tiny">✦ incarnation.* (all + future)</button>
+            <span style="margin-left:auto;font-size:12px;color:var(--text-muted)">Bulk scope → apply to checked</span>
+          </div>
+
+          <div class="groups">
+
+            <!-- READ group -->
+            <div class="rgroup read">
+              <div class="rgroup-h">
+                <span class="rgdot read"></span>
+                <span class="rgttl read">Read</span>
+                <span class="rgcnt">1/1</span>
+                <span class="rgall read on"><span class="gchk">✓</span> All read</span>
+              </div>
+              <div class="actrow">
+                <div class="actmain">
+                  <span class="chk rd on">✓</span>
+                  <span class="actname">incarnation.view</span>
+                  <span class="scoped-badge">coven=payments</span>
+                  <span class="actdesc">Read spec, state &amp; history</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- WRITE group -->
+            <div class="rgroup write">
+              <div class="rgroup-h">
+                <span class="rgdot write"></span>
+                <span class="rgttl write">Write</span>
+                <span class="rgcnt">3/3</span>
+                <span class="rgall write on"><span class="gchk">✓</span> All write</span>
+              </div>
+              <div class="actrow">
+                <div class="actmain">
+                  <span class="chk wr on">✓</span>
+                  <span class="actname">incarnation.create</span>
+                  <span class="scoped-badge">coven=payments</span>
+                  <span class="actdesc">Provision new incarnations</span>
+                </div>
+              </div>
+              <div class="actrow">
+                <div class="actmain">
+                  <span class="chk wr on">✓</span>
+                  <span class="actname">incarnation.upgrade</span>
+                  <span class="scoped-badge">coven=payments</span>
+                  <span class="actdesc">Migrate to a new service version</span>
+                </div>
+              </div>
+              <div class="actrow">
+                <div class="actmain">
+                  <span class="chk wr on">✓</span>
+                  <span class="actname">incarnation.reincarnate</span>
+                  <span class="scoped-badge">coven=payments</span>
+                  <span class="actdesc">Restore from state backup</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- DESTRUCTIVE group -->
+            <div class="rgroup destr">
+              <div class="rgroup-h">
+                <span class="rgdot destr"></span>
+                <span class="rgttl destr">Destructive</span>
+                <span class="rgcnt">1/2</span>
+                <span class="rgwarn">⚠ High-impact</span>
+                <span class="rgall destr part"><span class="gchk">−</span> All destructive</span>
+              </div>
+
+              <!-- view-secrets: checked + scope open (coven mode) -->
+              <div class="actrow">
+                <div class="actmain">
+                  <span class="chk ds on">✓</span>
+                  <span class="actname">incarnation.view-secrets</span>
+                  <span class="actdesc">Reveal Sigil-managed secrets</span>
+                </div>
+                <div class="scope">
+                  <div class="scope-h">◔ Scope — restrict where this permission applies</div>
+                  <div class="tabset">
+                    <span class="tp" data-k="incarnation"><span class="dot incarnation"></span>incarnation</span>
+                    <span class="tp on" data-k="coven"><span class="dot coven"></span>coven</span>
+                    <span class="tp" data-k="service"><span class="dot service"></span>service</span>
+                    <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ unscoped (any)</span>
+                  </div>
+                  <div class="picker">
+                    <div class="lead"><span class="dot coven" style="width:8px;height:8px;border-radius:50%"></span> Match souls tagged with coven — pick one or more labels</div>
+                    <div class="chips">
+                      <span class="chip sel" data-k="coven"><span class="d" style="background:var(--coven)"></span>payments</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>checkout</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>ledger</span>
+                      <span class="chip" data-k="coven"><span class="d" style="background:var(--coven)"></span>fraud</span>
+                      <span class="chip" data-k="coven" style="border-style:dashed">＋ label…</span>
+                    </div>
+                    <div class="scope-preview">incarnation.view-secrets <b>on coven=payments</b></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- destroy: unchecked -->
+              <div class="actrow">
+                <div class="actmain">
+                  <span class="chk ds">·</span>
+                  <span class="actname" style="color:var(--text-muted)">incarnation.destroy</span>
+                  <span class="actdesc">Tear down &amp; release resources</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- host-mode illustration: for host-keyed actions (soul / errand) scope becomes a SID list -->
+          <div class="scope" style="margin:0 18px 16px;background:var(--surface)">
+            <div class="scope-h">◔ Host-scoped actions (soul.issue-token, errand.run) — scope by soulprint</div>
+            <div class="tabset">
+              <span class="tp" data-k="coven"><span class="dot coven"></span>coven</span>
+              <span class="tp on" data-k="host"><span class="dot host"></span>host</span>
+              <span class="tp" style="border-style:dashed;color:var(--text-faint)">＋ unscoped (any)</span>
+            </div>
+            <div class="picker">
+              <div class="lead"><span class="dot host" style="width:8px;height:8px;border-radius:50%"></span> Pick specific souls by SID — host mode swaps labels for a SID list</div>
+              <div class="hostsearch">
+                <span class="mag">⌕</span>
+                <input value="os.family=debian" />
+              </div>
+              <div class="sidrow sel"><span class="schk">✓</span><span class="sid">01J8-KWZ3-EDGE-01</span><span class="sp">debian · edge</span></div>
+              <div class="sidrow sel"><span class="schk">✓</span><span class="sid">01J8-KWZ3-EDGE-02</span><span class="sp">debian · edge</span></div>
+              <div class="sidrow"><span class="schk"></span><span class="sid">01J8-MPX9-CORE-07</span><span class="sp">debian · core</span></div>
+              <div class="scope-preview">soul.issue-token <b>on host∈{01J8-KWZ3-EDGE-01, 01J8-KWZ3-EDGE-02}</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        Risk groups (<span style="color:var(--success)">Read</span> / <span style="color:var(--info)">Write</span> / <span style="color:var(--danger)">Destructive</span>) with group-level "All" let you grant "read-only" in one click and immediately surface dangerous permissions — a colored bar and "⚠ High-impact" highlight destroy / view-secrets. Downside: a risk-based layout hides the familiar alphabetical order of actions within a resource.
+      </div>
+
+      <div class="footer">
+        <button class="btn primary">Create role</button>
+        <button class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
