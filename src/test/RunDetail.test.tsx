@@ -48,6 +48,46 @@ describe('RunDetail', () => {
     expect(screen.getByText('host-b.local')).toBeInTheDocument();
     // Successful run -- no "Failed task" section.
     expect(screen.queryByText('Failed task')).not.toBeInTheDocument();
+    // No input in the response (omitempty) -- the Input block is not rendered.
+    expect(screen.queryByTestId('run-input-section')).not.toBeInTheDocument();
+  });
+
+  it('renders the Input block with masked secret and intact non-secret fields', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: `/v1/incarnations/redis-prod/runs/${APPLY_ID}`,
+        body: {
+          apply_id: APPLY_ID,
+          scenario: 'create',
+          status: 'success',
+          started_at: '2026-06-30T10:00:00Z',
+          finished_at: '2026-06-30T10:05:00Z',
+          input: {
+            version: '7.2',
+            db_password: '***MASKED***',
+            users: [{ name: 'alice', perms: ['read', 'write'] }],
+          },
+          hosts: [
+            { sid: 'host-a.local', status: 'success', passage: 0, attempt: 1, cancel_requested: false },
+          ],
+        },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name/runs/:applyId" element={<RunDetail />} />
+      </Routes>,
+      `/incarnations/redis-prod/runs/${APPLY_ID}`,
+    );
+
+    const section = await waitFor(() => screen.getByTestId('run-input-section'));
+    // Secret masked as-is (not re-masked), non-secret and nested fields intact.
+    expect(section).toHaveTextContent('***MASKED***');
+    expect(section).toHaveTextContent('7.2');
+    expect(section).toHaveTextContent('alice');
+    expect(section).toHaveTextContent('write');
   });
 
   it('renders a failed run with the failed-task block (task_idx + error_summary)', async () => {
