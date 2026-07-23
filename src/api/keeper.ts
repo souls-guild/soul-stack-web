@@ -25,7 +25,12 @@ export type IncarnationHistoryReply = components['schemas']['IncarnationHistoryR
 // of apply_runs by apply_id for a single incarnation (create/rerun-last/operational scenario run).
 export type RunSummaryEntry = components['schemas']['RunSummaryEntry'];
 export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply'];
-export type RunDetailReply = components['schemas']['RunDetailReply'];
+// input — masked snapshot of the operator input for the run (secrets already
+// ***MASKED*** on the backend write path). Extended manually until the vendor
+// openapi is re-synced and `npm run gen:api` picks the field into the base schema.
+export type RunDetailReply = components['schemas']['RunDetailReply'] & {
+  input?: Record<string, unknown>;
+};
 export type RunHostStatusEntry = components['schemas']['RunHostStatusEntry'];
 
 // GET /runs/{apply_id}/tasks (NIM-37 Schema-2). Server joins the plan (name/module/

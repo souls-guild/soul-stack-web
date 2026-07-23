@@ -83,6 +83,8 @@
   "runFailedTaskTitle": "Failed task",
   "runHostsEmpty": "No hosts yet.",
   "runHostsTitle": "Hosts",
+  "runInputTitle": "Input",
+  "runInputMaskedHint": "Secret values are masked.",
   "runKeeperSideBadge": "keeper-side",
   "runKeeperSideHint": "This task runs on keeper (on: keeper), not a Soul — there is no soul page for it.",
   "runLiveBadge": "live",

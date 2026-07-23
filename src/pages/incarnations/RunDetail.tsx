@@ -7,6 +7,7 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
+import { JsonViewer } from '../../components/JsonViewer';
 import { runStatusTone } from '../../components/status';
 import { subscribeRunEvents } from '../../api/runEvents';
 import { RunTasks } from './RunTasks';
@@ -188,6 +189,16 @@ export function RunDetail() {
           ) : null}
         </div>
       </section>
+
+      {run.input && Object.keys(run.input).length > 0 ? (
+        <section className={styles.section} aria-label="Run input" data-testid="run-input-section">
+          <h2 className={styles.sectionTitle}>{t('runhistory:runInputTitle')}</h2>
+          <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-muted)' }}>
+            {t('runhistory:runInputMaskedHint')}
+          </p>
+          <JsonViewer value={run.input} />
+        </section>
+      ) : null}
 
       {failedHosts.length > 0 ? (
         <section className={styles.section} aria-label="Failed task" data-testid="run-failed-section">
