@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
-import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, CalendarClock, Info } from 'lucide-react';
+import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, SquareTerminal, CalendarClock, Info } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { CONSTRAINTS } from '../../api/constraints.gen';
 import type {
@@ -49,6 +49,7 @@ import {
   type HostCriteria,
 } from './hostSelector';
 import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder';
+import { consoleHrefFrom } from '../console/consoleLink';
 import { ModulePicker } from './ModulePicker';
 import { hasParams, paramsToInputSchema } from './moduleParams.helpers';
 import { ChipsInput } from '../incarnations/ChipsInput';
@@ -74,12 +75,19 @@ const STEPS: Array<{ id: 1 | 2 | 3 | 4; label: string }> = [
   { id: 4, label: 'Options' },
 ];
 
+// Multi-console is offered next to the two wizard workloads but is not one: an
+// interactive PTY wall has nothing to submit, so picking it leaves the wizard
+// for the full-screen page instead of advancing to Step 2.
+type WorkloadChoice = Workload | 'console';
+
 // Step 1 — workload selection. `title` is the workload entity name (English, not translated);
 // `descKey` is the i18n key for the description (translated).
-const WORKLOADS: Array<{ kind: Workload; title: string; descKey: string; icon: typeof Box }> = [
+const WORKLOADS: Array<{ kind: WorkloadChoice; title: string; descKey: string; icon: typeof Box }> = [
   { kind: 'scenario', title: 'Scenario apply', descKey: 'run:workloadScenarioDesc', icon: Box },
   { kind: 'command', title: 'Command', descKey: 'run:workloadCommandDesc', icon: Terminal },
+  { kind: 'console', title: 'Multi-console', descKey: 'run:workloadConsoleDesc', icon: SquareTerminal },
 ];
+
 
 interface ScenarioStateValues {
   service: string;
@@ -310,6 +318,16 @@ export function RunWizard() {
     () => hasAnyCriteria(initialCriteria),
     [initialCriteria],
   );
+
+  // Multi-console leaves the wizard entirely (see WORKLOADS). `?workload=console`
+  // is honoured on entry so bulk-run links can target the wall directly.
+  const openConsole = useCallback(
+    () => navigate(consoleHrefFrom(searchParams)),
+    [navigate, searchParams],
+  );
+  useEffect(() => {
+    if (searchParams.get('workload') === 'console') navigate(consoleHrefFrom(searchParams), { replace: true });
+  }, [searchParams, navigate]);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(draft?.step ?? 1);
   const [workload, setWorkload] = useState<Workload>(draft?.workload ?? initialWorkload);
@@ -927,6 +945,7 @@ export function RunWizard() {
           <Step1
             workload={workload}
             onWorkloadChange={setWorkload}
+            onOpenConsole={openConsole}
             runMode={runMode}
             onRunModeChange={setRunMode}
           />
@@ -1091,11 +1110,13 @@ function Stepper({
 function Step1({
   workload,
   onWorkloadChange,
+  onOpenConsole,
   runMode,
   onRunModeChange,
 }: {
   workload: Workload;
   onWorkloadChange: (v: Workload) => void;
+  onOpenConsole: () => void;
   runMode: RunMode;
   onRunModeChange: (v: RunMode) => void;
 }) {
@@ -1148,7 +1169,7 @@ function Step1({
                 name="workload"
                 value={w.kind}
                 checked={active}
-                onChange={() => onWorkloadChange(w.kind)}
+                onChange={() => (w.kind === 'console' ? onOpenConsole() : onWorkloadChange(w.kind))}
                 aria-label={w.title}
               />
               <Icon size={18} style={{ marginTop: 2, color: 'var(--text-muted)' }} />

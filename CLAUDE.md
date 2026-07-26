@@ -71,6 +71,16 @@ src/
       RunWizard.tsx              — primary entry: 4-step (workload/params/target/options)
       WizardSteps.module.css
       targetTranslator.ts        — UI DSL → ErrandRunTarget + CEL where AND-merge
+    console/                     — 3rd Run mode (/run/console): live PTY shells
+      MultiConsolePage.tsx       — scope step → Connect → wall + group tabs
+      ScopePicker.tsx            — incarnation/coven/VM-name/soulprint + Connect
+      useHostResolution.ts       — criteria → SIDs (same 3 stages as the wizard)
+      consoleQuery.ts            — group query language (text <-> builder, flat)
+      GroupsEditor.tsx           — operator-defined groups: query or builder
+      consoleGrouping.ts         — evaluates group defs into tabs
+      consoleSessionStore.ts     — sessions over one WS; output bypasses React state
+      TerminalView.tsx           — the only xterm.js module (lazy-loaded chunk)
+      see docs/console-ws-contract.md — the /v1/console wire contract
     operators/                   — list (Archons)
     archons/
       ArchonsList.tsx            — multi-select roles + Hide-revoked filter

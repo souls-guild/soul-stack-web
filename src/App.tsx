@@ -39,6 +39,7 @@ import { OracleFiresList } from './pages/beacons/OracleFiresList';
 import { PushRunsList } from './pages/pushRuns/PushRunsList';
 import { PushRunDetail } from './pages/pushRuns/PushRunDetail';
 import { RunWizard } from './pages/run/RunWizard';
+import { MultiConsolePage } from './pages/console/MultiConsolePage';
 import { RunsFeed } from './pages/runs/RunsFeed';
 import { VoyageDetail } from './pages/voyages/VoyageDetail';
 import { CadencesList } from './pages/cadences/CadencesList';
@@ -131,6 +132,9 @@ export function App() {
             <Route path="/push-runs" element={<Protected><PushRunsList /></Protected>} />
             <Route path="/push-runs/:applyId" element={<Protected><PushRunDetail /></Protected>} />
             <Route path="/run" element={<Protected><RunWizard /></Protected>} />
+            {/* Third Run mode. Lives under /run: same section, but full-screen rather than a
+                wizard step — an interactive wall has nothing to submit. */}
+            <Route path="/run/console" element={<Protected><MultiConsolePage /></Protected>} />
             <Route path="/runs" element={<Protected><RunsFeed /></Protected>} />
             {/* Merged into unified /runs (Scenario segment); redirect for backward-compat links */}
             <Route path="/incarnation-runs" element={<Navigate to="/runs" replace />} />

@@ -1,7 +1,8 @@
 {
-  "crumbs": "unified entry-point: Scenario / Command",
+  "crumbs": "unified entry-point: Scenario / Command / Multi-console",
   "workloadScenarioDesc": "Apply a service scenario to selected incarnations (Voyage, pull mode, multi-select).",
   "workloadCommandDesc": "Ad-hoc exec on selected Souls (Voyage, command run).",
+  "workloadConsoleDesc": "Interactive shell on a selection of souls — a live console per host, broadcast to all",
   "workloadPushDesc": "Push destiny over SSH without an agent.",
   "stepWorkload": "Workload",
   "stepScenario": "Scenario",

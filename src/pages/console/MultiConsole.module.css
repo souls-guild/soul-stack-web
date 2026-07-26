@@ -1,0 +1,779 @@
+/* Multi-console wall. Terminal surfaces use the --term-* tokens, which stay
+   dark in every theme: the 16 ANSI colours the remote program emits are only
+   legible against a dark background. */
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: var(--t-body-size);
+  margin: var(--s-2) 0 0;
+  max-width: 900px;
+}
+
+/* ---------- banners ---------- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--s-3) var(--s-4);
+  font-size: 13px;
+  background: var(--surface);
+}
+
+.bannerWarn {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  color: var(--text);
+}
+
+.bannerDanger {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--text);
+}
+
+/* ---------- scope bar (above a live session) ---------- */
+
+.scopeBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--s-3) var(--s-4);
+}
+
+.selectionLabel {
+  font-size: var(--t-stat-label-size);
+  font-weight: var(--t-stat-label-weight);
+  letter-spacing: var(--t-stat-label-track);
+  text-transform: var(--t-stat-label-case);
+  color: var(--text-faint);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.chipMono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.selectionStats {
+  margin-left: auto;
+  display: flex;
+  gap: var(--s-4);
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.selectionStats b {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ---------- toolbar ---------- */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1;
+  min-width: 240px;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--text-faint);
+}
+
+.searchBox:focus-within {
+  border-color: var(--accent);
+}
+
+.searchBox input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.searchBox input:focus {
+  outline: none;
+}
+
+.foundLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.densityGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.densityIcon {
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.columnsSeg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.columnsBtn,
+.columnsBtnActive {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.columnsBtnActive {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* ---------- wall ---------- */
+
+.empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--s-10) var(--s-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Rows are a DEFINITE height on purpose. With auto rows the pane sizes itself
+   to the terminal, but xterm writes an explicit pixel height from fit() — so a
+   pane expanded to full screen and collapsed back would drag its inflated
+   height into the grid, ResizeObserver would re-fit to that larger box and
+   agree with itself, and the wall would ratchet taller on every expand.
+   A definite row makes the terminal fit INTO the pane instead. */
+.wall {
+  display: grid;
+  gap: var(--s-3);
+  grid-auto-rows: var(--console-row-h, 340px);
+}
+
+.cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (width <= 1100px) {
+  .cols3,
+  .cols4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (width <= 720px) {
+  .wall { grid-template-columns: minmax(0, 1fr); }
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.paneError {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.groupBadge {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--scope-incarnation);
+  background: color-mix(in srgb, var(--scope-incarnation) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--scope-incarnation) 32%, var(--border));
+}
+
+.paneHidden {
+  display: none;
+}
+
+/* Expanded in place rather than portalled into an overlay: moving the node
+   would remount the terminal and drop the session's scrollback. */
+.paneFocused {
+  position: fixed;
+  inset: var(--s-6);
+  /* inset drives the size here — height:100% from .pane would ignore `bottom`. */
+  height: auto;
+  z-index: 61;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / 55%);
+}
+
+.paneHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.paneName {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paneMeta {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.paneActions {
+  display: flex;
+  gap: 3px;
+}
+
+.paneIcon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.paneIcon:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* min-height:0 lets the flex child actually shrink to the pane; the default
+   `auto` would floor it at content height and reopen the growth path above. */
+.term {
+  flex: 1;
+  min-height: 0;
+  background: var(--term-bg);
+  padding: 6px 8px;
+  overflow: hidden;
+}
+
+/* ---------- broadcast bar ---------- */
+
+/* Sticky within the scrolling content column, NOT fixed to the viewport: a
+   fixed bar spans the whole window and slides under the sidebar, and it would
+   have to re-learn the sidebar's width every time it collapses. Sticky is laid
+   out inside .main, so the content column already bounds it. */
+.broadcast {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-top: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 -6px 24px rgb(0 0 0 / 10%);
+}
+
+.broadcastInner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  padding: var(--s-3) var(--s-4);
+}
+
+.broadcastPrompt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: 1;
+  min-width: 300px;
+  background: var(--term-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  color: var(--accent);
+}
+
+.broadcastPrompt input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--term-fg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.broadcastPrompt input:focus {
+  outline: none;
+}
+
+.broadcastPrompt input:disabled {
+  color: var(--text-faint);
+}
+
+.broadcastSent {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.broadcastHint {
+  width: 100%;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* ---------- scope step ---------- */
+
+.scope {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.scopeHead { display: flex; flex-direction: column; gap: var(--s-1); }
+
+.scopeTitle {
+  font-size: var(--t-h2-size);
+  font-weight: var(--t-h2-weight);
+  letter-spacing: var(--t-h2-track);
+  margin: 0;
+}
+
+.scopeHint { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+.scopeFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s-4);
+}
+
+.scopeField { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.fieldLabel {
+  font-size: var(--t-label-size);
+  font-weight: var(--t-label-weight);
+  color: var(--text-muted);
+}
+
+.scopeInput {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.scopeInput:focus { outline: none; border-color: var(--accent); }
+
+.scopeFieldHint { font-size: 11.5px; color: var(--text-faint); }
+.scopeWarn { font-size: 12px; color: var(--danger); }
+.scopeMuted { font-size: 12.5px; color: var(--text-faint); }
+
+.scopePreview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.scopeCount { display: flex; align-items: center; gap: var(--s-3); }
+
+.scopeList { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.scopeSid {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.scopeActions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+
+/* ---------- group tabs ---------- */
+
+.groupBar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--s-2);
+}
+
+.groupsBtn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.groupsBtn:hover { border-color: var(--border-strong); color: var(--text); }
+
+.tabWarnIcon { color: var(--danger); }
+
+.groupBy { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--text-faint); }
+
+.groupByLabel {
+  font-size: var(--t-stat-label-size);
+  font-weight: var(--t-stat-label-weight);
+  letter-spacing: var(--t-stat-label-track);
+  text-transform: var(--t-stat-label-case);
+}
+
+.groupSelect {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.tabs { display: flex; gap: var(--s-1); flex-wrap: wrap; }
+
+.tab, .tabActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 7px 14px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--text); background: var(--surface-2); }
+
+.tabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+.tabCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.tabActive .tabCount {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+/* ---------- groups editor ---------- */
+
+.groupsEditor {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.groupsEditorHead { display: flex; flex-direction: column; gap: var(--s-1); }
+
+.autoSplit {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  color: var(--text-faint);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--s-2) var(--s-3);
+}
+
+.autoSplitBtn {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  padding: 3px 11px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.autoSplitBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+.groupsList { display: flex; flex-direction: column; gap: var(--s-3); }
+
+.groupRow {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.groupRowHead { display: flex; align-items: center; gap: var(--s-3); }
+
+.groupName {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.groupName:focus, .groupQuery:focus { outline: none; border-color: var(--accent); }
+
+.groupCount, .groupCountZero {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.groupCount { color: var(--accent); }
+.groupCountZero { color: var(--text-faint); }
+
+.groupQuery {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* ---------- query builder ---------- */
+
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--border);
+}
+
+.builderRow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.builderLead, .builderJoin {
+  min-width: 62px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.builderJoin, .builderField, .builderOp {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 7px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.builderValue {
+  flex: 1;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.builderValue:focus { outline: none; border-color: var(--accent); }
+
+.builderAdd {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.groupsFoot { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+
+/* ---------- per-VM arming ---------- */
+
+.selectionToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.selectionCount, .selectionCountZero {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.selectionCount { color: var(--text-muted); }
+.selectionCountZero { color: var(--danger); font-weight: 500; }
+
+.selectionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.selectionBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.selectionBtn:disabled { opacity: 0.45; cursor: default; }
+
+.paneCheck {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Armed: a teal edge marks the consoles a tab send would reach. */
+.paneArmed {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Un-armed: visibly stood down. Still readable and still typeable directly —
+   the checkbox governs group sends only — but unmistakably out of the blast
+   radius at a glance. */
+.paneMuted {
+  opacity: 0.5;
+  filter: saturate(0.5);
+}
+
+.paneMuted .paneHead { background: var(--bg); }
+
+.paneMuted:hover { opacity: 0.75; }
+
+.broadcastWarn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  font-size: 12.5px;
+  color: var(--danger);
+}

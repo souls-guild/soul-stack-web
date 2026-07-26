@@ -23,7 +23,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/v1': { target: keeperTarget, changeOrigin: true },
+      // ws:true is required for the multi-console upgrade (/v1/console); without
+      // it the dev server answers the Upgrade request with plain HTTP.
+      '/v1': { target: keeperTarget, changeOrigin: true, ws: true },
       '/healthz': { target: keeperTarget, changeOrigin: true },
       '/readyz': { target: keeperTarget, changeOrigin: true },
       '/openapi.yaml': { target: keeperTarget, changeOrigin: true },

@@ -36,6 +36,15 @@
   --rail-and:          #0d9488;
   --rail-or:           #f59e0b;
 
+  /* ---------- Terminal surfaces (multi-console) ----------
+     Dark in every theme on purpose: the ANSI palette a remote program emits is
+     only legible on a dark background, and re-mapping it would misreport the
+     host's output. Only the surface, cursor and selection are themed. */
+  --term-bg:        #0d0f0e;
+  --term-fg:        #d6d3d1;
+  --term-cursor:    #34d399;
+  --term-selection: rgb(13 148 136 / 38%);
+
   /* ---------- Geometry ---------- */
   --radius:        8px;
   --radius-lg:     12px;
@@ -121,6 +130,9 @@
   --scope-trait:       #f472b6;
   --rail-and:          #14b8a6;
   --rail-or:           #fbbf24;
+  --term-bg:        #0b0d0c;
+  --term-cursor:    #2dd4bf;
+  --term-selection: rgb(20 184 166 / 35%);
   color-scheme: dark;
 }
 
