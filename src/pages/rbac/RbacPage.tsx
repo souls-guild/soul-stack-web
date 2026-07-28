@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pencil, ShieldPlus, Trash2, UserPlus, X } from 'lucide-react';
 import { keeperApi, type RoleView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { Badge, Button } from '../../components/primitives';
 import { DeleteRoleModal } from './DeleteRoleModal';
 import { AssignRoleModal } from './AssignRoleModal';
@@ -17,9 +18,11 @@ interface RolesTabProps {
   roles: RoleView[];
   onEdit: (r: RoleView) => void;
   onDelete: (r: RoleView) => void;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
-function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
+function RolesTab({ roles, onEdit, onDelete, canEdit, canDelete }: RolesTabProps) {
   const { t } = useTranslation();
   return (
     <table className={styles.table}>
@@ -27,6 +30,7 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
         <tr>
           <th>Name</th>
           <th>Builtin</th>
+          <th>Derived from</th>
           <th>Description</th>
           <th>Permissions</th>
           <th>Archons</th>
@@ -38,27 +42,59 @@ function RolesTab({ roles, onEdit, onDelete }: RolesTabProps) {
           <tr key={r.name}>
             <td className="mono">{r.name}</td>
             <td>{r.builtin ? <Badge tone="info">builtin</Badge> : '—'}</td>
+            {/* parent_role (ADR-078): a derived role is bounded by it — visible without opening the role. */}
+            <td className="mono">
+              {r.parent_role ? (
+                <span data-testid={`role-parent-${r.name}`}>{r.parent_role}</span>
+              ) : (
+                '—'
+              )}
+            </td>
             <td>{r.description ?? '—'}</td>
-            <td className="mono">{(r.permissions ?? []).length}</td>
+            {/* Stored count, plus the resolved one when derivation attenuates it. */}
+            <td className="mono">
+              {(r.permissions ?? []).length}
+              {r.parent_role && (r.effective_permissions ?? []).length !== (r.permissions ?? []).length ? (
+                <span
+                  title={t('admin:rbacEffectiveCountTitle')}
+                  style={{ color: 'var(--text-faint)' }}
+                >
+                  {` → ${(r.effective_permissions ?? []).length}`}
+                </span>
+              ) : null}
+            </td>
             <td className="mono">{(r.operators ?? []).length}</td>
             <td>
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                 <button
                   type="button"
                   aria-label={t('forms:ariaEditPermissions', { name: r.name })}
-                  title={r.builtin ? t('pages:builtinEditDenied') : t('admin:rbacBuiltinEditTitle')}
+                  title={
+                    !canEdit
+                      ? t('admin:rbacNoRoleUpdate')
+                      : r.builtin
+                        ? t('pages:builtinEditDenied')
+                        : t('admin:rbacBuiltinEditTitle')
+                  }
+                  disabled={!canEdit}
                   onClick={() => onEdit(r)}
-                  style={iconBtn(false)}
+                  style={iconBtn(false, !canEdit)}
                 >
                   <Pencil size={14} />
                 </button>
                 <button
                   type="button"
                   aria-label={t('forms:ariaDeleteRole', { name: r.name })}
-                  title={r.builtin ? t('pages:builtinDeleteDenied') : t('admin:rbacBuiltinDeleteTitle')}
-                  disabled={r.builtin}
+                  title={
+                    !canDelete
+                      ? t('admin:rbacNoRoleDelete')
+                      : r.builtin
+                        ? t('pages:builtinDeleteDenied')
+                        : t('admin:rbacBuiltinDeleteTitle')
+                  }
+                  disabled={r.builtin || !canDelete}
                   onClick={() => onDelete(r)}
-                  style={iconBtn(true, r.builtin)}
+                  style={iconBtn(true, r.builtin || !canDelete)}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -100,6 +136,14 @@ function PermissionsTab({ roles, onEdit }: PermissionsTabProps) {
           <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="mono">{r.name}</span>
             {r.builtin ? <Badge tone="info">builtin</Badge> : null}
+            {r.parent_role ? (
+              <span
+                data-testid={`role-derived-badge-${r.name}`}
+                style={{ fontSize: 11.5, color: 'var(--text-muted)' }}
+              >
+                {t('admin:rbacDerivedFrom', { name: r.parent_role })}
+              </span>
+            ) : null}
             <span style={{ flex: 1 }} />
             <Button
               type="button"
@@ -134,6 +178,33 @@ function PermissionsTab({ roles, onEdit }: PermissionsTabProps) {
               ))}
             </div>
           )}
+          {/* A derived role's stored rows are not what it grants — the resolved form is. */}
+          {r.parent_role ? (
+            <div data-testid={`role-effective-${r.name}`} style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginBottom: 4 }}>
+                {t('admin:rbacEffectiveHeading', { name: r.parent_role })}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {(r.effective_permissions ?? []).map((p) => (
+                  <code
+                    key={p}
+                    style={{
+                      padding: '2px 8px',
+                      background: 'color-mix(in srgb, var(--accent) 8%, var(--surface-2))',
+                      border: '1px solid color-mix(in srgb, var(--accent) 26%, var(--border))',
+                      borderRadius: 'var(--radius-pill)',
+                      fontSize: 12,
+                    }}
+                  >
+                    {p}
+                  </code>
+                ))}
+                {(r.effective_permissions ?? []).length === 0 ? (
+                  <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>{t('pages:noPermissions')}</span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </section>
       ))}
     </div>
@@ -278,6 +349,13 @@ export function RbacPage() {
   const [tab, setTab] = useState<Tab>('roles');
   const [deleting, setDeleting] = useState<RoleView | null>(null);
   const [assigningAid, setAssigningAid] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  // Actions the caller cannot perform are disabled rather than offered and 403'd.
+  const { hasPermission } = useMyPermissions();
+  const canCreate = hasPermission('role.create');
+  const canEdit = hasPermission('role.update');
+  const canDelete = hasPermission('role.delete');
 
   // Edit is a dedicated page (was a cramped modal) — same layout as Create.
   const editRole = (r: RoleView) => nav(`/rbac/roles/${encodeURIComponent(r.name)}/edit`);
@@ -295,8 +373,20 @@ export function RbacPage() {
     enabled: tab === 'members',
   });
 
-  const roles = useMemo(() => rolesQ.data?.items ?? [], [rolesQ.data]);
+  const allRoles = useMemo(() => rolesQ.data?.items ?? [], [rolesQ.data]);
   const operators = operatorsQ.data?.items ?? [];
+
+  // Name / description / parent filter — a real cluster's catalog outgrows one screen.
+  const roles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allRoles;
+    return allRoles.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q)
+        || (r.description ?? '').toLowerCase().includes(q)
+        || (r.parent_role ?? '').toLowerCase().includes(q),
+    );
+  }, [allRoles, search]);
 
   return (
     <div className={styles.page}>
@@ -306,7 +396,13 @@ export function RbacPage() {
           <div className={styles.crumbs}>{t('pages:rbacCrumbs')}</div>
         </div>
         {tab === 'roles' ? (
-          <Button type="button" variant="primary" onClick={() => nav('/rbac/roles/new')}>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={!canCreate}
+            title={canCreate ? undefined : t('admin:rbacNoRoleCreate')}
+            onClick={() => nav('/rbac/roles/new')}
+          >
             <ShieldPlus size={14} style={{ marginRight: 6 }} />
             {t('createRole')}
           </Button>
@@ -343,6 +439,31 @@ export function RbacPage() {
         </button>
       </div>
 
+      {allRoles.length > 0 && tab !== 'members' ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 12px' }}>
+          <input
+            type="text"
+            data-testid="rbac-role-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('admin:rbacRoleSearch')}
+            aria-label={t('admin:rbacRoleSearch')}
+            style={{
+              width: 280,
+              fontSize: 13,
+              padding: '6px 10px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              color: 'var(--text)',
+            }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+            {t('admin:rbacRoleCount', { shown: roles.length, total: allRoles.length })}
+          </span>
+        </div>
+      ) : null}
+
       {rolesQ.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
       {rolesQ.error ? (
         <div className={styles.errorBox}>
@@ -353,19 +474,27 @@ export function RbacPage() {
       ) : null}
 
       {rolesQ.data && roles.length === 0 ? (
-        <div className={styles.empty}>{t('pages:noRoles')}</div>
+        <div className={styles.empty}>
+          {allRoles.length > 0 ? t('admin:rbacRoleNoMatch') : t('pages:noRoles')}
+        </div>
       ) : null}
 
       {roles.length > 0 ? (
         <>
           {tab === 'roles' ? (
-            <RolesTab roles={roles} onEdit={editRole} onDelete={setDeleting} />
+            <RolesTab
+              roles={roles}
+              onEdit={editRole}
+              onDelete={setDeleting}
+              canEdit={canEdit}
+              canDelete={canDelete}
+            />
           ) : null}
           {tab === 'permissions' ? (
             <PermissionsTab roles={roles} onEdit={editRole} />
           ) : null}
           {tab === 'members' ? (
-            <MembersTab roles={roles} operators={operators} onAssign={setAssigningAid} />
+            <MembersTab roles={allRoles} operators={operators} onAssign={setAssigningAid} />
           ) : null}
         </>
       ) : null}

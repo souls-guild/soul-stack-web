@@ -1477,13 +1477,13 @@ export interface paths {
         };
         /**
          * List roles
-         * @description Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. Read-only, no audit.
+         * @description Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. Each role comes both AS STORED (permissions/default_scope) and AS RESOLVED against its derivation chain (effective_permissions/effective_scope, ADR-078) — consumers must not re-derive inheritance from parent_role. Read-only, no audit.
          */
         get: operations["listRoles"];
         put?: never;
         /**
          * Create role
-         * @description Creates RBAC role with set of permissions (ADR-022). Permission role.create. 409 — name already taken.
+         * @description Creates RBAC role with set of permissions (ADR-022). Permission role.create. Optional parent_role derives the role from another one (ADR-078), bounding it by that role. 409 — name already taken; 404 — parent_role not found; 403 — beyond the parent or beyond the caller's own rights.
          */
         post: operations["createRole"];
         delete?: never;
@@ -1567,7 +1567,7 @@ export interface paths {
         head?: never;
         /**
          * Replace role permissions
-         * @description Replace semantics: set completely replaces existing (ADR-022). Permission role.update. 409 — builtin/last-admin.
+         * @description Replace semantics: set completely replaces existing (ADR-022). Permission role.update. default_scope/parent_role follow PATCH presence (omitted → untouched). 409 — builtin/last-admin; 403 — beyond the parent role (ADR-078).
          */
         patch: operations["updateRolePermissions"];
         trace?: never;
@@ -1662,6 +1662,26 @@ export interface paths {
          * @description Replace semantics for git/ref/refresh, name is immutable (ADR-028). Permission service.update. 404 - entry absent.
          */
         patch: operations["updateService"];
+        trace?: never;
+    };
+    "/v1/services/{name}/compat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * engine-compat window of a Service (declared keeper versions) + this keeper's version
+         * @description Effective keeper-version window of the service (ADR-0076): the intersection of the `compat:` block declared by service.yml and by EVERY destiny the service pulls at its pinned ref - the narrowest wins. `entities[]` carries each contribution so a narrow bound is attributable to the artifact that set it; `effective_window` is null when nothing declares one (unbounded - existing services keep working). `status` is a backend catalog value the UI renders as-is: ok | unsupported (a run on this instance is rejected with keeper_version_unsupported) | not_enforced (this build carries no comparable version, e.g. 0.0.0-dev) | window_empty (the declarations do not overlap - an authoring error). `keeper_version` is the raw build string of the instance serving the request, `keeper_release` the release core actually compared - during a rolling upgrade instances differ, and enforcement belongs to the instance that renders. Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for a pinned commit-SHA ref, otherwise no-cache. 502 - loader failed (service or destiny repo unreachable).
+         */
+        get: operations["getServiceCompat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/services/{name}/dependencies": {
@@ -1779,6 +1799,50 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Keeper runtime settings catalog
+         * @description Every admitted runtime setting with its type, range bounds, built-in default, the EFFECTIVE value on this instance and its source (default < file < pg, ADR-0073). Renders the settings form without hardcoding the field list in the UI. Permission setting.read. Read-only, no audit.
+         */
+        get: operations["listSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Override a Keeper runtime setting
+         * @description Writes a cluster-wide override into keeper_settings and invalidates the other Keeper nodes, which re-merge it onto their keeper.yml without a restart (ADR-0073). Permission setting.update. 404 - the key is not in the registry; 422 - unparsable or out-of-range value, nothing is written.
+         */
+        put: operations["updateSetting"];
+        post?: never;
+        /**
+         * Drop a Keeper runtime setting override
+         * @description Removes the keeper_settings row, so the keeper.yml value (or the built-in default) is back in effect cluster-wide — the clean revert of ADR-0073(f). Permission setting.delete. 404 - the key is not in the registry, or there is no override to drop.
+         */
+        delete: operations["deleteSetting"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2668,6 +2732,18 @@ export interface components {
                 [key: string]: string;
             };
             self_kid: string;
+        };
+        CompatEntityView: {
+            compatible: boolean;
+            kind: string;
+            name: string;
+            ref?: string;
+            window: components["schemas"]["CompatWindowView"];
+        };
+        CompatWindowView: {
+            display: string;
+            max?: string;
+            min?: string;
         };
         DecreeCreateRequest: {
             /** @description scenario input (vault-ref passed through as-is) */
@@ -3598,12 +3674,14 @@ export interface components {
             token_ttl?: string;
         };
         RoleCreateRequest: {
-            /** @description role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted/null → role without scope */
+            /** @description role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted/null → role without scope. On a DERIVED role (parent_role set) this is the attenuating delta, conjoined with the parent's effective scope — write only the ADDED narrowing */
             default_scope?: string;
             /** @description human-readable role description for UI/audit */
             description?: string;
             /** @description role name (kebab-case), unique in cluster */
             name: string;
+            /** @description derive from this role (ADR-078): it becomes the ceiling and the new role can never exceed it — permissions outside it are refused, its scope is conjoined onto every permission. Omitted/null → a plain role. Requires the caller to hold the parent's rights */
+            parent_role?: string;
             /** @description set of permission strings for role (e.g., incarnation.run, soul.*, *) */
             permissions?: string[] | null;
         };
@@ -3612,18 +3690,26 @@ export interface components {
             items: components["schemas"]["RoleView"][] | null;
         };
         RolePermissionsUpdateRequest: {
-            /** @description scope: boolean predicate over coven/service/incarnation/host/trait; omitted → scope untouched; present (incl. null) → replaces (null removes scope) */
+            /** @description scope: boolean predicate over coven/service/incarnation/host/trait; omitted → scope untouched; present (incl. null) → replaces (null removes scope). On a derived role it is the attenuating delta */
             default_scope?: string | null;
+            /** @description re-root the role's derivation (ADR-078); omitted → untouched; present (incl. null) → replaces (null makes the role plain again). The ceiling is re-checked on every update: the result must stay within the parent and the caller must hold it */
+            parent_role?: string | null;
             /** @description complete new set of permission strings (replace) */
             permissions: string[] | null;
         };
         RoleView: {
             builtin: boolean;
-            /** @description role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted → role without scope */
+            /** @description role scope AS STORED: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted → role without scope. On a derived role this is only the attenuating delta — see effective_scope */
             default_scope?: string;
             description?: string;
+            /** @description permissions AS RESOLVED against the derivation chain (ADR-078): own ∩ the parent's effective, every scope capped by the chain's ceiling. Equals permissions on a plain role. Consumers read THIS instead of walking parent_role */
+            effective_permissions: string[] | null;
+            /** @description role scope AS RESOLVED: the parent's effective scope AND this role's delta; omitted → unrestricted. Bare permissions inherit it, as on a plain role */
+            effective_scope?: string;
             name: string;
             operators: string[] | null;
+            /** @description the role this one derives from (ADR-078) — its ceiling; omitted → a plain role */
+            parent_role?: string;
             permissions: string[] | null;
         };
         RunDetailReply: {
@@ -3631,6 +3717,9 @@ export interface components {
             /** Format: date-time */
             finished_at?: string;
             hosts: components["schemas"]["RunHostStatusEntry"][] | null;
+            input?: {
+                [key: string]: unknown;
+            };
             scenario: string;
             /** Format: date-time */
             started_at: string;
@@ -3779,6 +3868,18 @@ export interface components {
             show_when?: string;
             title?: string;
         };
+        ServiceCompatReply: {
+            detail?: string;
+            effective_window: components["schemas"]["CompatWindowView"];
+            enforced: boolean;
+            entities: components["schemas"]["CompatEntityView"][] | null;
+            keeper_release?: string;
+            keeper_version: string;
+            ref: string;
+            service: string;
+            sha1: string;
+            status: string;
+        };
         ServiceDependenciesReply: {
             destiny: components["schemas"]["ServiceDependency"][] | null;
             modules: components["schemas"]["ServiceDependency"][] | null;
@@ -3862,6 +3963,27 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             updated_by_aid?: string;
+        };
+        SettingReply: {
+            /** @description accepted range, e.g. (0, 1] */
+            bounds: string;
+            default: unknown;
+            description: string;
+            key: string;
+            /** @enum {string} */
+            source: "default" | "file" | "pg";
+            /** @enum {string} */
+            type: "float" | "int";
+            /** @description effective value on this instance */
+            value: unknown;
+            yaml_path: string;
+        };
+        SettingUpdateRequest: {
+            /** @description new value in text form (e.g. "0.5"); parsed and range-checked by the field registry */
+            value: string;
+        };
+        SettingsCatalogReply: {
+            items: components["schemas"]["SettingReply"][] | null;
         };
         SigilKeyIntroduceReply: {
             /** Format: date-time */
@@ -10613,6 +10735,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
             /** @description Conflict */
             409: {
                 headers: {
@@ -11344,6 +11475,82 @@ export interface operations {
             };
         };
     };
+    getServiceCompat: {
+        parameters: {
+            query?: {
+                /** @description optional git-ref override (omitted -> ref from registry) */
+                ref?: string;
+            };
+            header?: {
+                /** @description conditional GET: 304 if it matches ETag (snapshot SHA1) */
+                "If-None-Match"?: string;
+            };
+            path: {
+                /** @description Service name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceCompatReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listServiceDependencies: {
         parameters: {
             query?: {
@@ -11770,6 +11977,175 @@ export interface operations {
             };
             /** @description Bad Gateway */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsCatalogReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description setting key from GET /v1/settings (cfg_* namespace of keeper_settings) */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteSetting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description setting key whose override is dropped */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -2,7 +2,7 @@
 // constructors and pruning of in-progress empty rows before serialization. Kept
 // out of ScopeBuilder.tsx so the component file exports only components.
 
-import type { ScopeCond, ScopeDim, ScopeGroup, ScopeNode } from './scopeExpr';
+import { parseScope, serializeScope, type ScopeCond, type ScopeDim, type ScopeGroup, type ScopeNode } from './scopeExpr';
 
 export function newCond(dim: ScopeDim): ScopeCond {
   if (dim === 'trait') return { kind: 'cond', dim: 'trait', key: '', match: 'in', values: [''] };
@@ -36,4 +36,30 @@ export function pruneScope(node: ScopeNode | null | undefined): ScopeNode | null
   if (kids.length === 0) return null;
   if (kids.length === 1) return kids[0];
   return { ...node, children: kids };
+}
+
+// --- editor slot: a parsed tree, or the raw string when it doesn't parse ---
+
+/**
+ * One scope under edit: a boolean tree for the builder or, when an existing scope
+ * string doesn't parse, a raw-string fallback the operator can still edit verbatim
+ * (graceful degradation — NIM-128).
+ */
+export type ScopeSlot = { kind: 'tree'; node: ScopeNode | null } | { kind: 'raw'; text: string };
+
+/** The canonical wire string of a slot ('' = no scope). */
+export function slotScopeString(slot: ScopeSlot | undefined): string {
+  if (!slot) return '';
+  if (slot.kind === 'raw') return slot.text.trim();
+  return serializeScope(pruneScope(slot.node));
+}
+
+/** Reads an existing scope string into a slot; unparseable → a raw slot. */
+export function slotFromScope(scope: string | undefined): ScopeSlot | undefined {
+  if (!scope) return undefined;
+  try {
+    return { kind: 'tree', node: parseScope(scope) };
+  } catch {
+    return { kind: 'raw', text: scope };
+  }
 }

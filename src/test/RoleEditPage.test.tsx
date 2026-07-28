@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
@@ -63,6 +63,7 @@ interface Call {
 function recordingFetch(opts: {
   rolesList: typeof SAMPLE;
   permissions?: typeof PERMISSIONS_SAMPLE;
+  myPermissions?: unknown;
   conflict?: { path: RegExp; method: string; status: number; type?: string; detail?: string };
 }): Call[] {
   const calls: Call[] = [];
@@ -84,6 +85,12 @@ function recordingFetch(opts: {
       );
     }
 
+    if (url.startsWith('/v1/me/permissions') && method === 'GET') {
+      if (!opts.myPermissions) return new Response('{}', { status: 599 });
+      return new Response(JSON.stringify(opts.myPermissions), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
     if (url.startsWith('/v1/permissions') && method === 'GET') {
       return new Response(JSON.stringify(opts.permissions ?? PERMISSIONS_SAMPLE), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -215,5 +222,148 @@ describe('RoleEditPage (NIM-128)', () => {
 
     expect(await screen.findByRole('heading', { name: /not found/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/rbac');
+  });
+
+  // NIM-182 / ADR-078 — a derived role is edited under its parent's ceiling.
+  describe('derived role', () => {
+    const DERIVED = {
+      items: [
+        {
+          name: 'soul-reader',
+          description: 'parent',
+          builtin: false,
+          permissions: ['soul.list', 'soul.read'],
+          operators: [] as string[],
+          default_scope: 'coven=ops',
+          effective_permissions: ['soul.list', 'soul.read'],
+          effective_scope: 'coven=ops',
+        },
+        {
+          name: 'soul-reader-web',
+          description: 'child',
+          builtin: false,
+          permissions: ['soul.list'],
+          operators: [] as string[],
+          parent_role: 'soul-reader',
+          default_scope: 'trait.tier=web',
+          effective_permissions: ['soul.list on coven=ops AND trait.tier=web'],
+          effective_scope: 'coven=ops AND trait.tier=web',
+        },
+      ],
+    };
+
+    it('shows the inherited ceiling and disables what the parent does not grant', async () => {
+      recordingFetch({ rolesList: DERIVED });
+      renderEdit('soul-reader-web');
+      const user = userEvent.setup();
+
+      await screen.findByRole('heading', { name: /Permissions: soul-reader-web/i });
+      const panel = await screen.findByTestId('inherited-ceiling-panel');
+      expect(panel).toHaveTextContent(/soul-reader/);
+      expect(within(panel).getByTestId('inherited-scope')).toHaveTextContent('coven=ops');
+
+      await user.click(await screen.findByRole('button', { name: 'resource soul' }));
+      expect(screen.getByRole('checkbox', { name: 'soul.list' })).toBeChecked();
+      // soul.exec is in the catalog but outside the parent.
+      expect(screen.getByRole('checkbox', { name: 'soul.exec' })).toBeDisabled();
+      // Another resource entirely — nothing there is grantable.
+      expect(screen.getByTestId('perm-resource-blocked-incarnation')).toBeInTheDocument();
+    });
+
+    it('PATCH carries the delta as default_scope and leaves parent_role untouched', async () => {
+      const calls = recordingFetch({ rolesList: DERIVED });
+      renderEdit('soul-reader-web');
+      const user = userEvent.setup();
+
+      await screen.findByRole('heading', { name: /Permissions: soul-reader-web/i });
+      // The stored delta seeds the builder — not the parent's scope.
+      const delta = await screen.findByRole('group', { name: /narrowing delta on top of soul-reader/i });
+      expect(within(delta).getByTestId('scope-trait-key')).toHaveValue('tier');
+
+      await user.click(screen.getByRole('button', { name: /Save/i }));
+      await waitFor(() => {
+        const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/permissions'));
+        expect(patch).toBeDefined();
+        const body = JSON.parse(patch!.body ?? '{}');
+        expect(body.default_scope).toBe('trait.tier=web');
+        expect(String(body.default_scope)).not.toContain('coven=ops');
+        // Omitted → the derivation is left as it is (PATCH presence semantics).
+        expect('parent_role' in body).toBe(false);
+      });
+    });
+
+    it('★ editing the PARENT lists the children a change would travel to', async () => {
+      recordingFetch({ rolesList: DERIVED });
+      renderEdit('soul-reader');
+
+      await screen.findByRole('heading', { name: /Permissions: soul-reader/i });
+      const panel = await screen.findByTestId('derived-children-panel');
+      expect(panel).toHaveTextContent(/1 role\(s\) derive from this one/i);
+      // Each child with its own narrowing and what it currently resolves to.
+      const child = within(panel).getByTestId('derived-child-soul-reader-web');
+      expect(child).toHaveTextContent('trait.tier=web');
+      expect(child).toHaveTextContent('coven=ops AND trait.tier=web');
+      // A leaf role has no such panel.
+      expect(screen.queryByTestId('inherited-ceiling-panel')).not.toBeInTheDocument();
+    });
+
+    it('a parent outside the readable catalog degrades to a note, not a crash', async () => {
+      recordingFetch({ rolesList: { items: [DERIVED.items[1]] } });
+      renderEdit('soul-reader-web');
+
+      await screen.findByRole('heading', { name: /Permissions: soul-reader-web/i });
+      expect(await screen.findByTestId('parent-unresolved')).toBeInTheDocument();
+      expect(screen.queryByTestId('inherited-ceiling-panel')).not.toBeInTheDocument();
+    });
+  });
+
+  // New roles are always derived (NIM-182), but plain ones predate that rule and are
+  // still editable — and there the caller's own scope is the only bound there is.
+  describe('plain role edited by a scope-restricted caller', () => {
+    const SCOPED_CALLER = {
+      permissions: [
+        { resource: 'soul', action: '*', wildcard: false, scope: { unrestricted: false, exprs: ['coven=dba'] } },
+        { resource: 'role', action: 'update', wildcard: false, scope: { unrestricted: true, exprs: [] } },
+      ],
+    };
+
+    it('★ warns that an unscoped plain role grants wider than the caller holds, and can adopt their scope', async () => {
+      const calls = recordingFetch({ rolesList: SAMPLE, myPermissions: SCOPED_CALLER });
+      renderEdit('soul-operator');
+      const user = userEvent.setup();
+
+      // soul-operator stores soul.list/read/exec with no scope; the caller holds soul.*
+      // only on coven=dba, so saving it as is comes back 403.
+      const warn = await screen.findByTestId('role-scope-caller-floor');
+      expect(warn).toHaveTextContent(/coven\s*=\s*dba/);
+
+      await user.click(screen.getByTestId('role-scope-apply-floor'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('role-scope-caller-floor')).not.toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /^Save$/ }));
+      await waitFor(() => {
+        const patch = calls.find((c) => c.method === 'PATCH');
+        expect(patch).toBeDefined();
+        expect(JSON.parse(patch!.body ?? '{}').default_scope).toBe('coven=dba');
+      });
+    });
+
+    it('stays quiet when the caller holds the rights unscoped', async () => {
+      recordingFetch({
+        rolesList: SAMPLE,
+        myPermissions: {
+          permissions: [
+            { resource: 'soul', action: '*', wildcard: false, scope: { unrestricted: true, exprs: [] } },
+            { resource: 'role', action: 'update', wildcard: false, scope: { unrestricted: true, exprs: [] } },
+          ],
+        },
+      });
+      renderEdit('soul-operator');
+
+      await screen.findByRole('heading', { name: /Permissions: soul-operator/i });
+      expect(screen.queryByTestId('role-scope-caller-floor')).not.toBeInTheDocument();
+    });
   });
 });

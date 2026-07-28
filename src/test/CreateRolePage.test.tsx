@@ -30,6 +30,16 @@ const PERMISSIONS_SAMPLE = {
   ],
 };
 
+// Every role is derived (NIM-182), so the form needs a parent to submit at all. A
+// full-access parent keeps these NIM-80 cases about the permission picker itself: it
+// bounds nothing, so the catalog behaves exactly as it did before derivation existed.
+const ROLES_SAMPLE = {
+  items: [
+    { name: 'cluster-admin', builtin: true, permissions: ['*'], operators: [], effective_permissions: ['*'] },
+  ],
+};
+const MY_PERMISSIONS = { permissions: [{ wildcard: true, scope: { unrestricted: true, exprs: [] } }] };
+
 interface Call {
   url: string;
   method: string;
@@ -78,9 +88,29 @@ function recordingFetch(opts?: {
       });
     }
     if (url === '/v1/roles' && method === 'POST') return new Response('', { status: 201 });
+    if (url === '/v1/roles' && method === 'GET') {
+      return new Response(JSON.stringify(ROLES_SAMPLE), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.startsWith('/v1/me/permissions')) {
+      return new Response(JSON.stringify(MY_PERMISSIONS), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (url.startsWith('/v1/synods')) {
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
     return new Response('{}', { status: 599 });
   });
   return calls;
+}
+
+// A role cannot be created without a parent — pick one before every submit.
+async function pickParent(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByTestId('parent-role-option-cluster-admin'));
 }
 
 // Routing: page at /rbac/roles/new, marker at /rbac to verify navigation.
@@ -104,6 +134,9 @@ describe('CreateRolePage (NIM-80)', () => {
     renderPage();
     const user = userEvent.setup();
     expect(screen.getByRole('heading', { name: /Create role/i })).toBeInTheDocument();
+    // The catalog only appears once there is a parent to read it against.
+    expect(await screen.findByTestId('awaiting-parent')).toBeInTheDocument();
+    await pickParent(user);
     // audit sorts first → its action shows by default in the right panel.
     expect(await screen.findByRole('checkbox', { name: 'audit.read' })).toBeInTheDocument();
     // Selecting a resource in the left rail reveals its action-wildcard.
@@ -119,6 +152,7 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'inc-admin');
+    await pickParent(user);
     await user.click(await screen.findByRole('button', { name: 'resource incarnation' }));
     const wildcard = screen.getByRole('checkbox', { name: /incarnation\.\*/ });
     await user.click(wildcard);
@@ -142,6 +176,7 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'soul-ops');
+    await pickParent(user);
     await user.click(await screen.findByRole('button', { name: 'resource soul' }));
     const cb = screen.getByRole('checkbox', { name: 'soul.list' });
     await user.click(cb);
@@ -171,6 +206,7 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'log-reader');
+    await pickParent(user);
     await user.click(screen.getByRole('button', { name: /^Create$/ }));
 
     const alert = await screen.findByRole('alert');
@@ -202,6 +238,7 @@ describe('CreateRolePage (NIM-80)', () => {
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('soul-operator'), 'scoped-role');
+    await pickParent(user);
     await user.click(await screen.findByRole('button', { name: 'resource soul' }));
     await user.click(screen.getByRole('checkbox', { name: 'soul.list' }));
 

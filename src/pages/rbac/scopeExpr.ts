@@ -235,6 +235,20 @@ export function isValidScope(s: string): boolean {
   }
 }
 
+/**
+ * Conjoin two canonical scope strings into one. Parsed and re-serialized rather than
+ * string-glued: `a OR b` + `c` naively joined reads as `a OR (b AND c)` — the wrong
+ * predicate, and a WIDER one. An empty side returns the other verbatim. Throws if
+ * either side doesn't parse (callers fall back to the delta alone).
+ */
+export function conjoinScopes(left: string, right: string): string {
+  const l = parseScope(left);
+  const r = parseScope(right);
+  if (!l) return serializeScope(r);
+  if (!r) return serializeScope(l);
+  return serializeScope({ kind: 'group', op: 'and', children: [l, r] });
+}
+
 // --- convenience constructors for the builder ---
 
 export function emptyCond(dim: ScopeDim = 'coven'): ScopeCond {

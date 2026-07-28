@@ -154,6 +154,40 @@ describe('RbacPage', () => {
     });
   });
 
+  // NIM-182 / ADR-078: derivation is visible in the catalog — a role bounded by another
+  // one, and what it actually grants once that parent is applied.
+  it('shows parent_role and the resolved set of a derived role', async () => {
+    const derived = {
+      items: [
+        ...SAMPLE.items,
+        {
+          name: 'soul-operator-web',
+          description: 'web tier only',
+          builtin: false,
+          permissions: ['soul.list', 'soul.read'],
+          operators: [] as string[],
+          parent_role: 'soul-operator',
+          effective_permissions: ['soul.list on trait.tier=web'],
+        },
+      ],
+    };
+    installFetchMock([{ method: 'GET', url: '/v1/roles', body: derived }]);
+    renderWithProviders(<RbacPage />, '/rbac');
+    const user = userEvent.setup();
+
+    const parentCell = await screen.findByTestId('role-parent-soul-operator-web');
+    expect(parentCell).toHaveTextContent('soul-operator');
+    // 2 stored rows resolve to 1 — the counts differ, so both are shown.
+    expect(parentCell.closest('tr')).toHaveTextContent('2 → 1');
+
+    await user.click(screen.getByRole('tab', { name: /Role permissions/i }));
+    const effective = await screen.findByTestId('role-effective-soul-operator-web');
+    expect(effective).toHaveTextContent('soul.list on trait.tier=web');
+    expect(screen.getByTestId('role-derived-badge-soul-operator-web')).toHaveTextContent(
+      /derived from soul-operator/i,
+    );
+  });
+
   it('switching to Role permissions shows permission chips', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/roles', body: SAMPLE }]);
     renderWithProviders(<RbacPage />, '/rbac');

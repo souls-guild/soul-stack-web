@@ -8,7 +8,12 @@ import { Button } from '../../components/primitives';
 import { keeperApi, type RoleView } from '../../api/keeper';
 import { editPermissionsSchema, type EditPermissionsFormValues } from './schemas';
 import { PermissionsEditor } from './PermissionsEditor';
+import { InheritedCeilingPanel } from './InheritedCeilingPanel';
+import { DerivedChildrenPanel } from './DerivedChildrenPanel';
+import { RoleScopeField } from './RoleScopeField';
 import { normalizePermissionCatalog } from './permissions';
+import { callerPermissionGate, callerScopeFloor, parentBounds } from './roleCeiling';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { prettyRbacError } from './errors';
 import styles from '../common.module.css';
 
@@ -16,6 +21,11 @@ import styles from '../common.module.css';
 // (was a cramped modal). Replace semantics: PATCH /v1/roles/{name}/permissions takes the
 // full set. Builtin roles are read-only (submit blocked, mirrors the server 409). The role
 // is read from the shared ['rbac.roles'] list; graceful "not found" if it's missing.
+//
+// A DERIVED role (parent_role, ADR-078) is edited under its parent's ceiling: the picker
+// offers a subset of the parent's resolved set and the scope field is the delta. The
+// derivation itself is not re-rooted here — parent_role is omitted from the PATCH, which
+// leaves it untouched (presence semantics).
 export function RoleEditPage() {
   const { t } = useTranslation();
   const params = useParams<{ name: string }>();
@@ -52,10 +62,10 @@ export function RoleEditPage() {
   }
 
   // Mount the form once the role is loaded so defaultValues are stable.
-  return <RoleEditForm role={role} />;
+  return <RoleEditForm role={role} roles={rolesQ.data?.items ?? []} />;
 }
 
-function RoleEditForm({ role }: { role: RoleView }) {
+function RoleEditForm({ role, roles }: { role: RoleView; roles: readonly RoleView[] }) {
   const { t } = useTranslation();
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -64,11 +74,30 @@ function RoleEditForm({ role }: { role: RoleView }) {
   const {
     handleSubmit,
     control,
+    watch,
     formState: { isSubmitting },
   } = useForm<EditPermissionsFormValues>({
     resolver: zodResolver(editPermissionsSchema),
-    defaultValues: { permissions: [...(role.permissions ?? [])] },
+    defaultValues: {
+      permissions: [...(role.permissions ?? [])],
+      defaultScope: role.default_scope ?? '',
+    },
   });
+
+  const parentView = role.parent_role ? roles.find((r) => r.name === role.parent_role) : undefined;
+  const parent = useMemo(() => (parentView ? parentBounds(parentView) : undefined), [parentView]);
+  const children = useMemo(() => roles.filter((r) => r.parent_role === role.name), [roles, role.name]);
+
+  const { permissions: myPerms } = useMyPermissions();
+  const callerLimit = useMemo(() => callerPermissionGate(myPerms), [myPerms]);
+
+  // Same bound as on creation: a plain role edited by a scope-restricted caller must
+  // still stay inside what that caller holds, or the PATCH comes back 403.
+  const editedPermissions = watch('permissions');
+  const callerFloor = useMemo(
+    () => (parent ? '' : callerScopeFloor(callerLimit, editedPermissions)),
+    [callerLimit, parent, editedPermissions],
+  );
 
   const permsQ = useQuery({
     queryKey: ['rbac.permissions'],
@@ -82,7 +111,11 @@ function RoleEditForm({ role }: { role: RoleView }) {
 
   const mu = useMutation({
     mutationFn: (values: EditPermissionsFormValues) =>
-      keeperApi.roles.updatePermissions(role.name, { permissions: values.permissions }),
+      keeperApi.roles.updatePermissions(role.name, {
+        permissions: values.permissions,
+        // Present (incl. null) replaces; '' clears the scope entirely.
+        default_scope: values.defaultScope ? values.defaultScope : null,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['rbac.roles'] });
       nav('/rbac');
@@ -121,6 +154,17 @@ function RoleEditForm({ role }: { role: RoleView }) {
               {t('admin:rbacEditReplaceProse')}
             </p>
           )}
+          {parent ? (
+            <div style={{ marginBottom: 14 }}>
+              <InheritedCeilingPanel parent={parent.role} roles={roles} />
+            </div>
+          ) : null}
+          <DerivedChildrenPanel children={children} />
+          {role.parent_role && !parent ? (
+            <div data-testid="parent-unresolved" style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 12 }}>
+              {t('admin:rbacParentUnresolved', { name: role.parent_role })}
+            </div>
+          ) : null}
           <Controller
             name="permissions"
             control={control}
@@ -130,6 +174,26 @@ function RoleEditForm({ role }: { role: RoleView }) {
                 onChange={field.onChange}
                 catalog={catalog}
                 ariaLabel={t('admin:rbacPermissionsAria')}
+                parent={parent}
+                callerLimit={callerLimit}
+              />
+            )}
+          />
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>
+            {parent ? t('admin:rbacRoleScopeDeltaTitle') : t('admin:rbacRoleScopeTitle')}
+          </h2>
+          <Controller
+            name="defaultScope"
+            control={control}
+            render={({ field }) => (
+              <RoleScopeField
+                onChange={field.onChange}
+                initial={role.default_scope ?? ''}
+                parent={parent}
+                callerFloor={callerFloor}
               />
             )}
           />

@@ -79,5 +79,7 @@ export function useMyPermissions() {
     return { unrestricted: false, exprs: scope.exprs ?? [] };
   }
 
-  return { hasPermission, ceilingFor, isLoading: q.isLoading };
+  // The raw held set, for callers that gate a whole picker rather than one button
+  // (rbac/roleCeiling.callerPermissionGate). undefined while unknown — gate optimistically.
+  return { hasPermission, ceilingFor, permissions: q.data?.permissions ?? undefined, isLoading: q.isLoading };
 }

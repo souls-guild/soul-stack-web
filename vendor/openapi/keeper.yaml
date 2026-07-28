@@ -533,6 +533,37 @@ components:
         - self_kid
         - self_health
       type: object
+    CompatEntityView:
+      additionalProperties: false
+      properties:
+        compatible:
+          type: boolean
+        kind:
+          type: string
+        name:
+          type: string
+        ref:
+          type: string
+        window:
+          $ref: "#/components/schemas/CompatWindowView"
+      required:
+        - kind
+        - name
+        - window
+        - compatible
+      type: object
+    CompatWindowView:
+      additionalProperties: false
+      properties:
+        display:
+          type: string
+        max:
+          type: string
+        min:
+          type: string
+      required:
+        - display
+      type: object
     DecreeCreateRequest:
       additionalProperties: false
       properties:
@@ -2688,13 +2719,17 @@ components:
       additionalProperties: false
       properties:
         default_scope:
-          description: "role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted/null → role without scope"
+          description: "role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted/null → role without scope. On a DERIVED role (parent_role set) this is the attenuating delta, conjoined with the parent's effective scope — write only the ADDED narrowing"
           type: string
         description:
           description: human-readable role description for UI/audit
           type: string
         name:
           description: role name (kebab-case), unique in cluster
+          pattern: ^[a-z][a-z0-9-]*$
+          type: string
+        parent_role:
+          description: "derive from this role (ADR-078): it becomes the ceiling and the new role can never exceed it — permissions outside it are refused, its scope is conjoined onto every permission. Omitted/null → a plain role. Requires the caller to hold the parent's rights"
           pattern: ^[a-z][a-z0-9-]*$
           type: string
         permissions:
@@ -2724,7 +2759,12 @@ components:
       additionalProperties: false
       properties:
         default_scope:
-          description: "scope: boolean predicate over coven/service/incarnation/host/trait; omitted → scope untouched; present (incl. null) → replaces (null removes scope)"
+          description: "scope: boolean predicate over coven/service/incarnation/host/trait; omitted → scope untouched; present (incl. null) → replaces (null removes scope). On a derived role it is the attenuating delta"
+          type:
+            - string
+            - "null"
+        parent_role:
+          description: "re-root the role's derivation (ADR-078); omitted → untouched; present (incl. null) → replaces (null makes the role plain again). The ceiling is re-checked on every update: the result must stay within the parent and the caller must hold it"
           type:
             - string
             - "null"
@@ -2744,9 +2784,19 @@ components:
         builtin:
           type: boolean
         default_scope:
-          description: "role scope: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted → role without scope"
+          description: "role scope AS STORED: boolean predicate over coven/service/incarnation/host/trait (e.g. coven in (a, b) AND host matches redis-*); omitted → role without scope. On a derived role this is only the attenuating delta — see effective_scope"
           type: string
         description:
+          type: string
+        effective_permissions:
+          description: "permissions AS RESOLVED against the derivation chain (ADR-078): own ∩ the parent's effective, every scope capped by the chain's ceiling. Equals permissions on a plain role. Consumers read THIS instead of walking parent_role"
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        effective_scope:
+          description: "role scope AS RESOLVED: the parent's effective scope AND this role's delta; omitted → unrestricted. Bare permissions inherit it, as on a plain role"
           type: string
         name:
           pattern: ^[a-z][a-z0-9-]*$
@@ -2757,6 +2807,10 @@ components:
           type:
             - array
             - "null"
+        parent_role:
+          description: the role this one derives from (ADR-078) — its ceiling; omitted → a plain role
+          pattern: ^[a-z][a-z0-9-]*$
+          type: string
         permissions:
           items:
             type: string
@@ -2765,6 +2819,7 @@ components:
             - "null"
       required:
         - builtin
+        - effective_permissions
         - name
         - operators
         - permissions
@@ -2784,6 +2839,9 @@ components:
           type:
             - array
             - "null"
+        input:
+          additionalProperties: {}
+          type: object
         scenario:
           type: string
         started_at:
@@ -3108,6 +3166,43 @@ components:
       required:
         - key
       type: object
+    ServiceCompatReply:
+      additionalProperties: false
+      properties:
+        detail:
+          type: string
+        effective_window:
+          $ref: "#/components/schemas/CompatWindowView"
+        enforced:
+          type: boolean
+        entities:
+          items:
+            $ref: "#/components/schemas/CompatEntityView"
+          type:
+            - array
+            - "null"
+        keeper_release:
+          type: string
+        keeper_version:
+          type: string
+        ref:
+          type: string
+        service:
+          type: string
+        sha1:
+          type: string
+        status:
+          type: string
+      required:
+        - service
+        - ref
+        - sha1
+        - keeper_version
+        - enforced
+        - status
+        - effective_window
+        - entities
+      type: object
     ServiceDependenciesReply:
       additionalProperties: false
       properties:
@@ -3342,6 +3437,63 @@ components:
         - name
         - ref
         - updated_at
+      type: object
+    SettingReply:
+      additionalProperties: false
+      properties:
+        bounds:
+          description: accepted range, e.g. (0, 1]
+          type: string
+        default: {}
+        description:
+          type: string
+        key:
+          type: string
+        source:
+          enum:
+            - default
+            - file
+            - pg
+          type: string
+        type:
+          enum:
+            - float
+            - int
+          type: string
+        value:
+          description: effective value on this instance
+        yaml_path:
+          type: string
+      required:
+        - key
+        - yaml_path
+        - type
+        - bounds
+        - default
+        - value
+        - source
+        - description
+      type: object
+    SettingUpdateRequest:
+      additionalProperties: false
+      properties:
+        value:
+          description: new value in text form (e.g. "0.5"); parsed and range-checked by the field registry
+          type: string
+      required:
+        - value
+      type: object
+    SettingsCatalogReply:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/SettingReply"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     SigilKeyIntroduceReply:
       additionalProperties: false
@@ -10002,7 +10154,7 @@ paths:
         - push
   /v1/roles:
     get:
-      description: Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. Read-only, no audit.
+      description: Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. Each role comes both AS STORED (permissions/default_scope) and AS RESOLVED against its derivation chain (effective_permissions/effective_scope, ADR-078) — consumers must not re-derive inheritance from parent_role. Read-only, no audit.
       operationId: listRoles
       responses:
         "200":
@@ -10021,7 +10173,7 @@ paths:
       tags:
         - role
     post:
-      description: Creates RBAC role with set of permissions (ADR-022). Permission role.create. 409 — name already taken.
+      description: Creates RBAC role with set of permissions (ADR-022). Permission role.create. Optional parent_role derives the role from another one (ADR-078), bounding it by that role. 409 — name already taken; 404 — parent_role not found; 403 — beyond the parent or beyond the caller's own rights.
       operationId: createRole
       requestBody:
         content:
@@ -10044,6 +10196,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/HumaProblemError"
           description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Not Found
         "409":
           content:
             application/problem+json:
@@ -10225,7 +10383,7 @@ paths:
         - role
   /v1/roles/{name}/permissions:
     patch:
-      description: "Replace semantics: set completely replaces existing (ADR-022). Permission role.update. 409 — builtin/last-admin."
+      description: "Replace semantics: set completely replaces existing (ADR-022). Permission role.update. default_scope/parent_role follow PATCH presence (omitted → untouched). 409 — builtin/last-admin; 403 — beyond the parent role (ADR-078)."
       operationId: updateRolePermissions
       parameters:
         - description: role name
@@ -10647,6 +10805,78 @@ paths:
       summary: Update a Service (replace mutable-fields)
       tags:
         - service
+  /v1/services/{name}/compat:
+    get:
+      description: "Effective keeper-version window of the service (ADR-0076): the intersection of the `compat:` block declared by service.yml and by EVERY destiny the service pulls at its pinned ref - the narrowest wins. `entities[]` carries each contribution so a narrow bound is attributable to the artifact that set it; `effective_window` is null when nothing declares one (unbounded - existing services keep working). `status` is a backend catalog value the UI renders as-is: ok | unsupported (a run on this instance is rejected with keeper_version_unsupported) | not_enforced (this build carries no comparable version, e.g. 0.0.0-dev) | window_empty (the declarations do not overlap - an authoring error). `keeper_version` is the raw build string of the instance serving the request, `keeper_release` the release core actually compared - during a rolling upgrade instances differ, and enforcement belongs to the instance that renders. Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for a pinned commit-SHA ref, otherwise no-cache. 502 - loader failed (service or destiny repo unreachable)."
+      operationId: getServiceCompat
+      parameters:
+        - description: Service name
+          in: path
+          name: name
+          required: true
+          schema:
+            description: Service name
+            type: string
+        - description: optional git-ref override (omitted -> ref from registry)
+          explode: false
+          in: query
+          name: ref
+          schema:
+            description: optional git-ref override (omitted -> ref from registry)
+            type: string
+        - description: "conditional GET: 304 if it matches ETag (snapshot SHA1)"
+          in: header
+          name: If-None-Match
+          schema:
+            description: "conditional GET: 304 if it matches ETag (snapshot SHA1)"
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCompatReply"
+          description: OK
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Not Found
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+        "502":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Bad Gateway
+      summary: engine-compat window of a Service (declared keeper versions) + this keeper's version
+      tags:
+        - service
   /v1/services/{name}/dependencies:
     get:
       description: Destiny building blocks + custom modules declared in service.yml with their own git refs, for the UI Service Detail (ADR-007/028). Permission service.list. Read-only, no audit. 502 - loader failed.
@@ -11027,6 +11257,135 @@ paths:
       summary: default host-vitals telemetry config of a Service + allowed collectors
       tags:
         - service
+  /v1/settings:
+    get:
+      description: Every admitted runtime setting with its type, range bounds, built-in default, the EFFECTIVE value on this instance and its source (default < file < pg, ADR-0073). Renders the settings form without hardcoding the field list in the UI. Permission setting.read. Read-only, no audit.
+      operationId: listSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsCatalogReply"
+          description: OK
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Keeper runtime settings catalog
+      tags:
+        - settings
+  /v1/settings/{key}:
+    delete:
+      description: Removes the keeper_settings row, so the keeper.yml value (or the built-in default) is back in effect cluster-wide — the clean revert of ADR-0073(f). Permission setting.delete. 404 - the key is not in the registry, or there is no override to drop.
+      operationId: deleteSetting
+      parameters:
+        - description: setting key whose override is dropped
+          in: path
+          name: key
+          required: true
+          schema:
+            description: setting key whose override is dropped
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingReply"
+          description: OK
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Not Found
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Drop a Keeper runtime setting override
+      tags:
+        - settings
+    put:
+      description: Writes a cluster-wide override into keeper_settings and invalidates the other Keeper nodes, which re-merge it onto their keeper.yml without a restart (ADR-0073). Permission setting.update. 404 - the key is not in the registry; 422 - unparsable or out-of-range value, nothing is written.
+      operationId: updateSetting
+      parameters:
+        - description: setting key from GET /v1/settings (cfg_* namespace of keeper_settings)
+          in: path
+          name: key
+          required: true
+          schema:
+            description: setting key from GET /v1/settings (cfg_* namespace of keeper_settings)
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingUpdateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingReply"
+          description: OK
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Bad Request
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Forbidden
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Not Found
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/HumaProblemError"
+          description: Internal Server Error
+      summary: Override a Keeper runtime setting
+      tags:
+        - settings
   /v1/sigil/keys:
     get:
       description: Active trust-anchor signing keys (primary first, without vault_ref, ADR-026(h)). Permission sigil.key-list. Read-only, no audit.

@@ -11,6 +11,7 @@ import {
 import { newCond, newGroup, pruneScope } from './scopeBuilderModel';
 import { useAutocompleteOptions } from './useScopeAutocomplete';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
+import type { ScopeCeiling } from './roleCeiling';
 
 // Boolean condition-builder for an RBAC permission scope (NIM-128). Edits a
 // ScopeNode tree (usually a ScopeGroup root) over five dimensions — coven /
@@ -18,6 +19,11 @@ import { useMyPermissions } from '../../hooks/useMyPermissions';
 // The wire form is the CANONICAL string produced by serializeScope (scopeExpr.ts);
 // this component never touches strings except for the live preview / copy.
 // Visual: approved mockup design/rbac-mockups/scope-builder.v2.mockup.html.
+//
+// On a DERIVED role (ADR-078) the builder edits only the attenuating DELTA: the
+// parent's resolved scope arrives via `ceiling` + `inheritedFrom`, is shown read-only,
+// and the effective rule is `inherited AND delta` — so the operator can tell an edit
+// of their own from something the parent already imposes.
 
 interface Props {
   /** Root scope node, or null = "no restriction" (unrestricted). */
@@ -26,6 +32,14 @@ interface Props {
   ariaLabel?: string;
   /** Base permission (`resource.action` | `resource.*`) — drives the inherited-ceiling hint. */
   base?: string;
+  /**
+   * Ceiling to show instead of the caller's own rights — the chosen parent role's
+   * resolved scope for this base. Omitted → the caller's own ceiling (via `base`);
+   * null → nothing known, panel hidden.
+   */
+  ceiling?: ScopeCeiling | null;
+  /** Parent role name — switches the panel and preview to the derived-role framing. */
+  inheritedFrom?: string;
 }
 
 const dimColor = (dim: ScopeDim) => `var(--scope-${dim})`;
@@ -496,15 +510,51 @@ function PreviewGroup({ group, top }: { group: ScopeGroup; top: boolean }) {
   );
 }
 
-function ScopePreview({ node }: { node: ScopeNode | null }) {
+// The parent's slice of the rule: read-only, dashed, visually behind the operator's own
+// conditions — the whole point of the delta view (NIM-182).
+function InheritedTerm({ text, from }: { text: string; from: string }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      data-testid="scope-preview-inherited"
+      title={t('admin:rbacScopeDeltaInheritedTitle', { name: from })}
+      style={{
+        color: 'var(--text-muted)',
+        borderBottom: '1px dashed var(--border-strong)',
+        paddingBottom: 1,
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
+function ScopePreview({
+  node,
+  inherited,
+  inheritedFrom,
+}: {
+  node: ScopeNode | null;
+  inherited?: string | null;
+  inheritedFrom?: string;
+}) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const pruned = pruneScope(node);
+  const inheritedTerm =
+    inherited && inheritedFrom ? <InheritedTerm text={inherited} from={inheritedFrom} /> : null;
 
   if (!pruned) {
     return (
       <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-faint)', fontStyle: 'italic' }} data-testid="scope-preview-empty">
-        {t('admin:rbacScopeEmpty')}
+        {inheritedTerm ? (
+          <>
+            <span style={{ fontFamily: 'var(--font-mono)', fontStyle: 'normal' }}>{inheritedTerm}</span>
+            <div style={{ marginTop: 4 }}>{t('admin:rbacScopeDeltaNoneYet', { name: inheritedFrom })}</div>
+          </>
+        ) : (
+          t('admin:rbacScopeEmpty')
+        )}
       </div>
     );
   }
@@ -523,7 +573,7 @@ function ScopePreview({ node }: { node: ScopeNode | null }) {
     <div style={{ margin: '18px 0 4px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--surface-2)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
-          {t('admin:rbacScopeResult')}
+          {inheritedTerm ? t('admin:rbacScopeResultEffective') : t('admin:rbacScopeResult')}
         </span>
         <button
           type="button"
@@ -537,22 +587,48 @@ function ScopePreview({ node }: { node: ScopeNode | null }) {
         data-testid="scope-preview-code"
         style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.75, padding: '13px 15px', color: 'var(--text)', whiteSpace: 'pre-wrap' }}
       >
+        {inheritedTerm ? (
+          <>
+            {inheritedTerm}
+            {'\n'}
+            <span style={{ color: railColor('and'), fontWeight: 700 }}>AND</span>{' '}
+          </>
+        ) : null}
         {pruned.kind === 'group' ? <PreviewGroup group={pruned} top /> : <PreviewCond c={pruned} />}
       </div>
+      {inheritedTerm ? (
+        <div
+          data-testid="scope-preview-legend"
+          style={{ fontSize: 11, color: 'var(--text-faint)', padding: '0 15px 11px', lineHeight: 1.5 }}
+        >
+          {t('admin:rbacScopeDeltaLegend', { name: inheritedFrom })}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 // --- inherited ceiling (least-privilege, read-only) ---
 
-// Shows the caller's own scope ceiling for the edited permission: the server caps
-// any grant to a subset of what you hold. Purely informational (the server still
-// enforces it — 403 on exceeding). Renders nothing when the ceiling is unknown.
-function InheritedCeiling({ base }: { base: string }) {
+// Shows the scope ceiling for the edited permission: the server caps any grant to a
+// subset of it. Without `override` that ceiling is the caller's own rights; with one it
+// is the chosen parent role's resolved scope (a derived role, ADR-078) — a strictly
+// narrower bound the operator is editing a delta against. Purely informational (the
+// server still enforces it — 403 on exceeding). Hidden when the ceiling is unknown.
+function InheritedCeiling({
+  base,
+  override,
+  inheritedFrom,
+}: {
+  base?: string;
+  override?: ScopeCeiling | null;
+  inheritedFrom?: string;
+}) {
   const { t } = useTranslation();
   const { ceilingFor } = useMyPermissions();
-  const ceiling = ceilingFor(base);
+  const ceiling = override !== undefined ? override : base ? ceilingFor(base) : null;
   if (!ceiling) return null;
+  const derived = Boolean(inheritedFrom);
 
   return (
     <div
@@ -569,13 +645,21 @@ function InheritedCeiling({ base }: { base: string }) {
       }}
     >
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: 4 }}>
-        {t('admin:rbacScopeCeilingHeading')}
+        {derived
+          ? t('admin:rbacScopeCeilingFromParent', { name: inheritedFrom })
+          : t('admin:rbacScopeCeilingHeading')}
       </div>
       {ceiling.unrestricted ? (
-        <span>{t('admin:rbacScopeCeilingUnrestricted')}</span>
+        <span>
+          {derived
+            ? t('admin:rbacScopeCeilingParentUnrestricted', { name: inheritedFrom })
+            : t('admin:rbacScopeCeilingUnrestricted')}
+        </span>
       ) : (
         <span>
-          {t('admin:rbacScopeCeilingCapped')}{' '}
+          {derived
+            ? t('admin:rbacScopeCeilingParentCapped', { name: inheritedFrom })
+            : t('admin:rbacScopeCeilingCapped')}{' '}
           {ceiling.exprs.length > 0 ? (
             ceiling.exprs.map((e, i) => (
               <Fragment key={i}>
@@ -596,11 +680,29 @@ function InheritedCeiling({ base }: { base: string }) {
 
 // Memoized: with a stable `onChange` (cached per-base by the parent editor), an
 // unrelated scope keystroke elsewhere won't re-render every mounted builder.
-export const ScopeBuilder = memo(function ScopeBuilder({ value, onChange, ariaLabel, base }: Props) {
+export const ScopeBuilder = memo(function ScopeBuilder({
+  value,
+  onChange,
+  ariaLabel,
+  base,
+  ceiling,
+  inheritedFrom,
+}: Props) {
   const { t } = useTranslation();
   const root: ScopeGroup | null =
     value == null ? null : value.kind === 'group' ? value : { kind: 'group', op: 'and', children: [value] };
   const conditionsOn = root != null;
+
+  // The parent's term of the effective rule, as one string (several OR-ed grants get
+  // parenthesized). Only meaningful on a derived role — otherwise the builder is the
+  // whole rule, not a delta.
+  const inheritedTerm =
+    inheritedFrom && ceiling && !ceiling.unrestricted && ceiling.exprs.length > 0
+      ? ceiling.exprs.length === 1
+        ? ceiling.exprs[0]
+        : `(${ceiling.exprs.join(') OR (')})`
+      : null;
+  const showCeiling = base != null || ceiling !== undefined;
 
   const modeBtn = (active: boolean): CSSProperties => ({
     border: 0,
@@ -662,13 +764,19 @@ export const ScopeBuilder = memo(function ScopeBuilder({ value, onChange, ariaLa
       {conditionsOn && root ? (
         <div style={{ padding: '16px 14px 12px' }}>
           <GroupView group={root} onChange={onChange} depth={0} />
-          <ScopePreview node={root} />
-          {base ? <InheritedCeiling base={base} /> : null}
+          <ScopePreview node={root} inherited={inheritedTerm} inheritedFrom={inheritedFrom} />
+          {showCeiling ? (
+            <InheritedCeiling base={base} override={ceiling} inheritedFrom={inheritedFrom} />
+          ) : null}
         </div>
       ) : (
         <div style={{ padding: '14px', fontSize: 12.5, color: 'var(--text-muted)' }}>
-          {t('admin:rbacScopeUnrestrictedHint')}
-          {base ? <InheritedCeiling base={base} /> : null}
+          {inheritedFrom
+            ? t('admin:rbacScopeDeltaUnrestrictedHint', { name: inheritedFrom })
+            : t('admin:rbacScopeUnrestrictedHint')}
+          {showCeiling ? (
+            <InheritedCeiling base={base} override={ceiling} inheritedFrom={inheritedFrom} />
+          ) : null}
         </div>
       )}
     </div>
