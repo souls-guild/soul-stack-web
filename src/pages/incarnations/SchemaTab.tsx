@@ -75,7 +75,7 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
               <tr>
                 <th>{t('incarnations:colField')}</th>
                 <th>{t('incarnations:colType')}</th>
-                <th>Required</th>
+                <th>{t('colRequired')}</th>
               </tr>
             </thead>
             <tbody>
@@ -111,8 +111,8 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>From</th>
-                  <th>To</th>
+                  <th>{t('colFrom')}</th>
+                  <th>{t('colTo')}</th>
                   <th>{t('incarnations:colFile')}</th>
                 </tr>
               </thead>

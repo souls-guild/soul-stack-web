@@ -146,12 +146,12 @@ export function DecreeDetail() {
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Action input</h2>
+        <h2 className={styles.sectionTitle}>{t('beacons:secActionInput')}</h2>
         <JsonViewer value={d.action_input} emptyLabel={t('beacons:actionInputEmpty')} />
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Recent fires</h2>
+        <h2 className={styles.sectionTitle}>{t('beacons:secRecentFires')}</h2>
         <div className={styles.empty}>
           <Trans i18nKey="beacons:recentFiresTodo" components={{ code: <code className="mono" /> }} />
         </div>

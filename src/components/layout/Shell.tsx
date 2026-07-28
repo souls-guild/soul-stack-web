@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Footer } from '../primitives';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function Shell({ children }: Props) {
+  const { t } = useTranslation();
   const { collapsed, toggle } = useSidebar();
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
@@ -21,7 +23,7 @@ export function Shell({ children }: Props) {
       </aside>
       <main className={styles.main}>{children}</main>
       <div className={styles.footerWrap}>
-        <Footer brand="Soul Stack · Keeper UI v0.1.0-pilot" status="Connected to Keeper" />
+        <Footer brand="Soul Stack · Keeper UI v0.1.0-pilot" status={t('footerStatusConnected')} />
       </div>
     </div>
   );

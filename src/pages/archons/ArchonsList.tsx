@@ -224,14 +224,14 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
     <table className={styles.table}>
       <thead>
         <tr>
-          <th>AID</th>
+          <th>{t('common:colAid')}</th>
           <th>{t('pages:archonDisplayName')}</th>
-          <th>Auth</th>
+          <th>{t('colAuth')}</th>
           <th>{t('admin:archonCreatedVia')}</th>
-          <th>Created</th>
-          <th>Created by</th>
-          <th>Revoked</th>
-          <th>Bootstrap</th>
+          <th>{t('colCreated')}</th>
+          <th>{t('colCreatedBy')}</th>
+          <th>{t('colRevoked')}</th>
+          <th>{t('common:colBootstrap')}</th>
           <th></th>
         </tr>
       </thead>

@@ -136,7 +136,7 @@ export function CadenceDetail() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>ID</th>
+                <th>{t('common:colId')}</th>
                 <th>{t('cadences:runsColStatus')}</th>
                 <th>{t('cadences:runsColScope')}</th>
                 <th>{t('cadences:runsColStarted')}</th>

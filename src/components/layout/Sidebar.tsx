@@ -38,7 +38,9 @@ import styles from './Sidebar.module.css';
 
 interface NavItem {
   to: string;
-  label: string;
+  // Key in the `common` namespace; entity-name items resolve to the same
+  // English word in every locale (see the i18n translation rule in CLAUDE.md).
+  labelKey: string;
   icon: typeof Boxes;
   disabled?: boolean;
   // If set - the link is active on prefix match too (for nested sub-tabs).
@@ -46,36 +48,36 @@ interface NavItem {
 }
 
 const PRIMARY: NavItem[] = [
-  { to: '/overview', label: 'Overview', icon: LayoutDashboard },
-  { to: '/run', label: 'Run', icon: Play, matchPrefix: '/run' },
+  { to: '/overview', labelKey: 'navOverview', icon: LayoutDashboard },
+  { to: '/run', labelKey: 'navRun', icon: Play, matchPrefix: '/run' },
 ];
 
 const REGISTRY: NavItem[] = [
-  { to: '/archons', label: 'Archons', icon: Users, matchPrefix: '/archons' },
-  { to: '/services', label: 'Services', icon: Package },
-  { to: '/incarnations', label: 'Incarnations', icon: Boxes },
-  { to: '/souls', label: 'Souls', icon: Users },
-  { to: '/plugins', label: 'Plugins', icon: Puzzle, matchPrefix: '/plugins' },
-  { to: '/providers', label: 'Providers', icon: Cloud, matchPrefix: '/providers' },
-  { to: '/rbac', label: 'RBAC', icon: ShieldCheck },
-  { to: '/synods', label: 'Synods', icon: Users2, matchPrefix: '/synods' },
+  { to: '/archons', labelKey: 'navArchons', icon: Users, matchPrefix: '/archons' },
+  { to: '/services', labelKey: 'navServices', icon: Package },
+  { to: '/incarnations', labelKey: 'navIncarnations', icon: Boxes },
+  { to: '/souls', labelKey: 'navSouls', icon: Users },
+  { to: '/plugins', labelKey: 'navPlugins', icon: Puzzle, matchPrefix: '/plugins' },
+  { to: '/providers', labelKey: 'navProviders', icon: Cloud, matchPrefix: '/providers' },
+  { to: '/rbac', labelKey: 'navRbac', icon: ShieldCheck },
+  { to: '/synods', labelKey: 'navSynods', icon: Users2, matchPrefix: '/synods' },
 ];
 
 const ORACLE: NavItem[] = [
-  { to: '/vigils', label: 'Vigils', icon: Eye, matchPrefix: '/vigils' },
-  { to: '/decrees', label: 'Decrees', icon: Scroll, matchPrefix: '/decrees' },
-  { to: '/oracle/fires', label: 'Oracle fires', icon: Zap, matchPrefix: '/oracle' },
+  { to: '/vigils', labelKey: 'navVigils', icon: Eye, matchPrefix: '/vigils' },
+  { to: '/decrees', labelKey: 'navDecrees', icon: Scroll, matchPrefix: '/decrees' },
+  { to: '/oracle/fires', labelKey: 'navOracleFires', icon: Zap, matchPrefix: '/oracle' },
 ];
 
 const HISTORY: NavItem[] = [
-  { to: '/runs', label: 'All runs', icon: Activity, matchPrefix: '/runs' },
-  { to: '/cadences', label: 'Cadences', icon: CalendarClock, matchPrefix: '/cadences' },
+  { to: '/runs', labelKey: 'navAllRuns', icon: Activity, matchPrefix: '/runs' },
+  { to: '/cadences', labelKey: 'navCadences', icon: CalendarClock, matchPrefix: '/cadences' },
 ];
 
 const BOTTOM: NavItem[] = [
-  { to: '/audit', label: 'Audit log', icon: FileText },
-  { to: '/notifications', label: 'Notifications', icon: Bell, matchPrefix: '/notifications' },
-  { to: '/settings', label: 'Settings', icon: Settings, matchPrefix: '/settings' },
+  { to: '/audit', labelKey: 'navAuditLog', icon: FileText },
+  { to: '/notifications', labelKey: 'navNotifications', icon: Bell, matchPrefix: '/notifications' },
+  { to: '/settings', labelKey: 'navSettings', icon: Settings, matchPrefix: '/settings' },
 ];
 
 interface ItemProps {
@@ -84,8 +86,10 @@ interface ItemProps {
 }
 
 function Item({ item, collapsed }: ItemProps) {
+  const { t } = useTranslation();
   const Icon = item.icon;
-  const titleAttr = collapsed ? item.label : undefined;
+  const label = t(item.labelKey);
+  const titleAttr = collapsed ? label : undefined;
   if (item.disabled) {
     return (
       <span
@@ -96,7 +100,7 @@ function Item({ item, collapsed }: ItemProps) {
         <span className={styles.icon}>
           <Icon size={16} />
         </span>
-        {collapsed ? null : <span className={styles.label}>{item.label}</span>}
+        {collapsed ? null : <span className={styles.label}>{label}</span>}
       </span>
     );
   }
@@ -111,7 +115,7 @@ function Item({ item, collapsed }: ItemProps) {
       <span className={styles.icon}>
         <Icon size={16} />
       </span>
-      {collapsed ? null : <span className={styles.label}>{item.label}</span>}
+      {collapsed ? null : <span className={styles.label}>{label}</span>}
     </NavLink>
   );
 }
@@ -155,15 +159,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {PRIMARY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Registry</div>}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>{t('navGroupRegistry')}</div>}
       {REGISTRY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Oracle</div>}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>{t('navGroupOracle')}</div>}
       {ORACLE.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>Runs</div>}
+      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>{t('navGroupRuns')}</div>}
       {HISTORY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}

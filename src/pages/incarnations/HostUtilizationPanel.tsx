@@ -191,15 +191,15 @@ export function HostUtilizationPanel({ incarnationName }: { incarnationName: str
         <table className={common.table}>
           <thead>
             <tr>
-              <SortHeader label="Host" col="host" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('host')} />
-              <SortHeader label="Status" col="status" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('status')} />
-              <SortHeader label="CPU" col="cpu" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('cpu')} />
-              <SortHeader label="Mem" col="mem" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('mem')} />
-              <SortHeader label="Disk" col="disk" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('disk')} />
-              <SortHeader label="Net" col="net" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('net')} />
-              <SortHeader label="Load" col="load" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('load')} />
-              <SortHeader label="Uptime" col="uptime" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('uptime')} />
-              <SortHeader label="Fresh" col="fresh" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('fresh')} />
+              <SortHeader label={t('incarnations:utilHost')} col="host" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('host')} />
+              <SortHeader label={t('incarnations:utilStatus')} col="status" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('status')} />
+              <SortHeader label={t('incarnations:utilCpu')} col="cpu" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('cpu')} />
+              <SortHeader label={t('incarnations:utilMem')} col="mem" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('mem')} />
+              <SortHeader label={t('incarnations:utilDisk')} col="disk" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('disk')} />
+              <SortHeader label={t('incarnations:utilNet')} col="net" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('net')} />
+              <SortHeader label={t('incarnations:utilLoad')} col="load" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('load')} />
+              <SortHeader label={t('incarnations:utilUptime')} col="uptime" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('uptime')} />
+              <SortHeader label={t('incarnations:utilFresh')} col="fresh" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('fresh')} />
               <th style={{ width: 1 }} />
             </tr>
           </thead>
@@ -466,11 +466,11 @@ function HostTrends({ sid, now }: { sid: string; now: number }) {
         </span>
       </div>
       <div className={styles.trendGrid}>
-        <UtilTrend label="CPU" values={cpu} format={formatPct} times={times} now={now} min={0} max={100} tone={utilTone(minMaxLast(cpu)?.last)} testId="host-trend-cpu" />
-        <UtilTrend label="Mem" values={mem} format={formatPct} times={times} now={now} min={0} max={100} tone={utilTone(minMaxLast(mem)?.last)} testId="host-trend-mem" />
-        <UtilTrend label="Load1" values={load1} format={formatLoad} times={times} now={now} tone="accent" testId="host-trend-load" />
-        <UtilTrend label="Net ↓" values={rx} format={formatBps} axisFormat={formatBpsShort} times={times} now={now} min={0} tone="accent" testId="host-trend-rx" />
-        <UtilTrend label="Net ↑" values={tx} format={formatBps} axisFormat={formatBpsShort} times={times} now={now} min={0} tone="accent" testId="host-trend-tx" />
+        <UtilTrend label={t('incarnations:utilCpu')} values={cpu} format={formatPct} times={times} now={now} min={0} max={100} tone={utilTone(minMaxLast(cpu)?.last)} testId="host-trend-cpu" />
+        <UtilTrend label={t('incarnations:utilMem')} values={mem} format={formatPct} times={times} now={now} min={0} max={100} tone={utilTone(minMaxLast(mem)?.last)} testId="host-trend-mem" />
+        <UtilTrend label={t('incarnations:utilLoadShort')} values={load1} format={formatLoad} times={times} now={now} tone="accent" testId="host-trend-load" />
+        <UtilTrend label={t('incarnations:utilNetRx')} values={rx} format={formatBps} axisFormat={formatBpsShort} times={times} now={now} min={0} tone="accent" testId="host-trend-rx" />
+        <UtilTrend label={t('incarnations:utilNetTx')} values={tx} format={formatBps} axisFormat={formatBpsShort} times={times} now={now} min={0} tone="accent" testId="host-trend-tx" />
       </div>
       {disks.length > 0 ? (
         <div className={styles.inodeBlock} data-testid="spark-inodes">

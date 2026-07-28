@@ -95,7 +95,7 @@ export function PluginsList() {
           </div>
         </div>
         <label>
-          <div className={styles.metaKey}>Status</div>
+          <div className={styles.metaKey}>{t('colStatus')}</div>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as StatusFilter)}
@@ -153,13 +153,13 @@ export function PluginsList() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Namespace</th>
-              <th>Name</th>
-              <th>Ref</th>
-              <th>SHA-256</th>
-              <th>Status</th>
-              <th>Allowed at</th>
-              <th>Allowed by</th>
+              <th>{t('common:colNamespace')}</th>
+              <th>{t('colName')}</th>
+              <th>{t('common:colRef')}</th>
+              <th>{t('common:colSha256')}</th>
+              <th>{t('colStatus')}</th>
+              <th>{t('colAllowedAt')}</th>
+              <th>{t('colAllowedBy')}</th>
             </tr>
           </thead>
           <tbody>

@@ -236,9 +236,9 @@ export function PushApply() {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>SID</th>
-                      <th>Status</th>
-                      <th>Error</th>
+                      <th>{t('common:colSid')}</th>
+                      <th>{t('colStatus')}</th>
+                      <th>{t('colError')}</th>
                     </tr>
                   </thead>
                   <tbody>

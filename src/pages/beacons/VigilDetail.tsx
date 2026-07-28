@@ -121,12 +121,12 @@ export function VigilDetail() {
       </div>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Params</h2>
+        <h2 className={styles.sectionTitle}>{t('colParams')}</h2>
         <JsonViewer value={v.params} emptyLabel={t('beacons:paramsEmpty')} />
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Portent history</h2>
+        <h2 className={styles.sectionTitle}>{t('beacons:secPortentHistory')}</h2>
         <div className={styles.empty}>
           <Trans i18nKey="beacons:portentHistoryTodo" components={{ code: <code className="mono" /> }} />
         </div>

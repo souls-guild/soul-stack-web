@@ -117,9 +117,9 @@ export function RedisUsersTable({ incarnationName, secretId, users, revealableKe
       <table className={styles.table} data-testid="redis-users-table">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Perms</th>
-            <th>State</th>
+            <th>{t('colName')}</th>
+            <th>{t('colPerms')}</th>
+            <th>{t('colState')}</th>
             <th></th>
           </tr>
         </thead>

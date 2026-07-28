@@ -189,10 +189,10 @@ function TaskDetail({ task }: { task: RunTaskView }) {
       <table className={styles.hostsTable}>
         <thead>
           <tr>
-            <th>SID</th>
-            <th>Status</th>
-            <th>Output</th>
-            <th>Error</th>
+            <th>{t('common:colSid')}</th>
+            <th>{t('colStatus')}</th>
+            <th>{t('colOutput')}</th>
+            <th>{t('colError')}</th>
           </tr>
         </thead>
         <tbody>

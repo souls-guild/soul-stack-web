@@ -103,9 +103,9 @@ export function DecreeNewForm() {
       <div className={styles.header}>
         <div>
           <div className={styles.crumbs}>
-            <a href="/decrees" onClick={(e) => { e.preventDefault(); nav('/decrees'); }}>decrees</a> / new
+            <a href="/decrees" onClick={(e) => { e.preventDefault(); nav('/decrees'); }}>decrees</a> / {t('crumbNew')}
           </div>
-          <h1 className={styles.title}>New Decree</h1>
+          <h1 className={styles.title}>{t('beacons:newDecreeTitle')}</h1>
           <div className={styles.crumbs}>{t('beacons:newDecreeSubtitle')}</div>
         </div>
       </div>
@@ -184,7 +184,7 @@ export function DecreeNewForm() {
         </section>
 
         <section className={styles.section} aria-label={t('beacons:subjectXorLegend')}>
-          <h2 className={styles.sectionTitle}>Subject</h2>
+          <h2 className={styles.sectionTitle}>{t('colSubject')}</h2>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {t('beacons:subjectDecreeHint', { sid: 'sid', coven: 'coven' })}
           </div>
@@ -219,7 +219,7 @@ export function DecreeNewForm() {
         </section>
 
         <section className={styles.section} aria-label="Action">
-          <h2 className={styles.sectionTitle}>Action</h2>
+          <h2 className={styles.sectionTitle}>{t('colAction')}</h2>
           <div className={styles.filters}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div className={styles.metaKey}>Incarnation</div>

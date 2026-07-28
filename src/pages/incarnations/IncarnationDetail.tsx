@@ -158,11 +158,11 @@ export function IncarnationDetail() {
                   variant="secondary"
                   onClick={() => { setTab('drift'); driftMu.mutate(); }}
                   disabled={driftMu.isPending}
-                  title="Check drift"
+                  title={t('incarnations:actionCheckDrift')}
                 >
                   <Search size={14} /> {driftMu.isPending ? t('scanning') : t('checkDrift')}
                 </Button>
-                <Button variant="secondary" onClick={() => setUpgradeOpen(true)} title="Upgrade">
+                <Button variant="secondary" onClick={() => setUpgradeOpen(true)} title={t('incarnations:actionUpgrade')}>
                   <ArrowUp size={14} /> Upgrade
                 </Button>
                 <Button variant="secondary" onClick={() => setTraitsOpen(true)} title={t('incarnations:editTraitsTitle')}>
@@ -227,34 +227,34 @@ export function IncarnationDetail() {
 
       <div className={styles.tabs} role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'overview'} className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
-          Overview
+          {t('incarnations:tabOverview')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'spec'} className={`${styles.tab} ${tab === 'spec' ? styles.tabActive : ''}`} onClick={() => setTab('spec')}>
-          <FileText size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />Spec
+          <FileText size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabSpec')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'state'} className={`${styles.tab} ${tab === 'state' ? styles.tabActive : ''}`} onClick={() => setTab('state')}>
-          <Activity size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />State
+          <Activity size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabState')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'schema'} className={`${styles.tab} ${tab === 'schema' ? styles.tabActive : ''}`} onClick={() => setTab('schema')}>
-          <Layers size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />Schema
+          <Layers size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabSchema')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'hosts'} className={`${styles.tab} ${tab === 'hosts' ? styles.tabActive : ''}`} onClick={() => setTab('hosts')}>
-          Hosts
+          {t('incarnations:tabHosts')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'choirs'} className={`${styles.tab} ${tab === 'choirs' ? styles.tabActive : ''}`} onClick={() => setTab('choirs')}>
-          Choirs
+          {t('incarnations:tabChoirs')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'history'} className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`} onClick={() => setTab('history')}>
-          <HistoryIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />History
+          <HistoryIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabHistory')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'drift'} className={`${styles.tab} ${tab === 'drift' ? styles.tabActive : ''}`} onClick={() => setTab('drift')}>
-          Drift Check
+          {t('incarnations:tabDriftCheck')}
         </button>
       </div>
 
       {tab === 'overview' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Data summary</h2>
+          <h2 className={styles.sectionTitle}>{t('incarnations:dataSummaryTitle')}</h2>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
             {t('incarnations:dataSummaryDesc')} <strong>Spec</strong> {t('incarnations:dataSummarySpecTail')},{' '}
             <strong>State</strong> {t('incarnations:dataSummaryStateTail')},{' '}
@@ -305,13 +305,13 @@ export function IncarnationDetail() {
 
           {row.status_details ? (
             <>
-              <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>Status details</h2>
+              <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('secStatusDetails')}</h2>
               <JsonViewer value={row.status_details} />
             </>
           ) : null}
           {row.last_drift_summary ? (
             <>
-              <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>Last drift summary</h2>
+              <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('secLastDriftSummary')}</h2>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <Badge tone="warn">drifted: {row.last_drift_summary.hosts_drifted ?? 0}</Badge>
                 <Badge tone="ok">clean: {row.last_drift_summary.hosts_clean ?? 0}</Badge>
@@ -370,10 +370,10 @@ export function IncarnationDetail() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Scenario</th>
-                  <th>Apply ID</th>
-                  <th>Changed by</th>
-                  <th>Created at</th>
+                  <th>{t('colScenario')}</th>
+                  <th>{t('common:colApplyId')}</th>
+                  <th>{t('colChangedBy')}</th>
+                  <th>{t('colCreatedAt')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -414,7 +414,7 @@ export function IncarnationDetail() {
 
       {tab === 'drift' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Check drift</h2>
+          <h2 className={styles.sectionTitle}>{t('secCheckDrift')}</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <Button variant="primary" onClick={() => driftMu.mutate()} disabled={driftMu.isPending}>
               <Search size={14} /> {driftMu.isPending ? t('scanning') : t('driftScan')}

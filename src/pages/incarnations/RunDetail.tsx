@@ -226,8 +226,8 @@ export function RunDetail() {
           <table className={styles.table} data-testid="run-hosts-table">
             <thead>
               <tr>
-                <th>SID</th>
-                <th>Status</th>
+                <th>{t('common:colSid')}</th>
+                <th>{t('colStatus')}</th>
                 <th>{t('runhistory:runColPassage')}</th>
                 <th>{t('runhistory:runColAttempt')}</th>
               </tr>

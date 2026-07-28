@@ -284,9 +284,9 @@ export function MultiConsolePage() {
     <div className={`${pageStyles.page} ${connected && !scopeOpen ? styles.consolePage : ''}`}>
       <div>
         <div className={pageStyles.crumbs}>
-          <Link to="/run">Run</Link> / Multi-console
+          <Link to="/run">{t('common:navRun')}</Link> / {t('console:pageTitleMultiConsole')}
         </div>
-        <h1 className={pageStyles.title}>Multi-console</h1>
+        <h1 className={pageStyles.title}>{t('console:pageTitleMultiConsole')}</h1>
         <p className={styles.subtitle}>{t('console:subtitle')}</p>
       </div>
 

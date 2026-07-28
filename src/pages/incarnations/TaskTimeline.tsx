@@ -46,9 +46,9 @@ export function TaskTimeline({
             <tr>
               <th>#</th>
               <th>{t('runhistory:runColPassage')}</th>
-              <th>SID</th>
-              <th>Status</th>
-              <th>Module</th>
+              <th>{t('common:colSid')}</th>
+              <th>{t('colStatus')}</th>
+              <th>{t('colModule')}</th>
             </tr>
           </thead>
           <tbody>

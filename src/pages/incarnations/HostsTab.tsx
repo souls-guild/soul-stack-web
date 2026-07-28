@@ -148,9 +148,9 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>SID</th>
-              <th>Role</th>
-              <th>Coven</th>
+              <th>{t('common:colSid')}</th>
+              <th>{t('colRole')}</th>
+              <th>{t('common:colCoven')}</th>
               {editingBlocked ? null : <th style={{ width: 1 }} />}
             </tr>
           </thead>
@@ -220,9 +220,9 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>SID</th>
-              <th>Role</th>
-              <th>Data</th>
+              <th>{t('common:colSid')}</th>
+              <th>{t('colRole')}</th>
+              <th>{t('colData')}</th>
             </tr>
           </thead>
           <tbody>

@@ -91,7 +91,7 @@ export function PluginRegisterForm() {
     <div className={styles.page}>
       <div>
         <div className={styles.crumbs}>
-          <Link to="/plugins">plugins</Link> / <span>register</span>
+          <Link to="/plugins">plugins</Link> / <span>{t('crumbRegister')}</span>
         </div>
         <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Stamp size={22} /> {t('admin:pluginRegisterTitle')}
@@ -104,7 +104,7 @@ export function PluginRegisterForm() {
       <form className={styles.section} onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className={styles.filters}>
           <Input
-            label="Namespace"
+            label={t('admin:pluginFieldNamespace')}
             placeholder={t('admin:pluginNamespacePlaceholder')}
             mono
             hint={t('admin:pluginNamespaceHint')}
@@ -112,7 +112,7 @@ export function PluginRegisterForm() {
             {...register('namespace')}
           />
           <Input
-            label="Name"
+            label={t('admin:pluginFieldName')}
             placeholder={t('admin:pluginNamePlaceholderAcme')}
             mono
             hint={t('admin:pluginNameHint')}
@@ -120,7 +120,7 @@ export function PluginRegisterForm() {
             {...register('name')}
           />
           <Input
-            label="Ref"
+            label={t('admin:pluginFieldRef')}
             placeholder={t('admin:pluginRefPlaceholder')}
             mono
             hint={t('admin:pluginRefHint')}

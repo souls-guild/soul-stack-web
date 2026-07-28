@@ -139,7 +139,7 @@ export function ArchonDetail() {
           className={`${styles.tab} ${tab === 'info' ? styles.tabActive : ''}`}
           onClick={() => setTab('info')}
         >
-          Info
+          {t('pages:archonTabInfo')}
         </button>
         <button
           type="button"
@@ -148,7 +148,7 @@ export function ArchonDetail() {
           className={`${styles.tab} ${tab === 'activity' ? styles.tabActive : ''}`}
           onClick={() => setTab('activity')}
         >
-          Activity
+          {t('pages:archonTabActivity')}
         </button>
       </div>
 
@@ -182,7 +182,7 @@ export function ArchonDetail() {
           </div>
           <section className={styles.section} aria-label="roles">
             <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>Roles</span>
+              <span>{t('common:colRoles')}</span>
               <span style={{ flex: 1 }} />
               {!revoked ? (
                 <Button
@@ -291,7 +291,7 @@ export function ArchonDetail() {
             )}
           </section>
           <section className={styles.section} aria-label="metadata">
-            <h2 className={styles.sectionTitle}>Metadata</h2>
+            <h2 className={styles.sectionTitle}>{t('secMetadata')}</h2>
             {hasMetadata ? (
               <JsonViewer value={op.metadata} />
             ) : (

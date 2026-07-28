@@ -39,7 +39,7 @@ export function DecreesList() {
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>Limit</div>
+          <div className={styles.metaKey}>{t('colLimit')}</div>
           <input
             type="number"
             min={1}
@@ -75,13 +75,13 @@ export function DecreesList() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>on_beacon</th>
-                <th>where (CEL)</th>
-                <th>Action</th>
-                <th>Incarnation</th>
-                <th>Cooldown</th>
-                <th>Enabled</th>
+                <th>{t('colName')}</th>
+                <th>{t('common:colOnBeacon')}</th>
+                <th>{t('common:colWhereCel')}</th>
+                <th>{t('colAction')}</th>
+                <th>{t('common:colIncarnation')}</th>
+                <th>{t('colCooldown')}</th>
+                <th>{t('colEnabled')}</th>
               </tr>
             </thead>
             <tbody>

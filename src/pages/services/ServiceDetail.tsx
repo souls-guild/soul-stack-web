@@ -215,8 +215,9 @@ export function ServiceDetail() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             {t('admin:svcOverviewProse')} <span className="mono">{row.git}</span> {t('admin:svcOverviewProse2')}
             <span className="mono"> {row.ref}</span> {t('admin:svcOverviewProse3')} <span className="mono">scenario/</span>
-            {t('admin:svcOverviewProse4')} <span className="mono">Scenarios</span>{t('admin:svcOverviewProse5')}{' '}
-            <span className="mono">Refs</span>.
+            {/* Names of the tabs on this page — must read exactly as the tabs do. */}
+            {t('admin:svcOverviewProse4')} <span className="mono">{t('admin:svcTabScenarios')}</span>
+            {t('admin:svcOverviewProse5')} <span className="mono">{t('admin:svcTabRefs')}</span>.
           </div>
         </section>
       ) : null}

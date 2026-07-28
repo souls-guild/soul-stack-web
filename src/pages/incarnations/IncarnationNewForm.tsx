@@ -228,7 +228,7 @@ export function IncarnationNewForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
         <Input
-          label="Name (kebab-case)"
+          label={t('incarnations:newNameLabel')}
           placeholder="redis-prod"
           mono
           data-testid="incarnation-name-input"

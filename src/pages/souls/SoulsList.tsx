@@ -452,7 +452,7 @@ export function SoulsList() {
           ) : null}
         </label>
         <label>
-          <div className={styles.metaKey}>Status</div>
+          <div className={styles.metaKey}>{t('colStatus')}</div>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as SoulStatus | '')}
@@ -466,7 +466,7 @@ export function SoulsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Transport</div>
+          <div className={styles.metaKey}>{t('colTransport')}</div>
           <select
             value={transport}
             onChange={(e) => setTransport(e.target.value as SoulTransport | '')}
@@ -599,8 +599,8 @@ export function SoulsList() {
                   Status{sortGlyph('status')}
                 </button>
               </th>
-              <th>Transport</th>
-              <th>Covens</th>
+              <th>{t('colTransport')}</th>
+              <th>{t('common:colCovens')}</th>
               <th>
                 <button
                   type="button"
@@ -610,7 +610,7 @@ export function SoulsList() {
                   Last seen{sortGlyph('last_seen_at')}
                 </button>
               </th>
-              <th>Registered</th>
+              <th>{t('colRegistered')}</th>
             </tr>
           </thead>
           <tbody>

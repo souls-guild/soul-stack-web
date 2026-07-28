@@ -178,7 +178,7 @@ export function OverviewPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Overview</h1>
+          <h1 className={styles.title}>{t('secOverview')}</h1>
           <div className={styles.crumbs}>{t('pages:overviewCrumbs')}</div>
         </div>
       </div>
@@ -284,7 +284,7 @@ export function OverviewPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>KID</th>
+                  <th>{t('common:colKid')}</th>
                   <th>{t('pages:overviewClusterStarted')}</th>
                   <th>{t('pages:overviewClusterStatus')}</th>
                 </tr>
@@ -360,11 +360,11 @@ export function OverviewPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Kind</th>
-                <th>Target</th>
-                <th>Status</th>
-                <th>Started</th>
+                <th>{t('common:colId')}</th>
+                <th>{t('colKind')}</th>
+                <th>{t('colTarget')}</th>
+                <th>{t('colStatus')}</th>
+                <th>{t('colStarted')}</th>
               </tr>
             </thead>
             <tbody>

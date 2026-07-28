@@ -292,7 +292,7 @@ export function ErrandDetail() {
           className={`${styles.tab} ${tab === 'output' ? styles.tabActive : ''}`}
           onClick={() => setTab('output')}
         >
-          Output
+          {t('colOutput')}
         </button>
         <button
           type="button"
@@ -301,7 +301,7 @@ export function ErrandDetail() {
           className={`${styles.tab} ${tab === 'params' ? styles.tabActive : ''}`}
           onClick={() => setTab('params')}
         >
-          Params
+          {t('colParams')}
         </button>
         <button
           type="button"
@@ -310,7 +310,7 @@ export function ErrandDetail() {
           className={`${styles.tab} ${tab === 'events' ? styles.tabActive : ''}`}
           onClick={() => setTab('events')}
         >
-          Events
+          {t('runhistory:tabEvents')}
         </button>
       </div>
 

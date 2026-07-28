@@ -13,7 +13,7 @@ export function OracleFiresList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Oracle fires</h1>
+          <h1 className={styles.title}>{t('beacons:oracleFiresTitle')}</h1>
           <div className={styles.crumbs}>{t('beacons:oracleFiresSubtitle')}</div>
         </div>
       </div>

@@ -499,7 +499,7 @@ function VoicesTable({ incarnationName, choirName }: VoicesTableProps) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>SID</th>
+              <th>{t('common:colSid')}</th>
               <th>{t('incarnations:voiceRoleCol')}</th>
               <th>{t('incarnations:voicePositionCol')}</th>
               <th>{t('incarnations:voiceAddedAtCol')}</th>

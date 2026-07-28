@@ -189,7 +189,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
         />
       ) : (
         <Input
-          label="To version (git-ref)"
+          label={t('incarnations:upgradeToLabel')}
           placeholder="v3.0.0 / main / abcdef0"
           mono
           aria-invalid={errors.to_version ? 'true' : undefined}

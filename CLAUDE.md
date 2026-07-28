@@ -179,25 +179,42 @@ src/
    - **Pure (non-hook) functions** — error helpers (`rbac/errors.ts`,
      `services/errors.ts`, `RevokeArchonModal.prettyError`) use the global
      instance: `import i18n from '../../i18n'; const t = i18n.t.bind(i18n);`.
-   - **Switcher:** `src/components/layout/LangToggle.tsx` (EN | RU), mounted in
-     `Topbar.tsx` next to `ThemeToggle`. Switching goes through `changeLang(lng)`
-     from `src/i18n` (persist + `i18n.changeLanguage`, returns the ns-load
-     promise). While a non-default language loads async the buttons are `disabled`
-     (guards against a double click); until it resolves i18next keeps the current
-     strings — no flash/crash.
-   - **Translation rule:**
-     - **Change per language** (en/ru keys): buttons/actions, hints/descriptions,
-       errors, empty-states, confirm texts, loading/"no data".
-     - **Not translated** (English-identical in both locales OR hardcoded English):
-       entity names (Archon / Keeper / Souls / Coven / Tide / Surge / Vigil /
+   - **Switcher:** Settings → Appearance
+     (`src/pages/settings/AppearanceSettings.tsx`, the Language section next to
+     Theme and Font) — NOT the Topbar. `LangToggle.tsx` still exists and is what
+     `i18n.test.tsx` renders, but it is no longer mounted in the shell. Switching
+     goes through `changeLang(lng)` from `src/i18n` (persist +
+     `i18n.changeLanguage`, returns the ns-load promise). While a non-default
+     language loads async the buttons are `disabled` (guards against a double
+     click); until it resolves i18next keeps the current strings — no flash/crash.
+   - **Translation rule:** everything a reader reads is translated. A string stays
+     English only when the English word **is** the term.
+     - **Translated** (per-language en/ru values): buttons/actions, hints/
+       descriptions, errors, empty-states, confirm texts, loading/"no data", **and
+       all structural labels — nav items, group headers, section headers, page
+       titles, breadcrumb suffixes, tab names, table column headers.**
+     - **Not translated** (English-identical in both locales): entity names of the
+       dictionary (Archon / Keeper / Souls / Coven / Tide / Surge / Vigil /
        Portent / Oracle / Decree / Sigil / Errand / ErrandRun / Acolyte /
-       Service / Incarnation / Soulprint / Plugin / RBAC), structural labels
-       (nav / section headers / page titles / tab names / table column headers),
-       technical identifiers (SID / AID / ULID / git-ref / CEL), status enum
-       values (pending/running/succeeded). For English-identical strings
-       ("Register" / "Issue token" / "Showing N of M") the value is the same
-       English in both `en.json` and `ru.json` — that is how the `i18n.test.tsx`
-       test checks key sync and that these stay unchanged.
+       Service / Incarnation / Soulprint / Choir / Voyage / Passage / Plugin /
+       RBAC), technical identifiers and wire field names (SID / AID / ULID /
+       git-ref / CEL / `dry_run` / `self_health`), placeholder example values
+       (`redis-prod`, `os.family=debian`), status enum values
+       (pending/running/succeeded/builtin), and proper names (font families).
+     - ⚠️ **"It is a structural label" is NOT a reason to leave English.** That was
+       the old rule; it produced a half-translated Russian UI and was reversed in
+       **NIM-213**. Nav, tabs and column headers are translated like everything
+       else — only entity names inside them stay English (`Souls`, `Covens`).
+     - **Enforced by a guard test**, not by convention alone:
+       `src/test/i18nTranslationRule.test.ts` fails when a key is identical in both
+       locales and is not on the explicit allow-list (grouped by reason: entity
+       name / technical identifier / placeholder / status value / proper name). It
+       also fails on stale allow-list entries and on `{{placeholder}}` drift
+       between locales. Adding an English-identical key means either translating
+       it or adding it to that list with the category that justifies it.
+     - **Structural labels live in i18n, not in JSX.** Nav items and table headers
+       carry a `labelKey` (see `Sidebar.tsx`, `RunsFeed.tsx` `SEGMENTS`); generic
+       column headers reuse the shared `common:col*` keys.
    - **Add a key:** add it to **both** files — `en` in
      `src/i18n/locales/en/<ns>.json` + `ru` in `public/locales/ru/<ns>.json` (both
      required). A key in only one locale is caught by the ns-key-sync test

@@ -70,7 +70,7 @@ export function VigilsList() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Beacon kind</div>
+          <div className={styles.metaKey}>{t('colBeaconKind')}</div>
           <select
             value={checkFilter}
             onChange={(e) => setCheckFilter(e.target.value)}
@@ -89,7 +89,7 @@ export function VigilsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>Limit</div>
+          <div className={styles.metaKey}>{t('colLimit')}</div>
           <input
             type="number"
             min={1}
@@ -125,13 +125,13 @@ export function VigilsList() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Beacon kind</th>
-                <th>Subject</th>
-                <th>Interval</th>
-                <th>Params</th>
-                <th>Enabled</th>
-                <th>Created</th>
+                <th>{t('colName')}</th>
+                <th>{t('colBeaconKind')}</th>
+                <th>{t('colSubject')}</th>
+                <th>{t('colInterval')}</th>
+                <th>{t('colParams')}</th>
+                <th>{t('colEnabled')}</th>
+                <th>{t('colCreated')}</th>
               </tr>
             </thead>
             <tbody>

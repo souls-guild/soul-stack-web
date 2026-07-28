@@ -119,19 +119,19 @@ export function SoulUtilizationTab({ sid, enabled }: { sid: string; enabled: boo
           <SkewNote collectedAt={data?.collected_at} receivedAt={data?.received_at} />
 
           <div className={styles.radials}>
-            <RadialGauge label="CPU" pct={l.cpu_pct} testId="soul-radial-cpu" />
-            <RadialGauge label="Memory" pct={memPct} sub={memCaption(l.mem_used_mb, l.mem_total_mb)} testId="soul-radial-mem" />
-            <RadialGauge label="Disk" pct={disk?.pct ?? null} sub={disk?.mount} testId="soul-radial-disk" />
+            <RadialGauge label={t('incarnations:utilCpu')} pct={l.cpu_pct} testId="soul-radial-cpu" />
+            <RadialGauge label={t('incarnations:utilMemory')} pct={memPct} sub={memCaption(l.mem_used_mb, l.mem_total_mb)} testId="soul-radial-mem" />
+            <RadialGauge label={t('incarnations:utilDisk')} pct={disk?.pct ?? null} sub={disk?.mount} testId="soul-radial-disk" />
           </div>
 
           <div className={styles.detailGrid}>
-            <Detail label="Load" value={`${formatLoad(l.load1)} / ${formatLoad(l.load5)} / ${formatLoad(l.load15)}`} sub="1m / 5m / 15m" />
-            <Detail label="Swap" value={formatMb(l.swap_used_mb)} />
-            <Detail label="Uptime" value={formatUptime(l.uptime_sec)} />
-            <Detail label="Net ↓" value={formatBps(l.net_rx_bps)} />
-            <Detail label="Net ↑" value={formatBps(l.net_tx_bps)} />
-            <Detail label="Net err" value={`${l.net_err_ps}/s`} />
-            <Detail label="Interval" value={`${l.interval_sec}s`} />
+            <Detail label={t('incarnations:utilLoad')} value={`${formatLoad(l.load1)} / ${formatLoad(l.load5)} / ${formatLoad(l.load15)}`} sub="1m / 5m / 15m" />
+            <Detail label={t('incarnations:utilSwap')} value={formatMb(l.swap_used_mb)} />
+            <Detail label={t('incarnations:utilUptime')} value={formatUptime(l.uptime_sec)} />
+            <Detail label={t('incarnations:utilNetRx')} value={formatBps(l.net_rx_bps)} />
+            <Detail label={t('incarnations:utilNetTx')} value={formatBps(l.net_tx_bps)} />
+            <Detail label={t('incarnations:utilNetErr')} value={`${l.net_err_ps}/s`} />
+            <Detail label={t('incarnations:utilInterval')} value={`${l.interval_sec}s`} />
           </div>
 
           <DiskTable disks={l.disks} />
@@ -185,6 +185,7 @@ function Detail({ label, value, sub }: { label: string; value: string; sub?: str
 const NATURAL_DIR: Record<DiskSortKey, SortDir> = { mount: 'asc', space: 'desc', inodes: 'desc' };
 
 function DiskTable({ disks }: { disks?: TelemetryDisk[] | null }) {
+  const { t } = useTranslation();
   // Default: busiest space on top. Click a header to sort by it; click again to toggle dir.
   const [sortKey, setSortKey] = useState<DiskSortKey>('space');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -205,9 +206,9 @@ function DiskTable({ disks }: { disks?: TelemetryDisk[] | null }) {
     <table className={common.table} style={{ marginTop: 12 }} data-testid="soul-util-disks">
       <thead>
         <tr>
-          <SortHeader label="Mount" col="mount" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('mount')} />
-          <SortHeader label="Space" col="space" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('space')} />
-          <SortHeader label="Inodes" col="inodes" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('inodes')} />
+          <SortHeader label={t('incarnations:utilMount')} col="mount" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('mount')} />
+          <SortHeader label={t('incarnations:utilSpace')} col="space" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('space')} />
+          <SortHeader label={t('incarnations:utilInodes')} col="inodes" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('inodes')} />
         </tr>
       </thead>
       <tbody>
@@ -304,17 +305,17 @@ function WindowTrends({ window }: { window?: UtilizationWindowPoint[] | null }) 
   return (
     <div data-testid="soul-util-trends" style={{ marginTop: 12 }}>
       <div className={styles.trendsHead}>
-        <span className={styles.trendsTitle}>Trends</span>
+        <span className={styles.trendsTitle}>{t('incarnations:utilTrends')}</span>
         <span className={styles.trendsSpan}>
           {win.length} samples{spanText ? ` · ${spanText}` : ''}
         </span>
       </div>
       <div className={styles.trendGrid}>
-        <UtilTrend label="CPU" values={cpu} times={times} now={now} format={formatPct} min={0} max={100} tone={utilTone(minMaxLast(cpu)?.last)} testId="soul-trend-cpu" />
-        <UtilTrend label="Mem" values={mem} times={times} now={now} format={formatPct} min={0} max={100} tone={utilTone(minMaxLast(mem)?.last)} testId="soul-trend-mem" />
-        <UtilTrend label="Load1" values={load1} times={times} now={now} format={formatLoad} tone="accent" testId="soul-trend-load" />
-        <UtilTrend label="Net ↓" values={rx} times={times} now={now} format={formatBps} axisFormat={formatBpsShort} min={0} tone="accent" testId="soul-trend-rx" />
-        <UtilTrend label="Net ↑" values={tx} times={times} now={now} format={formatBps} axisFormat={formatBpsShort} min={0} tone="accent" testId="soul-trend-tx" />
+        <UtilTrend label={t('incarnations:utilCpu')} values={cpu} times={times} now={now} format={formatPct} min={0} max={100} tone={utilTone(minMaxLast(cpu)?.last)} testId="soul-trend-cpu" />
+        <UtilTrend label={t('incarnations:utilMem')} values={mem} times={times} now={now} format={formatPct} min={0} max={100} tone={utilTone(minMaxLast(mem)?.last)} testId="soul-trend-mem" />
+        <UtilTrend label={t('incarnations:utilLoadShort')} values={load1} times={times} now={now} format={formatLoad} tone="accent" testId="soul-trend-load" />
+        <UtilTrend label={t('incarnations:utilNetRx')} values={rx} times={times} now={now} format={formatBps} axisFormat={formatBpsShort} min={0} tone="accent" testId="soul-trend-rx" />
+        <UtilTrend label={t('incarnations:utilNetTx')} values={tx} times={times} now={now} format={formatBps} axisFormat={formatBpsShort} min={0} tone="accent" testId="soul-trend-tx" />
       </div>
     </div>
   );
@@ -324,6 +325,7 @@ function WindowTrends({ window }: { window?: UtilizationWindowPoint[] | null }) 
 // nothing on unavailable/forbidden/error/no-latest, keeping the Overview clean. The
 // freshness card ticks live via useNow.
 export function SoulUtilizationStrip({ sid, enabled }: { sid: string; enabled: boolean }) {
+  const { t } = useTranslation();
   const q = useSoulTelemetry(sid, enabled);
   const now = useNow(1000);
   const data = q.data;
@@ -339,19 +341,19 @@ export function SoulUtilizationStrip({ sid, enabled }: { sid: string; enabled: b
 
   return (
     <div className={styles.statRow} data-testid="soul-util-strip">
-      <StatCard label="CPU" value={formatPct(l.cpu_pct)} pct={l.cpu_pct} tone={utilTone(l.cpu_pct)} />
-      <StatCard label="Mem" value={formatPct(memPct)} pct={memPct} tone={utilTone(memPct)} />
+      <StatCard label={t('incarnations:utilCpu')} value={formatPct(l.cpu_pct)} pct={l.cpu_pct} tone={utilTone(l.cpu_pct)} />
+      <StatCard label={t('incarnations:utilMem')} value={formatPct(memPct)} pct={memPct} tone={utilTone(memPct)} />
       <StatCard
-        label="Disk"
+        label={t('incarnations:utilDisk')}
         value={disk ? formatPct(disk.pct) : '—'}
         pct={disk?.pct ?? null}
         tone={utilTone(disk?.pct)}
         title={disk?.mount}
       />
-      <StatCard label="Net" value={`↓ ${formatBps(l.net_rx_bps)}  ↑ ${formatBps(l.net_tx_bps)}`} />
-      <StatCard label="Load1" value={formatLoad(l.load1)} />
+      <StatCard label={t('incarnations:utilNet')} value={`↓ ${formatBps(l.net_rx_bps)}  ↑ ${formatBps(l.net_tx_bps)}`} />
+      <StatCard label={t('incarnations:utilLoadShort')} value={formatLoad(l.load1)} />
       <div className={styles.statCard}>
-        <span className={styles.statLabel}>Fresh</span>
+        <span className={styles.statLabel}>{t('incarnations:utilFresh')}</span>
         <span className={styles.statFresh} title={data?.collected_at}>
           <Dot kind={stale ? 'warn' : 'ok'} /> {freshText}
         </span>

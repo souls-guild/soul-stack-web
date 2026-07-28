@@ -288,9 +288,9 @@ export function SynodsList() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Builtin</th>
-              <th>Description</th>
+              <th>{t('colName')}</th>
+              <th>{t('common:colBuiltin')}</th>
+              <th>{t('colDescription')}</th>
               <th>{t('synods:members')}</th>
               <th>{t('synods:roles')}</th>
               <th></th>

@@ -117,7 +117,7 @@ export function CreateRolePage() {
       <div className={styles.header}>
         <div>
           <div className={styles.crumbs}>
-            <Link to="/rbac">RBAC</Link> / new role
+            <Link to="/rbac">RBAC</Link> / {t('crumbNewRole')}
           </div>
           <h1 className={styles.title}>{t('forms:createRoleTitle')}</h1>
         </div>

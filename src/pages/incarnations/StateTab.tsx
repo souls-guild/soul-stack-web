@@ -139,9 +139,9 @@ export function StateTab({ state, stateSchemaVersion, incarnationName }: Props) 
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>SID</th>
-                    <th>Role</th>
-                    <th>Data</th>
+                    <th>{t('common:colSid')}</th>
+                    <th>{t('colRole')}</th>
+                    <th>{t('colData')}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -92,7 +92,7 @@ export function PushRunsList() {
           />
         </label>
         <div>
-          <div className={styles.metaKey}>Status</div>
+          <div className={styles.metaKey}>{t('colStatus')}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
             {STATUSES.map((s) => {
               const active = statusSet.has(s);
@@ -128,14 +128,14 @@ export function PushRunsList() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Apply ID</th>
-                <th>Destiny</th>
-                <th>SSH provider</th>
-                <th>Status</th>
-                <th>Targets</th>
-                <th>Success</th>
-                <th>Failed</th>
-                <th>Started</th>
+                <th>{t('common:colApplyId')}</th>
+                <th>{t('common:colDestiny')}</th>
+                <th>{t('common:colSshProvider')}</th>
+                <th>{t('colStatus')}</th>
+                <th>{t('colTargets')}</th>
+                <th>{t('colSuccess')}</th>
+                <th>{t('colFailed')}</th>
+                <th>{t('colStarted')}</th>
               </tr>
             </thead>
             <tbody>

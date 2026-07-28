@@ -51,7 +51,7 @@ export function RoleEditPage() {
         <div className={styles.header}>
           <div>
             <div className={styles.crumbs}>
-              <Link to="/rbac">RBAC</Link> / edit
+              <Link to="/rbac">RBAC</Link> / {t('crumbEdit')}
             </div>
             <h1 className={styles.title}>{t('admin:rbacRoleNotFound', { name: roleName })}</h1>
           </div>
@@ -128,7 +128,7 @@ function RoleEditForm({ role, roles }: { role: RoleView; roles: readonly RoleVie
       <div className={styles.header}>
         <div>
           <div className={styles.crumbs}>
-            <Link to="/rbac">RBAC</Link> / edit
+            <Link to="/rbac">RBAC</Link> / {t('crumbEdit')}
           </div>
           <h1 className={styles.title}>{t('forms:editPermissionsTitle', { name: role.name })}</h1>
         </div>

@@ -28,12 +28,12 @@ function RolesTab({ roles, onEdit, onDelete, canEdit, canDelete }: RolesTabProps
     <table className={styles.table}>
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Builtin</th>
-          <th>Derived from</th>
-          <th>Description</th>
-          <th>Permissions</th>
-          <th>Archons</th>
+          <th>{t('colName')}</th>
+          <th>{t('common:colBuiltin')}</th>
+          <th>{t('colDerivedFrom')}</th>
+          <th>{t('colDescription')}</th>
+          <th>{t('colPermissions')}</th>
+          <th>{t('common:colArchons')}</th>
           <th></th>
         </tr>
       </thead>
@@ -260,8 +260,8 @@ function MembersTab({ roles, operators, onAssign }: MembersTabProps) {
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>AID</th>
-            <th>Roles</th>
+            <th>{t('common:colAid')}</th>
+            <th>{t('colRoles')}</th>
             <th></th>
           </tr>
         </thead>
@@ -417,7 +417,7 @@ export function RbacPage() {
           className={`${styles.tab} ${tab === 'roles' ? styles.tabActive : ''}`}
           onClick={() => setTab('roles')}
         >
-          Roles
+          {t('colRoles')}
         </button>
         <button
           type="button"
@@ -426,7 +426,7 @@ export function RbacPage() {
           className={`${styles.tab} ${tab === 'permissions' ? styles.tabActive : ''}`}
           onClick={() => setTab('permissions')}
         >
-          Role permissions
+          {t('admin:rbacTabRolePermissions')}
         </button>
         <button
           type="button"
@@ -435,7 +435,7 @@ export function RbacPage() {
           className={`${styles.tab} ${tab === 'members' ? styles.tabActive : ''}`}
           onClick={() => setTab('members')}
         >
-          Archon assignments
+          {t('admin:rbacTabArchonAssignments')}
         </button>
       </div>
 

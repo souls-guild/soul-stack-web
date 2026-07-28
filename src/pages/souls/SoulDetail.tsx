@@ -156,7 +156,7 @@ export function SoulDetail() {
           className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`}
           onClick={() => setTab('overview')}
         >
-          Overview
+          {t('secOverview')}
         </button>
         <button
           type="button"
@@ -174,7 +174,7 @@ export function SoulDetail() {
           className={`${styles.tab} ${tab === 'utilization' ? styles.tabActive : ''}`}
           onClick={() => setTab('utilization')}
         >
-          Utilization
+          {t('souls:tabUtilization')}
         </button>
         <button
           type="button"
@@ -183,13 +183,13 @@ export function SoulDetail() {
           className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`}
           onClick={() => setTab('history')}
         >
-          History
+          {t('secHistory')}
         </button>
       </div>
 
       {tab === 'overview' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Overview</h2>
+          <h2 className={styles.sectionTitle}>{t('secOverview')}</h2>
           <SoulUtilizationStrip sid={row.sid} enabled={tab === 'overview'} />
           <div className={styles.meta}>
             <span className={styles.metaKey}>SID</span>
@@ -290,7 +290,7 @@ function SoulHistoryTab({ sid }: { sid: string }) {
 
   return (
     <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>History</h2>
+      <h2 className={styles.sectionTitle}>{t('secHistory')}</h2>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
         {HISTORY_TYPES.map((tp) => {
@@ -337,12 +337,12 @@ function SoulHistoryTab({ sid }: { sid: string }) {
           <table className={styles.table} data-testid="soul-history-table">
             <thead>
               <tr>
-                <th>Type</th>
-                <th>ID</th>
-                <th>Incarnation / Module</th>
-                <th>Status</th>
-                <th>Started</th>
-                <th>Finished</th>
+                <th>{t('colType')}</th>
+                <th>{t('common:colId')}</th>
+                <th>{t('common:colIncarnationModule')}</th>
+                <th>{t('colStatus')}</th>
+                <th>{t('colStarted')}</th>
+                <th>{t('colFinished')}</th>
               </tr>
             </thead>
             <tbody>
@@ -558,8 +558,9 @@ function SoulprintMemoryBlock({ memory }: { memory?: NonNullable<Awaited<ReturnT
 }
 
 function SoulprintNetworkBlock({ network }: { network?: NonNullable<Awaited<ReturnType<typeof keeperApi.souls.getSoulprint>>['typed_facts']['network']> | undefined }) {
+  const { t } = useTranslation();
+  const ifaces: SoulprintNetworkInterface[] = network?.interfaces ?? [];
   if (!network) return null;
-  const ifaces: SoulprintNetworkInterface[] = network.interfaces ?? [];
   return (
     <div>
       <h3 style={{ fontSize: 13, margin: '8px 0', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>network</h3>
@@ -571,11 +572,11 @@ function SoulprintNetworkBlock({ network }: { network?: NonNullable<Awaited<Retu
         <table className={styles.table} style={{ marginTop: 8 }}>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>IPv4</th>
-              <th>IPv6</th>
-              <th>MAC</th>
-              <th>MTU</th>
+              <th>{t('colName')}</th>
+              <th>{t('common:colIpv4')}</th>
+              <th>{t('common:colIpv6')}</th>
+              <th>{t('common:colMac')}</th>
+              <th>{t('common:colMtu')}</th>
             </tr>
           </thead>
           <tbody>

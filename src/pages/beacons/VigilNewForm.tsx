@@ -281,9 +281,9 @@ export function VigilNewForm() {
       <div className={styles.header}>
         <div>
           <div className={styles.crumbs}>
-            <a href="/vigils" onClick={(e) => { e.preventDefault(); nav('/vigils'); }}>vigils</a> / new
+            <a href="/vigils" onClick={(e) => { e.preventDefault(); nav('/vigils'); }}>vigils</a> / {t('crumbNew')}
           </div>
-          <h1 className={styles.title}>New Vigil</h1>
+          <h1 className={styles.title}>{t('beacons:newVigilTitle')}</h1>
           <div className={styles.crumbs}>{t('beacons:newVigilSubtitle')}</div>
         </div>
       </div>
@@ -308,7 +308,7 @@ export function VigilNewForm() {
               error={errors.interval?.message ? t(errors.interval.message) : undefined}
             />
             <label>
-              <div className={styles.metaKey}>Beacon kind</div>
+              <div className={styles.metaKey}>{t('colBeaconKind')}</div>
               <select
                 value={check}
                 onChange={(e) => onCheckChange(e.target.value)}
@@ -340,7 +340,7 @@ export function VigilNewForm() {
         </section>
 
         <section className={styles.section} aria-label={t('beacons:subjectXorLegend')}>
-          <h2 className={styles.sectionTitle}>Subject</h2>
+          <h2 className={styles.sectionTitle}>{t('colSubject')}</h2>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {t('beacons:subjectVigilHint', { sid: 'sid', coven: 'coven' })}
           </div>
@@ -375,7 +375,7 @@ export function VigilNewForm() {
         </section>
 
         <section className={styles.section} aria-label="Params">
-          <h2 className={styles.sectionTitle}>Params</h2>
+          <h2 className={styles.sectionTitle}>{t('colParams')}</h2>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
             <input
               type="checkbox"

@@ -257,7 +257,7 @@ export function AuditLog() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Audit</h1>
+          <h1 className={styles.title}>{t('admin:auditPageTitle')}</h1>
           <div className={styles.crumbs}>{t('admin:auditCrumbs')}</div>
         </div>
       </div>
@@ -312,7 +312,7 @@ export function AuditLog() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Limit</div>
+          <div className={styles.metaKey}>{t('colLimit')}</div>
           <input
             type="number"
             min={1}

@@ -30,13 +30,14 @@ import styles from '../common.module.css';
 
 type Segment = 'all' | 'scenario' | 'voyage' | 'push' | 'errand';
 
-// Structural segment labels — English-identical in both locales (web-CLAUDE.md).
-const SEGMENTS: { id: Segment; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'scenario', label: 'Scenario' },
-  { id: 'voyage', label: 'Voyage' },
-  { id: 'push', label: 'Push' },
-  { id: 'errand', label: 'Errand' },
+// Segment labels are localized; the run-type names that are dictionary entities
+// (Voyage / Push / Errand) resolve to the same English word in every locale.
+const SEGMENTS: { id: Segment; labelKey: string }[] = [
+  { id: 'all', labelKey: 'all' },
+  { id: 'scenario', labelKey: 'runhistory:segScenario' },
+  { id: 'voyage', labelKey: 'runhistory:segVoyage' },
+  { id: 'push', labelKey: 'runhistory:segPush' },
+  { id: 'errand', labelKey: 'runhistory:segErrand' },
 ];
 
 type RunType = 'scenario' | 'voyage-scenario' | 'voyage-command' | 'push' | 'errand';
@@ -53,17 +54,18 @@ interface FeedRow {
 
 // The Type badge of a union row maps onto the segment taxonomy (Scenario/Voyage/Push/Errand),
 // so the Type column matches the segment selector. The voyage scenario/command nuance is visible in Target.
-function typeLabel(type: RunType): string {
+// Returns an i18n key — the same keys the segment selector uses, so both stay in step.
+function typeLabelKey(type: RunType): string {
   switch (type) {
     case 'scenario':
-      return 'Scenario';
+      return 'runhistory:segScenario';
     case 'voyage-scenario':
     case 'voyage-command':
-      return 'Voyage';
+      return 'runhistory:segVoyage';
     case 'push':
-      return 'Push';
+      return 'runhistory:segPush';
     case 'errand':
-      return 'Errand';
+      return 'runhistory:segErrand';
   }
 }
 
@@ -500,7 +502,7 @@ export function RunsFeed() {
                   data-testid={`runs-segment-${seg.id}`}
                   style={chipStyle(active)}
                 >
-                  {seg.label}
+                  {t(seg.labelKey)}
                 </button>
               );
             })}
@@ -643,7 +645,7 @@ export function RunsFeed() {
           sortKey={unionSortKey}
           sortDir={unionSortDir}
           onSort={toggleUnionSort}
-          typeLabelOf={typeLabel}
+          typeLabelKeyOf={typeLabelKey}
         />
       )}
     </div>
@@ -660,7 +662,7 @@ function UnionSegment({
   sortKey,
   sortDir,
   onSort,
-  typeLabelOf,
+  typeLabelKeyOf,
 }: {
   segment: Segment;
   rows: FeedRow[];
@@ -670,16 +672,16 @@ function UnionSegment({
   sortKey: UnionSortKey;
   sortDir: SortDir;
   onSort: (k: UnionSortKey) => void;
-  typeLabelOf: (t: RunType) => string;
+  typeLabelKeyOf: (t: RunType) => string;
 }) {
   const { t } = useTranslation();
   const cols: { key: UnionSortKey; label: string }[] = [
-    { key: 'type', label: 'Type' },
+    { key: 'type', label: t('colType') },
     { key: 'id', label: 'ID' },
-    { key: 'target', label: 'Target' },
-    { key: 'status', label: 'Status' },
-    { key: 'started', label: 'Started' },
-    { key: 'finished', label: 'Finished' },
+    { key: 'target', label: t('colTarget') },
+    { key: 'status', label: t('colStatus') },
+    { key: 'started', label: t('colStarted') },
+    { key: 'finished', label: t('colFinished') },
   ];
 
   return (
@@ -736,7 +738,7 @@ function UnionSegment({
             {rows.map((r) => (
               <tr key={`${r.type}:${r.id}`} data-testid={`runs-row-${r.id}`} data-run-type={r.type}>
                 <td>
-                  <Badge tone="info">{typeLabelOf(r.type)}</Badge>
+                  <Badge tone="info">{t(typeLabelKeyOf(r.type))}</Badge>
                 </td>
                 <td>
                   <Link to={r.to} title={r.id}>
@@ -849,12 +851,12 @@ function ScenarioSegment({
           <table className={styles.table} data-testid="runs-scenario-table">
             <thead>
               <tr>
-                <th>Apply ID</th>
+                <th>{t('common:colApplyId')}</th>
                 <ScenTh colKey="incarnation" label="Incarnation" />
                 <ScenTh colKey="service" label="Service" />
                 <ScenTh colKey="scenario" label="Scenario" />
                 <ScenTh colKey="status" label="Status" />
-                <th>Started by</th>
+                <th>{t('colStartedBy')}</th>
                 <ScenTh colKey="started_at" label="Started at" />
                 <ScenTh colKey="finished_at" label="Finished at" />
               </tr>

@@ -112,14 +112,14 @@ export function PushRunDetail() {
       </section>
 
       <section className={styles.section} aria-label="Per-host">
-        <h2 className={styles.sectionTitle}>Per-host</h2>
+        <h2 className={styles.sectionTitle}>{t('secPerHost')}</h2>
         {hosts && hosts.length > 0 ? (
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>SID</th>
-                <th>Status</th>
-                <th>Error</th>
+                <th>{t('common:colSid')}</th>
+                <th>{t('colStatus')}</th>
+                <th>{t('colError')}</th>
               </tr>
             </thead>
             <tbody>
@@ -145,7 +145,7 @@ export function PushRunDetail() {
 
       {view.input ? (
         <section className={styles.section} aria-label="Input">
-          <h2 className={styles.sectionTitle}>Input</h2>
+          <h2 className={styles.sectionTitle}>{t('secInput')}</h2>
           <JsonViewer value={view.input} emptyLabel={t('runhistory:summaryEmptyInput')} />
         </section>
       ) : null}

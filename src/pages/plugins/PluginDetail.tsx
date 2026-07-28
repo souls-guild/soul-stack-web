@@ -194,7 +194,7 @@ export function PluginDetail() {
           className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`}
           onClick={() => setTab('overview')}
         >
-          Overview
+          {t('secOverview')}
         </button>
         <button
           type="button"
@@ -203,7 +203,7 @@ export function PluginDetail() {
           className={`${styles.tab} ${tab === 'audit' ? styles.tabActive : ''}`}
           onClick={() => setTab('audit')}
         >
-          Audit history
+          {t('admin:pluginTabAuditHistory')}
         </button>
         <button
           type="button"
@@ -212,7 +212,7 @@ export function PluginDetail() {
           className={`${styles.tab} ${tab === 'kinds' ? styles.tabActive : ''}`}
           onClick={() => setTab('kinds')}
         >
-          Plugin kinds
+          {t('admin:pluginTabKinds')}
         </button>
       </div>
 

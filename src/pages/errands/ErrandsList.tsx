@@ -113,7 +113,7 @@ export function ErrandsList() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Status</div>
+          <div className={styles.metaKey}>{t('colStatus')}</div>
           <select
             value={status}
             onChange={(e) => {
@@ -167,14 +167,14 @@ export function ErrandsList() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Errand ID</th>
-                <th>SID</th>
-                <th>Module</th>
-                <th>Status</th>
-                <th>Exit</th>
-                <th>Duration ms</th>
-                <th>Started at</th>
-                <th>Finished at</th>
+                <th>{t('common:colErrandId')}</th>
+                <th>{t('common:colSid')}</th>
+                <th>{t('colModule')}</th>
+                <th>{t('colStatus')}</th>
+                <th>{t('colExit')}</th>
+                <th>{t('colDurationMs')}</th>
+                <th>{t('colStartedAt')}</th>
+                <th>{t('colFinishedAt')}</th>
               </tr>
             </thead>
             <tbody>
