@@ -348,6 +348,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/console/recordings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List of recorded console sessions (paged)
+         * @description Recorded console sessions with filters and pagination (ADR-0074(g), NIM-145/NIM-148). Permission soul.console — the same right and the same selectors as opening the console itself; rows are narrowed to the hosts the caller may console into. Read-only, no audit.
+         */
+        get: operations["listConsoleRecordings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/recordings/{recording_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recorded console session (metadata)
+         * @description Metadata of one recorded session (ADR-0074(g)). Permission soul.console with the recording's host in scope. 404 covers both an unknown id and one outside the caller's scope. Read-only, no audit.
+         */
+        get: operations["getConsoleRecording"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/recordings/{recording_id}/cast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recorded console session (asciicast v2)
+         * @description The recorded session as an asciicast v2 file — a JSON header line followed by one JSON array per event (ADR-0074(g), NIM-145). Replays with asciinema, agg and xterm.js. Permission soul.console with the recording's host in scope; audited as console.recording-read. Vault references were masked when the session was recorded and are served as masked — there is no un-masked form of this body.
+         */
+        get: operations["getConsoleRecordingCast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/decrees": {
         parameters: {
             query?: never;
@@ -726,6 +786,50 @@ export interface paths {
          * @description Three modes (replace/append/remove) over declared hosts (ADR-008). Permission incarnation.update-hosts.
          */
         patch: operations["updateIncarnationHosts"];
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the incarnation's roster
+         * @description Member hosts of the incarnation (incarnation_membership, ADR-008 amendment / NIM-124), with bound_at / bound_by_aid. Permission incarnation.get. Narrowed to the hosts inside the caller's soul scope. Read-only, no audit.
+         */
+        get: operations["listIncarnationMembers"];
+        put?: never;
+        /**
+         * Bind hosts to an incarnation
+         * @description Binds already-onboarded, connected Souls to the incarnation's roster so a scenario can subsequently roll onto them (ADR-008 amendment, NIM-209). Idempotent: re-binding a member is a no-op reported in already_member. Permission incarnation.bind-member; EVERY target SID must also be inside the caller's soul scope (all-or-nothing) - otherwise 403. 422 - unknown SID or a host that is not connected.
+         */
+        post: operations["bindIncarnationMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{name}/members/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unbind a host from an incarnation
+         * @description Removes the host from the incarnation's roster - it stops being a target of every FUTURE run (ADR-008 amendment, NIM-209). Idempotent: unbinding a non-member succeeds unchanged. Permission incarnation.unbind-member; the SID must also be inside the caller's soul scope.
+         */
+        delete: operations["unbindIncarnationMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/incarnations/{name}/rerun-last": {
@@ -1477,13 +1581,13 @@ export interface paths {
         };
         /**
          * List roles
-         * @description Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. Each role comes both AS STORED (permissions/default_scope) and AS RESOLVED against its derivation chain (effective_permissions/effective_scope, ADR-078) — consumers must not re-derive inheritance from parent_role. Read-only, no audit.
+         * @description Catalog of RBAC roles with full permissions and operator membership (ADR-022). Permission role.list. SCOPED TO THE CALLER: the answer holds only the roles the caller could grant themselves — a role's permission set and its operator list together are the cluster's privilege map, so role.list is not the right to read all of it. A caller holding an unrestricted `*` — or the explicit `role.list-all` right — sees every role. Each role comes both AS STORED (permissions/default_scope) and AS RESOLVED against its derivation chain (effective_permissions/effective_scope, ADR-078) — consumers must not re-derive inheritance from parent_role. Read-only, no audit.
          */
         get: operations["listRoles"];
         put?: never;
         /**
          * Create role
-         * @description Creates RBAC role with set of permissions (ADR-022). Permission role.create. Optional parent_role derives the role from another one (ADR-078), bounding it by that role. 409 — name already taken; 404 — parent_role not found; 403 — beyond the parent or beyond the caller's own rights.
+         * @description Creates RBAC role with set of permissions (ADR-022). Permission role.create. Optional parent_role derives the role from another one (ADR-078), bounding it by that role. WITHOUT parent_role the role tracks nothing, so it additionally requires role.create-root — the default is to derive from a role you hold. 409 — name already taken; 404 — parent_role not found; 403 — beyond the parent, beyond the caller's own rights, or parentless without role.create-root.
          */
         post: operations["createRole"];
         delete?: never;
@@ -1813,7 +1917,7 @@ export interface paths {
         };
         /**
          * Keeper runtime settings catalog
-         * @description Every admitted runtime setting with its type, range bounds, built-in default, the EFFECTIVE value on this instance and its source (default < file < pg, ADR-0073). Renders the settings form without hardcoding the field list in the UI. Permission setting.read. Read-only, no audit.
+         * @description Every admitted runtime setting with its type, range bounds, built-in default, the EFFECTIVE value on this instance and its source (default < pg < file, ADR-0073 — the instance's own keeper.yml wins). Where the file shadows a cluster override the entry also carries cluster_value + overridden_locally. Renders the settings form without hardcoding the field list in the UI. Permission setting.read. Read-only, no audit.
          */
         get: operations["listSettings"];
         put?: never;
@@ -1834,7 +1938,7 @@ export interface paths {
         get?: never;
         /**
          * Override a Keeper runtime setting
-         * @description Writes a cluster-wide override into keeper_settings and invalidates the other Keeper nodes, which re-merge it onto their keeper.yml without a restart (ADR-0073). Permission setting.update. 404 - the key is not in the registry; 422 - unparsable or out-of-range value, nothing is written.
+         * @description Writes a cluster-wide override into keeper_settings and invalidates the other Keeper nodes, which re-merge it onto their keeper.yml without a restart (ADR-0073). An instance whose own keeper.yml sets the key keeps its local value; the catalog then reports cluster_value + overridden_locally. Permission setting.update. 404 - the key is not in the registry; 422 - unparsable value, out of range, or a cross-field invariant broken either here or on a node whose file is silent about the key; nothing is written.
          */
         put: operations["updateSetting"];
         post?: never;
@@ -1986,9 +2090,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Bulk assignment of trait-tags (deprecated)
-         * @deprecated
-         * @description DEPRECATED (ADR-060): use PUT /v1/incarnations/{name}/traits (incarnation.traits - source of truth, projected into souls.traits). Bulk merge/replace/remove operator-set trait-tags (souls.traits jsonb) on hosts under selector ∩ coven-scope. Per-soul write is overwritten by the incarnation.traits projection. Permission soul.traits-assign. partial -> 200 status:partial.
+         * Bulk assignment of trait-tags to hosts
+         * @description Bulk merge/replace/remove of operator-set trait-tags attached to HOSTS (souls.traits jsonb) on hosts under selector ∩ coven-scope. A host's effective traits are these unioned with the traits of every incarnation it belongs to (ADR-080): labelling the incarnation covers hosts that join later, labelling the host covers exactly one. Permission soul.traits-assign; merge/replace additionally require every pair to lie inside the operator's own trait-scope (gate b). partial -> 200 status:partial.
          */
         post: operations["assignSoulTraits"];
         delete?: never;
@@ -2745,6 +2848,55 @@ export interface components {
             max?: string;
             min?: string;
         };
+        ConsoleRecording: {
+            /** @description the Archon who held the session */
+            archon_aid: string;
+            /**
+             * Format: int64
+             * @description encoded size of the cast body in bytes
+             */
+            byte_count: number;
+            close_reason?: string;
+            /** Format: int64 */
+            event_count: number;
+            /**
+             * Format: date-time
+             * @description absent while the session is live, and also when the Keeper instance holding it died mid-recording — the body up to that point is complete and replayable
+             */
+            finished_at?: string;
+            /**
+             * Format: int32
+             * @description terminal rows from the cast header
+             */
+            height: number;
+            /**
+             * @description interactive = a PTY session over GET /v1/console; command = a one-shot keeper.soul.run-command
+             * @enum {string}
+             */
+            kind: "interactive" | "command";
+            recording_id: string;
+            session_id: string;
+            /** @description the host the session ran on */
+            sid: string;
+            /** Format: date-time */
+            started_at: string;
+            /** @description the session hit the per-session recording cap and was closed; the recording ends before the shell did */
+            truncated: boolean;
+            /**
+             * Format: int32
+             * @description terminal columns from the cast header
+             */
+            width: number;
+        };
+        ConsoleRecordingListReply: {
+            items: components["schemas"]["ConsoleRecording"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            total: number;
+        };
         DecreeCreateRequest: {
             /** @description scenario input (vault-ref passed through as-is) */
             action_input?: unknown;
@@ -3036,8 +3188,8 @@ export interface components {
             input?: {
                 [key: string]: unknown;
             };
-            /** @description new instance name (kebab-case), root Coven tag */
-            name: string;
+            /** @description new instance name (kebab-case); omit when the create scenario declares name_template (ADR-0079) — then it is composed server-side from input components */
+            name?: string;
             /** @description service name from registry (ADR-029) */
             service: string;
             /** @description operator-set trait labels (key → scalar|list of scalars), ADR-060 */
@@ -3121,6 +3273,31 @@ export interface components {
              * Format: int32
              * @description total number of entries in set
              */
+            total: number;
+        };
+        IncarnationMember: {
+            /** Format: date-time */
+            bound_at: string;
+            bound_by_aid?: string;
+            sid: string;
+            status: string;
+        };
+        IncarnationMemberBindReply: {
+            already_member: string[] | null;
+            bound: string[] | null;
+            incarnation: string;
+        };
+        IncarnationMemberBindRequest: {
+            /** @description SIDs (FQDN) of already-onboarded, connected hosts to bind to this incarnation */
+            sids: string[] | null;
+        };
+        IncarnationMemberListReply: {
+            items: components["schemas"]["IncarnationMember"][] | null;
+            /** Format: int64 */
+            limit: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
             total: number;
         };
         IncarnationRerunLastReply: {
@@ -3271,6 +3448,7 @@ export interface components {
         ModuleCatalogItem: {
             description?: string;
             errand_safe: boolean;
+            introduced_in?: string;
             kind: string;
             name: string;
             namespace?: string;
@@ -3279,6 +3457,11 @@ export interface components {
         };
         ModuleCatalogReply: {
             items: components["schemas"]["ModuleCatalogItem"][] | null;
+        };
+        ModuleDeprecation: {
+            removed_in?: string;
+            since?: string;
+            use?: string;
         };
         ModuleFormPrepChoirSource: {
             /** @description incarnation name of the Choir */
@@ -3307,10 +3490,12 @@ export interface components {
             incarnation_hosts?: boolean;
         };
         ModuleParam: {
+            deprecated?: components["schemas"]["ModuleDeprecation"];
             description?: string;
             enum?: unknown[] | null;
             example?: string;
             format?: string;
+            introduced_in?: string;
             items?: components["schemas"]["ModuleParam"];
             multiline?: boolean;
             name: string;
@@ -3684,18 +3869,30 @@ export interface components {
             parent_role?: string;
             /** @description set of permission strings for role (e.g., incarnation.run, soul.*, *) */
             permissions?: string[] | null;
+            /**
+             * @description what default_scope means here (ADR-078). track (the default) keeps it a delta, so the parent's scope cascades in and moving the parent moves this role. pin materializes the parent's CURRENT effective scope into the delta, so a later WIDENING of the parent does not reach this role — narrowing still does. Requires parent_role
+             * @enum {string}
+             */
+            scope_mode?: "track" | "pin";
         };
         RoleListReply: {
             /** @description role catalog (metadata + permissions + operators) */
             items: components["schemas"]["RoleView"][] | null;
         };
         RolePermissionsUpdateRequest: {
+            /** @description proceed even though this change alters the rights of roles DERIVED from this one. Without it such an update is refused 409 with the affected roles and the number of operators holding them; that refusal is what you show the operator before resending with this set */
+            confirm_cascade?: boolean;
             /** @description scope: boolean predicate over coven/service/incarnation/host/trait; omitted → scope untouched; present (incl. null) → replaces (null removes scope). On a derived role it is the attenuating delta */
             default_scope?: string | null;
             /** @description re-root the role's derivation (ADR-078); omitted → untouched; present (incl. null) → replaces (null makes the role plain again). The ceiling is re-checked on every update: the result must stay within the parent and the caller must hold it */
             parent_role?: string | null;
             /** @description complete new set of permission strings (replace) */
             permissions: string[] | null;
+            /**
+             * @description the delta's intent (ADR-078); omitted → untouched. Sending pin RE-PINS: the parent's effective scope AS OF NOW is written into the delta, so later widenings of the parent stop here. Sending track drops back to following the parent
+             * @enum {string|null}
+             */
+            scope_mode?: "track" | "pin" | null;
         };
         RoleView: {
             builtin: boolean;
@@ -3706,11 +3903,18 @@ export interface components {
             effective_permissions: string[] | null;
             /** @description role scope AS RESOLVED: the parent's effective scope AND this role's delta; omitted → unrestricted. Bare permissions inherit it, as on a plain role */
             effective_scope?: string;
+            /** @description stored permissions the derivation chain no longer covers (ADR-078): present in permissions, granting NOTHING, because the parent lost the right or narrowed past it. Empty on a plain role. A role with a non-empty permissions list and everything in here grants no access at all */
+            inert_permissions: string[] | null;
             name: string;
             operators: string[] | null;
             /** @description the role this one derives from (ADR-078) — its ceiling; omitted → a plain role */
             parent_role?: string;
             permissions: string[] | null;
+            /**
+             * @description what default_scope means on this derived role (ADR-078): track = the delta is the added narrowing only, so the parent's scope cascades in; pin = the parent's scope was materialized into the delta, so a later WIDENING of the parent stops here. Omitted → a plain role. Narrowing always cascades, in both modes
+             * @enum {string}
+             */
+            scope_mode?: "track" | "pin";
         };
         RunDetailReply: {
             apply_id: string;
@@ -3736,11 +3940,18 @@ export interface components {
             failed_plan_index?: number;
             /** Format: int64 */
             failed_task_idx?: number;
+            notices?: components["schemas"]["RunNoticeEntry"][] | null;
             /** Format: int64 */
             passage: number;
             /** @description host FQDN OR synthetic run sid (keeper=on:keeper, __run__=run-sentinel abort to dispatch), not addressing a Soul (NIM-36) */
             sid: string;
             status: string;
+        };
+        RunNoticeEntry: {
+            code: string;
+            message: string;
+            module: string;
+            param?: string;
         };
         RunSummaryEntry: {
             apply_id: string;
@@ -3965,15 +4176,19 @@ export interface components {
             updated_by_aid?: string;
         };
         SettingReply: {
-            /** @description accepted range, e.g. (0, 1] */
+            /** @description accepted range, e.g. (0, 1] or [30s, 1h]; an enum ("debug | info | warn | error") or "true | false" where a range makes no sense */
             bounds: string;
+            /** @description value stored cluster-wide, present only when this instance's file shadows it */
+            cluster_value?: unknown;
             default: unknown;
             description: string;
             key: string;
+            /** @description true when keeper.yml on this instance wins over the cluster value */
+            overridden_locally?: boolean;
             /** @enum {string} */
             source: "default" | "file" | "pg";
             /** @enum {string} */
-            type: "float" | "int";
+            type: "float" | "int" | "duration" | "bool" | "string";
             /** @description effective value on this instance */
             value: unknown;
             yaml_path: string;
@@ -6102,6 +6317,195 @@ export interface operations {
             };
         };
     };
+    listConsoleRecordings: {
+        parameters: {
+            query?: {
+                /** @description filter by recorded host (FQDN); malformed -> 422 */
+                sid?: string;
+                /** @description filter by the Archon whose session was recorded */
+                archon_aid?: string;
+                /** @description interactive = a PTY session; command = a one-shot keeper.soul.run-command */
+                kind?: "interactive" | "command";
+                /** @description filter by start (started_at > value, RFC3339); bad value -> 400 */
+                started_after?: string;
+                /** @description filter by start (started_at < value, RFC3339); bad value -> 400 */
+                started_before?: string;
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description page size 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleRecordingListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getConsoleRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID of the recording */
+                recording_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleRecording"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getConsoleRecordingCast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID of the recording */
+                recording_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The asciicast v2 file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-asciicast": string;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listDecrees: {
         parameters: {
             query?: {
@@ -7793,6 +8197,196 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listIncarnationMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationMemberListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    bindIncarnationMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationMemberBindRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationMemberBindReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    unbindIncarnationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation name */
+                name: string;
+                /** @description SID (FQDN) of the host to unbind */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
