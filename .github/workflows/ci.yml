@@ -48,6 +48,14 @@ on:
     branches: [main, 'release/**']
   pull_request:
     branches: [main, 'release/**']
+  # Manual re-verification of a branch whose tip already has a verdict — a release branch
+  # being prepared for acceptance, or a run that failed on a transient (a registry
+  # timeout, a runner hiccup) rather than on the tree. Without it the only way to ask the
+  # question again is a synthetic empty commit on a release branch, which is noise in the
+  # history of the thing being accepted. Adds no automatic runs: it fires only when
+  # someone asks. Note that GitHub only offers workflow_dispatch for workflows present on
+  # the DEFAULT branch, so this becomes usable once the release reaches `main`.
+  workflow_dispatch:
 
 # Cancel superseded runs on PULL REQUESTS, where only the tip of the branch matters and
 # intermediate states interest nobody. NOT on the integration targets (`main`,
