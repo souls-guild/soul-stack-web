@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import {
@@ -52,15 +52,29 @@ const PRIMARY: NavItem[] = [
   { to: '/run', labelKey: 'navRun', icon: Play, matchPrefix: '/run' },
 ];
 
-const REGISTRY: NavItem[] = [
+// The former single Registry group held eight items of three unrelated kinds,
+// with the three access items at positions 1, 7 and 8 — Archons cut off from
+// RBAC and Synods by five strangers. Split by what the operator is actually
+// looking for.
+
+// Access reads as a chain: who acts, how they are grouped, what they are granted.
+const ACCESS: NavItem[] = [
   { to: '/archons', labelKey: 'navArchons', icon: Users, matchPrefix: '/archons' },
+  { to: '/synods', labelKey: 'navSynods', icon: Users2, matchPrefix: '/synods' },
+  { to: '/rbac', labelKey: 'navRbac', icon: ShieldCheck },
+];
+
+// What gets deployed: the catalog and its instances.
+const WORKLOADS: NavItem[] = [
   { to: '/services', labelKey: 'navServices', icon: Package },
   { to: '/incarnations', labelKey: 'navIncarnations', icon: Boxes },
+];
+
+// What it runs on and what extends it.
+const INFRASTRUCTURE: NavItem[] = [
   { to: '/souls', labelKey: 'navSouls', icon: Users },
-  { to: '/plugins', labelKey: 'navPlugins', icon: Puzzle, matchPrefix: '/plugins' },
   { to: '/providers', labelKey: 'navProviders', icon: Cloud, matchPrefix: '/providers' },
-  { to: '/rbac', labelKey: 'navRbac', icon: ShieldCheck },
-  { to: '/synods', labelKey: 'navSynods', icon: Users2, matchPrefix: '/synods' },
+  { to: '/plugins', labelKey: 'navPlugins', icon: Puzzle, matchPrefix: '/plugins' },
 ];
 
 const ORACLE: NavItem[] = [
@@ -72,6 +86,16 @@ const ORACLE: NavItem[] = [
 const HISTORY: NavItem[] = [
   { to: '/runs', labelKey: 'navAllRuns', icon: Activity, matchPrefix: '/runs' },
   { to: '/cadences', labelKey: 'navCadences', icon: CalendarClock, matchPrefix: '/cadences' },
+];
+
+// Everything between PRIMARY and BOTTOM, in render order. Grouping lives here
+// as data, so a regrouping is an edit to this list rather than a re-layout.
+const SECTIONS: { titleKey: string; items: NavItem[] }[] = [
+  { titleKey: 'navGroupAccess', items: ACCESS },
+  { titleKey: 'navGroupWorkloads', items: WORKLOADS },
+  { titleKey: 'navGroupInfrastructure', items: INFRASTRUCTURE },
+  { titleKey: 'navGroupOracle', items: ORACLE },
+  { titleKey: 'navGroupRuns', items: HISTORY },
 ];
 
 const BOTTOM: NavItem[] = [
@@ -159,17 +183,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {PRIMARY.map((it) => (
         <Item key={it.to} item={it} collapsed={collapsed} />
       ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>{t('navGroupRegistry')}</div>}
-      {REGISTRY.map((it) => (
-        <Item key={it.to} item={it} collapsed={collapsed} />
-      ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>{t('navGroupOracle')}</div>}
-      {ORACLE.map((it) => (
-        <Item key={it.to} item={it} collapsed={collapsed} />
-      ))}
-      {collapsed ? <div className={styles.divider} aria-hidden="true" /> : <div className={styles.group}>{t('navGroupRuns')}</div>}
-      {HISTORY.map((it) => (
-        <Item key={it.to} item={it} collapsed={collapsed} />
+      {/* The rule is a divider in BOTH states: collapsed it is the only
+          separator there is, expanded the heading alone did not read as one. */}
+      {SECTIONS.map(({ titleKey, items }) => (
+        <Fragment key={titleKey}>
+          <div className={styles.divider} data-testid="nav-divider" aria-hidden="true" />
+          {collapsed ? null : <div className={styles.group}>{t(titleKey)}</div>}
+          {items.map((it) => (
+            <Item key={it.to} item={it} collapsed={collapsed} />
+          ))}
+        </Fragment>
       ))}
 
       <div className={styles.bottom}>

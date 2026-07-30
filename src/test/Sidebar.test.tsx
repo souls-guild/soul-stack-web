@@ -44,4 +44,23 @@ describe('Sidebar navigation', () => {
     renderSidebar();
     expect(screen.getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/settings');
   });
+
+  // The reported defect was not "no groups" — groups existed. It was that the
+  // three access items sat at positions 1, 7 and 8 of one eight-item group, so
+  // Archons was cut off from RBAC and Synods by five unrelated entries. Pin the
+  // adjacency, otherwise the next item added to the nav scatters them again.
+  it('Archons, Synods and RBAC are adjacent in one group', () => {
+    renderSidebar();
+    const labels = screen.getAllByRole('link').map((el) => el.textContent?.trim());
+    const first = labels.indexOf('Archons');
+    expect(first, 'Archons link is missing from the nav').toBeGreaterThanOrEqual(0);
+    expect(labels.slice(first, first + 3)).toEqual(['Archons', 'Synods', 'RBAC']);
+  });
+
+  // A divider used to render only while the sidebar was collapsed; expanded, the
+  // groups were told apart by a heading alone.
+  it('every group is separated by a divider while expanded', () => {
+    renderSidebar();
+    expect(screen.getAllByTestId('nav-divider').length).toBe(5);
+  });
 });
