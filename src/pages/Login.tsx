@@ -23,7 +23,22 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 interface LocationState {
-  from?: { pathname?: string };
+  from?: { pathname?: string; search?: string; hash?: string };
+}
+
+// Where an authenticated operator belongs. ProtectedRoute hands over the whole
+// location it interrupted, and the query string is where the operator's filter
+// lives — coming back to the bare path loses their work and reads as "it did
+// not return me at all".
+//
+// Both the post-login navigation and the already-authenticated redirect below
+// go through this. They used to disagree, and the redirect — which ignored the
+// origin entirely — won the race after login, so nobody was ever returned. The
+// fix is not to win that race but to remove it: one destination, one rule.
+function returnTo(state: unknown): string {
+  const from = (state as LocationState | undefined)?.from;
+  if (!from?.pathname) return '/incarnations';
+  return `${from.pathname}${from.search ?? ''}${from.hash ?? ''}`;
 }
 
 export function Login() {
@@ -43,15 +58,14 @@ export function Login() {
   });
 
   if (isAuthenticated) {
-    return <Navigate to="/incarnations" replace />;
+    return <Navigate to={returnTo(location.state)} replace />;
   }
 
   async function onSubmit(values: Values) {
     setServerError(null);
     try {
       await loginWithToken(values.token);
-      const from = (location.state as LocationState | undefined)?.from?.pathname ?? '/incarnations';
-      navigate(from, { replace: true });
+      navigate(returnTo(location.state), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setServerError(
