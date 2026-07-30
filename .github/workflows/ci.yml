@@ -1,0 +1,195 @@
+# Soul Stack UI CI. A thin wrapper over the scripts in package.json — the gate is
+# `lint` / `test` / `build` / `gen:api`, and the workflow only reproduces a clean
+# environment and runs them. Same decision as the core repo (see soul-stack
+# .github/workflows/ci.yml): the checks live with the project, Actions just runs them.
+#
+# Why this file exists at all: until NIM-355 this repository had NO CI whatsoever —
+# .github/workflows/ held only cla.yml. Meanwhile the tree carries 112 test files
+# (1272 vitest cases) and produces the bundle that is vendored into the keeper binary
+# and shipped (ADR-055). Every one of those tests was documentation rather than a gate,
+# and the shipped UI was whatever the last person to run `npm run build` locally
+# produced. That is the same substitution the core repo spent R5 removing: an absent
+# check is indistinguishable from a passed one (NIM-238, NIM-297).
+#
+# NOT here, deliberately:
+#   - Playwright (`npm run test:e2e`) needs a LIVE stand — keeper on :8080 with
+#     Postgres/Redis/Vault behind it, plus vite on :5173 (see playwright.config.ts and
+#     e2e/README.md). That is a stand-provisioning problem, not a unit-test problem, and
+#     the core repo keeps its live tier on a separate gate for the same reason. Tracked
+#     separately rather than bolted on here with `continue-on-error`, which would put a
+#     check on the page that nobody is allowed to trust.
+#   - Pairing the bundle against the core repo's vendored copy
+#     (keeper/internal/webui/assets). That needs both repositories checked out and a
+#     token for the private companion; it is NIM-341 and belongs on the core side, which
+#     already records the companion sha in WEBUI_SOURCE. Doing it from here too would be
+#     the same check twice, from the weaker end.
+#   - Anything that PUBLISHES. No releases, no npm publish, no Pages. Publication in this
+#     project hangs off tags and releases in the core repo; this workflow only verifies.
+name: CI
+
+# Triggers are the INTEGRATION TARGETS plus pull requests into them — not every branch.
+#
+#
+# `main` and `release/**` are where work actually lands: this repo follows the release
+# train, so a ticket branch is squash-merged into `release/<REL>` inside a worktree and
+# the release is later merged into `main`. Each of those pushes is a unit of acceptance
+# and needs its own verdict. Pull requests are the other way in — outside contributions
+# and Dependabot bumps — and they get gated before the merge rather than after.
+#
+# What this deliberately does NOT run on: pushes to ticket branches (`feat/**`) and to
+# Dependabot's own branches. Cost, stated: a ticket branch gets no CI verdict before it
+# is merged, so the pre-merge check stays the local `npm ci && npm run lint && npm test
+# && npm run build` the ticket session runs anyway, and CI's answer arrives on the
+# release branch. In exchange, runners are not spent re-verifying every intermediate
+# commit of work that is squashed on landing, and a Dependabot PR produces one run
+# instead of two.
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main, 'release/**']
+
+# Cancel superseded runs on PULL REQUESTS, where only the tip of the branch matters and
+# intermediate states interest nobody. NOT on the integration targets (`main`,
+# `release/**`): there every push is a squash-merge and so a unit of acceptance on its
+# own, and "the newest sha was verified" does not imply "my merge was verified". The core
+# repo learned this the expensive way — a run evicted seconds after the following merge
+# reports `cancelled`, which reads like `success` in memory and sits next to `failure` in
+# `gh run list` (NIM-339).
+#
+# Cost, stated: on a busy release branch runs queue instead of evicting each other, so
+# the tip's verdict lands later and several runs hold runners at once. Affordable on a
+# public repo with standard runners, and it is what makes every merge answerable.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+
+permissions:
+  contents: read
+
+env:
+  # Pinned rather than `lts/*`: the tree is built and tested against this line locally,
+  # and a silent major bump on the runner is exactly the kind of red that teaches people
+  # to stop reading CI. Bump deliberately.
+  NODE_VERSION: "22"
+
+# ── Jobs are INDEPENDENT ON PURPOSE: no `needs:` between them. ──────────────────────
+# The tempting shape is one job with four sequential steps, or lint gating the rest on
+# the reasoning "why test a tree that doesn't lint". The cost is that the first failure
+# ERASES the other three answers, and GitHub renders the erasure as `skipped` — which in
+# the run list reads as "nothing to check" rather than "not checked". That is the silent
+# skip the core repo removed one level down, and it is not worth re-introducing to save a
+# few runner-minutes. Four verdicts, read separately. The price is four `npm ci` runs;
+# setup-node's cache makes them cheap and the repo is public.
+jobs:
+  lint:
+    name: lint (eslint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # setup-node caches the npm cache keyed on the lockfile hash.
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run lint
+        run: npm run lint
+
+  test:
+    name: test (vitest, 112 files)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # jsdom + @testing-library/react. Includes the guard suites that exist to catch a
+      # CLASS of regression rather than one bug — i18nTranslationRule.test.ts (English
+      # strings leaking into the Russian locale, {{placeholder}} drift, stale allow-list
+      # entries), i18n.test.tsx (en/ru key parity read off the filesystem), and
+      # Sidebar.test.tsx. Those are precisely the tests whose value was zero while
+      # nothing ran them automatically.
+      - name: npm test
+        run: npm test
+
+  build:
+    name: build (tsc -b + vite build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # `npm run build` is `tsc -b && vite build`, so this job is the type-check gate as
+      # well as the bundle gate. A type error stops it before vite runs, which is the
+      # correct order: there is no point shipping a bundle from a tree that doesn't
+      # type-check. This is also the only automatic proof that the artifact vendored into
+      # the keeper binary can be produced from a clean checkout at all.
+      - name: npm run build
+        run: npm run build
+
+  codegen:
+    name: codegen up to date (gen:api)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # src/api/types.gen.ts and src/api/constraints.gen.ts are COMMITTED, generated from
+      # the vendored vendor/openapi/keeper.yaml. Regenerating and diffing catches the case
+      # where someone edits the vendored spec (or a generated file) and forgets to re-run
+      # `npm run gen:api` — the committed types then describe an API the spec no longer
+      # declares, and the mismatch surfaces as a runtime shape bug rather than a red build.
+      # Vendored-artifact drift has already bitten this project (NIM-296, NIM-299).
+      #
+      # This does NOT check the vendored spec against the core repo's
+      # docs/keeper/openapi.yaml — that comparison needs both checkouts and lives with
+      # NIM-341. It checks only that the generated files match the spec that IS committed
+      # here, which is the half doable without cross-repo access.
+      - name: npm run gen:api
+        run: npm run gen:api
+
+      - name: Fail if generated files drifted
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- src/api/types.gen.ts src/api/constraints.gen.ts; then
+            echo "::error::Generated API files are out of date. Run 'npm run gen:api' and commit the result."
+            exit 1
+          fi

@@ -21,8 +21,10 @@ reader-facing content and stays in Russian (see the i18n section below).
   Souls / Plugins / RBAC / Providers / Vigils / Decrees / Oracle fires / Tides /
   Errand runs / Push runs / Errands / Cadences / Synods / Notifications /
   Settings / Audit log).
-- Broad unit + integration suite (~95 test files: vitest + @testing-library/react
-  + jsdom), plus Playwright e2e smoke tests under `e2e/`.
+- Broad unit + integration suite (112 test files / 1272 cases: vitest +
+  @testing-library/react + jsdom), plus Playwright e2e smoke tests under `e2e/`.
+  The vitest suite runs in CI on every push (see the CI section); the Playwright
+  tier does not — it needs a live stand.
 - TypeScript types are generated from `vendor/openapi/keeper.yaml` via
   `npm run gen:api` (openapi-typescript → `src/api/types.gen.ts`, then
   `scripts/gen-constraints.mjs`). That yaml is a vendored copy of the core repo's
@@ -255,6 +257,38 @@ npm run test:e2e      # playwright e2e
 npm run gen:api       # openapi-typescript from vendor/openapi/keeper.yaml (+ gen-constraints)
 npm run build         # tsc -b && vite build (production)
 ```
+
+## CI
+
+`.github/workflows/ci.yml` runs on pushes to the integration targets (`main`,
+`release/**`) and on pull requests into them. Four **independent** jobs — no
+`needs:` between them, so one failure never erases the other three answers:
+
+| job       | what it runs                            |
+|-----------|-----------------------------------------|
+| `lint`    | `npm run lint`                          |
+| `test`    | `npm test` (vitest, 112 files)          |
+| `build`   | `npm run build` — this is the type gate too |
+| `codegen` | `npm run gen:api` + fail on a git diff  |
+
+The workflow is a thin wrapper over the scripts above: keep the checks in
+`package.json`, not in YAML.
+
+**Ticket branches (`feat/**`) are NOT gated by CI** — the verdict arrives once the
+branch is squash-merged into `release/<REL>`. So run the gate locally before
+merging: `npm ci && npm run lint && npm test && npm run build`.
+
+**`npm run test:e2e` (Playwright) is NOT in CI.** It needs a live stand — keeper on
+:8080 with Postgres/Redis/Vault, plus vite on :5173 (see `playwright.config.ts`,
+`e2e/README.md`). Run it locally against a stand.
+
+**Pairing the bundle with the core repo's vendored copy** (`keeper/internal/webui/assets`)
+is not checked here either — it needs both checkouts and lives on the core side.
+
+`.npmrc` pins `legacy-peer-deps=true`. Do not delete it without reading the reason
+in the file: without it `npm ci` fails outright on a clean checkout, because
+`openapi-typescript@7.13.0` caps its `typescript` peer at `^5.x` and this repo is
+on `typescript@6`.
 
 ## Updating the openapi types
 
