@@ -165,6 +165,12 @@ describe('IncarnationNewForm', () => {
       calls.find((c) => c.method === 'POST' && c.url === '/v1/incarnations'),
       'an empty name must not reach the keeper where the scenario composes nothing',
     ).toBeUndefined();
+
+    // The form must not also be telling the operator to leave that field empty. It did, in a
+    // note under the input, from back when the form could not tell composing scenarios apart
+    // and had to ask the operator to guess — so "leave empty if the scenario composes the
+    // name" sat directly above "required field", and following it got the request refused.
+    expect(document.body.textContent).not.toMatch(/leave empty/i);
   });
 
   // Hiding the input does not clear it. Switching from a scenario the operator typed a name

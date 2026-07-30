@@ -279,20 +279,21 @@ export function IncarnationNewForm() {
             covens={watch('covens') ?? []}
           />
         ) : (
-          <>
-            <Input
-              label={t('incarnations:newNameLabel')}
-              placeholder="redis-prod"
-              mono
-              data-testid="incarnation-name-input"
-              aria-invalid={errors.name ? 'true' : undefined}
-              error={errors.name ? t(errors.name.message ?? '') : undefined}
-              {...register('name')}
-            />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -10 }}>
-              {t('incarnations:newNameComposedHint')}
-            </span>
-          </>
+          // No "leave it empty if the scenario composes the name" note here. This branch IS
+          // the one where nothing composes it and the name is required, so that instruction
+          // told the operator to do the one thing the form then rejects — it sat directly
+          // above "required field". It was written when the form could not tell the two kinds
+          // of scenario apart and had to ask the operator to guess; `composes_name` decides
+          // now, and the composing branch above explains itself.
+          <Input
+            label={t('incarnations:newNameLabel')}
+            placeholder="redis-prod"
+            mono
+            data-testid="incarnation-name-input"
+            aria-invalid={errors.name ? 'true' : undefined}
+            error={errors.name ? t(errors.name.message ?? '') : undefined}
+            {...register('name')}
+          />
         )}
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
