@@ -201,4 +201,31 @@ describe('i18n translation rule', () => {
     expect(unsorted, 'Locale files must have their keys sorted alphabetically.').toEqual([]);
     expect(misordered, 'en and ru must list keys in the same order.').toEqual([]);
   });
+
+  // A "…By" label names WHO did something, and the column under it holds an
+  // archon AID, not a timestamp. Russian has to carry that "by whom": dropping
+  // it turns the label into a past participle that reads as a date, right next
+  // to a real "Created" column ("Создан" vs "Создано" — NIM-264).
+  //
+  // The rule cannot be widened to every English value ending in "by": there,
+  // "by" also introduces a criterion ("Split by" → «Разбить по»), which is a
+  // different word and correctly translated. Keying off the key name as well
+  // keeps it to labels that genuinely name an actor.
+  it('“…By” labels keep the actor in Russian', () => {
+    const missing: string[] = [];
+    for (const ns of namespaces) {
+      const en = loadNs(EN_DIR, ns);
+      const ru = loadNs(RU_DIR, ns);
+      for (const [key, value] of Object.entries(en)) {
+        if (!key.endsWith('By') || typeof value !== 'string') continue;
+        if (!/\bby$/i.test(value.trim())) continue;
+        if (!/кем/i.test(ru[key] ?? '')) missing.push(`${ns}:${key} — en "${value}" vs ru "${ru[key]}"`);
+      }
+    }
+    expect(
+      missing,
+      'A "…By" label must say by whom in Russian (e.g. «Кем создано»), otherwise ' +
+        'it reads as a timestamp and collides with the neighbouring "Created" column.',
+    ).toEqual([]);
+  });
 });

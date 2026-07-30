@@ -9,7 +9,6 @@
   "confirmBtn": "Confirm",
   "createBtn": "Create schedule",
   "createdAt": "Created at",
-  "createdBy": "Created by",
   "crumbs": "scheduled recurring runs",
   "deleteConfirm": "Delete schedule \"{{name}}\"? Created runs (Voyage) will remain in history.",
   "deleteTitle": "Delete Cadence?",
