@@ -201,4 +201,53 @@ describe('AuditLog', () => {
     // The form field is filled in too.
     expect(screen.getByDisplayValue('archon-bootstrap')).toBeInTheDocument();
   });
+
+  // Most event types have no label key, and the fallback that was supposed to
+  // hide that compared t()'s output against the PREFIXED key. On a miss i18next
+  // returns the key without its namespace, so the comparison never matched and
+  // the raw key went to the screen as the label — on a live stand that was 16 of
+  // the 20 types present (NIM-337).
+  it('an event type without a label key shows no raw i18n key', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/audit',
+        body: {
+          items: [
+            {
+              id: '01HZAUDIT00000000000000101',
+              type: 'incarnation.member_bound',
+              source: 'api',
+              archon_aid: 'archon-alice',
+              created_at: '2026-07-29T10:00:00Z',
+              payload: {},
+            },
+            {
+              id: '01HZAUDIT00000000000000102',
+              type: 'command.run_invoked',
+              source: 'api',
+              archon_aid: 'archon-alice',
+              created_at: '2026-07-29T10:01:00Z',
+              payload: {},
+            },
+          ],
+          offset: 0,
+          limit: 50,
+          total: 2,
+        },
+      },
+    ]);
+
+    renderWithProviders(<AuditLog />, '/audit');
+
+    // The known type keeps its label...
+    await screen.findByText(/Command run invoked/);
+    // ...and the unknown one falls back to nothing extra, never to its own key.
+    expect(
+      screen.queryByText(/auditEventLabel_/),
+      'a missing label key must degrade to no label — the event type is already ' +
+        'rendered next to it, so leaking the key adds noise and looks broken',
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('incarnation.member_bound')).toBeInTheDocument();
+  });
 });

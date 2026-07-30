@@ -47,7 +47,8 @@ function sourceTone(s: AuditEventSource | string | undefined):
 
 // Mapping of dot-notation event types to i18n keys in the admin namespace.
 // Dots are replaced with _ for compatibility with JSON keys (i18next doesn't support
-// nested dots in a flat namespace; graceful fallback — a missing key → undefined).
+// nested dots in a flat namespace). Most types have no key — the label is optional
+// decoration over ev.type, not a translation of it.
 function auditEventLabelKey(type: string): string {
   return `admin:auditEventLabel_${type.replace(/\./g, '_')}`;
 }
@@ -104,13 +105,16 @@ function EventCard({ ev }: { ev: AuditEvent }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const { value, truncated } = useMemo(() => maybeTruncatePayload(ev.payload), [ev.payload]);
-  // Get the label via i18n (graceful: if the key is not found — undefined).
+  // Ask i18next whether the key exists rather than inferring it from what t()
+  // gave back. On a miss t() returns the key WITHOUT its namespace prefix, so
+  // comparing against the prefixed key never matched and every unlabelled event
+  // type rendered its own key as the label — 16 of the 20 types on a live stand.
+  // The row already carries ev.type next to this, so dropping the label leaves
+  // the honest technical name rather than a hole.
   const evLabel = useMemo(() => {
     if (!ev.type) return undefined;
     const key = auditEventLabelKey(ev.type);
-    const raw = t(key);
-    // i18next returns the key itself if there's no translation → we check for a match.
-    return raw !== key ? raw : undefined;
+    return i18n.exists(key) ? t(key) : undefined;
   }, [ev.type, t]);
 
   function handleCopyLink(e: React.MouseEvent) {
