@@ -145,6 +145,11 @@ export function RunDetail() {
 
   const hosts = run.hosts ?? [];
   const failedHosts = hosts.filter((h) => h.error_summary || h.failed_task_idx != null || h.failed_plan_index != null);
+  // notices is `array | null` on the wire, and it arrives on SUCCESSFUL runs —
+  // a deprecated parameter is still honored until the version it names. Kept
+  // per host on purpose: a park mid-upgrade legitimately answers differently
+  // from host to host, and that spread is the useful part.
+  const noticeHosts = hosts.filter((h) => (h.notices ?? []).length > 0);
 
   return (
     <div className={styles.page}>
@@ -220,6 +225,40 @@ export function RunDetail() {
         </section>
       ) : null}
 
+      {noticeHosts.length > 0 ? (
+        <section
+          className={styles.section}
+          aria-label={t('runhistory:runNoticesTitle')}
+          data-testid="run-notices-section"
+        >
+          <h2 className={styles.sectionTitle}>{t('runhistory:runNoticesTitle')}</h2>
+          <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-muted)' }}>
+            {t('runhistory:runNoticesHint')}
+          </p>
+          {noticeHosts.map((h) => (
+            <div
+              key={`${h.sid}-${h.passage}`}
+              className={styles.deprecationBanner}
+              role="note"
+              data-testid={`run-notice-host-${h.sid}`}
+              style={{ marginBottom: 8 }}
+            >
+              <div className="mono" style={{ fontWeight: 600, marginBottom: 4 }}>
+                <KeeperSidCell sid={h.sid} />
+              </div>
+              {(h.notices ?? []).map((n, i) => (
+                <div key={`${n.code}-${n.module}-${n.param ?? ''}-${i}`} style={{ marginTop: 4 }}>
+                  <span className="mono" style={{ color: 'var(--text-muted)' }}>
+                    {n.param ? `${n.module}.${n.param}` : n.module}
+                  </span>{' '}
+                  {n.message}
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
       <section className={styles.section} aria-label={t('common:secPerHost')}>
         <h2 className={styles.sectionTitle}>{t('runhistory:runHostsTitle')}</h2>
         {hosts.length > 0 ? (
@@ -237,6 +276,12 @@ export function RunDetail() {
                 <tr key={`${h.sid}-${h.passage}`} data-testid={`run-host-row-${h.sid}`}>
                   <td className="mono">
                     <KeeperSidCell sid={h.sid} />
+                    {(h.notices ?? []).length > 0 ? (
+                      <>
+                        {' '}
+                        <Badge tone="warn">{t('runhistory:runNoticeMark')}</Badge>
+                      </>
+                    ) : null}
                   </td>
                   <td>
                     <Badge tone={runStatusTone(h.status)}>
