@@ -10,11 +10,17 @@ import { ApiError } from '../../api/client';
 import { AddHostModal } from './AddHostModal';
 import { RemoveHostModal } from './RemoveHostModal';
 import { HostUtilizationPanel } from './HostUtilizationPanel';
+import { MembersSection } from './MembersSection';
 import styles from '../common.module.css';
 
 // Hosts tab for IncarnationDetail.
 //
 // Data sources:
+//   0. incarnation_membership — the ROSTER (MembersSection, NIM-209/NIM-232).
+//      The authoritative set a run resolves its targets from, and the only one of
+//      the four that is editable as a relation (bind/unbind). It leads the tab
+//      for that reason: the sections below it are a declaration and two
+//      projections, none of which decide where a scenario actually rolls.
 //   1. incarnation.spec.hosts[] — the operator's declared list (ADR-008). Editing
 //      via PATCH /v1/incarnations/{name}/hosts (mode=append/remove). Add host —
 //      the AddHostModal (select SID from the souls registry + opt. role); Remove —
@@ -118,12 +124,15 @@ export function HostsTab({ incarnationName, spec, state, status }: Props) {
 
   return (
     <section className={styles.section}>
+      <MembersSection incarnationName={incarnationName} />
+
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
+          marginTop: 16,
         }}
       >
         <h2 className={styles.sectionTitle} style={{ margin: 0 }}>

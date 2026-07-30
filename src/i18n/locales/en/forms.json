@@ -7,6 +7,7 @@
   "ariaEditPermissions": "edit permissions {{name}}",
   "assignRoleTitle": "Assign role: {{aid}}",
   "authMethod": "Auth method",
+  "bindMembersTitle": "Bind hosts to {{name}}",
   "covenHint": "Stable logical host labels (cluster / project / environment)",
   "createChoirTitle": "Create Choir → {{name}}",
   "createRoleTitle": "Create role",
@@ -37,6 +38,7 @@
   "rolesHint": "Roles to assign — they define operator permissions",
   "selectPlaceholder": "Select…",
   "tokenTtlHint": "Lifetime of the issued JWT",
+  "unbindMemberTitle": "Unbind {{sid}}",
   "unlockTitle": "Unlock error_locked: {{name}}",
   "upgradeTitle": "Upgrade: {{name}}"
 }

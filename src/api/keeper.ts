@@ -340,6 +340,14 @@ export type IncarnationRerunLastReply = components['schemas']['IncarnationRerunL
 
 // Hosts-editing (PATCH /v1/incarnations/{name}/hosts).
 export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
+// Incarnation membership (incarnation_membership, ADR-008 amendment / NIM-124).
+// The roster is the relation a run resolves its hosts from — NOT spec.hosts[]
+// (a declaration) and NOT coven==name (a label). `bound_by_aid` is optional:
+// rows written by a scenario carry no operator.
+export type IncarnationMember = components['schemas']['IncarnationMember'];
+export type IncarnationMemberListReply = components['schemas']['IncarnationMemberListReply'];
+export type IncarnationMemberBindRequest = components['schemas']['IncarnationMemberBindRequest'];
+export type IncarnationMemberBindReply = components['schemas']['IncarnationMemberBindReply'];
 export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
 export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
 
@@ -717,6 +725,34 @@ export const keeperApi = {
         `/v1/incarnations/${encodeURIComponent(name)}/hosts`,
         'PATCH',
         { body },
+      ),
+    // GET /v1/incarnations/{name}/members — the membership roster. Permission
+    // incarnation.get, but the rows are NARROWED to the hosts inside the caller's
+    // soul scope: a host the operator may not see is absent from the reply, and
+    // that is the contract, not a gap in the UI.
+    members: (name: string) =>
+      apiGet<IncarnationMemberListReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/members`,
+      ),
+    // POST /v1/incarnations/{name}/members — bind already-onboarded, connected
+    // hosts. Permission incarnation.bind-member. Idempotent, and the reply splits
+    // what this call wrote (bound) from what was already there (already_member).
+    // ALL-OR-NOTHING on the per-host gate: one SID outside the caller's soul
+    // scope rejects the whole request with 403. 422 covers two distinct causes —
+    // an unknown SID and a host that is not connected.
+    bindMembers: (name: string, sids: string[]) =>
+      apiSend<IncarnationMemberBindReply>(
+        `/v1/incarnations/${encodeURIComponent(name)}/members`,
+        'POST',
+        { body: { sids } satisfies IncarnationMemberBindRequest },
+      ),
+    // DELETE /v1/incarnations/{name}/members/{sid} — unbind one host.
+    // Permission incarnation.unbind-member. Idempotent (204 even for a
+    // non-member); the host leaves the roster of every future run.
+    unbindMember: (name: string, sid: string) =>
+      apiSend<void>(
+        `/v1/incarnations/${encodeURIComponent(name)}/members/${encodeURIComponent(sid)}`,
+        'DELETE',
       ),
     // PUT /v1/incarnations/{name}/traits — full replacement of incarnation.traits (ADR-060).
     // Source of truth; projected into souls.traits of member hosts.
