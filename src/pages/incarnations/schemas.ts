@@ -29,11 +29,20 @@ const jsonObjectFromString = z
   });
 
 export const incarnationCreateSchema = z.object({
+  // Empty is allowed on purpose: a create scenario declaring `name_template`
+  // composes the name server-side and REJECTS a request that carries one, so a
+  // hard `min(1)` here made those services impossible to create from the
+  // console at all (NIM-340).
+  //
+  // This cannot be conditional yet — the scenario list gives the client no way
+  // to tell a composing scenario from a plain one, so the form cannot know
+  // which of the two it is looking at (NIM-345). Until it can, an empty name is
+  // sent as an omitted field and the keeper answers: it composes the name, or
+  // it replies that the field is required and we show that on this input.
   name: z
     .string()
     .trim()
-    .min(1, 'incarnations:nameRequired')
-    .regex(KEBAB, 'incarnations:kebabPattern'),
+    .refine((v) => v === '' || KEBAB.test(v), 'incarnations:kebabPattern'),
   service: z.string().trim().min(1, 'incarnations:noService'),
   covens: z
     .array(z.string().regex(KEBAB, 'incarnations:kebabEach'))

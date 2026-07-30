@@ -11,25 +11,119 @@ describe('IncarnationNewForm', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('zod validation: empty name blocks submit', async () => {
-    installFetchMock([
-      {
-        method: 'GET',
-        url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
-      },
-    ]);
+  // A create scenario declaring `name_template` composes the name server-side
+  // and rejects a request that carries one. The form used to demand a name
+  // unconditionally, so those services could not be created from the console at
+  // all: no name and zod blocked, a name and the keeper refused (NIM-340).
+  //
+  // The empty field must therefore arrive as an OMITTED key. Sending `name: ""`
+  // would look the same in the form and still be a request that carries `name`.
+  function stubCreate(onPost: (body: string) => Response) {
+    const calls: Array<{ url: string; method: string; body: string }> = [];
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      const body = typeof init?.body === 'string' ? init.body : '';
+      calls.push({ url, method, body });
+      if (method === 'GET' && url.includes('/v1/services/svc/scenarios')) {
+        return new Response(
+          JSON.stringify({
+            service: 'svc',
+            ref: 'v1.0.0',
+            scenarios: [
+              { name: 'converge', kind: 'lifecycle', path: 'scenario/converge/main.yml', create: false, input_schema: {} },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (method === 'GET' && url.startsWith('/v1/services')) {
+        return new Response(
+          JSON.stringify({ items: [{ name: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (method === 'POST' && url.startsWith('/v1/incarnations')) return onPost(body);
+      return new Response('{}', { status: 599 });
+    }) as typeof fetch);
+    return calls;
+  }
 
+  function renderForm() {
     renderWithProviders(
       <Routes>
         <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+        <Route path="/incarnations/:name" element={<div>detail-stub</div>} />
       </Routes>,
       '/incarnations/new',
     );
+  }
 
+  it('an empty name is sent as an omitted field, not as an empty string', async () => {
+    const calls = stubCreate(() =>
+      new Response(JSON.stringify({ apply_id: '01ARZ', incarnation: 'composed-name' }), {
+        status: 202,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    renderForm();
     const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
-    expect(await screen.findByText(/required field/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
+      expect(post, 'an empty name must no longer block the request client-side').toBeTruthy();
+      const parsed = JSON.parse(post!.body) as Record<string, unknown>;
+      expect(
+        'name' in parsed,
+        'the key must be absent — a composing scenario rejects a request that carries `name` at all',
+      ).toBe(false);
+    });
+  });
+
+  it('a malformed name is still rejected before the request', async () => {
+    const calls = stubCreate(() => new Response('{}', { status: 202 }));
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+    await user.type(screen.getByPlaceholderText('redis-prod'), 'Not Kebab');
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
+
+    // Asserted on the field state, not on the message: the label itself reads
+    // "Name (kebab-case)", so matching that text finds two elements.
+    await waitFor(() =>
+      expect(screen.getByTestId('incarnation-name-input')).toHaveAttribute('aria-invalid', 'true'),
+    );
+    expect(
+      calls.find((c) => c.method === 'POST'),
+      'dropping the required-check must not drop the format check',
+    ).toBeUndefined();
+  });
+
+  // The keeper is the only party that knows whether the chosen scenario composes
+  // a name, so "you must supply one" arrives as a 422 rather than as client-side
+  // validation. It has to land on the field it is about.
+  it('the keeper asking for a name shows up on the name input', async () => {
+    stubCreate(() =>
+      new Response(
+        JSON.stringify({ title: 'Validation failed', status: 422, detail: "field 'name' is required" }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
+
+    await screen.findByText(/does not compose a name/i);
+    expect(screen.getByTestId('incarnation-name-input')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('create-input: typed fields from scenario with create=true, converge not offered', async () => {

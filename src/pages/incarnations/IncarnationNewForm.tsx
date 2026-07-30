@@ -57,6 +57,7 @@ export function IncarnationNewForm() {
     handleSubmit,
     control,
     watch,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<IncarnationCreateFormInput, unknown, IncarnationCreateFormOutput>({
     // zodResolver (@hookform/resolvers v3) doesn't propagate the transform schema's output type
@@ -160,13 +161,22 @@ export function IncarnationNewForm() {
   }, [createSchema, usePerField, fields]);
 
   const createMu = useMutation({
-    mutationFn: (body: { name: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap }) =>
+    mutationFn: (body: { name?: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap }) =>
       keeperApi.incarnations.create(body),
     onSuccess: (reply) => {
       setCreatedApplyId(reply.apply_id ?? null);
       setTimeout(() => navigate(`/incarnations/${encodeURIComponent(reply.incarnation)}`), 600);
     },
     onError: (err) => {
+      // The keeper is the only party that knows whether this create scenario
+      // composes the name, so its "name is required" comes back as a 422 rather
+      // than as client-side validation. Put it on the field it is about instead
+      // of in the generic banner — otherwise it reads as a failure of the whole
+      // form rather than of one empty input.
+      if (err instanceof ApiError && err.status === 422 && /field 'name' is required/i.test(err.detail ?? '')) {
+        setError('name', { type: 'server', message: 'incarnations:nameRequiredByScenario' });
+        return;
+      }
       if (err instanceof ApiError && err.status === 422) {
         setServerError(t('incarnations:missingRequired', { fields: missingRequired.join(', ') || err.detail }));
         setShowInputErrors(true);
@@ -199,7 +209,9 @@ export function IncarnationNewForm() {
       usePerField && createSchema ? serializeFields(createSchema, fields) : {};
     const traits = Object.keys(values.traits).length > 0 ? values.traits : undefined;
     createMu.mutate({
-      name: values.name,
+      // Omitted, not empty: a composing scenario rejects a request that carries
+      // `name` at all, and a plain one answers that the field is required.
+      ...(values.name ? { name: values.name } : {}),
       service: values.service,
       covens: values.covens,
       input,
@@ -236,6 +248,9 @@ export function IncarnationNewForm() {
           error={errors.name ? t(errors.name.message ?? '') : undefined}
           {...register('name')}
         />
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -10 }}>
+          {t('incarnations:newNameComposedHint')}
+        </span>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Service</span>

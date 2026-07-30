@@ -166,6 +166,8 @@
   "migrationsEmpty": "No migrations — the service is on the first version of the state structure.",
   "missingRequired": "Fill in the required fields: {{fields}}.",
   "nameRequired": "required field",
+  "nameRequiredByScenario": "This create scenario does not compose a name — enter one.",
+  "newNameComposedHint": "Leave empty if the create scenario composes the name from the input.",
   "newNameLabel": "Name (kebab-case)",
   "noConnectedSouls": "No souls bound to coven {{name}}.",
   "noHostsInState": "No data in state.hosts — either there was no apply, or the scenario does not write per-host state.",
