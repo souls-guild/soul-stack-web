@@ -456,6 +456,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/deprecations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deprecated params still used across the estate
+         * @description Which incarnations still pass a module param marked `deprecated:` in its manifest, and the release it stops working in (ADR-0076(v)). Sourced from the DEFINITIONS the incarnations are pinned to - NOT from run history, which would miss an incarnation nobody has run lately and still list one fixed yesterday. `items` is ordered by `removed_in`: what breaks first comes first. `gaps` lists what could not be checked (most often a plugin module, whose manifest ships beside its binary rather than with the definition) - an empty `items` with a non-empty `gaps` means "not checked", not "clean". Visibility scoped by RBAC exactly as the incarnation list (fail-closed: empty scope -> empty survey). Permission incarnation.list. Read-only.
+         */
+        get: operations["listDeprecations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/errands": {
         parameters: {
             query?: never;
@@ -610,6 +630,26 @@ export interface paths {
          * @description Service runtime instance (ADR-029). Runs create scenario (async, if lifecycle.auto_create). Permission incarnation.create.
          */
         post: operations["createIncarnation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/resolve-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve the name a create would compose
+         * @description Live preview for the create form: composes the incarnation name from the chosen create scenario's name_template over the input so far, reports its length against the ceiling, and whether the name is free. Composition runs server-side — the same code the create runs — so the previewed name cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed name is measured against the caller's scope, and the occupying service is named only to a caller who may see it.
+         */
+        post: operations["resolveIncarnationName"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1608,7 +1648,7 @@ export interface paths {
         post?: never;
         /**
          * Delete role
-         * @description Deletes RBAC role cascade (permissions + membership). Permission role.delete. 409 — builtin/last-admin.
+         * @description Deletes RBAC role cascade (permissions + membership). Permission role.delete, which is the right to reach this endpoint and not the reach itself: the caller must also be able to ADMINISTER the role, i.e. could grant what it grants (NIM-214). Every holder of a role administers the roles derived from it; a role granting nothing is administrable by anyone; a bare `*` covers everything. 403 — the role's rights are beyond the caller's; 409 — builtin/last-admin/has derived roles.
          */
         delete: operations["deleteRole"];
         options?: never;
@@ -1648,7 +1688,7 @@ export interface paths {
         post?: never;
         /**
          * Unbind operator from role
-         * @description Removes membership entry (name, aid). Permission role.revoke-operator. 409 — last-admin lock-out.
+         * @description Removes membership entry (name, aid). Permission role.revoke-operator, which is the right to reach this endpoint and not the reach itself: unbinding asks for what binding asks for — the caller must hold the role's effective rights (NIM-285). 403 — the role is beyond the caller's rights; 409 — last-admin lock-out.
          */
         delete: operations["revokeRoleOperator"];
         options?: never;
@@ -1671,7 +1711,7 @@ export interface paths {
         head?: never;
         /**
          * Replace role permissions
-         * @description Replace semantics: set completely replaces existing (ADR-022). Permission role.update. default_scope/parent_role follow PATCH presence (omitted → untouched). 409 — builtin/last-admin; 403 — beyond the parent role (ADR-078).
+         * @description Replace semantics: set completely replaces existing (ADR-022). Permission role.update, which is the right to reach this endpoint and not the reach itself: the caller must also be able to ADMINISTER the role, i.e. could grant what it currently grants (NIM-214) — so trimming a role beyond your rights is refused even though removing permissions grants nothing. default_scope/parent_role follow PATCH presence (omitted → untouched). 409 — builtin/last-admin/unconfirmed cascade; 403 — the role is beyond the caller's rights, the result exceeds the parent role (ADR-078), or the result would be a parentless role granting something without role.create-root.
          */
         patch: operations["updateRolePermissions"];
         trace?: never;
@@ -2249,7 +2289,7 @@ export interface paths {
         };
         /**
          * List Synod groups
-         * @description Catalog of Synod groups with role bundle and member roster (ADR-049). Permission synod.list. Read-only, no audit.
+         * @description Catalog of Synod groups with role bundle and member roster (ADR-049). Permission synod.list. SCOPED TO THE CALLER: the answer holds only the groups the caller could add someone to — a group's bundle and its roster together say which packages of privilege exist and who holds them, so synod.list is not the right to read all of it. A group is visible when the caller covers the effective rights of EVERY role it bundles (the ADR-049(f) add-operator rule, read backwards); a group that bundles nothing is visible to everyone, and a visible group comes back whole. A caller holding an unrestricted `*` — or the explicit `synod.list-all` right — sees every group. Read-only, no audit.
          */
         get: operations["listSynods"];
         put?: never;
@@ -2320,7 +2360,7 @@ export interface paths {
         post?: never;
         /**
          * Remove an archon from a Synod group
-         * @description Removes the membership row (name, aid). Permission synod.remove-operator. 409 - last-admin lock-out.
+         * @description Removes the membership row (name, aid). Permission synod.remove-operator, which is the right to reach this endpoint and not the reach itself: a member holds the group's WHOLE bundle, so removing one is measured against all of it, exactly as adding one is (ADR-049(f), NIM-285). 403 — the bundle is beyond the caller's rights; 409 - last-admin lock-out.
          */
         delete: operations["removeSynodOperator"];
         options?: never;
@@ -2360,7 +2400,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a role from a Synod group bundle
-         * @description The role's permissions are revoked from all group members (ADR-049). Permission synod.revoke-role. 409 - last-admin lock-out.
+         * @description The role's permissions are revoked from all group members (ADR-049). Permission synod.revoke-role, which is the right to reach this endpoint and not the reach itself: the caller must hold the revoked role's effective rights, the same set synod.grant-role demands to put it in the bundle (NIM-285). 403 — the role is beyond the caller's rights; 409 - last-admin lock-out.
          */
         delete: operations["revokeSynodRole"];
         options?: never;
@@ -2945,6 +2985,38 @@ export interface components {
             updated_at: string;
             where?: string;
         };
+        DeprecationEntry: {
+            module: string;
+            param: string;
+            removed_in?: string;
+            since?: string;
+            sites: components["schemas"]["DeprecationSiteEntry"][] | null;
+            use?: string;
+        };
+        DeprecationGapEntry: {
+            detail?: string;
+            incarnations: string[] | null;
+            reason: string;
+            /** @enum {string} */
+            scope: "service" | "module";
+            subject: string;
+        };
+        DeprecationSiteEntry: {
+            incarnation: string;
+            scenario: string;
+            service: string;
+            service_version?: string;
+            where?: string;
+        };
+        DeprecationsReply: {
+            gaps: components["schemas"]["DeprecationGapEntry"][] | null;
+            items: components["schemas"]["DeprecationEntry"][] | null;
+            /** Format: int64 */
+            scanned_definitions: number;
+            /** Format: int64 */
+            scanned_incarnations: number;
+            truncated?: boolean;
+        };
         DriftHostReport: {
             sid: string;
             status: string;
@@ -3308,6 +3380,42 @@ export interface components {
         IncarnationRerunLastRequest: {
             /** @description free text confirmation */
             reason: string;
+        };
+        IncarnationResolveNameReply: {
+            /** @description no incarnation holds this name (meaningful only when valid) */
+            available: boolean;
+            /** @description the name a create with this input would produce; carries the offending value when invalid */
+            composed_name: string;
+            /** @description the chosen create scenario composes the name from name_template (ADR-0079); false → the operator names the incarnation */
+            composes: boolean;
+            /** @description why the name could not be composed or was rejected, in operator terms */
+            invalid_reason?: string;
+            /**
+             * Format: int64
+             * @description character count of composed_name
+             */
+            length: number;
+            /**
+             * Format: int64
+             * @description the incarnation name ceiling — server-sourced so the form does not restate it
+             */
+            max_length: number;
+            /** @description service of the incarnation holding the name — only when the caller may see it */
+            taken_by_service?: string;
+            /** @description composed_name is a legal incarnation name */
+            valid: boolean;
+        };
+        IncarnationResolveNameRequest: {
+            /** @description declared environment tags of the intended create — scope parity with POST /v1/incarnations, not part of the composition */
+            covens?: string[] | null;
+            /** @description chosen create scenario, whose name_template composes the name */
+            create_scenario?: string;
+            /** @description the create input so far — partial is expected, this is a live preview */
+            input?: {
+                [key: string]: unknown;
+            };
+            /** @description service name from registry (ADR-029) */
+            service: string;
         };
         IncarnationRevealSecretReply: {
             /** @description plaintext value of the secret */
@@ -4048,6 +4156,7 @@ export interface components {
             last_24h: components["schemas"]["RunsStatsBucket"];
         };
         Scenario: {
+            composes_name?: boolean;
             create?: boolean;
             description?: string;
             form?: components["schemas"]["ScenarioForm"];
@@ -4265,9 +4374,9 @@ export interface components {
         SoulCovenAssignSelector: {
             /** @description no host filter (entire registry ∩ scope) */
             all?: boolean;
-            /** @description hosts with this Coven tag */
+            /** @description hosts carrying this Coven tag, own or inherited from an incarnation they belong to, that incarnation's name included (ADR-080) */
             coven?: string;
-            /** @description hosts of this incarnation (root Coven tag) */
+            /** @description members of this incarnation, resolved from incarnation_membership — a membership question, never answered from the label union above (ADR-008 amendment NIM-124) */
             incarnation?: string;
             /** @description point list of hosts (SID = FQDN) */
             sids?: string[] | null;
@@ -6752,6 +6861,44 @@ export interface operations {
             };
         };
     };
+    listDeprecations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeprecationsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listErrands: {
         parameters: {
             query?: {
@@ -7444,6 +7591,57 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    resolveIncarnationName: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncarnationResolveNameRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationResolveNameReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12991,7 +13189,7 @@ export interface operations {
     listSouls: {
         parameters: {
             query?: {
-                /** @description filter by Coven label (AND within scope) */
+                /** @description filter by Coven label, own or inherited from an incarnation the host belongs to, that incarnation's name included (ADR-080); AND within scope */
                 coven?: string;
                 /** @description filter by status; outside enum -> 422 */
                 status?: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";

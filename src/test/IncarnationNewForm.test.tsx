@@ -18,7 +18,43 @@ describe('IncarnationNewForm', () => {
   //
   // The empty field must therefore arrive as an OMITTED key. Sending `name: ""`
   // would look the same in the form and still be a request that carries `name`.
-  function stubCreate(onPost: (body: string) => Response) {
+  // A create scenario that composes its name (`composes_name`) — the mode where the
+  // form shows a preview instead of a name field.
+  const COMPOSING_SCENARIO = {
+    name: 'create',
+    kind: 'lifecycle',
+    path: 'scenario/create/main.yml',
+    create: true,
+    runnable: true,
+    composes_name: true,
+    input_schema: {},
+  };
+
+  // A create scenario that does NOT compose — the operator types the name, and it
+  // is still required. Keeping both in the suite is the point: the flag has to
+  // switch the form, not remove a check everywhere.
+  const TYPED_NAME_SCENARIO = {
+    name: 'create',
+    kind: 'lifecycle',
+    path: 'scenario/create/main.yml',
+    create: true,
+    runnable: true,
+    input_schema: {},
+  };
+
+  const DEFAULT_RESOLVE = {
+    composes: true,
+    composed_name: 'cache-billing-redis',
+    length: 19,
+    max_length: 63,
+    valid: true,
+    available: true,
+  };
+
+  function stubCreate(
+    onPost: (body: string) => Response,
+    opts: { scenarios?: unknown[]; resolve?: unknown } = {},
+  ) {
     const calls: Array<{ url: string; method: string; body: string }> = [];
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -30,7 +66,7 @@ describe('IncarnationNewForm', () => {
           JSON.stringify({
             service: 'svc',
             ref: 'v1.0.0',
-            scenarios: [
+            scenarios: opts.scenarios ?? [
               { name: 'converge', kind: 'lifecycle', path: 'scenario/converge/main.yml', create: false, input_schema: {} },
             ],
           }),
@@ -42,6 +78,15 @@ describe('IncarnationNewForm', () => {
           JSON.stringify({ items: [{ name: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }] }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
+      }
+      // Before the create branch: the resolve lives under the same path prefix, and
+      // answering it with the create's stub would make the preview look like a
+      // successful create.
+      if (method === 'POST' && url.startsWith('/v1/incarnations/resolve-name')) {
+        const r = opts.resolve ?? DEFAULT_RESOLVE;
+        return r instanceof Response
+          ? r.clone()
+          : new Response(JSON.stringify(r), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
       if (method === 'POST' && url.startsWith('/v1/incarnations')) return onPost(body);
       return new Response('{}', { status: 599 });
@@ -59,29 +104,128 @@ describe('IncarnationNewForm', () => {
     );
   }
 
-  it('an empty name is sent as an omitted field, not as an empty string', async () => {
-    const calls = stubCreate(() =>
-      new Response(JSON.stringify({ apply_id: '01ARZ', incarnation: 'composed-name' }), {
-        status: 202,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+  it('a composing scenario replaces the name field with a preview and sends no name', async () => {
+    const calls = stubCreate(
+      () =>
+        new Response(JSON.stringify({ apply_id: '01ARZ', incarnation: 'cache-billing-redis' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      { scenarios: [COMPOSING_SCENARIO] },
     );
 
     renderForm();
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    // The operator does not type this name, so offering a field for it invites a
+    // request the keeper refuses outright.
+    await waitFor(() => expect(screen.getByTestId('composed-name-preview')).toBeInTheDocument());
+    expect(screen.queryByTestId('incarnation-name-input')).toBeNull();
+
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     await waitFor(() => {
-      const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
-      expect(post, 'an empty name must no longer block the request client-side').toBeTruthy();
+      const post = calls.find(
+        (c) => c.method === 'POST' && c.url === '/v1/incarnations',
+      );
+      expect(post, 'a composing scenario must submit without a name').toBeTruthy();
       const parsed = JSON.parse(post!.body) as Record<string, unknown>;
       expect(
         'name' in parsed,
         'the key must be absent — a composing scenario rejects a request that carries `name` at all',
       ).toBe(false);
     });
+  });
+
+  // The other half of the same flag, and the one a fix for the templated path is
+  // most likely to break: where the operator DOES type the name, it is still
+  // required. NIM-340 had to drop that check outright because the scenario list
+  // carried no way to tell the two apart.
+  it('a scenario that does not compose still requires a name', async () => {
+    const calls = stubCreate(() => new Response('{}', { status: 202 }), {
+      scenarios: [TYPED_NAME_SCENARIO],
+    });
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    expect(screen.getByTestId('incarnation-name-input')).toBeInTheDocument();
+    expect(screen.queryByTestId('composed-name-preview')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('incarnation-name-input')).toHaveAttribute('aria-invalid', 'true'),
+    );
+    expect(
+      calls.find((c) => c.method === 'POST' && c.url === '/v1/incarnations'),
+      'an empty name must not reach the keeper where the scenario composes nothing',
+    ).toBeUndefined();
+  });
+
+  // The name is the immutable primary key: the operator has to read it before the
+  // create makes it permanent, and read how close it is to the ceiling that would
+  // refuse it.
+  it('the preview shows the composed name and its length', async () => {
+    stubCreate(() => new Response('{}', { status: 202 }), { scenarios: [COMPOSING_SCENARIO] });
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    await waitFor(() => expect(screen.getByTestId('composed-name-value')).toHaveTextContent('cache-billing-redis'));
+    expect(screen.getByTestId('composed-name-counter')).toHaveTextContent('19');
+    expect(screen.getByTestId('composed-name-counter')).toHaveTextContent('63');
+    expect(screen.getByTestId('composed-name-free')).toBeInTheDocument();
+  });
+
+  // Seeing the collision BEFORE pressing create is the point: under a template the
+  // 409 names a string the operator never typed.
+  it('a taken name is visible before the create is attempted', async () => {
+    stubCreate(() => new Response('{}', { status: 202 }), {
+      scenarios: [COMPOSING_SCENARIO],
+      resolve: { ...DEFAULT_RESOLVE, available: false, taken_by_service: 'redis' },
+    });
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    await waitFor(() => expect(screen.getByTestId('composed-name-taken')).toHaveTextContent(/redis/));
+    expect(screen.queryByTestId('composed-name-free')).toBeNull();
+  });
+
+  // A preview that cannot be composed must SAY why. Going silently blank is the
+  // failure the endpoint was opened to remove — the operator is left staring at an
+  // empty box with four fields and no clue which one is at fault.
+  it('an uncomposable name explains itself instead of going blank', async () => {
+    stubCreate(() => new Response('{}', { status: 202 }), {
+      scenarios: [COMPOSING_SCENARIO],
+      resolve: {
+        composes: true,
+        composed_name: '',
+        length: 0,
+        max_length: 63,
+        valid: false,
+        invalid_reason: 'the name cannot be composed yet — no such key: project',
+        available: false,
+      },
+    });
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('composed-name-incomplete')).toHaveTextContent(/project/),
+    );
   });
 
   it('a malformed name is still rejected before the request', async () => {
@@ -103,27 +247,6 @@ describe('IncarnationNewForm', () => {
       calls.find((c) => c.method === 'POST'),
       'dropping the required-check must not drop the format check',
     ).toBeUndefined();
-  });
-
-  // The keeper is the only party that knows whether the chosen scenario composes
-  // a name, so "you must supply one" arrives as a 422 rather than as client-side
-  // validation. It has to land on the field it is about.
-  it('the keeper asking for a name shows up on the name input', async () => {
-    stubCreate(() =>
-      new Response(
-        JSON.stringify({ title: 'Validation failed', status: 422, detail: "field 'name' is required" }),
-        { status: 422, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
-
-    renderForm();
-    const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
-    await user.selectOptions(screen.getByRole('combobox'), 'svc');
-    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
-
-    await screen.findByText(/does not compose a name/i);
-    expect(screen.getByTestId('incarnation-name-input')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('create-input: typed fields from scenario with create=true, converge not offered', async () => {

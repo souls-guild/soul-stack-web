@@ -467,6 +467,8 @@ export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
 
 // ScenarioForm types: optional presentation layer for scenario input_schema (ADR-045).
 export type ScenarioForm = components['schemas']['ScenarioForm'];
+export type IncarnationResolveNameRequest = components['schemas']['IncarnationResolveNameRequest'];
+export type IncarnationResolveNameReply = components['schemas']['IncarnationResolveNameReply'];
 export type ScenarioFormSection = components['schemas']['ScenarioFormSection'];
 export type ScenarioFormField = components['schemas']['ScenarioFormField'];
 
@@ -491,6 +493,21 @@ export interface ServiceScenarioInfo {
   create?: boolean;
   description?: string;
   input_schema?: ScenarioInputSchema;
+  /**
+   * The create scenario composes the incarnation name from its `input:`
+   * components instead of the operator typing one, so POST /v1/incarnations must
+   * NOT carry `name` (the keeper refuses a request that does).
+   *
+   * A flag, not the template: the operator is shown the resulting name, not the
+   * formula. The name itself comes from `incarnations.resolveName` — the keeper
+   * composes, the form displays. Composing here instead would mean a second CEL
+   * evaluator producing a different string from the same input, and under an
+   * immutable name that is a different identity, arrived at silently.
+   *
+   * Optional for backward compatibility: an older keeper omits the field, and the
+   * form then behaves as it did before — a name is typed.
+   */
+  composes_name?: boolean;
   /** Optional presentation layer: splits fields into sections with headings. */
   form?: ScenarioForm;
 }
@@ -631,6 +648,17 @@ export const keeperApi = {
       ),
     create: (body: IncarnationCreateRequest) =>
       apiSend<IncarnationCreateReply>('/v1/incarnations', 'POST', { body }),
+    // POST /v1/incarnations/resolve-name — what name would a create with this input
+    // compose, is it a legal name, and is it free. Creates nothing; the create
+    // re-checks everything. Called on a debounce as the operator fills the identity
+    // components of a `composes_name` scenario.
+    //
+    // `covens` is not part of the composition — it is sent so the permission check
+    // scopes the preview exactly as it scopes the create it previews; without it a
+    // coven-scoped operator would be refused on every keystroke for a create that
+    // would have succeeded.
+    resolveName: (body: IncarnationResolveNameRequest) =>
+      apiSend<IncarnationResolveNameReply>('/v1/incarnations/resolve-name', 'POST', { body }),
     // API behavior: if `wave` is present in the request, IncarnationRunTideReply is returned,
     // otherwise — the classic IncarnationRunReply. A caller using wave must do its own
     // type-narrowing by the presence of `tide_id`. The existing /incarnations/:name -> RunScenarioForm

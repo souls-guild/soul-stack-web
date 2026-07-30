@@ -13,6 +13,7 @@ import { TraitsEditor, type TraitsMap } from './TraitsEditor';
 import { useServiceScenarios } from './useServiceScenarios';
 import { useServiceDirectives } from './useServiceDirectives';
 import { ScenarioInputFields } from './ScenarioInputFields';
+import { ComposedNamePreview } from './ComposedNamePreview';
 import {
   computeVisibleFields,
   computeRequiredHostCount,
@@ -94,6 +95,13 @@ export function IncarnationNewForm() {
   const createSchema = selectedCreateScenario?.input_schema;
   const usePerField = isSupportedInputSchema(createSchema);
 
+  // The chosen create scenario composes the name from its input components
+  // (ADR-0079), so the operator does not type one and the keeper REFUSES a request
+  // that carries one. The name field gives way to a live preview of what the create
+  // would compose. An older keeper omits the flag → false → the form behaves as
+  // before, with a typed name.
+  const composesName = selectedCreateScenario?.composes_name === true;
+
   const [fields, setFields] = useState<ScenarioFieldsState>({});
   const [showInputErrors, setShowInputErrors] = useState(false);
   useEffect(() => {
@@ -160,6 +168,14 @@ export function IncarnationNewForm() {
     return requiredHosts;
   }, [createSchema, usePerField, fields]);
 
+  // The SAME serialization the create posts. Previewing over the raw field state
+  // would measure a different input than the one the name gets composed from — the
+  // divergence this feature exists to prevent, reintroduced on the client side.
+  const previewInput = useMemo(
+    () => (usePerField && createSchema ? serializeFields(createSchema, fields) : {}),
+    [usePerField, createSchema, fields],
+  );
+
   const createMu = useMutation({
     mutationFn: (body: { name?: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap }) =>
       keeperApi.incarnations.create(body),
@@ -189,6 +205,15 @@ export function IncarnationNewForm() {
   function onSubmit(values: IncarnationCreateFormOutput) {
     setServerError(null);
     setCreatedApplyId(null);
+    // Conditional, which the zod schema cannot be: whether a name is required is a
+    // property of the CHOSEN scenario, not of the field. NIM-340 had to drop the
+    // requirement outright because the scenario list carried no such flag, which
+    // lost the check wherever a name IS still typed; `composes_name` restores it
+    // without re-breaking the templated path.
+    if (!composesName && !values.name) {
+      setError('name', { type: 'required', message: 'incarnations:nameRequired' });
+      return;
+    }
     // Scenario selection validation — if create scenarios exist, selection is required.
     if (missingScenarioSelection) {
       setServerError(t('incarnations:createScenarioRequired'));
@@ -239,18 +264,29 @@ export function IncarnationNewForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
-        <Input
-          label={t('incarnations:newNameLabel')}
-          placeholder="redis-prod"
-          mono
-          data-testid="incarnation-name-input"
-          aria-invalid={errors.name ? 'true' : undefined}
-          error={errors.name ? t(errors.name.message ?? '') : undefined}
-          {...register('name')}
-        />
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -10 }}>
-          {t('incarnations:newNameComposedHint')}
-        </span>
+        {composesName ? (
+          <ComposedNamePreview
+            service={selectedService}
+            scenario={selectedCreateScenario!.name}
+            input={previewInput}
+            covens={watch('covens') ?? []}
+          />
+        ) : (
+          <>
+            <Input
+              label={t('incarnations:newNameLabel')}
+              placeholder="redis-prod"
+              mono
+              data-testid="incarnation-name-input"
+              aria-invalid={errors.name ? 'true' : undefined}
+              error={errors.name ? t(errors.name.message ?? '') : undefined}
+              {...register('name')}
+            />
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -10 }}>
+              {t('incarnations:newNameComposedHint')}
+            </span>
+          </>
+        )}
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Service</span>
