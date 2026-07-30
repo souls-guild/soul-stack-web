@@ -29,16 +29,18 @@ const jsonObjectFromString = z
   });
 
 export const incarnationCreateSchema = z.object({
-  // Empty is allowed on purpose: a create scenario declaring `name_template`
-  // composes the name server-side and REJECTS a request that carries one, so a
-  // hard `min(1)` here made those services impossible to create from the
-  // console at all (NIM-340).
+  // Empty is allowed HERE, and required is enforced in the form instead. A create scenario
+  // declaring `name_template` composes the name server-side and REJECTS a request that
+  // carries one, so a hard `min(1)` in the schema made those services impossible to create
+  // from the console at all (NIM-340).
   //
-  // This cannot be conditional yet — the scenario list gives the client no way
-  // to tell a composing scenario from a plain one, so the form cannot know
-  // which of the two it is looking at (NIM-345). Until it can, an empty name is
-  // sent as an omitted field and the keeper answers: it composes the name, or
-  // it replies that the field is required and we show that on this input.
+  // The rule is a property of the CHOSEN SCENARIO, not of the field, and this schema is a
+  // module-level constant with no way to see the selection — so `IncarnationNewForm` gates
+  // the empty name against `composes_name` before submitting. Read that check together with
+  // this relaxation: on its own the line below looks like the name is simply optional, and it
+  // is not.
+  //
+  // The format check does stay here, and applies to whatever value IS present.
   name: z
     .string()
     .trim()

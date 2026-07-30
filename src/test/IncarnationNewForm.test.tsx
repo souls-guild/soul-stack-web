@@ -167,6 +167,72 @@ describe('IncarnationNewForm', () => {
     ).toBeUndefined();
   });
 
+  // Hiding the input does not clear it. Switching from a scenario the operator typed a name
+  // for to one that composes leaves that name in form state, so an omission decided by
+  // "is the value empty" ships it anyway — and a composing scenario refuses a request that
+  // carries `name` at all. The decision has to be the flag, not the emptiness.
+  it('a name typed for a plain scenario is not carried into a composing one', async () => {
+    const PLAIN = { ...TYPED_NAME_SCENARIO, name: 'create-plain' };
+    const COMPOSING = { ...COMPOSING_SCENARIO, name: 'create-composed' };
+    const calls = stubCreate(
+      () =>
+        new Response(JSON.stringify({ apply_id: '01ARZ', incarnation: 'cache-billing-redis' }), {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      { scenarios: [PLAIN, COMPOSING] },
+    );
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+
+    await screen.findByTestId('incarnation-name-input');
+    await user.type(screen.getByTestId('incarnation-name-input'), 'typed-earlier');
+
+    await user.selectOptions(screen.getByTestId('create-scenario-select'), 'create-composed');
+    await waitFor(() => expect(screen.getByTestId('composed-name-preview')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.method === 'POST' && c.url === '/v1/incarnations');
+      expect(post, 'the composing scenario must still submit').toBeTruthy();
+      expect(
+        'name' in (JSON.parse(post!.body) as Record<string, unknown>),
+        'a name left over from the previous scenario must not be sent',
+      ).toBe(false);
+    });
+  });
+
+  // If the keeper asks for a name while the descriptor said the scenario composes one, the two
+  // sides disagree — and there is no input on screen to carry the complaint. Attaching it to
+  // the absent field would swallow it and leave the operator with a form that just does
+  // nothing on submit.
+  it('the keeper contradicting the flag reaches the operator instead of a hidden field', async () => {
+    stubCreate(
+      () =>
+        new Response(
+          JSON.stringify({ title: 'Validation failed', status: 422, detail: "field 'name' is required" }),
+          { status: 422, headers: { 'Content-Type': 'application/json' } },
+        ),
+      { scenarios: [COMPOSING_SCENARIO] },
+    );
+
+    renderForm();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'svc');
+    await waitFor(() => expect(screen.getByTestId('composed-name-preview')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
+
+    const box = await screen.findByTestId('incarnation-create-error');
+    expect(box).toHaveTextContent(/does not compose a name/i);
+    expect(screen.queryByTestId('incarnation-name-input')).toBeNull();
+  });
+
   // The name is the immutable primary key: the operator has to read it before the
   // create makes it permanent, and read how close it is to the ceiling that would
   // refuse it.

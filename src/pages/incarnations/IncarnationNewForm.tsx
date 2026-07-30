@@ -184,13 +184,17 @@ export function IncarnationNewForm() {
       setTimeout(() => navigate(`/incarnations/${encodeURIComponent(reply.incarnation)}`), 600);
     },
     onError: (err) => {
-      // The keeper is the only party that knows whether this create scenario
-      // composes the name, so its "name is required" comes back as a 422 rather
-      // than as client-side validation. Put it on the field it is about instead
-      // of in the generic banner — otherwise it reads as a failure of the whole
-      // form rather than of one empty input.
+      // "field 'name' is required" belongs on the name input — a failure of one field reads
+      // wrong in the generic banner. But when the scenario composes the name there IS no
+      // input: the two sides disagree (the descriptor said composing, the keeper then asked
+      // for a name), and attaching the error to a field that is not rendered would drop the
+      // message entirely. Then, and only then, it goes to the form-level box.
       if (err instanceof ApiError && err.status === 422 && /field 'name' is required/i.test(err.detail ?? '')) {
-        setError('name', { type: 'server', message: 'incarnations:nameRequiredByScenario' });
+        if (composesName) {
+          setServerError(t('incarnations:nameRequiredByScenario'));
+        } else {
+          setError('name', { type: 'server', message: 'incarnations:nameRequiredByScenario' });
+        }
         return;
       }
       if (err instanceof ApiError && err.status === 422) {
@@ -234,9 +238,12 @@ export function IncarnationNewForm() {
       usePerField && createSchema ? serializeFields(createSchema, fields) : {};
     const traits = Object.keys(values.traits).length > 0 ? values.traits : undefined;
     createMu.mutate({
-      // Omitted, not empty: a composing scenario rejects a request that carries
-      // `name` at all, and a plain one answers that the field is required.
-      ...(values.name ? { name: values.name } : {}),
+      // Decided by the flag, not by emptiness. Hiding the input does not clear it, so a name
+      // typed for a previously selected scenario is still in form state when the operator
+      // switches to one that composes — and a composing scenario rejects a request carrying
+      // `name` at all. Testing `values.name` here would send that leftover and earn the very
+      // 422 this path exists to avoid.
+      ...(composesName || !values.name ? {} : { name: values.name }),
       service: values.service,
       covens: values.covens,
       input,
