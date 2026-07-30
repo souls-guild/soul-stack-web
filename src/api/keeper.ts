@@ -421,6 +421,13 @@ export interface ScenarioInputSchemaProperty {
   /** Marker for a normalized map type (type=map): scalar items.type -> KEY->VALUE editor. */
   isMap?: boolean;
   /**
+   * NIM-243: the module still honors the parameter but it is on its way out.
+   * A warning, never a gate — the field stays editable and is still submitted.
+   * Carried here (rather than alongside the schema) so it survives
+   * paramsToInputSchema, which builds properties from an explicit field list.
+   */
+  deprecated?: ModuleDeprecation;
+  /**
    * Sub-fields of a typed object (NIM-72). Present for a single
    * type=object (AclUser add_user.user) and for items array-of-object.
    * Note: object-level `required` here is an array of required sub-field names
@@ -514,6 +521,7 @@ export type ModuleCatalogItem = components['schemas']['ModuleCatalogItem'];
 export type ModuleCatalogReply = components['schemas']['ModuleCatalogReply'];
 export type ModuleParam = components['schemas']['ModuleParam'];
 export type ModuleInputSource = components['schemas']['ModuleInputSource'];
+export type ModuleDeprecation = components['schemas']['ModuleDeprecation'];
 export type ModuleKind = NonNullable<ModuleCatalogItem['kind']>;
 
 // form-prep (ADR-045 S4): resolves live SIDs by source (incarnation_hosts/choir) + prefix.

@@ -27,6 +27,8 @@ import {
   type ScenarioFieldsState,
 } from './scenarioInputFields.helpers';
 import { SidPicker } from './SidPicker';
+import { DeprecatedParamNotice } from './DeprecatedParamNotice';
+import { successorSwap } from './deprecatedParam.helpers';
 
 interface Props {
   schema: ScenarioInputSchema;
@@ -92,6 +94,43 @@ export function ScenarioInputFields({
   if (entries.length === 0) return null;
 
   function renderField(
+    key: string,
+    prop: ScenarioInputSchemaProperty,
+    labelOverride?: string,
+    placeholderOverride?: string,
+    hintOverride?: string,
+  ) {
+    const field = renderFieldControl(key, prop, labelOverride, placeholderOverride, hintOverride);
+    // NIM-243: the deprecation marker wraps the control instead of living inside
+    // it — every field shape (SID picker / list / map / object / provision) is
+    // covered from one place and none of their branches change. The control stays
+    // enabled: the parameter is honored until removed_in, so this warns, it never
+    // gates. A parameter without the block renders exactly as it did before.
+    if (!prop.deprecated) return field;
+    const swap = successorSwap(key, prop, schema ?? {}, value);
+    return (
+      <div
+        key={key}
+        data-testid={`field-deprecated-wrap-${key}`}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          borderLeft: '2px solid var(--warning)',
+          paddingLeft: 8,
+        }}
+      >
+        {field}
+        <DeprecatedParamNotice
+          name={key}
+          deprecated={prop.deprecated}
+          onSwitch={swap ? () => onChange(swap) : undefined}
+        />
+      </div>
+    );
+  }
+
+  function renderFieldControl(
     key: string,
     prop: ScenarioInputSchemaProperty,
     labelOverride?: string,

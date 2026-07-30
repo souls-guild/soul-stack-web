@@ -49,6 +49,10 @@ export function paramsToInputSchema(params: ModuleParam[] | undefined): Scenario
       ...(p.example != null ? { example: p.example } : {}),
       // B2: isMap preserves the type=map marker (normalized to object) for the KEY->VALUE editor.
       ...(isMapRawType(p.type) ? { isMap: true } : {}),
+      // NIM-243: deprecation block rides through to the field renderer. This projection
+      // copies an explicit list of keys, so anything omitted here is dropped in silence —
+      // a missing marker in the form then reads as "the backend never sent it".
+      ...(p.deprecated != null ? { deprecated: p.deprecated } : {}),
       // S8b: items describes the element type (list) or value type (map).
       ...(p.items != null ? { items: {
         type: normalizeType(p.items.type),
