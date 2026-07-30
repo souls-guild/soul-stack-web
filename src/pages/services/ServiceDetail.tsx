@@ -562,7 +562,7 @@ function ServiceSchemaTab({ name, serviceRef }: { name: string; serviceRef: stri
 
       {q.data ? (
         <div className={styles.meta}>
-          <span className={styles.metaKey}>Ref</span>
+          <span className={styles.metaKey}>{t('common:colRef')}</span>
           <span className={styles.metaVal}>
             <span className="mono">{q.data.ref ?? serviceRef}</span>
           </span>

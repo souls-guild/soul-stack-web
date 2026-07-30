@@ -57,7 +57,7 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
   return (
     <div
       role="dialog"
-      aria-label="New JWT"
+      aria-label={t('admin:archonNewJwtAria')}
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--warn, #b07f00)',
@@ -128,7 +128,7 @@ function RolesPicker({
     <label className={styles.rolesPickerField}>
       <span className={styles.metaKey}>{t('pages:archonRolesOptional')}</span>
       <div
-        aria-label="selected roles"
+        aria-label={t('admin:archonSelectedRolesAria')}
         style={{
           display: 'flex',
           flexWrap: 'wrap',
@@ -175,7 +175,7 @@ function RolesPicker({
           </span>
         ))}
         <select
-          aria-label="add role"
+          aria-label={t('forms:addRole')}
           value=""
           disabled={disabled || remaining.length === 0}
           onChange={(e) => {
@@ -416,7 +416,7 @@ export function ArchonsList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Archons</h1>
+          <h1 className={styles.title}>{t('common:navArchons')}</h1>
           <div className={styles.crumbs}>{t('pages:archonsCrumbs')}</div>
         </div>
       </div>
@@ -429,7 +429,7 @@ export function ArchonsList() {
         <h2 className={styles.sectionTitle}>{t('pages:archonCreateSection')}</h2>
         <div className={styles.filters}>
           <Input
-            label="AID"
+            label={t('common:colAid')}
             value={aidNew}
             onChange={(e) => setAidNew(e.target.value)}
             placeholder={t('pages:archonAidPlaceholder')}
@@ -538,7 +538,7 @@ export function ArchonsList() {
 
         {list.data ? (
           <div
-            aria-label="archons counter"
+            aria-label={t('admin:archonsCounterAria')}
             style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
           >
             {needle

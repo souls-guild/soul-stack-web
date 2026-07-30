@@ -215,6 +215,24 @@ src/
      - **Structural labels live in i18n, not in JSX.** Nav items and table headers
        carry a `labelKey` (see `Sidebar.tsx`, `RunsFeed.tsx` `SEGMENTS`); generic
        column headers reuse the shared `common:col*` keys.
+     - **So do field labels and a11y text.** The locale comparison above can only
+       see strings that reached a locale file, so a label hardcoded in the markup
+       slips past it and stays English in Russian forever. The same guard test
+       therefore scans `src/pages` + `src/components` for three patterns —
+       `<span className={styles.metaKey}>…</span>`, `aria-label="…"` and
+       `title="…"` — and fails on any literal that is not on its explicit
+       inventory (wire field name / technical identifier / proper name), plus on
+       stale inventory entries. The scan stops at those three patterns on
+       purpose: over all of JSX it is a false-positive generator (NIM-259).
+     - **Detail panels come in two flavours.** Panels that label values with prose
+       (`Created at`, `Last drift check`) are translated; panels that dump a
+       payload key beside its value (`started_at`, `pkg_mgr`, `scope_size`) keep
+       the wire name, because the label names the field the value came from.
+     - **A new key's English value must match the literal it replaces.** The suite
+       renders `en` and a good part of it queries by accessible name
+       (`getByLabelText('Incarnation regex')`), so rewording English while moving
+       a string into i18n breaks tests that have nothing to do with the change.
+       Reuse an existing key only when its `en` value is character-identical.
    - **Add a key:** add it to **both** files — `en` in
      `src/i18n/locales/en/<ns>.json` + `ru` in `public/locales/ru/<ns>.json` (both
      required). A key in only one locale is caught by the ns-key-sync test

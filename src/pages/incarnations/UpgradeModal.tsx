@@ -137,7 +137,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
           name="to_version"
           render={({ field }) => (
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>To version (git-ref)</span>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('incarnations:upgradeToLabel')}</span>
               <select
                 value={field.value}
                 onChange={(e) => field.onChange(e.target.value)}

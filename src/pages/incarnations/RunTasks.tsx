@@ -86,7 +86,7 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
 
   if (tasks.length === 0) {
     return (
-      <section className={common.section} aria-label="Task timeline" data-testid="run-task-timeline">
+      <section className={common.section} aria-label={t('incarnations:taskTimelineAria')} data-testid="run-task-timeline">
         <h2 className={common.sectionTitle}>{t('runhistory:runTasksTitle')}</h2>
         <div className={common.empty} data-testid="run-tasks-empty">
           {t('runhistory:runTasksEmpty')}
@@ -96,7 +96,7 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
   }
 
   return (
-    <section className={common.section} aria-label="Task timeline" data-testid="run-task-timeline">
+    <section className={common.section} aria-label={t('incarnations:taskTimelineAria')} data-testid="run-task-timeline">
       <h2 className={common.sectionTitle}>
         {t('runhistory:runTasksTitle')}
         {live ? (
@@ -110,7 +110,7 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
       </h2>
 
       <div className={styles.md} data-testid="run-tasks-md">
-        <div className={styles.list} role="listbox" aria-label="Tasks">
+        <div className={styles.list} role="listbox" aria-label={t('incarnations:tasksAria')}>
           {tasks.map((tk) => {
             const sel = current != null && taskKey(tk) === taskKey(current);
             return (

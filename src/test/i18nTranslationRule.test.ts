@@ -28,7 +28,7 @@ const ENTITY_NAMES = [
   'cadences:title',
   'common:navArchons', 'common:navCadences', 'common:navDecrees', 'common:navGroupOracle',
   'common:navIncarnations', 'common:navPlugins', 'common:navRbac', 'common:navServices',
-  'common:navSouls', 'common:navSynods', 'common:navVigils',
+  'common:navSouls', 'common:navSynods', 'common:navVigils', 'common:synodsAria',
   'common:colArchons', 'common:colCoven', 'common:colCovens', 'common:colDestiny',
   'common:colIncarnation', 'common:colIncarnationModule',
   'console:scopeIncarnations', 'console:scopeCovens', 'console:scopeSoulprint',
@@ -39,7 +39,7 @@ const ENTITY_NAMES = [
   'run:stepIncarnations',
   'runhistory:filterServiceLabel', 'runhistory:runColPassage',
   'runhistory:segErrand', 'runhistory:segPush', 'runhistory:segVoyage',
-  'souls:covensLabel',
+  'souls:covensLabel', 'souls:soulprintTitle',
   'synods:title',
 ];
 
@@ -52,7 +52,8 @@ const TECHNICAL = [
   'admin:rbacErrRoleNamePattern',
   'admin:rbacScopeKey_incarnation', 'admin:rbacScopeKey_service', 'admin:rbacScopeKey_coven',
   'admin:rbacScopeKey_host', 'admin:auditExpand', 'admin:auditArchonPrefix', 'admin:helpMcpTitle',
-  'beacons:errCovenKebab', 'beacons:errActionScenarioSnake',
+  'admin:auditCorrelationId', 'admin:svcRefreshLabel',
+  'beacons:errCovenKebab', 'beacons:errActionScenarioSnake', 'beacons:celWhereAria',
   'common:pushApply',
   'common:colAid', 'common:colApplyId', 'common:colErrandId', 'common:colId',
   'common:colIpv4', 'common:colIpv6', 'common:colKid', 'common:colMac', 'common:colMtu',
@@ -67,8 +68,9 @@ const TECHNICAL = [
   'run:sidRegexLabel', 'run:covenKebabError', 'run:destinyRefLabel', 'run:sshProviderLabel',
   'run:covenKebabShortError', 'run:regexLabel', 'run:celWhereLabel', 'run:wherePrefix',
   'run:scheduleAtUtc', 'run:dryRunLabel', 'run:listRemoveItem', 'run:mapRemovePair',
-  'run:cadenceKindCron',
+  'run:cadenceKindCron', 'run:sidRegexAria',
   'runhistory:dryRunLabel', 'runhistory:filterSshProviderLabel', 'runhistory:pushDestinyHint',
+  'runhistory:pushDestinyRefLabel',
   'runhistory:runFailedPlanIndex', 'runhistory:runFailedTaskIdx', 'runhistory:runKeeperSideBadge',
   'runhistory:runLiveBadge', 'runhistory:countNoMatch', 'runhistory:voyageTargetsColApplyId',
   'runhistory:voyageChangedRunStatusUnknown', 'runhistory:sidLabel',
@@ -122,6 +124,91 @@ const ALLOWED_ENGLISH = new Map<string, string>([
   ...STATUS_VALUES.map((k) => [k, 'status value'] as const),
   ...PROPER_NAMES.map((k) => [k, 'proper name'] as const),
 ]);
+
+// ---------------------------------------------------------------------------
+// Literal English text left in JSX.
+//
+// The locale checks above compare two JSON files, so a string that never
+// reached a locale file is invisible to them. That is exactly how ~180 field
+// labels and a11y attributes stayed English in the Russian UI after NIM-213 —
+// they were hardcoded in the markup, so there was nothing for a translator to
+// translate and nothing for the guard to compare (NIM-259).
+//
+// The scan is deliberately limited to three patterns. A blanket rule over every
+// JSX string literal reports far more noise than signal (class names, format
+// fragments, data attributes), and a guard nobody can keep green stops being a
+// guard.
+//
+// A literal survives only by being listed below with the reason it is not
+// prose. Everything else has to go through t(). The inventory lives here rather
+// than as English-identical i18n keys on purpose: a wire field name is not a
+// translation unit, and minting one dead key per payload field would bury the
+// strings a translator actually has to work on.
+const SCAN_DIRS = ['src/pages', 'src/components'];
+
+// Wire field names rendered as their own label: these detail panels show the
+// payload verbatim, key beside value. Translating the key would misname the
+// field the value came from.
+const WIRE_FIELD_LABELS = [
+  'arch', 'attempt', 'available_mb', 'batch_size', 'by', 'changed', 'cleanup_stale',
+  'codename', 'collected_at', 'concurrency', 'count', 'covens', 'created_at', 'destiny',
+  'distro', 'dry_run', 'duration_ms', 'error', 'exit_code', 'expires_at', 'expires_at: ',
+  'family', 'finished_at', 'fqdn', 'hostname', 'init_system', 'keys', 'kind', 'label',
+  'labels', 'matched', 'mode', 'model', 'module', 'on_failure', 'pkg_mgr', 'primary_ip',
+  'received_at', 'recursive', 'release', 'scenario', 'scope_size', 'sid', 'ssh_provider',
+  'started_at', 'started_by', 'state_schema_version', 'status', 'swap_mb',
+  'target.incarnations', 'target.sids', 'targets', 'total_mb', 'transport', 'vendor',
+  'version',
+];
+
+// Technical identifiers and enum values used as the accessible name of a
+// control that has no prose label of its own.
+const TECHNICAL_A11Y_NAMES = [
+  'SID', 'batch_mode_barrier', 'batch_mode_window', 'cleanup_stale_versions',
+  'correlation_id', 'dry_run', 'enabled-only', 'group-roles', 'provisioning-policy',
+  'require_alive', 'schedule_kind_cron', 'schedule_kind_interval', 'sha256',
+];
+
+const LITERAL_PROPER_NAMES = ['Soul Stack'];
+
+const ALLOWED_LITERALS = new Map<string, string>([
+  ...WIRE_FIELD_LABELS.map((s) => [s, 'wire field name'] as const),
+  ...TECHNICAL_A11Y_NAMES.map((s) => [s, 'technical identifier'] as const),
+  ...LITERAL_PROPER_NAMES.map((s) => [s, 'proper name'] as const),
+]);
+
+// `[^<{]` on the first character is what separates a literal from an already
+// interpolated `>{t('…')}<`.
+const LITERAL_PATTERNS = [
+  /className=\{styles\.metaKey\}>([^<{][^<]*)</g,
+  /aria-label="([^"]*)"/g,
+  /(?<![-\w])title="([^"]*)"/g,
+];
+
+function tsxFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...tsxFiles(full));
+    else if (entry.name.endsWith('.tsx')) out.push(full);
+  }
+  return out;
+}
+
+function jsxLiterals(): { where: string; text: string }[] {
+  const found: { where: string; text: string }[] = [];
+  for (const dir of SCAN_DIRS) {
+    for (const file of tsxFiles(path.resolve(dir))) {
+      const rel = path.relative(path.resolve('.'), file);
+      readFileSync(file, 'utf-8').split('\n').forEach((line, i) => {
+        for (const re of LITERAL_PATTERNS) {
+          for (const m of line.matchAll(re)) found.push({ where: `${rel}:${i + 1}`, text: m[1] });
+        }
+      });
+    }
+  }
+  return found;
+}
 
 function loadNs(dir: string, ns: string): Record<string, string> {
   return JSON.parse(readFileSync(path.join(dir, `${ns}.json`), 'utf-8'));
@@ -226,6 +313,29 @@ describe('i18n translation rule', () => {
       missing,
       'A "…By" label must say by whom in Russian (e.g. «Кем создано»), otherwise ' +
         'it reads as a timestamp and collides with the neighbouring "Created" column.',
+    ).toEqual([]);
+  });
+
+  it('field labels and a11y attributes are not hardcoded English', () => {
+    const literals = jsxLiterals().filter((l) => !ALLOWED_LITERALS.has(l.text));
+    expect(
+      literals.map((l) => `${l.where} — "${l.text}"`),
+      'A field label, aria-label or title written straight into JSX can never ' +
+        'reach the Russian locale — there is no key for a translator to fill in. ' +
+        "Replace it with t('<ns>:<key>') and add the key to BOTH " +
+        'src/i18n/locales/en/<ns>.json and public/locales/ru/<ns>.json. If the ' +
+        'string is a wire field name or a technical identifier rather than prose, ' +
+        'add it to the matching list in this file instead.',
+    ).toEqual([]);
+  });
+
+  it('the JSX literal inventory has no stale entries', () => {
+    const present = new Set(jsxLiterals().map((l) => l.text));
+    const stale = [...ALLOWED_LITERALS.keys()].filter((s) => !present.has(s));
+    expect(
+      stale,
+      'These literals are listed as intentionally-English but no longer appear ' +
+        'in the scanned patterns. Drop them from the list.',
     ).toEqual([]);
   });
 });

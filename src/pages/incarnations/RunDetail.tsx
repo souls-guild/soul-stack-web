@@ -167,7 +167,7 @@ export function RunDetail() {
         </div>
       </div>
 
-      <section className={styles.section} aria-label="Run meta">
+      <section className={styles.section} aria-label={t('incarnations:runMetaAria')}>
         <div className={styles.meta}>
           <span className={styles.metaKey}>{t('runhistory:runScenarioLabel')}</span>
           <span className={styles.metaVal}>{run.scenario}</span>
@@ -191,7 +191,7 @@ export function RunDetail() {
       </section>
 
       {run.input && Object.keys(run.input).length > 0 ? (
-        <section className={styles.section} aria-label="Run input" data-testid="run-input-section">
+        <section className={styles.section} aria-label={t('incarnations:runInputAria')} data-testid="run-input-section">
           <h2 className={styles.sectionTitle}>{t('runhistory:runInputTitle')}</h2>
           <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-muted)' }}>
             {t('runhistory:runInputMaskedHint')}
@@ -201,7 +201,7 @@ export function RunDetail() {
       ) : null}
 
       {failedHosts.length > 0 ? (
-        <section className={styles.section} aria-label="Failed task" data-testid="run-failed-section">
+        <section className={styles.section} aria-label={t('incarnations:runFailedTaskAria')} data-testid="run-failed-section">
           <h2 className={styles.sectionTitle}>{t('runhistory:runFailedTaskTitle')}</h2>
           {failedHosts.map((h) => (
             <div key={`${h.sid}-${h.passage}`} className={styles.errorBox} style={{ marginBottom: 8 }}>
@@ -220,7 +220,7 @@ export function RunDetail() {
         </section>
       ) : null}
 
-      <section className={styles.section} aria-label="Per-host">
+      <section className={styles.section} aria-label={t('common:secPerHost')}>
         <h2 className={styles.sectionTitle}>{t('runhistory:runHostsTitle')}</h2>
         {hosts.length > 0 ? (
           <table className={styles.table} data-testid="run-hosts-table">
@@ -260,7 +260,7 @@ export function RunDetail() {
       ) : tasksUnavailable ? (
         <TaskTimeline rows={auditRows} degraded={auditForbidden} live={isApplying} />
       ) : (
-        <section className={styles.section} aria-label="Task timeline" data-testid="run-task-timeline">
+        <section className={styles.section} aria-label={t('incarnations:taskTimelineAria')} data-testid="run-task-timeline">
           <h2 className={styles.sectionTitle}>{t('runhistory:runTasksTitle')}</h2>
           <div className={styles.loading}>{t('loading')}</div>
         </section>

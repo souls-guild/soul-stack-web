@@ -293,14 +293,14 @@ export function VigilNewForm() {
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.formFields}>
             <Input
-              label="Name (kebab-case)"
+              label={t('beacons:nameKebabLabel')}
               mono
               {...register('name')}
               placeholder="redis-down"
               error={errors.name?.message ? t(errors.name.message) : undefined}
             />
             <Input
-              label="Interval"
+              label={t('common:colInterval')}
               mono
               {...register('interval')}
               placeholder="30s"
@@ -329,7 +329,7 @@ export function VigilNewForm() {
               ) : null}
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className={styles.metaKey}>Enabled</span>
+              <span className={styles.metaKey}>{t('common:colEnabled')}</span>
               <input
                 type="checkbox"
                 {...register('enabled')}
@@ -374,7 +374,7 @@ export function VigilNewForm() {
           </div>
         </section>
 
-        <section className={styles.section} aria-label="Params">
+        <section className={styles.section} aria-label={t('common:colParams')}>
           <h2 className={styles.sectionTitle}>{t('colParams')}</h2>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
             <input

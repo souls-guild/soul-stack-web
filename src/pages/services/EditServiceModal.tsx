@@ -81,7 +81,7 @@ export function EditServiceModal({ open, onClose, service }: Props) {
     >
       <form noValidate>
         <Input
-          label="Git"
+          label={t('admin:svcMetaGit')}
           mono
           placeholder={t('admin:svcGitPlaceholder')}
           hint={t('admin:svcGitHintShort')}
@@ -90,7 +90,7 @@ export function EditServiceModal({ open, onClose, service }: Props) {
         />
         <div style={{ height: 12 }} />
         <Input
-          label="Ref"
+          label={t('common:colRef')}
           mono
           placeholder={t('admin:svcRefPlaceholderMain')}
           hint={t('admin:svcRefHint')}
@@ -99,7 +99,7 @@ export function EditServiceModal({ open, onClose, service }: Props) {
         />
         <div style={{ height: 12 }} />
         <Input
-          label="Refresh"
+          label={t('admin:svcRefreshLabel')}
           mono
           placeholder={t('admin:svcRefreshPlaceholder')}
           hint={t('admin:svcRefreshHintShort')}

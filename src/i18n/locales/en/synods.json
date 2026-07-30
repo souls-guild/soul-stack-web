@@ -26,6 +26,7 @@
   "grantRoleSubmit": "Bind: {{n}}",
   "grantRoleTitle": "Bind role to {{name}}",
   "members": "Members",
+  "membersAria": "members",
   "name": "Group name",
   "nameLabel": "Group name (read-only)",
   "namePlaceholder": "ops-team",

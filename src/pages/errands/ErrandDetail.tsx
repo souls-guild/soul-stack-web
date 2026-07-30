@@ -143,7 +143,7 @@ function StreamBlock({
           type="button"
           onClick={() => copyToClipboard(text)}
           aria-label={t('runhistory:copyStream', { label })}
-          title="copy"
+          title={t('common:copyShort')}
           style={{
             background: 'transparent',
             border: '1px solid var(--border)',
@@ -157,7 +157,7 @@ function StreamBlock({
             fontSize: 11.5,
           }}
         >
-          <Copy size={12} /> copy
+          <Copy size={12} /> {t('common:copyShort')}
         </button>
       </div>
       <pre
@@ -315,7 +315,7 @@ export function ErrandDetail() {
       </div>
 
       {tab === 'output' ? (
-        <section className={styles.section} aria-label="Output">
+        <section className={styles.section} aria-label={t('common:colOutput')}>
           {result ? (
             <>
               <StreamBlock
@@ -338,7 +338,7 @@ export function ErrandDetail() {
       ) : null}
 
       {tab === 'params' ? (
-        <section className={styles.section} aria-label="Params">
+        <section className={styles.section} aria-label={t('common:colParams')}>
           {result?.output ? (
             <div>
               <div className={styles.metaKey} style={{ marginBottom: 6 }}>
@@ -369,7 +369,7 @@ export function ErrandDetail() {
       ) : null}
 
       {tab === 'events' ? (
-        <section className={styles.section} aria-label="Events">
+        <section className={styles.section} aria-label={t('common:colEvents')}>
           {result ? (
             <div className={styles.timeline}>
               {deriveEvents(result).map((ev, i) => (

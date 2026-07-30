@@ -274,7 +274,7 @@ export function AuditLog() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Archon AID</div>
+          <div className={styles.metaKey}>{t('admin:auditArchonAid')}</div>
           <input
             type="text"
             value={archonAid}
@@ -284,7 +284,7 @@ export function AuditLog() {
           />
         </label>
         <label>
-          <div className={styles.metaKey}>Correlation ID</div>
+          <div className={styles.metaKey}>{t('admin:auditCorrelationId')}</div>
           <input
             type="text"
             value={correlationId}
@@ -324,7 +324,7 @@ export function AuditLog() {
         </label>
       </div>
 
-      <div className={styles.filters} aria-label="Source filter">
+      <div className={styles.filters} aria-label={t('admin:auditSourceFilterAria')}>
         <span className={styles.metaKey} style={{ alignSelf: 'center' }}>{t('admin:auditSourceLabel')}</span>
         {SOURCES.map((s) => {
           const active = sources.includes(s);

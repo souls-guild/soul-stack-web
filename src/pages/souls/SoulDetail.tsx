@@ -192,18 +192,18 @@ export function SoulDetail() {
           <h2 className={styles.sectionTitle}>{t('secOverview')}</h2>
           <SoulUtilizationStrip sid={row.sid} enabled={tab === 'overview'} />
           <div className={styles.meta}>
-            <span className={styles.metaKey}>SID</span>
+            <span className={styles.metaKey}>{t('common:colSid')}</span>
             <span className={styles.metaVal}>{row.sid}</span>
-            <span className={styles.metaKey}>Status</span>
+            <span className={styles.metaKey}>{t('common:colStatus')}</span>
             <span className={styles.metaVal} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <Dot kind={soulDot(row.status)} title={row.status} />
               <Badge tone={soulTone(row.status)}>{row.status}</Badge>
             </span>
-            <span className={styles.metaKey}>Transport</span>
+            <span className={styles.metaKey}>{t('common:colTransport')}</span>
             <span className={styles.metaVal}>
               <Badge tone="muted">{row.transport}</Badge>
             </span>
-            <span className={styles.metaKey}>Covens</span>
+            <span className={styles.metaKey}>{t('common:colCovens')}</span>
             <span className={styles.metaVal}>
               {row.covens && row.covens.length > 0 ? (
                 <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4 }}>
@@ -215,15 +215,15 @@ export function SoulDetail() {
                 '—'
               )}
             </span>
-            <span className={styles.metaKey}>Registered</span>
+            <span className={styles.metaKey}>{t('common:colRegistered')}</span>
             <span className={styles.metaVal} title={row.registered_at}>
               {relativeAge(row.registered_at, now)}
             </span>
-            <span className={styles.metaKey}>Last seen</span>
+            <span className={styles.metaKey}>{t('common:colLastSeen')}</span>
             <span className={styles.metaVal} title={row.last_seen_at ?? undefined}>
               {row.last_seen_at ? relativeAge(row.last_seen_at, now) : '—'}
             </span>
-            <span className={styles.metaKey}>Last seen by KID</span>
+            <span className={styles.metaKey}>{t('common:colLastSeenKid')}</span>
             <span className={styles.metaVal}>{row.last_seen_by_kid ?? '—'}</span>
           </div>
           {row.transport === 'ssh' ? (
@@ -440,7 +440,7 @@ function SoulprintTab({ query }: SoulprintTabProps) {
   if (query.error instanceof SoulprintNotReceivedError) {
     return (
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Soulprint</h2>
+        <h2 className={styles.sectionTitle}>{t('souls:soulprintTitle')}</h2>
         <div className={styles.empty}>
           {t('souls:soulprintNotReceived')} <code className="mono">transport: ssh</code> {t('souls:soulprintNotReceivedSsh')}
         </div>
@@ -464,7 +464,7 @@ function SoulprintTab({ query }: SoulprintTabProps) {
 
   return (
     <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>Soulprint</h2>
+      <h2 className={styles.sectionTitle}>{t('souls:soulprintTitle')}</h2>
 
       <div className={styles.meta}>
         <span className={styles.metaKey}>collected_at</span>

@@ -139,7 +139,7 @@ export function PluginRegisterForm() {
       {reply ? (
         <section
           className={styles.section}
-          aria-label="admission result"
+          aria-label={t('admin:pluginAdmissionResultAria')}
           style={{
             background: 'color-mix(in srgb, var(--ok, #2e7d32) 6%, var(--surface))',
             border: '1px solid color-mix(in srgb, var(--ok, #2e7d32) 30%, var(--border))',
@@ -149,13 +149,13 @@ export function PluginRegisterForm() {
         >
           <h2 className={styles.sectionTitle}>{t('admin:pluginAllowedTitle')}</h2>
           <div className={styles.meta}>
-            <span className={styles.metaKey}>Namespace</span>
+            <span className={styles.metaKey}>{t('common:colNamespace')}</span>
             <span className={styles.metaVal}>{reply.namespace}</span>
-            <span className={styles.metaKey}>Name</span>
+            <span className={styles.metaKey}>{t('common:colName')}</span>
             <span className={styles.metaVal}>{reply.name}</span>
-            <span className={styles.metaKey}>Ref</span>
+            <span className={styles.metaKey}>{t('common:colRef')}</span>
             <span className={styles.metaVal}>{reply.ref}</span>
-            <span className={styles.metaKey}>SHA-256 (Keeper-side)</span>
+            <span className={styles.metaKey}>{t('common:colSha256Keeper')}</span>
             <span className={styles.metaVal}>{reply.sha256}</span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>

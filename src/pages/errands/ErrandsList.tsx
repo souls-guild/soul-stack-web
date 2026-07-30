@@ -87,7 +87,7 @@ export function ErrandsList() {
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>SID</div>
+          <div className={styles.metaKey}>{t('common:colSid')}</div>
           <input
             type="text"
             value={sid}

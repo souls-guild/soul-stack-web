@@ -83,7 +83,7 @@ export function RegisterServiceModal({ open, onClose }: Props) {
     >
       <form noValidate>
         <Input
-          label="Name"
+          label={t('common:colName')}
           mono
           placeholder={t('admin:svcNamePlaceholderRedis')}
           hint={t('admin:svcNameHint')}
@@ -92,7 +92,7 @@ export function RegisterServiceModal({ open, onClose }: Props) {
         />
         <div style={{ height: 12 }} />
         <Input
-          label="Git"
+          label={t('admin:svcMetaGit')}
           mono
           placeholder={t('admin:svcGitPlaceholder')}
           hint={t('admin:svcGitHint')}
@@ -101,7 +101,7 @@ export function RegisterServiceModal({ open, onClose }: Props) {
         />
         <div style={{ height: 12 }} />
         <Input
-          label="Ref"
+          label={t('common:colRef')}
           mono
           placeholder={t('admin:svcRefPlaceholderMain')}
           hint={t('admin:svcRefHint')}
@@ -110,7 +110,7 @@ export function RegisterServiceModal({ open, onClose }: Props) {
         />
         <div style={{ height: 12 }} />
         <Input
-          label="Refresh"
+          label={t('admin:svcRefreshLabel')}
           mono
           placeholder={t('admin:svcRefreshPlaceholder')}
           hint={t('admin:svcRefreshHint')}

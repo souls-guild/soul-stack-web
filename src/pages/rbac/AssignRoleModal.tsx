@@ -74,9 +74,9 @@ export function AssignRoleModal({ open, aid, roles, onClose }: Props) {
           </div>
         ) : (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span className={styles.metaKey}>Role</span>
+            <span className={styles.metaKey}>{t('common:colRole')}</span>
             <select
-              aria-label="role"
+              aria-label={t('common:roleAria')}
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
               style={{

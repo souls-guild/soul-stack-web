@@ -345,7 +345,7 @@ export function SoulsList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Souls</h1>
+          <h1 className={styles.title}>{t('common:navSouls')}</h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Button

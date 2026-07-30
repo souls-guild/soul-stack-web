@@ -155,7 +155,7 @@ export function ArchonDetail() {
       {tab === 'info' ? (
         <>
           <div className={styles.meta}>
-            <span className={styles.metaKey}>AID</span>
+            <span className={styles.metaKey}>{t('common:colAid')}</span>
             <span className={styles.metaVal}>{op.aid}</span>
             <span className={styles.metaKey}>{t('pages:archonDisplayName')}</span>
             <span className={styles.metaVal}>{op.display_name}</span>
@@ -171,16 +171,16 @@ export function ArchonDetail() {
                 <span data-testid={`created-via-${op.aid}`}>—</span>
               )}
             </span>
-            <span className={styles.metaKey}>Created at</span>
+            <span className={styles.metaKey}>{t('common:colCreatedAt')}</span>
             <span className={styles.metaVal}>{op.created_at}</span>
-            <span className={styles.metaKey}>Created by</span>
+            <span className={styles.metaKey}>{t('common:colCreatedBy')}</span>
             <span className={styles.metaVal}>{op.created_by_aid ?? '— (bootstrap)'}</span>
-            <span className={styles.metaKey}>Revoked at</span>
+            <span className={styles.metaKey}>{t('common:colRevokedAt')}</span>
             <span className={styles.metaVal}>{op.revoked_at ?? '—'}</span>
-            <span className={styles.metaKey}>Bootstrap initial</span>
+            <span className={styles.metaKey}>{t('common:colBootstrapInitial')}</span>
             <span className={styles.metaVal}>{op.bootstrap_initial ? 'true' : 'false'}</span>
           </div>
-          <section className={styles.section} aria-label="roles">
+          <section className={styles.section} aria-label={t('common:rolesAria')}>
             <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>{t('common:colRoles')}</span>
               <span style={{ flex: 1 }} />
@@ -255,7 +255,7 @@ export function ArchonDetail() {
               </div>
             )}
           </section>
-          <section className={styles.section} aria-label="synods">
+          <section className={styles.section} aria-label={t('common:synodsAria')}>
             <h2 className={styles.sectionTitle}>{t('pages:archonSynods')}</h2>
             {synodsQ.isLoading ? (
               <div className={styles.loading}>{t('loading')}</div>
@@ -290,7 +290,7 @@ export function ArchonDetail() {
               </div>
             )}
           </section>
-          <section className={styles.section} aria-label="metadata">
+          <section className={styles.section} aria-label={t('common:metadataAria')}>
             <h2 className={styles.sectionTitle}>{t('secMetadata')}</h2>
             {hasMetadata ? (
               <JsonViewer value={op.metadata} />
@@ -315,7 +315,7 @@ export function ArchonDetail() {
       />
 
       {tab === 'activity' ? (
-        <section className={styles.section} aria-label="activity">
+        <section className={styles.section} aria-label={t('common:activityAria')}>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
             {t('pages:archonActivityHint')}
           </p>

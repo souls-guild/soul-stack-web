@@ -84,7 +84,7 @@ export function PushRunDetail() {
         </div>
       </div>
 
-      <section className={styles.section} aria-label="Push meta">
+      <section className={styles.section} aria-label={t('runhistory:pushMetaAria')}>
         <div className={styles.meta}>
           <span className={styles.metaKey}>destiny</span>
           <span className={styles.metaVal}>{view.destiny_ref}</span>
@@ -111,7 +111,7 @@ export function PushRunDetail() {
         </div>
       </section>
 
-      <section className={styles.section} aria-label="Per-host">
+      <section className={styles.section} aria-label={t('common:secPerHost')}>
         <h2 className={styles.sectionTitle}>{t('secPerHost')}</h2>
         {hosts && hosts.length > 0 ? (
           <table className={styles.table}>
@@ -144,7 +144,7 @@ export function PushRunDetail() {
       </section>
 
       {view.input ? (
-        <section className={styles.section} aria-label="Input">
+        <section className={styles.section} aria-label={t('common:secInput')}>
           <h2 className={styles.sectionTitle}>{t('secInput')}</h2>
           <JsonViewer value={view.input} emptyLabel={t('runhistory:summaryEmptyInput')} />
         </section>

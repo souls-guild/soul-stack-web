@@ -135,7 +135,7 @@ export function SearchMultiSelect<T>({
   return (
     <div className={styles.root} ref={rootRef}>
       {selected.length > 0 ? (
-        <div className={styles.chips} aria-label="selected">
+        <div className={styles.chips} aria-label={t('common:selectedAria')}>
           {selected.map((key) => (
             <span key={key} className={styles.chip} data-testid={`${testidPrefix}-chip-${key}`}>
               <span className="mono">{chipLabel(key)}</span>

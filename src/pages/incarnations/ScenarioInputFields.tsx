@@ -383,7 +383,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
     <span
       data-testid={`field-required-marker-${name}`}
       style={{ color: 'var(--danger)', marginLeft: 2 }}
-      aria-label="required field"
+      aria-label={t('incarnations:nameRequired')}
     >
       *
     </span>
@@ -813,7 +813,7 @@ function TypedListField({ name, labelText, required, prop, value, onChange, miss
     <span
       data-testid={`field-required-marker-${name}`}
       style={{ color: 'var(--danger)', marginLeft: 2 }}
-      aria-label="required field"
+      aria-label={t('incarnations:nameRequired')}
     >
       *
     </span>
@@ -967,7 +967,7 @@ function ArrayOfObjectField({ name, labelText, required, prop, value, onChange, 
     <span
       data-testid={`field-required-marker-${name}`}
       style={{ color: 'var(--danger)', marginLeft: 2 }}
-      aria-label="required field"
+      aria-label={t('incarnations:nameRequired')}
     >
       *
     </span>
@@ -1143,7 +1143,7 @@ function ObjectField({ name, labelText, required, prop, value, onChange, missing
     <span
       data-testid={`field-required-marker-${name}`}
       style={{ color: 'var(--danger)', marginLeft: 2 }}
-      aria-label="required field"
+      aria-label={t('incarnations:nameRequired')}
     >
       *
     </span>
@@ -1503,7 +1503,7 @@ function MapEditor({ name, labelText, required, prop, value, onChange, missing, 
     <span
       data-testid={`field-required-marker-${name}`}
       style={{ color: 'var(--danger)', marginLeft: 2 }}
-      aria-label="required field"
+      aria-label={t('incarnations:nameRequired')}
     >
       *
     </span>

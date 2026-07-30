@@ -123,15 +123,15 @@ export function ErrandNewForm() {
         </div>
       </div>
 
-      <div className={styles.deprecationBanner} role="note" aria-label="Deprecation notice">
+      <div className={styles.deprecationBanner} role="note" aria-label={t('runhistory:deprecationNoticeAria')}>
         {t('runhistory:deprecationBannerBefore')}
         <Link to="/run?workload=command">{t('runhistory:runWizardLink')}</Link>
         {t('runhistory:deprecationErrandAfter')}
       </div>
 
-      <section className={styles.section} aria-label="Module">
+      <section className={styles.section} aria-label={t('common:colModule')}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 320 }}>
-          <span className={styles.metaKey}>Module</span>
+          <span className={styles.metaKey}>{t('common:colModule')}</span>
           <select
             value={
               kind === 'custom'
@@ -140,7 +140,7 @@ export function ErrandNewForm() {
                   : '__custom__'
                 : kind
             }
-            aria-label="Module kind"
+            aria-label={t('runhistory:errandModuleKindAria')}
             onChange={(e) => {
               const v = e.target.value;
               if (v === '__custom__') {
@@ -406,7 +406,7 @@ function TimeoutAndDryRow<T extends FieldValues>({
   return (
     <>
       <Input
-        label="Timeout (s)"
+        label={t('run:timeoutLabel')}
         type="number"
         min={1}
         max={3600}
@@ -617,7 +617,7 @@ function CustomForm({
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className={styles.section} aria-label="Custom module">
+    <form onSubmit={handleSubmit(onSubmit)} className={styles.section} aria-label={t('runhistory:errandCustomModuleAria')}>
       <div className={styles.filters}>
         <Input
           label={t('runhistory:moduleNameLabel')}

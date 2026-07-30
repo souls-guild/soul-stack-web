@@ -71,7 +71,7 @@ export function PluginsList() {
 
       <div className={styles.filters}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={styles.metaKey}>Namespace</span>
+          <span className={styles.metaKey}>{t('common:colNamespace')}</span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               type="button"

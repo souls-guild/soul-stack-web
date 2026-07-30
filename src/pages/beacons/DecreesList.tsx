@@ -29,7 +29,7 @@ export function DecreesList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Decrees</h1>
+          <h1 className={styles.title}>{t('common:navDecrees')}</h1>
           <div className={styles.crumbs}>{t('beacons:decreesSubtitle')}</div>
         </div>
         <Link to="/decrees/new">

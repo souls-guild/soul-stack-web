@@ -131,13 +131,13 @@ export function DynamicInputBuilder({
   }
 
   return (
-    <div className={styles.wrap} aria-label={ariaLabel ?? 'Dynamic input builder'}>
+    <div className={styles.wrap} aria-label={ariaLabel ?? t('run:builderRootAria')}>
       <div className={styles.toolbar}>
         <span className={styles.hint}>
           {rawMode ? t('run:builderRawHint') : t('run:builderFormHint')}
         </span>
         {allowRawJsonToggle ? (
-          <div className={styles.modeRow} role="group" aria-label="Input mode">
+          <div className={styles.modeRow} role="group" aria-label={t('run:builderInputModeAria')}>
             <button
               type="button"
               className={styles.modeBtn}
@@ -173,7 +173,7 @@ export function DynamicInputBuilder({
             value={rawText}
             onChange={(e) => onRawChange(e.target.value)}
             spellCheck={false}
-            aria-label="Raw JSON input"
+            aria-label={t('run:builderRawJsonAria')}
             placeholder="{}"
           />
           {rawError ? <span className={styles.error}>{rawError}</span> : null}
@@ -216,7 +216,7 @@ function FormView({
     return (
       <div className={styles.empty}>
         <span>{t('run:builderEmptyHint')}</span>
-        <button type="button" className={styles.addBtn} onClick={onAddRow} aria-label="Add first field">
+        <button type="button" className={styles.addBtn} onClick={onAddRow} aria-label={t('run:builderAddFirstFieldAria')}>
           <Plus size={12} /> {t('run:builderAddFirstField')}
         </button>
       </div>
@@ -224,7 +224,7 @@ function FormView({
   }
   return (
     <>
-      <div className={styles.rows} role="list" aria-label="Input fields">
+      <div className={styles.rows} role="list" aria-label={t('run:builderInputFieldsAria')}>
         {rows.map((row, idx) => (
           <RowEditor
             key={row.id}
@@ -237,7 +237,7 @@ function FormView({
           />
         ))}
       </div>
-      <button type="button" className={styles.addBtn} onClick={onAddRow} aria-label="Add field">
+      <button type="button" className={styles.addBtn} onClick={onAddRow} aria-label={t('run:builderAddFieldAria')}>
         <Plus size={12} /> {t('run:builderAddField')}
       </button>
     </>
@@ -345,11 +345,12 @@ function ValueInput({
 function Preview({ rows }: { rows: FieldRow[] }) {
   // Lossy preview always: show "best effort", even if there are invalid
   // rows (they'll come out as string).
+  const { t } = useTranslation();
   const obj = useMemo(() => fieldsToObjectLossy(rows), [rows]);
   const text = useMemo(() => JSON.stringify(obj, null, 2), [obj]);
   if (Object.keys(obj).length === 0) return null;
   return (
-    <pre className={styles.preview} aria-label="JSON preview">
+    <pre className={styles.preview} aria-label={t('run:builderJsonPreviewAria')}>
       {text}
     </pre>
   );

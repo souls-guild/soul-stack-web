@@ -136,7 +136,7 @@ export function SynodDetail() {
       </div>
 
       {/* Members section */}
-      <section className={styles.section} aria-label="members">
+      <section className={styles.section} aria-label={t('synods:membersAria')}>
         <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{t('synods:members')}</span>
           <span style={{ flex: 1 }} />

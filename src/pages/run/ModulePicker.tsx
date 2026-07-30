@@ -87,7 +87,7 @@ export function ModulePicker({ value, onSelect, errandSafe, onUnavailable }: Pro
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Module search"
+        aria-label={t('run:moduleSearchAria')}
         data-testid="module-picker-control"
       >
         <Search size={14} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
@@ -107,14 +107,14 @@ export function ModulePicker({ value, onSelect, errandSafe, onUnavailable }: Pro
       </button>
 
       {open ? (
-        <div className={styles.dropdown} role="listbox" aria-label="Module catalog">
+        <div className={styles.dropdown} role="listbox" aria-label={t('run:moduleCatalogAria')}>
           <input
             type="text"
             className={styles.searchInput}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('run:moduleSearchInputPlaceholder')}
-            aria-label="Module search query"
+            aria-label={t('run:moduleSearchQueryAria')}
             autoFocus
             data-testid="module-picker-search"
           />

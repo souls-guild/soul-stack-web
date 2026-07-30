@@ -45,11 +45,11 @@ export function SchemaTab({ serviceName, serviceVersion, stateSchemaVersion }: P
       </p>
 
       <div className={styles.meta}>
-        <span className={styles.metaKey}>Service</span>
+        <span className={styles.metaKey}>{t('incarnations:colService')}</span>
         <span className={styles.metaVal}>
           <Link to={`/services/${encodeURIComponent(serviceName)}`}>{serviceName}</Link>
         </span>
-        <span className={styles.metaKey}>Service version</span>
+        <span className={styles.metaKey}>{t('common:colServiceVersion')}</span>
         <span className={styles.metaVal}>{serviceVersion}</span>
         <span className={styles.metaKey}>state_schema_version</span>
         <span className={styles.metaVal}>{stateSchemaVersion}</span>

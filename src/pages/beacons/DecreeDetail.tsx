@@ -81,11 +81,11 @@ export function DecreeDetail() {
       ) : null}
 
       <div className={styles.meta}>
-        <span className={styles.metaKey}>on_beacon</span>
+        <span className={styles.metaKey}>{t('common:colOnBeacon')}</span>
         <span className={styles.metaVal}>
           <Link to={`/vigils/${encodeURIComponent(d.on_beacon)}`}>{d.on_beacon}</Link>
         </span>
-        <span className={styles.metaKey}>Subject</span>
+        <span className={styles.metaKey}>{t('common:colSubject')}</span>
         <span className={styles.metaVal}>
           {d.sid
             ? `sid: ${d.sid}`
@@ -93,19 +93,19 @@ export function DecreeDetail() {
               ? `coven: ${d.coven.join(', ')}`
               : t('beacons:subjectAnyVigil')}
         </span>
-        <span className={styles.metaKey}>Incarnation</span>
+        <span className={styles.metaKey}>{t('common:colIncarnation')}</span>
         <span className={styles.metaVal}>
           <Link to={`/incarnations/${encodeURIComponent(d.incarnation_name)}`}>
             {d.incarnation_name}
           </Link>
         </span>
-        <span className={styles.metaKey}>Action scenario</span>
+        <span className={styles.metaKey}>{t('beacons:colActionScenario')}</span>
         <span className={styles.metaVal}>{d.action_scenario}</span>
-        <span className={styles.metaKey}>Cooldown</span>
+        <span className={styles.metaKey}>{t('common:colCooldown')}</span>
         <span className={styles.metaVal}>{d.cooldown || '—'}</span>
-        <span className={styles.metaKey}>Enabled</span>
+        <span className={styles.metaKey}>{t('common:colEnabled')}</span>
         <span className={styles.metaVal}>{String(d.enabled)}</span>
-        <span className={styles.metaKey}>Created by</span>
+        <span className={styles.metaKey}>{t('common:colCreatedBy')}</span>
         <span className={styles.metaVal}>
           {d.created_by_aid ? (
             <Link
@@ -116,14 +116,14 @@ export function DecreeDetail() {
             </Link>
           ) : '—'}
         </span>
-        <span className={styles.metaKey}>Created at</span>
+        <span className={styles.metaKey}>{t('common:colCreatedAt')}</span>
         <span className={styles.metaVal}>{d.created_at}</span>
-        <span className={styles.metaKey}>Updated at</span>
+        <span className={styles.metaKey}>{t('common:colUpdatedAt')}</span>
         <span className={styles.metaVal}>{d.updated_at}</span>
       </div>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>CEL where</h2>
+        <h2 className={styles.sectionTitle}>{t('beacons:celWhereAria')}</h2>
         {d.where ? (
           <pre
             style={{

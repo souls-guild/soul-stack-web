@@ -9,7 +9,7 @@ const LABELS: Record<Lang, string> = {
 };
 
 export function LangToggle() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const current = (i18n.resolvedLanguage ?? i18n.language) as Lang;
   // Non-default languages load over HTTP async - disable buttons while loading
   // to avoid a double click / a race between switches.
@@ -22,7 +22,7 @@ export function LangToggle() {
   };
 
   return (
-    <div className={styles.group} role="group" aria-label="Language">
+    <div className={styles.group} role="group" aria-label={t('common:languageAria')}>
       {SUPPORTED_LANGS.map((lng) => {
         const active = current === lng;
         return (

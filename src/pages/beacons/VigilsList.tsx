@@ -50,7 +50,7 @@ export function VigilsList() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Vigils</h1>
+          <h1 className={styles.title}>{t('common:navVigils')}</h1>
           <div className={styles.crumbs}>{t('beacons:vigilsSubtitle')}</div>
         </div>
         <Link to="/vigils/new">

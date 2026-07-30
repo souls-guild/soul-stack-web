@@ -511,7 +511,7 @@ export function RunsFeed() {
         {isScenario ? (
           <>
             <label>
-              <div className={styles.metaKey}>Incarnation</div>
+              <div className={styles.metaKey}>{t('common:colIncarnation')}</div>
               <input
                 type="text"
                 value={incarnation}
@@ -852,13 +852,13 @@ function ScenarioSegment({
             <thead>
               <tr>
                 <th>{t('common:colApplyId')}</th>
-                <ScenTh colKey="incarnation" label="Incarnation" />
-                <ScenTh colKey="service" label="Service" />
-                <ScenTh colKey="scenario" label="Scenario" />
-                <ScenTh colKey="status" label="Status" />
+                <ScenTh colKey="incarnation" label={t('common:colIncarnation')} />
+                <ScenTh colKey="service" label={t('runhistory:filterServiceLabel')} />
+                <ScenTh colKey="scenario" label={t('common:colScenario')} />
+                <ScenTh colKey="status" label={t('common:colStatus')} />
                 <th>{t('colStartedBy')}</th>
-                <ScenTh colKey="started_at" label="Started at" />
-                <ScenTh colKey="finished_at" label="Finished at" />
+                <ScenTh colKey="started_at" label={t('common:colStartedAt')} />
+                <ScenTh colKey="finished_at" label={t('common:colFinishedAt')} />
               </tr>
             </thead>
             <tbody>

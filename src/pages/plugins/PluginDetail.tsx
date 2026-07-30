@@ -219,19 +219,19 @@ export function PluginDetail() {
       {tab === 'overview' ? (
         <>
           <div className={styles.meta}>
-            <span className={styles.metaKey}>Namespace</span>
+            <span className={styles.metaKey}>{t('common:colNamespace')}</span>
             <span className={styles.metaVal}>{row.namespace}</span>
-            <span className={styles.metaKey}>Name</span>
+            <span className={styles.metaKey}>{t('common:colName')}</span>
             <span className={styles.metaVal}>{row.name}</span>
-            <span className={styles.metaKey}>Ref</span>
+            <span className={styles.metaKey}>{t('common:colRef')}</span>
             <span className={styles.metaVal}>{row.ref}</span>
-            <span className={styles.metaKey}>Allowed at</span>
+            <span className={styles.metaKey}>{t('common:colAllowedAt')}</span>
             <span className={styles.metaVal}>{row.allowed_at}</span>
-            <span className={styles.metaKey}>Allowed by</span>
+            <span className={styles.metaKey}>{t('common:colAllowedBy')}</span>
             <span className={styles.metaVal}>
               <Link to={`/archons/${encodeURIComponent(row.allowed_by_aid)}`}>{row.allowed_by_aid}</Link>
             </span>
-            <span className={styles.metaKey}>Revoked at</span>
+            <span className={styles.metaKey}>{t('common:colRevokedAt')}</span>
             <span className={styles.metaVal}>{row.revoked_at ?? '—'}</span>
           </div>
 
@@ -246,7 +246,7 @@ export function PluginDetail() {
       ) : null}
 
       {tab === 'audit' ? (
-        <section className={styles.section} aria-label="audit history">
+        <section className={styles.section} aria-label={t('admin:pluginAuditHistoryAria')}>
           <h2 className={styles.sectionTitle}>{t('admin:pluginAuditTitle')}</h2>
           {audit.isLoading ? <div className={styles.loading}>{t('admin:pluginLoading')}</div> : null}
           {audit.error ? (
@@ -286,7 +286,7 @@ export function PluginDetail() {
       ) : null}
 
       {tab === 'kinds' ? (
-        <section className={styles.section} aria-label="plugin kinds">
+        <section className={styles.section} aria-label={t('admin:pluginKindsAria')}>
           <h2 className={styles.sectionTitle}>
             <Info size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
             {t('admin:pluginKindsTitle')}

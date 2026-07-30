@@ -1080,7 +1080,7 @@ function Stepper({
     return t('run:stepOptions');
   }
   return (
-    <ol className={styles.steps} aria-label="Wizard steps">
+    <ol className={styles.steps} aria-label={t('run:wizardStepsAria')}>
       {STEPS.map((s) => {
         const active = s.id === step;
         // "done" = behind the current one AND validation has progressed past it (gate passed).
@@ -1158,7 +1158,7 @@ function Step1({
       </div>
 
       {/* Workload selection */}
-      <div className={styles.radioRow} role="radiogroup" aria-label="Workload type">
+      <div className={styles.radioRow} role="radiogroup" aria-label={t('run:workloadTypeAria')}>
         {WORKLOADS.map((w) => {
           const active = workload === w.kind;
           const Icon = w.icon;
@@ -1353,7 +1353,7 @@ function Step3ScenarioIncarnations({
           value={value.incarnationRegex}
           onChange={(e) => onChange({ ...value, incarnationRegex: e.target.value })}
           placeholder={t('run:incarnationRegexPlaceholder')}
-          aria-label="Incarnation regex"
+          aria-label={t('run:incarnationRegexAria')}
         />
         <span className={styles.hint}>{t('run:incarnationRegexHint')}</span>
         {filterRe.empty ? <span className={styles.warn}>{t('run:incarnationRegexEmptyHint')}</span> : null}
@@ -1374,7 +1374,7 @@ function Step3ScenarioIncarnations({
             background: 'var(--surface)',
           }}
           role="list"
-          aria-label="Matched incarnations"
+          aria-label={t('run:matchedIncarnationsAria')}
         >
           {incarnationsLoading ? <div className={pageStyles.loading}>{t('loading')}</div> : null}
           {!incarnationsLoading && matched.length === 0 ? (
@@ -1407,7 +1407,7 @@ function Step3ScenarioIncarnations({
         </div>
       </div>
 
-      <div className={styles.preview} aria-label="Incarnation preview">
+      <div className={styles.preview} aria-label={t('run:incarnationPreviewAria')}>
         <div>
           <Badge tone={matched.length > 0 ? 'info' : 'muted'}>
             {t('run:incarnationRunOnN', { count: matched.length })}
@@ -1551,7 +1551,7 @@ function Step2CommandHosts({
           value={value.sidRegex}
           onChange={(e) => onChange({ ...value, sidRegex: e.target.value })}
           placeholder={t('run:sidRegexPlaceholder')}
-          aria-label="SID regex"
+          aria-label={t('run:sidRegexAria')}
         />
         <span className={styles.hint}>{t('run:sidRegexHint')}</span>
         {regexError ? <span className={styles.warn}>{regexError}</span> : null}
@@ -1565,7 +1565,7 @@ function Step2CommandHosts({
           value={value.soulprint}
           onChange={(e) => onChange({ ...value, soulprint: e.target.value })}
           placeholder={t('run:soulprintPlaceholder')}
-          aria-label="Soulprint filter"
+          aria-label={t('run:soulprintFilterAria')}
         />
         {invalidSoulprint.length > 0 ? (
           <span className={styles.warn}>
@@ -1586,7 +1586,7 @@ function Step2CommandHosts({
         </div>
       ) : null}
 
-      <div className={styles.preview} aria-label="Host preview">
+      <div className={styles.preview} aria-label={t('run:hostPreviewAria')}>
         {!active ? (
           <div>{t('run:hostCriteriaEmpty')}</div>
         ) : (
@@ -1692,7 +1692,7 @@ function Step3CommandParams({
                 onChange({ ...value, moduleName: e.target.value, moduleState: '', moduleStates: [], moduleParams: [] })
               }
               placeholder={t('run:moduleNamePlaceholder')}
-              aria-label="Custom module name"
+              aria-label={t('run:customModuleNameAria')}
               data-testid="module-freetext"
             />
             <span className={styles.hint}>{t('run:moduleCatalogUnavailable')}</span>
@@ -1748,7 +1748,7 @@ function Step3CommandParams({
           max={3600}
           value={value.timeoutSeconds}
           onChange={(e) => onChange({ ...value, timeoutSeconds: parseInt(e.target.value, 10) || 0 })}
-          aria-label="Timeout seconds"
+          aria-label={t('run:timeoutSecondsAria')}
         />
       </label>
     </>
@@ -1774,7 +1774,7 @@ function CommandStateSelect({
         className={styles.field}
         value={value.moduleState}
         onChange={(e) => onChange({ ...value, moduleState: e.target.value })}
-        aria-label="Module state"
+        aria-label={t('run:moduleStateAria')}
         data-testid="module-state-select"
       >
         {value.moduleStates.map((s) => (
@@ -1887,7 +1887,7 @@ function Step4Options({
               value={value.batch}
               onChange={(e) => onChange({ ...value, batch: e.target.value })}
               placeholder={t('run:batchPlaceholder')}
-              aria-label="Batch"
+              aria-label={t('run:batchAria')}
             />
             <span className={styles.hint}>{t('run:batchHint')}</span>
             {!batchValid && value.batch.trim() ? (
@@ -1919,7 +1919,7 @@ function Step4Options({
             value={value.maxFailures}
             onChange={(e) => onChange({ ...value, maxFailures: e.target.value })}
             placeholder={t('run:maxFailuresPlaceholder')}
-            aria-label="Max failures"
+            aria-label={t('run:maxFailuresAria')}
           />
           <span className={styles.hint}>{t('run:maxFailuresHint')}</span>
         </label>
@@ -1927,11 +1927,11 @@ function Step4Options({
         {/* Batch count preview */}
         {!isWindow && (isLateBinding ? (
           previewLoading ? (
-            <div className={styles.hint} aria-label="batch preview">
+            <div className={styles.hint} aria-label={t('run:batchPreviewAria')}>
               {t('run:batchPreviewLoading')}
             </div>
           ) : previewData ? (
-            <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
+            <div className={styles.hint} aria-label={t('run:batchPreviewAria')} data-testid="batch-preview">
               {previewData.batch_mode === 'window'
                 ? t('run:batchPreviewWindow')
                 : t('run:batchPreviewBatches', { count: previewData.total_batches, scope: previewData.scope_size })}
@@ -1939,7 +1939,7 @@ function Step4Options({
           ) : null
         ) : (
           localBatchCount !== null && snapshotScope > 0 ? (
-            <div className={styles.hint} aria-label="batch preview" data-testid="batch-preview">
+            <div className={styles.hint} aria-label={t('run:batchPreviewAria')} data-testid="batch-preview">
               {t('run:batchPreviewBatches', { count: localBatchCount, scope: snapshotScope })}
             </div>
           ) : null
@@ -1954,7 +1954,7 @@ function Step4Options({
             max={500}
             value={value.concurrency}
             onChange={(e) => onChange({ ...value, concurrency: e.target.value })}
-            aria-label="Concurrency"
+            aria-label={t('run:concurrencyAria')}
           />
           <span className={styles.hint}>
             {isWindow ? t('run:concurrencyWindowHint') : t('run:concurrencyHint')}
@@ -2002,7 +2002,7 @@ function Step4Options({
               value={value.interBatchIntervalMs}
               onChange={(e) => onChange({ ...value, interBatchIntervalMs: e.target.value })}
               placeholder={t('run:interBatchIntervalPlaceholder')}
-              aria-label="Inter-batch interval ms"
+              aria-label={t('run:interBatchIntervalAria')}
             />
             <span className={styles.hint}>{t('run:interBatchIntervalHint')}</span>
           </label>
@@ -2019,7 +2019,7 @@ function Step4Options({
               value={value.interUnitIntervalMs}
               onChange={(e) => onChange({ ...value, interUnitIntervalMs: e.target.value })}
               placeholder={t('run:interUnitIntervalPlaceholder')}
-              aria-label="Inter-unit interval ms"
+              aria-label={t('run:interUnitIntervalAria')}
             />
             <span className={styles.hint}>{t('run:interUnitIntervalHint')}</span>
           </label>
@@ -2049,7 +2049,7 @@ function Step4Options({
                 value={cadenceState.cadenceName}
                 onChange={(e) => onCadenceChange({ ...cadenceState, cadenceName: e.target.value })}
                 placeholder={t('run:cadenceNamePlaceholder')}
-                aria-label="Cadence name"
+                aria-label={t('run:cadenceNameAria')}
                 data-testid="cadence-name"
               />
               {!cadenceState.cadenceName.trim() && !cadenceValid ? (
@@ -2096,7 +2096,7 @@ function Step4Options({
                   value={cadenceState.intervalSeconds}
                   onChange={(e) => onCadenceChange({ ...cadenceState, intervalSeconds: e.target.value })}
                   placeholder="3600"
-                  aria-label="Interval seconds"
+                  aria-label={t('run:cadenceIntervalAria')}
                   data-testid="cadence-interval"
                 />
                 <span className={styles.hint}>{t('run:cadenceIntervalHint', { min: CONSTRAINTS.cadenceIntervalSecondsMin })}</span>
@@ -2110,7 +2110,7 @@ function Step4Options({
                   value={cadenceState.cronExpr}
                   onChange={(e) => onCadenceChange({ ...cadenceState, cronExpr: e.target.value })}
                   placeholder="0 */6 * * *"
-                  aria-label="Cron expression"
+                  aria-label={t('run:cadenceCronAria')}
                   data-testid="cadence-cron"
                 />
                 <span className={styles.hint}>{t('run:cadenceCronHint')}</span>
@@ -2124,7 +2124,7 @@ function Step4Options({
                 className={styles.field}
                 value={cadenceState.overlapPolicy}
                 onChange={(e) => onCadenceChange({ ...cadenceState, overlapPolicy: e.target.value as CadenceOverlapPolicy })}
-                aria-label="Overlap policy"
+                aria-label={t('run:cadenceOverlapAria')}
                 data-testid="cadence-overlap"
               >
                 <option value="skip">{t('run:cadenceOverlapSkip')}</option>
@@ -2142,7 +2142,7 @@ function Step4Options({
               className={styles.field}
               value={value.scheduleAt}
               onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
-              aria-label="Schedule at"
+              aria-label={t('run:scheduleAtAria')}
             />
             <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
             {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
@@ -2185,7 +2185,7 @@ function Step4Options({
             type="checkbox"
             checked={value.wait}
             onChange={(e) => onChange({ ...value, wait: e.target.checked })}
-            aria-label="wait"
+            aria-label={t('run:waitAria')}
           />
           {t('run:waitLabel')}
         </label>

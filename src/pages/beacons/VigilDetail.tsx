@@ -89,11 +89,11 @@ export function VigilDetail() {
       ) : null}
 
       <div className={styles.meta}>
-        <span className={styles.metaKey}>Beacon kind</span>
+        <span className={styles.metaKey}>{t('common:colBeaconKind')}</span>
         <span className={styles.metaVal}>{v.check}</span>
-        <span className={styles.metaKey}>Interval</span>
+        <span className={styles.metaKey}>{t('common:colInterval')}</span>
         <span className={styles.metaVal}>{v.interval}</span>
-        <span className={styles.metaKey}>Subject</span>
+        <span className={styles.metaKey}>{t('common:colSubject')}</span>
         <span className={styles.metaVal}>
           {v.sid
             ? `sid: ${v.sid}`
@@ -101,9 +101,9 @@ export function VigilDetail() {
               ? `coven: ${v.coven.join(', ')}`
               : t('beacons:subjectWholeFleet')}
         </span>
-        <span className={styles.metaKey}>Enabled</span>
+        <span className={styles.metaKey}>{t('common:colEnabled')}</span>
         <span className={styles.metaVal}>{String(v.enabled)}</span>
-        <span className={styles.metaKey}>Created by</span>
+        <span className={styles.metaKey}>{t('common:colCreatedBy')}</span>
         <span className={styles.metaVal}>
           {v.created_by_aid ? (
             <Link
@@ -114,9 +114,9 @@ export function VigilDetail() {
             </Link>
           ) : '—'}
         </span>
-        <span className={styles.metaKey}>Created at</span>
+        <span className={styles.metaKey}>{t('common:colCreatedAt')}</span>
         <span className={styles.metaVal}>{v.created_at}</span>
-        <span className={styles.metaKey}>Updated at</span>
+        <span className={styles.metaKey}>{t('common:colUpdatedAt')}</span>
         <span className={styles.metaVal}>{v.updated_at}</span>
       </div>
 

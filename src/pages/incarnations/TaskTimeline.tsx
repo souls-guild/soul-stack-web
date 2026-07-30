@@ -19,7 +19,7 @@ export function TaskTimeline({
 }) {
   const { t } = useTranslation();
   return (
-    <section className={styles.section} aria-label="Task timeline" data-testid="run-task-timeline">
+    <section className={styles.section} aria-label={t('incarnations:taskTimelineAria')} data-testid="run-task-timeline">
       <h2 className={styles.sectionTitle}>
         {t('runhistory:runTasksTitle')}
         {live ? (

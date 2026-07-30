@@ -163,20 +163,20 @@ export function IncarnationDetail() {
                   <Search size={14} /> {driftMu.isPending ? t('scanning') : t('checkDrift')}
                 </Button>
                 <Button variant="secondary" onClick={() => setUpgradeOpen(true)} title={t('incarnations:actionUpgrade')}>
-                  <ArrowUp size={14} /> Upgrade
+                  <ArrowUp size={14} /> {t('common:upgrade')}
                 </Button>
                 <Button variant="secondary" onClick={() => setTraitsOpen(true)} title={t('incarnations:editTraitsTitle')}>
                   <Tag size={14} /> {t('incarnations:editTraitsBtn')}
                 </Button>
-                <Button variant="danger" onClick={() => setDestroyOpen(true)} title="Destroy" data-testid="destroy-trigger">
-                  <Trash size={14} /> Destroy
+                <Button variant="danger" onClick={() => setDestroyOpen(true)} title={t('common:destroy')} data-testid="destroy-trigger">
+                  <Trash size={14} /> {t('common:destroy')}
                 </Button>
               </>
             ) : null}
             {isLocked ? (
               <>
                 <Button variant="primary" onClick={() => setUnlockOpen(true)} title={t('incarnations:unlockTitleShort')}>
-                  <Lock size={14} /> Unlock
+                  <Lock size={14} /> {t('common:unlock')}
                 </Button>
                 {row.status === 'error_locked' ? (
                   <Button
@@ -200,28 +200,28 @@ export function IncarnationDetail() {
       </div>
 
       <div className={styles.meta}>
-        <span className={styles.metaKey}>Status</span>
+        <span className={styles.metaKey}>{t('common:colStatus')}</span>
         <span className={styles.metaVal}>
           <Badge tone={incarnationTone(row.status)}>{row.status}</Badge>
         </span>
-        <span className={styles.metaKey}>Covens</span>
+        <span className={styles.metaKey}>{t('common:colCovens')}</span>
         <span className={styles.metaVal}>{(row.covens ?? []).length > 0 ? (row.covens ?? []).join(', ') : '—'}</span>
-        <span className={styles.metaKey}>Traits</span>
+        <span className={styles.metaKey}>{t('incarnations:colTraits')}</span>
         <span className={styles.metaVal}>
           <TraitsChips traits={row.traits as Record<string, unknown> | null | undefined} />
         </span>
-        <span className={styles.metaKey}>Created by</span>
+        <span className={styles.metaKey}>{t('common:colCreatedBy')}</span>
         <span className={styles.metaVal}>
           {row.created_by_aid
             ? <Link to={`/archons/${encodeURIComponent(row.created_by_aid)}`}>{row.created_by_aid}</Link>
             : <span style={{ color: 'var(--text-muted)' }}>—</span>
           }
         </span>
-        <span className={styles.metaKey}>Created at</span>
+        <span className={styles.metaKey}>{t('common:colCreatedAt')}</span>
         <span className={styles.metaVal}>{row.created_at}</span>
-        <span className={styles.metaKey}>Updated at</span>
+        <span className={styles.metaKey}>{t('common:colUpdatedAt')}</span>
         <span className={styles.metaVal}>{row.updated_at}</span>
-        <span className={styles.metaKey}>Last drift check</span>
+        <span className={styles.metaKey}>{t('incarnations:colLastDrift')}</span>
         <span className={styles.metaVal}>{row.last_drift_check_at ?? '—'}</span>
       </div>
 

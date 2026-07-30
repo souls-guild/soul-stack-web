@@ -106,12 +106,12 @@ export function PushApply() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Push apply</h1>
+          <h1 className={styles.title}>{t('common:pushApply')}</h1>
           <div className={styles.crumbs}>{t('runhistory:pushApplyCrumbs')}</div>
         </div>
       </div>
 
-      <div className={styles.deprecationBanner} role="note" aria-label="Deprecation notice">
+      <div className={styles.deprecationBanner} role="note" aria-label={t('runhistory:deprecationNoticeAria')}>
         {t('runhistory:deprecationBannerBefore')}
         <Link to="/run?workload=push">{t('runhistory:runWizardLink')}</Link>
         {t('runhistory:deprecationPushAfter')}
@@ -120,7 +120,7 @@ export function PushApply() {
       <section className={styles.section} aria-label={t('runhistory:pushParamsSectionAria')}>
         <div className={styles.filters}>
           <Input
-            label="Destiny ref"
+            label={t('runhistory:pushDestinyRefLabel')}
             value={destiny}
             onChange={(e) => setDestiny(e.target.value)}
             placeholder="redis-cluster@v2.0.0"
@@ -128,7 +128,7 @@ export function PushApply() {
             hint={t('runhistory:pushDestinyHint')}
           />
           <Input
-            label="SSH provider"
+            label={t('common:colSshProvider')}
             value={sshProvider}
             onChange={(e) => setSshProvider(e.target.value)}
             placeholder="default"
@@ -200,7 +200,7 @@ export function PushApply() {
       </section>
 
       {applyId ? (
-        <section className={styles.section} aria-label="Run state">
+        <section className={styles.section} aria-label={t('runhistory:pushRunStateAria')}>
           <h2 className={styles.sectionTitle}>{t('runhistory:pushRunStateTitle')} <span className="mono">{applyId}</span></h2>
           {poll.isLoading ? <div className={styles.loading}>{t('runhistory:pushRunStateRequesting')}</div> : null}
           {poll.error ? (

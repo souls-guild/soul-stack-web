@@ -410,7 +410,7 @@ export function VoyageDetail() {
         </div>
       </div>
 
-      <section className={styles.section} aria-label="Voyage meta">
+      <section className={styles.section} aria-label={t('runhistory:voyageMetaAria')}>
         <div className={styles.meta}>
           <span className={styles.metaKey}>kind</span>
           <span className={styles.metaVal}>{voyage.kind}</span>
@@ -516,7 +516,7 @@ export function VoyageDetail() {
         </div>
       </section>
 
-      <section className={styles.section} aria-label="Voyage progress">
+      <section className={styles.section} aria-label={t('runhistory:voyageProgressAria')}>
         <h2 className={styles.sectionTitle}>
           {voyage.batch_mode === 'window'
             ? t('runhistory:voyageProgressTitleWindow', {
@@ -528,14 +528,14 @@ export function VoyageDetail() {
                 total: voyage.total_batches,
               })}
         </h2>
-        <div aria-label="progress" style={progressOuter}>
+        <div aria-label={t('runhistory:progressAria')} style={progressOuter}>
           <div style={{ ...progressInner, width: `${pct}%` }} />
         </div>
         <div className={styles.metaKey}>{pct}%</div>
       </section>
 
       {summary ? (
-        <section className={styles.section} aria-label="Voyage summary">
+        <section className={styles.section} aria-label={t('runhistory:voyageSummaryAria')}>
           <h2 className={styles.sectionTitle}>{t('runhistory:voyageSummaryTitle')}</h2>
           <div data-testid="voyage-summary-counts" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {(['succeeded', 'failed', 'cancelled'] as const).map((s) => {
@@ -571,7 +571,7 @@ export function VoyageDetail() {
           </div>
         </section>
       ) : (
-        <section className={styles.section} aria-label="Voyage summary">
+        <section className={styles.section} aria-label={t('runhistory:voyageSummaryAria')}>
           <div className={styles.empty}>
             {isRunning
               ? t('runhistory:voyageSummaryPending')
@@ -580,17 +580,17 @@ export function VoyageDetail() {
         </section>
       )}
 
-      <section className={styles.section} aria-label="Voyage targets">
+      <section className={styles.section} aria-label={t('runhistory:voyageTargetsAria')}>
         <h2 className={styles.sectionTitle}>{t('runhistory:voyageTargetsTitle')}</h2>
         <VoyageTargets voyageId={id} refetchInterval={isRunning ? 3000 : false} statusFilter={statusFilter} />
       </section>
 
-      <section className={styles.section} aria-label="Voyage notifications" data-testid="voyage-notifications-section">
+      <section className={styles.section} aria-label={t('runhistory:voyageNotificationsAria')} data-testid="voyage-notifications-section">
         <h2 className={styles.sectionTitle}>{t('notifications:voyageNotificationsTitle')}</h2>
         <VoyageNotifications events={notifQ.data?.items ?? []} isLoading={notifQ.isLoading} error={notifQ.error} />
       </section>
 
-      <section className={styles.section} aria-label="Voyage changed tasks" data-testid="voyage-changed-section">
+      <section className={styles.section} aria-label={t('runhistory:voyageChangedTasksAria')} data-testid="voyage-changed-section">
         <h2 className={styles.sectionTitle}>{t('runhistory:voyageChangedTitle')}</h2>
         <VoyageChangedTasks events={changedQ.data?.items ?? []} isLoading={changedQ.isLoading} error={changedQ.error} />
       </section>
@@ -648,7 +648,7 @@ export function VoyageDetail() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Cancel Voyage"
+          aria-label={t('runhistory:voyageCancelAria')}
           style={{
             position: 'fixed',
             inset: 0,

@@ -392,7 +392,7 @@ export function RbacPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>RBAC</h1>
+          <h1 className={styles.title}>{t('common:navRbac')}</h1>
           <div className={styles.crumbs}>{t('pages:rbacCrumbs')}</div>
         </div>
         {tab === 'roles' ? (

@@ -115,7 +115,7 @@ export function DecreeNewForm() {
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.filters}>
             <Input
-              label="Name (kebab-case)"
+              label={t('beacons:nameKebabLabel')}
               mono
               {...register('name')}
               placeholder="restart-on-config-change"
@@ -144,7 +144,7 @@ export function DecreeNewForm() {
               ) : null}
             </label>
             <Input
-              label="Cooldown"
+              label={t('common:colCooldown')}
               mono
               {...register('cooldown')}
               placeholder={t('beacons:cooldownPlaceholder')}
@@ -152,7 +152,7 @@ export function DecreeNewForm() {
               error={errors.cooldown?.message ? t(errors.cooldown.message) : undefined}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className={styles.metaKey}>Enabled (default-deny)</span>
+              <span className={styles.metaKey}>{t('beacons:enabledDefaultDeny')}</span>
               <input
                 type="checkbox"
                 {...register('enabled')}
@@ -162,7 +162,7 @@ export function DecreeNewForm() {
           </div>
         </section>
 
-        <section className={styles.section} aria-label="CEL where">
+        <section className={styles.section} aria-label={t('beacons:celWhereAria')}>
           <h2 className={styles.sectionTitle}>{t('beacons:celWhereOptional')}</h2>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span className={styles.metaKey}>{t('beacons:celWhereHint')}</span>
@@ -218,11 +218,11 @@ export function DecreeNewForm() {
           </div>
         </section>
 
-        <section className={styles.section} aria-label="Action">
+        <section className={styles.section} aria-label={t('common:colAction')}>
           <h2 className={styles.sectionTitle}>{t('colAction')}</h2>
           <div className={styles.filters}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div className={styles.metaKey}>Incarnation</div>
+              <div className={styles.metaKey}>{t('common:colIncarnation')}</div>
               <input
                 list="known-incarnations"
                 {...register('incarnation_name')}
