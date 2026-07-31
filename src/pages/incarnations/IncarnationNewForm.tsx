@@ -17,6 +17,8 @@ import { ComposedNamePreview } from './ComposedNamePreview';
 import {
   computeVisibleFields,
   computeRequiredHostCount,
+  rosterFieldName,
+  rosterSelectedSids,
   defaultsFromSchema,
   isSupportedInputSchema,
   isProvisionObjectField,
@@ -168,6 +170,28 @@ export function IncarnationNewForm() {
     return requiredHosts;
   }, [createSchema, usePerField, fields]);
 
+  // The roster the chosen create scenario asks for (ADR-081): which input field carries
+  // it, how many souls the topology needs, and how many the operator has picked. All
+  // three come from the schema and the live field state — the form never hardcodes a
+  // count, and never infers "this is a from-souls scenario" from its name.
+  const rosterField = useMemo(() => rosterFieldName(createSchema), [createSchema]);
+  const rosterRequired = useMemo(
+    () => (rosterField ? computeRequiredHostCount(fields) : null),
+    [rosterField, fields],
+  );
+  const rosterSelected = useMemo(
+    () => (rosterField ? rosterSelectedSids(fields[rosterField]) : []),
+    [rosterField, fields],
+  );
+  // Short of what the topology needs → submit is blocked with a message naming both
+  // numbers. Over it is not reachable from the picker (it closes at capacity), but a
+  // value pasted or left behind by a topology change still has to be caught here.
+  const rosterCountError = useMemo(() => {
+    if (!rosterField || rosterRequired === null) return null;
+    if (rosterSelected.length === rosterRequired) return null;
+    return { selected: rosterSelected.length, required: rosterRequired };
+  }, [rosterField, rosterRequired, rosterSelected]);
+
   // The SAME serialization the create posts. Previewing over the raw field state
   // would measure a different input than the one the name gets composed from — the
   // divergence this feature exists to prevent, reintroduced on the client side.
@@ -232,6 +256,14 @@ export function IncarnationNewForm() {
     // NIM-76: hard block on invalid map fields (incl. unknown-directive).
     if (invalidMaps.length > 0) {
       setShowInputErrors(true);
+      return;
+    }
+    // The roster must match the topology exactly (ADR-081). Blocked here rather than let
+    // through to the keeper: the same count is checked by the scenario's validate: rules,
+    // so submitting a short roster earns a 422 that the operator can see coming.
+    if (rosterCountError) {
+      setShowInputErrors(true);
+      setServerError(t('incarnations:rosterCountMismatch', rosterCountError));
       return;
     }
     const input =
@@ -406,8 +438,11 @@ export function IncarnationNewForm() {
           </label>
         ) : null}
 
-        {/* create_from_souls help block: reminds about onboarding souls before running */}
-        {selectedCreateScenario?.name?.includes('from_souls') ? (
+        {/* A scenario that rolls onto ready hosts (a roster field in its schema, ADR-081)
+            used to be detected by NAME and could only advise the operator to bind hosts
+            afterwards. The roster is now picked in this form, so what is left to say is
+            where the offered souls come from — and what to do when there are none. */}
+        {rosterField ? (
           <div
             style={{
               padding: '10px 12px',
@@ -422,9 +457,7 @@ export function IncarnationNewForm() {
             }}
             data-testid="create-from-souls-hint"
           >
-            <span>
-              {t('incarnations:createFromSoulsHint', { coven: watch('name') || '…' })}
-            </span>
+            <span>{t('incarnations:rosterHint')}</span>
             <Link
               to="/souls"
               style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}
@@ -504,6 +537,25 @@ export function IncarnationNewForm() {
                 coven: watch('name') || '…',
               })}
             </span>
+          </div>
+        ) : null}
+
+        {/* Roster count, live. The picker itself shows the same numbers, but the operator
+            reads the bottom of the form before pressing Create — a block that names both
+            numbers is what tells them WHY the button did nothing. */}
+        {rosterCountError ? (
+          <div
+            data-testid="roster-count-warning"
+            style={{
+              padding: '10px 14px',
+              background: 'color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--surface))',
+              border: '1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--border))',
+              borderRadius: 'var(--radius)',
+              fontSize: 13,
+              color: 'var(--text)',
+            }}
+          >
+            {t('incarnations:rosterCountMismatch', rosterCountError)}
           </div>
         ) : null}
 

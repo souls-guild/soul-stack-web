@@ -43,13 +43,18 @@ export function PluginDetail() {
   }, [list.data, namespace, name, ref]);
 
   // Audit history for allow/revoke by correlation_id is not possible (id is not exposed).
-  // We filter by type=plugin.sigil.allowed / plugin.sigil.revoked and look for events
-  // whose payload contains the matching (ns, name, ref).
+  // We filter by type=plugin.allowed / plugin.revoked and look for events whose payload
+  // contains the matching (ns, name, ref).
+  //
+  // The names used to be `plugin.sigil.*`, which the keeper has never emitted — so this
+  // panel was permanently empty and the danger badge below unreachable. Nothing caught it
+  // until the audit event-type enum became generated and the comparison stopped
+  // type-checking (NIM-371 refreshed the vendored spec).
   const audit = useQuery({
     queryKey: ['plugins.sigil.audit', namespace, name, ref],
     queryFn: () =>
       keeperApi.audit.list({
-        type: ['plugin.sigil.allowed', 'plugin.sigil.revoked'],
+        type: ['plugin.allowed', 'plugin.revoked'],
         limit: 200,
       }),
     enabled: tab === 'audit' && Boolean(namespace && name && ref),
@@ -258,8 +263,8 @@ export function PluginDetail() {
           ) : null}
           {audit.data && matched.length === 0 ? (
             <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
-              {t('admin:pluginAuditEmpty')} <code className="mono">plugin.sigil.allowed</code> /{' '}
-              <code className="mono">plugin.sigil.revoked</code> {t('admin:pluginAuditEmpty2')}
+              {t('admin:pluginAuditEmpty')} <code className="mono">plugin.allowed</code> /{' '}
+              <code className="mono">plugin.revoked</code> {t('admin:pluginAuditEmpty2')}
             </div>
           ) : null}
           {matched.length > 0 ? (
@@ -268,7 +273,7 @@ export function PluginDetail() {
                 <div key={ev.id} className={styles.timelineItem}>
                   <div className={styles.timelineHead}>
                     <span>
-                      <Badge tone={ev.type === 'plugin.sigil.revoked' ? 'danger' : 'ok'}>
+                      <Badge tone={ev.type === 'plugin.revoked' ? 'danger' : 'ok'}>
                         {ev.type}
                       </Badge>{' '}
                       <span className="mono" style={{ marginLeft: 8 }}>

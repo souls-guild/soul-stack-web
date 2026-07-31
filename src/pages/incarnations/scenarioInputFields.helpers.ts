@@ -607,6 +607,45 @@ export function isProvisionObjectField(prop: ScenarioInputSchemaProperty): boole
 }
 
 /**
+ * Name of the input field a scenario declares as its ROSTER — the souls the
+ * incarnation is created on (`source: { roster: true }`, ADR-081). null when the
+ * scenario declares none, which is what tells the form there is no roster to collect.
+ *
+ * Both shapes `source` is allowed on are accepted: on the field itself (single SID) and
+ * on `items` (the multi-select array form).
+ *
+ * This is what replaced guessing from the scenario NAME (`includes('from_souls')`): the
+ * schema states it, so a differently-named scenario gets the picker and a scenario that
+ * provisions its own hosts does not.
+ */
+export function rosterFieldName(schema: ScenarioInputSchema | undefined): string | null {
+  if (!schema) return null;
+  const names = Object.keys(schema)
+    .filter((name) => {
+      const prop = schema[name];
+      if (!prop) return false;
+      return Boolean(prop.source?.roster || prop.items?.source?.roster);
+    })
+    .sort();
+  return names.length > 0 ? names[0] : null;
+}
+
+/**
+ * SIDs currently held by a roster field. The multi picker stores its value as a raw JSON
+ * array string and the single one as a plain SID, so both are read here — the form gates
+ * submit on the COUNT, and a shape mismatch would silently read as zero selected.
+ */
+export function rosterSelectedSids(raw: ScenarioFieldValue): string[] {
+  if (raw === undefined || raw === '') return [];
+  const text = String(raw);
+  const parsed = tryParseJson(text);
+  if (parsed.ok && Array.isArray(parsed.value)) {
+    return parsed.value.filter((v): v is string => typeof v === 'string' && v !== '');
+  }
+  return [text];
+}
+
+/**
  * Computes the expected host count from the current input state.
  * sentinel -> 1 + replicas_per_master
  * cluster  -> shards x (1 + replicas_per_master)

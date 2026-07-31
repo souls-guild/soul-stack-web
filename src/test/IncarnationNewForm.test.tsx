@@ -754,8 +754,12 @@ describe('IncarnationNewForm', () => {
     expect(screen.queryByTestId('field-hint-port')).not.toBeInTheDocument();
   });
 
-  // Guard: create_from_souls scenario -> help block with a link to Souls is shown.
-  it('create_from_souls scenario — shows help block with onboarding hint', async () => {
+  // Guard (NIM-371): the roster block follows the SCHEMA, not the scenario name — a
+  // field declaring `source: { roster: true }` is what says "this scenario is given its
+  // hosts". Previously the form guessed from `name.includes('from_souls')`, which was
+  // wrong in both directions: a differently-named scenario got no picker, and a
+  // provisioning scenario that happened to be named that way got a misleading hint.
+  it('scenario declaring a roster field — shows the roster block', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -770,7 +774,13 @@ describe('IncarnationNewForm', () => {
               path: 'scenario/create_from_souls/main.yml',
               description: 'create from existing souls',
               create: true,
-              input_schema: {},
+              input_schema: {
+                hosts: {
+                  type: 'array',
+                  required: true,
+                  items: { type: 'string', format: 'sid', source: { roster: true } },
+                },
+              },
             },
           ],
         },
@@ -793,8 +803,53 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'redis');
 
-    // Help block appears for the create_from_souls scenario.
     expect(await screen.findByTestId('create-from-souls-hint')).toBeInTheDocument();
+    // And the picker itself is rendered for the declared field.
+    expect(await screen.findByTestId('field-sid-multi-hosts')).toBeInTheDocument();
+  });
+
+  // The other direction of the same guard: the NAME alone no longer summons the block.
+  // A scenario called *_from_souls that declares no roster field provisions its own
+  // hosts, and telling the operator to pick souls would be advice about nothing.
+  it('scenario named from_souls but declaring no roster field — no roster block', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: /\/v1\/services\/redis\/scenarios$/,
+        body: {
+          service: 'redis',
+          ref: 'v2.0.0',
+          scenarios: [
+            {
+              name: 'create_from_souls',
+              kind: 'lifecycle',
+              path: 'scenario/create_from_souls/main.yml',
+              create: true,
+              input_schema: { version: { type: 'string' } },
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
+        url: '/v1/services',
+        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/new" element={<IncarnationNewForm />} />
+      </Routes>,
+      '/incarnations/new',
+    );
+
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByRole('option', { name: /redis/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByRole('combobox'), 'redis');
+
+    expect(await screen.findByTestId('create-input-fields')).toBeInTheDocument();
+    expect(screen.queryByTestId('create-from-souls-hint')).not.toBeInTheDocument();
   });
 
   // Guard: regular create scenario (not from_souls) -> help block is NOT shown.

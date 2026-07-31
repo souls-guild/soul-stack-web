@@ -22,6 +22,7 @@ import {
   directiveFieldTag,
   directiveNamesForVersion,
   versionToSeries,
+  computeRequiredHostCount,
   type DirectiveCatalogContext,
   type ScenarioFieldValue,
   type ScenarioFieldsState,
@@ -89,6 +90,12 @@ export function ScenarioInputFields({
   const { t } = useTranslation();
   const notifyMapError = useFieldErrorAggregator(onInvalidMapChange);
   const notifyPatternError = useFieldErrorAggregator(onPatternErrorChange);
+
+  // How many hosts the topology asks for, derived from the SAME field state the form is
+  // showing (ADR-081). Computed here rather than passed in so the count a roster picker
+  // displays cannot drift from the shards/replicas inputs next to it. undefined = the
+  // topology does not pin a number yet, and the picker shows no count.
+  const rosterRequiredCount = computeRequiredHostCount(value) ?? undefined;
 
   const entries = Object.entries(schema ?? {});
   if (entries.length === 0) return null;
@@ -168,6 +175,7 @@ export function ScenarioInputFields({
         inputState={value as Record<string, unknown>}
         onChange={(nv) => onChange({ ...value, [key]: nv })}
         incarnationContext={incarnationContext}
+        rosterRequiredCount={rosterRequiredCount}
         moduleName={moduleName}
         onMapError={onInvalidMapChange ? notifyMapError : undefined}
         onPatternError={onPatternErrorChange ? notifyPatternError : undefined}
@@ -358,6 +366,7 @@ interface OneProps {
   onChange: (v: ScenarioFieldValue) => void;
   incarnationContext?: string;
   moduleName?: string;
+  rosterRequiredCount?: number;
   // Callback: (fieldName, hasError) — propagates a map-field error up to the parent.
   onMapError?: (name: string, hasError: boolean) => void;
   // Callback: (fieldName, hasError) — propagates a pattern error up to the parent.
@@ -374,7 +383,7 @@ interface OneProps {
   directiveVersion?: string;
 }
 
-function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride, showErrors, directiveCatalog, directiveVersion }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
+function ScenarioInputOneField({ name, required, missing, prop, value, onChange, incarnationContext, moduleName, rosterRequiredCount, onMapError, onPatternError, labelOverride, placeholderOverride, hintOverride, showErrors, directiveCatalog, directiveVersion }: Omit<OneProps, 'inputState'> & { inputState: Record<string, unknown> }) {
   const { t } = useTranslation();
   // Label text without the marker (the marker is rendered as a separate span).
   const labelBaseText = labelOverride ?? name;
@@ -424,6 +433,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           onChange={(v) => onChange(v)}
           source={prop.source}
           incarnationContext={incarnationContext}
+          requiredCount={rosterRequiredCount}
           moduleName={moduleName ?? ''}
           multi
           missing={missing}
@@ -448,6 +458,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           onChange={(v) => onChange(v)}
           source={prop.source}
           incarnationContext={incarnationContext}
+          requiredCount={rosterRequiredCount}
           moduleName={moduleName ?? ''}
           missing={missing}
         />
@@ -471,6 +482,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
           onChange={(v) => onChange(v)}
           source={prop.items.source}
           incarnationContext={incarnationContext}
+          requiredCount={rosterRequiredCount}
           moduleName={moduleName ?? ''}
           multi
           missing={missing}
@@ -555,6 +567,7 @@ function ScenarioInputOneField({ name, required, missing, prop, value, onChange,
         hintOverride={resolvedHint}
         showErrors={showErrors}
         incarnationContext={incarnationContext}
+        rosterRequiredCount={rosterRequiredCount}
         moduleName={moduleName}
         onMapError={onMapError}
         onPatternError={onPatternError}
@@ -1117,13 +1130,14 @@ interface ObjectFieldProps {
   showErrors?: boolean;
   incarnationContext?: string;
   moduleName?: string;
+  rosterRequiredCount?: number;
   onMapError?: (name: string, hasError: boolean) => void;
   onPatternError?: (name: string, hasError: boolean) => void;
   directiveCatalog?: DirectiveCatalogContext;
   directiveVersion?: string;
 }
 
-function ObjectField({ name, labelText, required, prop, value, onChange, missing, hintOverride, showErrors, incarnationContext, moduleName, onMapError, onPatternError, directiveCatalog, directiveVersion }: ObjectFieldProps) {
+function ObjectField({ name, labelText, required, prop, value, onChange, missing, hintOverride, showErrors, incarnationContext, moduleName, rosterRequiredCount, onMapError, onPatternError, directiveCatalog, directiveVersion }: ObjectFieldProps) {
   const { t } = useTranslation();
 
   const subProps = getObjectProperties(prop);
@@ -1172,6 +1186,7 @@ function ObjectField({ name, labelText, required, prop, value, onChange, missing
               inputState={subState as Record<string, unknown>}
               onChange={(nv) => handleSubChange(subKey, nv)}
               incarnationContext={incarnationContext}
+                    rosterRequiredCount={rosterRequiredCount}
               moduleName={moduleName}
               onMapError={onMapError}
               onPatternError={onPatternError}

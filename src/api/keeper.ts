@@ -396,6 +396,23 @@ export interface ServiceRefListReply {
   refs: ServiceRefInfo[] | null;
 }
 
+/**
+ * Catalog source of a SID field in a SCENARIO's input_schema. A superset of the
+ * module-param discriminator (`ModuleInputSource`): scenario input adds `roster`.
+ *
+ * The scenario schema travels as a raw map (the keeper does not project it through a
+ * typed wire schema), so this type is declared here rather than generated — which is
+ * also why it can carry a variant the module contract has no use for.
+ *
+ * Exactly one variant is active:
+ *  - `incarnation_hosts` / `choir` — resolved against an EXISTING incarnation, so they
+ *    need an incarnation context and are fetched through module form-prep;
+ *  - `roster` — the souls an incarnation is being CREATED on (ADR-081). There is no
+ *    incarnation to resolve against yet, so the catalog is the scoped souls list:
+ *    free, online hosts inside the covens the form declares.
+ */
+export type ScenarioInputSource = ModuleInputSource & { roster?: boolean };
+
 // input_schema — flat-map field→property (NOT a JSON-Schema wrapper `{type:'object',properties}`).
 // Each property carries its own `required: boolean` (per-field, not a top-level array).
 // UI renders simple types (string/integer/number/boolean) per-field; composite
@@ -414,7 +431,7 @@ export interface ScenarioInputSchemaProperty {
   /** Semantic string format (sid/hostname/...). */
   format?: string;
   /** Catalog source for the SID-picker (ADR-045). */
-  source?: ModuleInputSource;
+  source?: ScenarioInputSource;
   /**
    * List item type (ADR-045 S8b). Present for type=array.
    * Contains a nested ScenarioInputSchemaProperty (recursively).
@@ -605,6 +622,13 @@ export interface ListSoulsQuery {
   coven?: string[];
   status?: SoulStatus;
   transport?: SoulTransport;
+  /**
+   * Only hosts belonging to no incarnation — the free souls a create scenario can
+   * roll onto (ADR-081). A membership question, not a label one.
+   */
+  unassigned?: boolean;
+  /** Only SIDs with this prefix (autocomplete). Matched literally by the server. */
+  sid_prefix?: string;
   offset?: number;
   limit?: number;
   cursor?: string;
@@ -895,6 +919,11 @@ export const keeperApi = {
           coven: q.coven,
           status: q.status,
           transport: q.transport,
+          // Omitted rather than sent as `false`: an absent filter and a disabled one
+          // mean the same thing to the server, and a bare `?unassigned=false` in the
+          // URL reads like a deliberate "show me the busy ones".
+          unassigned: q.unassigned ? true : undefined,
+          sid_prefix: q.sid_prefix,
           offset: q.offset,
           limit: q.limit,
           cursor: q.cursor,

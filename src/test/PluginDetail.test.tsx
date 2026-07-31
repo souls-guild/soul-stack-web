@@ -25,7 +25,7 @@ const AUDIT = {
   items: [
     {
       id: '01J0AUDIT0001',
-      type: 'plugin.sigil.allowed',
+      type: 'plugin.allowed',
       source: 'api',
       archon_aid: 'archon-alice',
       correlation_id: null,
@@ -40,7 +40,7 @@ const AUDIT = {
     {
       // Not our ref - should be filtered out.
       id: '01J0AUDIT0002',
-      type: 'plugin.sigil.allowed',
+      type: 'plugin.allowed',
       source: 'api',
       archon_aid: 'archon-alice',
       correlation_id: null,
@@ -110,7 +110,7 @@ describe('PluginDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Audit history/i }));
     await waitFor(() => {
-      expect(screen.getByText('plugin.sigil.allowed')).toBeInTheDocument();
+      expect(screen.getByText('plugin.allowed')).toBeInTheDocument();
     });
     // other-mod in payload - must NOT be matched.
     expect(screen.queryByText('other-mod')).not.toBeInTheDocument();

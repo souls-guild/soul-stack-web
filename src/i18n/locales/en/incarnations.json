@@ -221,6 +221,8 @@
   "roleKebab": "Role — kebab-case (lowercase, digits, dash separator), up to 63 characters.",
   "roleOptional": "Role (optional)",
   "rolePlaceholder": "master / replica / …",
+  "rosterCountMismatch": "The roster needs exactly {{required}} souls for this topology, {{selected}} selected.",
+  "rosterHint": "This scenario deploys onto the souls you pick below — the onboarded, online ones you can see.",
   "runAccepted": "Run accepted: scenario",
   "runAcceptedTail": ". History will update once the run completes.",
   "runCommandOnHosts": "Run command on these hosts",
