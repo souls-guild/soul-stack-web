@@ -9,6 +9,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
 import { keeperApi } from '../api/keeper';
+import { ApiError } from '../api/client';
 import { bytesToBase64, type ConsoleClientMessage } from '../api/consoleProtocol';
 import type { ConsoleTransportHooks } from '../api/consoleSocket';
 import styles from '../pages/console/MultiConsole.module.css';
@@ -39,14 +40,24 @@ vi.mock('../api/consoleSocket', async (importOriginal) => {
 
 const { MultiConsolePage } = await import('../pages/console/MultiConsolePage');
 
+// NIM-449: the incarnation scope is the roster (`incarnation_membership`), not
+// the coven column — so here the two disagree, as they do on a real stand. The
+// mongo hosts are members of `mongoshard` without carrying its name as a label;
+// `web-01` carries the label and is not a member. Resolving off `souls.coven`
+// therefore opens shells on exactly the wrong VM, and every test below that
+// connects `?incarnation=mongoshard` says so.
 const SOULS = [
-  { sid: 'mongo-ctl-01', covens: ['mongoshard'], status: 'connected', transport: 'agent', traits: { role: 'control' } },
-  { sid: 'mongo-sh-01', covens: ['mongoshard'], status: 'connected', transport: 'agent', traits: { role: 'data' } },
-  { sid: 'mongo-sh-02', covens: ['mongoshard'], status: 'connected', transport: 'agent', traits: { role: 'data' } },
+  { sid: 'mongo-ctl-01', covens: ['dev'], status: 'connected', transport: 'agent', traits: { role: 'control' } },
+  { sid: 'mongo-sh-01', covens: ['dev'], status: 'connected', transport: 'agent', traits: { role: 'data' } },
+  { sid: 'mongo-sh-02', covens: ['dev'], status: 'connected', transport: 'agent', traits: { role: 'data' } },
   // In the incarnation but in no Choir and with no role trait — the ungrouped bucket.
-  { sid: 'mongo-arb-01', covens: ['mongoshard'], status: 'connected', transport: 'agent', traits: {} },
-  { sid: 'web-01', covens: ['web'], status: 'connected', transport: 'agent', traits: {} },
+  { sid: 'mongo-arb-01', covens: ['dev'], status: 'connected', transport: 'agent', traits: {} },
+  { sid: 'web-01', covens: ['mongoshard', 'web'], status: 'connected', transport: 'agent', traits: {} },
 ];
+
+const MEMBERS: Record<string, string[]> = {
+  mongoshard: ['mongo-ctl-01', 'mongo-sh-01', 'mongo-sh-02', 'mongo-arb-01'],
+};
 
 const CHOIRS = [
   { choir_name: 'control', incarnation_name: 'mongoshard', description: null, min_size: null, max_size: null, created_at: '2026-01-01T00:00:00Z', created_by_aid: null },
@@ -115,6 +126,17 @@ beforeEach(() => {
     offset: 0,
     limit: 1000,
   } as Awaited<ReturnType<typeof keeperApi.souls.list>>);
+  vi.spyOn(keeperApi.incarnations, 'members').mockImplementation(async (name: string) => {
+    const items = (MEMBERS[name] ?? []).map((sid) => ({
+      sid,
+      // The roster reports the `souls.status` column, which lags the lease —
+      // presence comes from GET /v1/souls and nothing here reads this field.
+      status: 'disconnected',
+      bound_at: '2026-01-01T00:00:00Z',
+      bound_by_aid: 'archon-x',
+    }));
+    return { items, offset: 0, limit: items.length, total: items.length };
+  });
   vi.spyOn(keeperApi.choirs, 'list').mockResolvedValue({ items: CHOIRS } as Awaited<
     ReturnType<typeof keeperApi.choirs.list>
   >);
@@ -170,7 +192,32 @@ describe('MultiConsolePage — scope step', () => {
     const opened = sent.filter((m) => m.type === 'open').map((m) => (m.type === 'open' ? m.sid : ''));
     expect(opened).toEqual(['mongo-ctl-01', 'mongo-sh-01', 'mongo-sh-02', 'mongo-arb-01']);
     expect(screen.getByTestId('pane-mongo-ctl-01')).toBeInTheDocument();
+    // Carries `mongoshard` as a label without being on the roster (NIM-449).
     expect(screen.queryByTestId('pane-web-01')).not.toBeInTheDocument();
+  });
+
+  // NIM-449: a root shell on "the incarnation" must reach its members and only
+  // them. Reading the coven column instead inverts this preview entirely.
+  it('[GUARD] the incarnation scope previews the roster, not what carries its label', async () => {
+    await renderPage('/run/console?incarnation=mongoshard');
+    await waitFor(() => expect(screen.getByTestId('console-scope-preview')).toHaveTextContent('4'));
+    const preview = screen.getByTestId('console-scope-preview').textContent ?? '';
+    for (const sid of MEMBERS.mongoshard) expect(preview).toContain(sid);
+    expect(preview).not.toContain('web-01');
+  });
+
+  it('an incarnation whose roster is refused is called out, and nothing connects', async () => {
+    vi.spyOn(keeperApi.incarnations, 'members').mockRejectedValue(
+      new ApiError(403, 'about:blank', 'Forbidden', 'incarnation.get denied'),
+    );
+    await renderPage('/run/console?incarnation=mongoshard');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('console-incarnation-forbidden')).toHaveTextContent('mongoshard'),
+    );
+    // Refusing to read the roster must not silently degrade into "0 VMs match".
+    expect(screen.getByTestId('console-connect')).toBeDisabled();
+    expect(sent.filter((m) => m.type === 'open')).toHaveLength(0);
   });
 
   it('narrows the scope by VM name', async () => {

@@ -12,12 +12,23 @@ import { Badge, Button } from '../../components/primitives';
 import { ChipsInput } from '../incarnations/ChipsInput';
 import type { SoulListEntry } from '../../api/keeper';
 import type { HostCriteria } from '../run/hostSelector';
+import type { MembershipFailure, UnresolvedIncarnation } from '../run/useIncarnationMembers';
 import { CONSOLE_SOFT_LIMIT } from './consoleSelection';
 import styles from './MultiConsole.module.css';
 
 // Incarnation / coven names are kebab-case (ADR-008).
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const PREVIEW_LIMIT = 40;
+
+// An incarnation whose roster did not arrive contributes nothing, and the three
+// causes are three different next steps for the operator: fix the name, ask for
+// the permission, or retry. Silence would read as "that incarnation is empty".
+const UNRESOLVED_KEY: Record<MembershipFailure, string> = {
+  unknown: 'console:scopeIncarnationUnknown',
+  forbidden: 'console:scopeIncarnationForbidden',
+  failed: 'console:scopeIncarnationUnresolved',
+};
+const UNRESOLVED_REASONS = Object.keys(UNRESOLVED_KEY) as MembershipFailure[];
 
 interface Props {
   value: HostCriteria;
@@ -28,6 +39,7 @@ interface Props {
   invalidSoulprint: string[];
   regexError: string | null;
   hasCriteria: boolean;
+  unresolvedIncarnations: UnresolvedIncarnation[];
   onConnect: () => void;
   // Present once a session is live — the step doubles as "change selection".
   onCancel: (() => void) | null;
@@ -43,6 +55,7 @@ export function ScopePicker({
   invalidSoulprint,
   regexError,
   hasCriteria,
+  unresolvedIncarnations,
   onConnect,
   onCancel,
   connectedCount,
@@ -74,6 +87,15 @@ export function ScopePicker({
             ariaLabel={t('console:scopeIncarnations')}
             validate={(v) => (NAME_REGEX.test(v) ? null : t('console:scopeNameInvalid'))}
           />
+          {UNRESOLVED_REASONS.map((reason) => {
+            const names = unresolvedIncarnations.filter((u) => u.reason === reason).map((u) => u.name);
+            if (names.length === 0) return null;
+            return (
+              <span key={reason} className={styles.scopeWarn} data-testid={`console-incarnation-${reason}`}>
+                {t(UNRESOLVED_KEY[reason], { names: names.join(', ') })}
+              </span>
+            );
+          })}
         </div>
 
         <div className={styles.scopeField} data-testid="console-scope-covens">

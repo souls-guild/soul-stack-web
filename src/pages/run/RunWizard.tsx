@@ -48,6 +48,11 @@ import {
   parseCriteriaSoulprint,
   type HostCriteria,
 } from './hostSelector';
+import {
+  useIncarnationMembers,
+  type MembershipFailure,
+  type UnresolvedIncarnation,
+} from './useIncarnationMembers';
 import { DynamicInputBuilder } from '../../components/input/DynamicInputBuilder';
 import { consoleHrefFrom } from '../console/consoleLink';
 import { ModulePicker } from './ModulePicker';
@@ -483,11 +488,15 @@ export function RunWizard() {
   const parsedSoulprint = useMemo(() => parseCriteriaSoulprint(hostCriteria), [hostCriteria]);
   const sidRegexComp = useMemo(() => compileSidRegex(hostCriteria.sidRegex), [hostCriteria.sidRegex]);
 
+  // The incarnation criterion is a membership question (NIM-449) — one roster
+  // fetch per name, not a scan of the coven column.
+  const membership = useIncarnationMembers(hostCriteria.incarnations);
+
   // Stage 1: stable criteria (incarnation/coven/sid-regex) — without a soulprint-fetch.
   const stableMatched = useMemo<SoulListEntry[]>(() => {
     if (workload !== 'command' || !hasAnyCriteria(hostCriteria)) return [];
-    return allSouls.filter((s) => matchStableCriteria(s, hostCriteria, sidRegexComp.re));
-  }, [workload, hostCriteria, allSouls, sidRegexComp.re]);
+    return allSouls.filter((s) => matchStableCriteria(s, hostCriteria, sidRegexComp.re, membership.memberSids));
+  }, [workload, hostCriteria, allSouls, sidRegexComp.re, membership.memberSids]);
 
   // Stage 2: soulprint-fetch only for the already-filtered stable candidates and
   // only if a soulprint criterion is set.
@@ -959,9 +968,10 @@ export function RunWizard() {
             value={hostCriteria}
             onChange={setHostCriteria}
             resolvedSouls={resolvedSouls}
-            soulsLoading={soulsListQ.isLoading || soulprintLoading}
+            soulsLoading={soulsListQ.isLoading || soulprintLoading || membership.loading}
             invalidSoulprint={parsedSoulprint.invalid}
             regexError={sidRegexComp.error}
+            unresolvedIncarnations={membership.unresolved}
             runMode={runMode}
           />
         ) : null}
@@ -1480,6 +1490,16 @@ function Step3ScenarioIncarnations({
   );
 }
 
+// An incarnation whose roster did not arrive contributes no hosts, and the three
+// causes are three different next steps for the operator: fix the name, ask for
+// the permission, or retry. Silence would read as "that incarnation is empty".
+const UNRESOLVED_INCARNATION_KEY: Record<MembershipFailure, string> = {
+  unknown: 'run:hostIncarnationUnknown',
+  forbidden: 'run:hostIncarnationForbidden',
+  failed: 'run:hostIncarnationUnresolved',
+};
+const UNRESOLVED_KEYS = Object.keys(UNRESOLVED_INCARNATION_KEY) as MembershipFailure[];
+
 // Step 2 Command: rich host selector. Criteria are combined (AND between different ones,
 // OR within a list). Live preview of the resolved list + counter.
 function Step2CommandHosts({
@@ -1489,6 +1509,7 @@ function Step2CommandHosts({
   soulsLoading,
   invalidSoulprint,
   regexError,
+  unresolvedIncarnations,
   runMode,
 }: {
   value: HostCriteria;
@@ -1497,6 +1518,7 @@ function Step2CommandHosts({
   soulsLoading: boolean;
   invalidSoulprint: string[];
   regexError: string | null;
+  unresolvedIncarnations: UnresolvedIncarnation[];
   runMode: RunMode;
 }) {
   const { t } = useTranslation();
@@ -1528,6 +1550,15 @@ function Step2CommandHosts({
           ariaLabel="Incarnations criterion"
           validate={(v) => (NAME_REGEX.test(v) ? null : t('run:covenKebabShortError'))}
         />
+        {UNRESOLVED_KEYS.map((reason) => {
+          const names = unresolvedIncarnations.filter((u) => u.reason === reason).map((u) => u.name);
+          if (names.length === 0) return null;
+          return (
+            <div key={reason} className={styles.warn} data-testid={`host-incarnation-${reason}`}>
+              {t(UNRESOLVED_INCARNATION_KEY[reason], { names: names.join(', ') })}
+            </div>
+          );
+        })}
       </div>
 
       <div>

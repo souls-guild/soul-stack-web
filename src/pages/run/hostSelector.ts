@@ -7,9 +7,10 @@
 // around the incomplete backend target algebra.
 //
 // Criteria:
-//   incarnations — list of incarnation names; a soul belongs to an incarnation if
-//                  the incarnation name is in its coven[] (incarnation.name is the root
-//                  Coven label, ADR-008).
+//   incarnations — list of incarnation names; a soul belongs to an incarnation
+//                  when the roster says so (`incarnation_membership`, NIM-124),
+//                  resolved by useIncarnationMembers and passed in as a SID set.
+//                  NOT a label question: see that file for why the two diverge.
 //   covens       — list of Coven labels; OR within.
 //   sidRegex     — RE2 pattern over SID, full-match (anchored `^(?:...)$`, like `grep -x`).
 //   soulprint    — DSL string (soulprintFilter.ts), AND within.
@@ -65,15 +66,21 @@ export function compileSidRegex(raw: string): { re: RegExp | null; error: string
 
 // Whether the soul matches the "stable" criteria (incarnations / covens / sidRegex).
 // soulprint is NOT checked at this stage — it requires a separate fetch.
+//
+// `memberSids` is the union of the rosters of `c.incarnations`
+// (useIncarnationMembers). It is a required argument rather than an optional one
+// so that a call site cannot quietly fall back to the coven column NIM-449 took
+// this criterion off. While the rosters are in flight the set is empty and the
+// criterion matches nothing — the caller reports "resolving", never "no hosts".
 export function matchStableCriteria(
   soul: SoulListEntry,
   c: HostCriteria,
   compiledRegex: RegExp | null,
+  memberSids: ReadonlySet<string>,
 ): boolean {
   const covens = soul.covens ?? [];
   if (c.incarnations.length > 0) {
-    // incarnation.name is the root coven label.
-    if (!c.incarnations.some((inc) => covens.includes(inc))) return false;
+    if (!memberSids.has(soul.sid)) return false;
   }
   if (c.covens.length > 0) {
     if (!c.covens.some((cv) => covens.includes(cv))) return false;

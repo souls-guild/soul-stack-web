@@ -320,6 +320,7 @@ export function MultiConsolePage() {
           invalidSoulprint={resolution.invalidSoulprint}
           regexError={resolution.regexError}
           hasCriteria={resolution.hasCriteria}
+          unresolvedIncarnations={resolution.unresolvedIncarnations}
           onConnect={onConnect}
           onCancel={connected ? () => setScopeOpen(false) : null}
           connectedCount={attached.length}

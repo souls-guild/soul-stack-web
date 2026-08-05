@@ -18,6 +18,7 @@ import {
   parseCriteriaSoulprint,
   type HostCriteria,
 } from '../run/hostSelector';
+import { useIncarnationMembers, type UnresolvedIncarnation } from '../run/useIncarnationMembers';
 
 export interface HostResolution {
   // All known souls — also feeds grouping and the scope preview.
@@ -31,6 +32,9 @@ export interface HostResolution {
   invalidSoulprint: string[];
   regexError: string | null;
   hasCriteria: boolean;
+  // Incarnations whose roster did not arrive — their hosts are NOT in `matched`,
+  // and the scope step says so rather than silently opening a narrower session.
+  unresolvedIncarnations: UnresolvedIncarnation[];
 }
 
 export function useHostResolution(criteria: HostCriteria): HostResolution {
@@ -45,11 +49,12 @@ export function useHostResolution(criteria: HostCriteria): HostResolution {
   const parsedSoulprint = useMemo(() => parseCriteriaSoulprint(criteria), [criteria]);
   const sidRegexComp = useMemo(() => compileSidRegex(criteria.sidRegex), [criteria.sidRegex]);
   const hasCriteria = hasAnyCriteria(criteria);
+  const membership = useIncarnationMembers(criteria.incarnations);
 
   const stableMatched = useMemo<SoulListEntry[]>(() => {
     if (!hasCriteria) return [];
-    return allSouls.filter((s) => matchStableCriteria(s, criteria, sidRegexComp.re));
-  }, [hasCriteria, allSouls, criteria, sidRegexComp.re]);
+    return allSouls.filter((s) => matchStableCriteria(s, criteria, sidRegexComp.re, membership.memberSids));
+  }, [hasCriteria, allSouls, criteria, sidRegexComp.re, membership.memberSids]);
 
   const soulprintActive = needsSoulprint(criteria);
   const soulprintQueries = useQueries({
@@ -86,10 +91,11 @@ export function useHostResolution(criteria: HostCriteria): HostResolution {
     allSouls,
     matched,
     sids: useMemo(() => matched.map((s) => s.sid), [matched]),
-    loading: soulsQ.isLoading || soulprintLoading,
+    loading: soulsQ.isLoading || soulprintLoading || membership.loading,
     soulsUnavailable: soulsQ.isError,
     invalidSoulprint: parsedSoulprint.invalid,
     regexError: sidRegexComp.error,
     hasCriteria,
+    unresolvedIncarnations: membership.unresolved,
   };
 }

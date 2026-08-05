@@ -69,6 +69,9 @@ interface FetchStubOpts {
   soulprints?: Record<string, unknown>;
   // Module catalog (GET /v1/modules). undefined -> default core cmd/exec.
   modules?: ModuleStub[];
+  // Rosters by incarnation name (GET /v1/incarnations/{name}/members, NIM-124).
+  // A name absent here answers 404, as the keeper does for an unknown incarnation.
+  members?: Record<string, string[]>;
 }
 
 const DEFAULT_MODULES: ModuleStub[] = [
@@ -107,6 +110,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
   const souls: SoulStub[] = opts.souls ?? [];
   const soulprints = opts.soulprints ?? {};
   const modules = opts.modules ?? DEFAULT_MODULES;
+  const members = opts.members ?? {};
   const ref: { posted: CapturedPost | null; posts: CapturedPost[] } = { posted: null, posts: [] };
 
   vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -167,6 +171,21 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     }
     if (url.includes(`/v1/services/${serviceName}/scenarios`)) {
       return json({ service: serviceName, ref: 'main', scenarios });
+    }
+    const membersMatch = url.match(/\/v1\/incarnations\/([^/?]+)\/members$/);
+    if (membersMatch) {
+      const name = decodeURIComponent(membersMatch[1]);
+      const roster = members[name];
+      if (!roster) return json({ title: 'Not Found', detail: `incarnation ${name} not found` }, 404);
+      const items = roster.map((sid) => ({
+        sid,
+        // The column, not the lease: the roster reports a status that lags
+        // presence, so nothing may read liveness from here (GET /v1/souls does).
+        status: 'disconnected',
+        bound_at: '2026-01-01T00:00:00Z',
+        bound_by_aid: 'archon-x',
+      }));
+      return json({ items, offset: 0, limit: items.length, total: items.length });
     }
     if (url.includes('/v1/incarnations?') || url.endsWith('/v1/incarnations')) {
       return json({
@@ -598,6 +617,93 @@ describe('RunWizard', () => {
     expect(body.input.cmd).toBe('uptime');
     expect(body.target.sids.sort()).toEqual(['db-1.example.com', 'db-2.example.com']);
     expect(body.concurrency).toBe(50);
+  });
+
+  // NIM-449. The criterion is a membership question (`incarnation_membership`,
+  // NIM-124); it used to be answered from the `souls.coven` column, which the
+  // incarnation's name also happens to appear in. The fixture makes the two
+  // disagree in both directions, so a resolver that went back to the column
+  // targets exactly the wrong host — same count, different SID.
+  it('[GUARD] Command: the Incarnations criterion targets the roster, not the coven label', async () => {
+    const stub = setupFetchStub({
+      souls: [
+        // A member that never got the label.
+        { sid: 'db-1.example.com', covens: ['prod'] },
+        // Labelled with the incarnation's name, but not on its roster.
+        { sid: 'web-1.example.com', covens: ['redis-prod'] },
+      ],
+      members: { 'redis-prod': ['db-1.example.com'] },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const incChip = await screen.findByLabelText('Incarnations criterion');
+    await user.type(incChip.querySelector('input') as HTMLInputElement, 'redis-prod ');
+
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    const preview = screen.getByLabelText('Host preview').textContent ?? '';
+    expect(preview).toContain('db-1.example.com');
+    expect(preview).not.toContain('web-1.example.com');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Run/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const body = stub.posted?.body as { target: { sids: string[] } };
+    expect(body.target.sids).toEqual(['db-1.example.com']);
+  });
+
+  // The criterion is an OR over the names, so one that cannot be resolved must
+  // not cancel the ones that can. With a single name the distinction is invisible.
+  it('[GUARD] Command: an unresolvable name does not erase the hosts of the names that resolved', async () => {
+    setupFetchStub({
+      souls: [{ sid: 'db-1.example.com', covens: [] }],
+      members: { 'redis-prod': ['db-1.example.com'] },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const input = (await screen.findByLabelText('Incarnations criterion')).querySelector(
+      'input',
+    ) as HTMLInputElement;
+    await user.type(input, 'redis-typo ');
+    await waitFor(() => expect(screen.getByTestId('host-incarnation-unknown')).toBeInTheDocument());
+    await user.type(input, 'redis-prod ');
+
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    expect(screen.getByLabelText('Host preview').textContent).toContain('db-1.example.com');
+    // The bad name stays reported — hosts arriving is not a reason to hide it.
+    expect(screen.getByTestId('host-incarnation-unknown')).toHaveTextContent('redis-typo');
+  });
+
+  it('Command: an incarnation with no roster is called out, and blocks the step', async () => {
+    setupFetchStub({
+      // The label is there; the roster is not. Silence here would read as
+      // "that incarnation is empty" instead of "there is no such incarnation".
+      souls: [{ sid: 'web-1.example.com', covens: ['redis-typo'] }],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Command'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const incChip = await screen.findByLabelText('Incarnations criterion');
+    await user.type(incChip.querySelector('input') as HTMLInputElement, 'redis-typo ');
+
+    await waitFor(() => expect(screen.getByTestId('host-incarnation-unknown')).toHaveTextContent('redis-typo'));
+    expect(screen.getByLabelText('Host preview').textContent).toMatch(/0 hosts match/);
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
   });
 
   it('Command: batch (string) filled → sent in Voyage POST as a raw string', async () => {
