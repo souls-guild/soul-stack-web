@@ -159,6 +159,9 @@ describe('MembersSection', () => {
 
     const confirm = screen.getByTestId('unbind-member-confirm');
     expect(confirm).toBeDisabled();
+    // Both halves of the warning: the lead-in comes from its own key, so a
+    // missing one would render as the bare key name rather than fail loudly.
+    expect(screen.getByTestId('unbind-member-warning').textContent).toMatch(/Dangerous operation/i);
     expect(screen.getByTestId('unbind-member-warning').textContent).toMatch(/future run/i);
 
     await user.click(screen.getByLabelText('Confirm unbinding the host'));

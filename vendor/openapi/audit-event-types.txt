@@ -55,7 +55,6 @@ incarnation.destroy_completed
 incarnation.destroy_failed
 incarnation.destroy_started
 incarnation.drift_checked
-incarnation.hosts_updated
 incarnation.member_bound
 incarnation.member_unbound
 incarnation.rerun_last

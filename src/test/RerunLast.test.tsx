@@ -24,7 +24,6 @@ function makeIncarnation(status: string) {
     service_version: 'v1.0.0',
     state_schema_version: 1,
     covens: [],
-    spec: {},
     state: {},
     status,
     created_by_aid: 'archon-alice',

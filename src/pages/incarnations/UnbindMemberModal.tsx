@@ -7,8 +7,8 @@ import styles from '../common.module.css';
 //
 // Unbinding is not "remove a row from a list": the host leaves the roster that
 // EVERY future run resolves, so a scenario that used to reach it silently stops
-// doing so. Mirrors RemoveHostModal: warning box + explicit checkbox + danger
-// button. The mutation lives in MembersSection; this is confirmation UI only.
+// doing so. Warning box + explicit checkbox + danger button. The mutation lives
+// in MembersSection; this is confirmation UI only.
 
 interface Props {
   // sid = null → modal closed (nothing selected for unbinding).
@@ -66,7 +66,7 @@ export function UnbindMemberModal({ sid, incarnationName, pending, error, onClos
         style={{ fontSize: 12.5, lineHeight: 1.5 }}
         data-testid="unbind-member-warning"
       >
-        <strong>{t('incarnations:removeHostWarningTitle')}</strong>{' '}
+        <strong>{t('incarnations:unbindWarningTitle')}</strong>{' '}
         {t('incarnations:memberUnbindWarningBody', { sid: sid ?? '', name: incarnationName })}
       </div>
 

@@ -33,10 +33,11 @@ import {
   type VitalsTone,
 } from './hostVitals';
 
-// Unified connected-hosts panel (NIM-127 rework). One table = the authoritative connected-souls
-// list (who is attached to the incarnation's root Coven, ADR-008) LEFT-JOINed with host utilization
-// from the incarnation telemetry aggregate. Base rows come from souls.list; a host with no telemetry
-// yet degrades to "—". Sparklines+skew are a per-soul on-demand request (the window lives only on the
+// Unified connected-hosts panel (NIM-127 rework). One table = the incarnation's member hosts
+// LEFT-JOINed with their utilization. Base rows come from the telemetry aggregate, which the
+// backend resolves from `incarnation_membership` (NIM-124) — NOT from coven=name; the souls
+// registry is joined in for status/transport only, with no coven filter, and a host with no
+// telemetry yet degrades to "—". Sparklines+skew are a per-soul on-demand request (the window lives only on the
 // soul endpoint), mounted only when a row is expanded → no N-polling. Freshness comes from the backend
 // `stale` flag and counts up live via useNow between the 15s refetches.
 const REFETCH_MS = 15000;

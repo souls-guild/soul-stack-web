@@ -17,12 +17,10 @@ import styles from '../common.module.css';
 //
 // This is the AUTHORITATIVE answer to "which hosts does this incarnation have":
 // the `incarnation_membership` relation, which is what a run resolves its
-// targets from. It is not the same thing as the two neighbouring sections:
-//   - spec.hosts[] is a DECLARATION the operator wrote for bootstrap-create;
-//   - the utilization panel is this same member set joined with host vitals,
-//     so it degrades to nothing without the telemetry permission.
-// Membership is the only one of the three that is editable as a relation, and
-// the only one that survives a scenario that never wrote spec.hosts.
+// targets from. It is not the same thing as the neighbouring section: the
+// utilization panel is this same member set joined with host vitals, so it
+// degrades to nothing without the telemetry permission. Membership is the
+// relation — the roster survives however a scenario chose to populate it.
 //
 // Two things about the reply drive this component:
 //   - the roster is NARROWED to the caller's soul scope, so an empty/short list

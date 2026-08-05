@@ -338,18 +338,14 @@ export type ServiceDependenciesReply = components['schemas']['ServiceDependencie
 export type IncarnationRerunLastRequest = components['schemas']['IncarnationRerunLastRequest'];
 export type IncarnationRerunLastReply = components['schemas']['IncarnationRerunLastReply'];
 
-// Hosts-editing (PATCH /v1/incarnations/{name}/hosts).
-export type IncarnationSpecHost = components['schemas']['IncarnationSpecHost'];
 // Incarnation membership (incarnation_membership, ADR-008 amendment / NIM-124).
-// The roster is the relation a run resolves its hosts from — NOT spec.hosts[]
-// (a declaration) and NOT coven==name (a label). `bound_by_aid` is optional:
-// rows written by a scenario carry no operator.
+// The roster is the relation a run resolves its hosts from — and since NIM-330
+// the only editable one: a declared role is a Voice, and coven==name is a label.
+// `bound_by_aid` is optional: rows written by a scenario carry no operator.
 export type IncarnationMember = components['schemas']['IncarnationMember'];
 export type IncarnationMemberListReply = components['schemas']['IncarnationMemberListReply'];
 export type IncarnationMemberBindRequest = components['schemas']['IncarnationMemberBindRequest'];
 export type IncarnationMemberBindReply = components['schemas']['IncarnationMemberBindReply'];
-export type IncarnationUpdateHostsRequest = components['schemas']['IncarnationUpdateHostsRequest'];
-export type IncarnationUpdateHostsMode = IncarnationUpdateHostsRequest['mode'];
 
 // Traits-editing (PUT /v1/incarnations/{name}/traits). Source of truth — incarnation.traits
 // (ADR-060); projected into souls.traits. Full replacement (full-replace semantics).
@@ -767,15 +763,6 @@ export const keeperApi = {
       apiSend<IncarnationRerunLastReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/rerun-last`,
         'POST',
-        { body },
-      ),
-    // PATCH /v1/incarnations/{name}/hosts — edit declared spec.hosts[] (ADR-008).
-    // mode=replace|append|remove. 200 -> updated incarnation. 422 unknown-SID,
-    // 409 destroying/destroy_failed, 404 no incarnation.
-    updateHosts: (name: string, body: IncarnationUpdateHostsRequest) =>
-      apiSend<IncarnationGetReply>(
-        `/v1/incarnations/${encodeURIComponent(name)}/hosts`,
-        'PATCH',
         { body },
       ),
     // GET /v1/incarnations/{name}/members — the membership roster. Permission

@@ -75,7 +75,6 @@
   "overviewTransport": "Transport pull / push",
   "overviewTransportHint": "agent (pull) / ssh (push)",
   "rbacCrumbs": "roles, permissions, Archon assignments",
-  "removeFromDeclared": "Remove from declared list",
   "revokeSigilConfirm": "Revoke Sigil grant {{sigil}}?\nThe binary will no longer pass Sigil verification. The record stays in the registry for audit.",
   "revokeSigilTitle": "Revoke grant",
   "runScenarioViaWizard": "Run scenario via Run Wizard",

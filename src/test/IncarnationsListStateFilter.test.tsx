@@ -62,7 +62,6 @@ const INCARNATIONS_REPLY = {
       covens: ['prod'],
       created_at: new Date().toISOString(),
       last_drift_check_at: null,
-      spec: {},
       state: {},
     },
     {
@@ -73,7 +72,6 @@ const INCARNATIONS_REPLY = {
       covens: ['staging'],
       created_at: new Date().toISOString(),
       last_drift_check_at: null,
-      spec: {},
       state: {},
     },
   ],

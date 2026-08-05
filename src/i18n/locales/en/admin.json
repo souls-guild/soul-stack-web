@@ -72,7 +72,6 @@
   "auditEventLabel_incarnation_destroy_failed": "Incarnation destroy failed",
   "auditEventLabel_incarnation_destroy_started": "Incarnation destroy started",
   "auditEventLabel_incarnation_drift_checked": "Drift check performed",
-  "auditEventLabel_incarnation_hosts_updated": "Declared hosts updated",
   "auditEventLabel_incarnation_member_bound": "Host bound to the incarnation",
   "auditEventLabel_incarnation_member_unbound": "Host unbound from the incarnation",
   "auditEventLabel_incarnation_rerun_last": "Last failed scenario re-run",

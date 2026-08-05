@@ -321,7 +321,7 @@ describe('NIM-76 #7 day-2 update_config takes the version from state.redis_versi
       }
       // single incarnation GET — state.redis_version = 8.2.2
       if (/\/v1\/incarnations\/redis-prod(\?|$)/.test(url)) {
-        return json({ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, status: 'ready', spec: {}, state: { redis_version: '8.2.2' }, status_details: {}, created_at: '', updated_at: '' });
+        return json({ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, status: 'ready', state: { redis_version: '8.2.2' }, status_details: {}, created_at: '', updated_at: '' });
       }
       if (url.includes('/v1/incarnations')) {
         return json({ items: [{ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_at: '', updated_at: '' }], offset: 0, limit: 50, total: 1 });

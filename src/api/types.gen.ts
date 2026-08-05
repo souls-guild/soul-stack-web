@@ -808,26 +808,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/hosts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Edit declared spec.hosts[] of an incarnation
-         * @description Three modes (replace/append/remove) over declared hosts (ADR-008). Permission incarnation.update-hosts.
-         */
-        patch: operations["updateIncarnationHosts"];
-        trace?: never;
-    };
     "/v1/incarnations/{name}/members": {
         parameters: {
             query?: never;
@@ -1857,7 +1837,7 @@ export interface paths {
         };
         /**
          * catalog of valid redis.conf directives by version
-         * @description Catalog of valid service directive names (essence.redis_directives, major.minor series map -> names) for the UI redis_settings editor (ADR-042). Permission service.list. Read-only, no audit. ?version=X.Y.Z narrows to the series. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for a pinned commit-SHA ref, otherwise no-cache (branch/tag mutable - revalidation via ETag/304). Service without a catalog -> directives:{} + 200. 502 - loader failed.
+         * @description Catalog of valid service directive names (vars.redis_directives, major.minor series map -> names) for the UI redis_settings editor (ADR-042). Permission service.list. Read-only, no audit. ?version=X.Y.Z narrows to the series. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for a pinned commit-SHA ref, otherwise no-cache (branch/tag mutable - revalidation via ETag/304). Service without a catalog -> directives:{} + 200. 502 - loader failed.
          */
         get: operations["listServiceDirectives"];
         put?: never;
@@ -1937,7 +1917,7 @@ export interface paths {
         };
         /**
          * default host-vitals telemetry config of a Service + allowed collectors
-         * @description Effective default (per-service, without essence/incarnation) host-vitals config of the service (enabled/interval_sec/collectors) from the manifest `telemetry:` + known_collectors (full allowed set for the UI, ADR-042 backend-driven, ADR-072). Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for pinned commit-SHA ref, otherwise no-cache (mutable branch/tag). A service without a telemetry block -> manifest defaults (enabled=true, interval_sec=30, all collectors) + 200. 502 - loader failed. Not to be confused with /v1/incarnations/{name}/telemetry (runtime host-vitals from Redis, NIM-86).
+         * @description Effective default (per-service, without an incarnation) host-vitals config of the service (enabled/interval_sec/collectors) from the manifest `telemetry:` + known_collectors (full allowed set for the UI, ADR-042 backend-driven, ADR-072). Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for pinned commit-SHA ref, otherwise no-cache (mutable branch/tag). A service without a telemetry block -> manifest defaults (enabled=true, interval_sec=30, all collectors) + 200. 502 - loader failed. Not to be confused with /v1/incarnations/{name}/telemetry (runtime host-vitals from Redis, NIM-86).
          */
         get: operations["getServiceTelemetry"];
         put?: never;
@@ -2614,7 +2594,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.drift_checked" | "incarnation.hosts_updated" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "provider.created" | "provider.deleted" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.drift_checked" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "provider.created" | "provider.deleted" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -3295,9 +3275,6 @@ export interface components {
             name: string;
             service: string;
             service_version: string;
-            spec: {
-                [key: string]: unknown;
-            };
             state: {
                 [key: string]: unknown;
             };
@@ -3382,6 +3359,10 @@ export interface components {
             scenario: string;
         };
         IncarnationRerunLastRequest: {
+            /** @description operator input, accepted only when the attempt cannot be replayed from history */
+            input?: {
+                [key: string]: unknown;
+            };
             /** @description free text confirmation */
             reason: string;
         };
@@ -3485,12 +3466,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        IncarnationSpecHost: {
-            /** @description declared role (kebab-case 1..63) or null */
-            role?: string;
-            /** @description SID (FQDN) of the host - must already exist in souls */
-            sid: string;
-        };
         /**
          * @description Runtime instance status. In proto the constants have a family-prefix (INCARNATION_STATUS_READY), in the JSON API - short forms. `drift` - an informational Scry status (ADR-031), NOT blocking: remediation = a regular apply, which on success returns the incarnation to `ready`.
          * @enum {string}
@@ -3515,15 +3490,6 @@ export interface components {
             name?: string;
             /** @description free text confirmation */
             reason: string;
-        };
-        IncarnationUpdateHostsRequest: {
-            /** @description host list for mode operation (empty legitimate for replace) */
-            hosts: components["schemas"]["IncarnationSpecHost"][] | null;
-            /**
-             * @description operation type over spec.hosts[]
-             * @enum {string}
-             */
-            mode: "replace" | "append" | "remove";
         };
         IncarnationUpgradePathsReply: {
             /** Format: int64 */
@@ -8275,6 +8241,10 @@ export interface operations {
             query?: {
                 /** @description opt. ULID filter by state_history.apply_id; non-ULID → 400 */
                 apply_id?: string;
+                /** @description opt. include the rerun-transition markers (excluded by default) */
+                include_transitions?: boolean;
+                /** @description opt. include soft-deleted (archived) snapshots (excluded by default) */
+                include_archived?: boolean;
                 /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
                 /** @description page size 1..1000 (out-of-range → 400) */
@@ -8318,87 +8288,6 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-        };
-    };
-    updateIncarnationHosts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description incarnation name */
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IncarnationUpdateHostsRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IncarnationGetReply"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Conflict */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

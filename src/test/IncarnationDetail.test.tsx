@@ -11,7 +11,7 @@ describe('IncarnationDetail', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
-  it('renders incarnation detail and Overview summary with navigation to Spec/State/Schema/Hosts', async () => {
+  it('renders incarnation detail and Overview summary with navigation to State/Schema/Hosts', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -22,7 +22,6 @@ describe('IncarnationDetail', () => {
           service_version: 'v2.0.0',
           state_schema_version: 3,
           covens: ['prod'],
-          spec: { replicas: 3, hosts: [{ sid: 'agent-04.local', role: 'master' }] },
           state: {
             greeting_file: '/tmp/x',
             primary: 'host01.example.com',
@@ -67,24 +66,17 @@ describe('IncarnationDetail', () => {
 
     // Default tab - Overview, we see Data summary.
     expect(screen.getByRole('heading', { name: 'Data summary' })).toBeInTheDocument();
-    // Hosts card: 2 online (from souls API) + 1 declared (from spec.hosts).
+    // Hosts card: 2 online (from souls API) — the only count left, a declared
+    // list no longer exists.
     await waitFor(() => {
       expect(screen.getByText(/2 online/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/1 declared/i)).toBeInTheDocument();
 
     // Action-bar for status=ready.
     expect(screen.getByRole('button', { name: /Run Scenario/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Destroy/i })).toBeInTheDocument();
 
     const user = userEvent.setup();
-
-    // Tab «Spec» — declared.
-    await user.click(screen.getByRole('tab', { name: /Spec/i }));
-    expect(screen.getByRole('heading', { name: /Spec \(declared\)/i })).toBeInTheDocument();
-    // Top-level keys in JsonKeyFilter (replicas, hosts).
-    expect(screen.getByText('replicas')).toBeInTheDocument();
-    expect(screen.getAllByText('hosts').length).toBeGreaterThan(0);
 
     // Tab «State».
     await user.click(screen.getByRole('tab', { name: /^State/i }));
@@ -113,7 +105,6 @@ describe('IncarnationDetail', () => {
           service_version: 'main',
           state_schema_version: 1,
           covens: [],
-          spec: {},
           state: {
             alpha: 1,
             beta: 'two',
@@ -159,41 +150,41 @@ describe('IncarnationDetail', () => {
     expect(filtered.every((t) => !t.includes('gamma'))).toBe(true);
   });
 
-  it('Trash2 on a declared host opens RemoveHostModal, PATCH is sent only after confirmation', async () => {
-    let patchCount = 0;
-    let lastUrl = '';
-    let lastBody: unknown = null;
+  it('offers no declared-hosts editor and writes nothing, on the reply shape the backend actually sends', async () => {
+    // The body below is a verbatim GET /v1/incarnations/{name} reply from a live
+    // keeper on migration 112: no `spec` key at all. The point of the fixture is
+    // that it is NOT seeded with the field under test — a tab or a table that
+    // needs `spec` has nothing to read here, exactly as in production.
+    const writes: Array<{ method: string; url: string }> = [];
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const method = (init?.method ?? 'GET').toUpperCase();
-      if (method === 'PATCH') {
-        patchCount += 1;
-        lastUrl = url;
-        lastBody = init?.body ? JSON.parse(init.body as string) : null;
-        return new Response(JSON.stringify({ name: 'redis-prod' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
+      if (method !== 'GET') writes.push({ method, url });
       if (url.includes('/v1/souls')) {
         return new Response(JSON.stringify({ items: [], offset: 0, limit: 200, total: 0 }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (url.includes('/members')) {
+        return new Response(JSON.stringify({ items: [], total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(
         JSON.stringify({
-          name: 'redis-prod',
-          service: 'redis',
-          service_version: 'v2.0.0',
-          state_schema_version: 3,
-          covens: ['prod'],
-          spec: { hosts: [{ sid: 'agent-04.local', role: 'master' }] },
-          state: {},
+          covens: [],
+          created_at: '2026-07-30T10:52:04.094288Z',
+          created_by_aid: null,
+          name: 'nim330-fixture',
+          service: 'hello-world',
+          service_version: 'main',
+          state: { greeting_file: '/tmp/soul-stack-hello' },
+          state_schema_version: 1,
           status: 'ready',
-          created_by_aid: 'archon-alice',
-          created_at: '2026-05-20T10:00:00Z',
-          updated_at: '2026-05-25T12:00:00Z',
+          status_details: null,
+          updated_at: '2026-07-30T10:55:42.229544Z',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
@@ -203,30 +194,32 @@ describe('IncarnationDetail', () => {
       <Routes>
         <Route path="/incarnations/:name" element={<IncarnationDetail />} />
       </Routes>,
-      '/incarnations/redis-prod',
+      '/incarnations/nim330-fixture',
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'redis-prod' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'nim330-fixture' })).toBeInTheDocument();
     });
+
+    // No Spec tab: the field it rendered is gone from the API.
+    expect(screen.queryByRole('tab', { name: /Spec/i })).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Hosts/i }));
 
-    // Click on Trash2 - opens modal, PATCH not sent yet.
-    await user.click(screen.getByRole('button', { name: /Remove host agent-04.local/i }));
-    expect(screen.getByTestId('remove-host-warning')).toBeInTheDocument();
-    expect(patchCount).toBe(0);
+    // The declared-hosts table and its editor are gone with the endpoint that
+    // backed them (PATCH .../hosts answers 404 since NIM-330). A per-row Remove
+    // button is deliberately NOT asserted on: with no `spec` there are no rows,
+    // so its absence is guaranteed by the fixture rather than by the component,
+    // and a green assertion there would be coverage that cannot fail.
+    expect(screen.queryByText(/Declared hosts/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add host/i })).not.toBeInTheDocument();
 
-    // Confirmation via checkbox -> confirm.
-    await user.click(screen.getByLabelText('Confirm host removal'));
-    await user.click(screen.getByTestId('remove-host-confirm'));
-
-    await waitFor(() => {
-      expect(patchCount).toBe(1);
-    });
-    expect(lastUrl).toMatch(/\/v1\/incarnations\/redis-prod\/hosts/);
-    expect(lastBody).toEqual({ mode: 'remove', hosts: [{ sid: 'agent-04.local' }] });
+    // Rendering the page writes nothing. This does not re-state the assertions
+    // above — it holds down a separate property (no mutation fires on mount or
+    // on tab switch), which is what a resurrected editor firing from an effect
+    // would violate.
+    expect(writes).toEqual([]);
   });
 
   it('Overview summary card clicks the Hosts tab and shows per-host runtime data', async () => {
@@ -240,7 +233,6 @@ describe('IncarnationDetail', () => {
           service_version: 'main',
           state_schema_version: 1,
           covens: [],
-          spec: {},
           state: {
             hosts: {
               'host-a': { role: 'master', pid: 1 },
@@ -313,7 +305,6 @@ describe('IncarnationDetail', () => {
           service_version: 'main',
           state_schema_version: 1,
           covens: [],
-          spec: {},
           state: {},
           status: 'ready',
           created_by_aid: 'archon-x',
@@ -368,7 +359,6 @@ describe('IncarnationDetail', () => {
           state_schema_version: 1,
           covens: ['prod'],
           traits: { team: 'platform', tier: ['gold', 'critical'] },
-          spec: {},
           state: {},
           status: 'ready',
           created_by_aid: 'archon-x',
@@ -407,7 +397,6 @@ describe('IncarnationDetail', () => {
           service_version: 'main',
           state_schema_version: 1,
           covens: [],
-          spec: {},
           state: {},
           status: 'ready',
           created_by_aid: 'archon-x',

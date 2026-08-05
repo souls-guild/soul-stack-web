@@ -1,5 +1,4 @@
 {
-  "addHostTitle": "Add host → {{name}}",
   "addRole": "add role",
   "addVoiceTitle": "Add Voice → {{choir}}",
   "ariaAssignRole": "assign role {{aid}}",
@@ -29,7 +28,6 @@
   "refHint": "git ref: tag (v2.0.0) or branch (main)",
   "refsLoading": "Loading refs…",
   "refsUnavailable": "Refs catalog unavailable, enter the name manually.",
-  "removeHostTitle": "Remove host: {{sid}}",
   "required": "Required field",
   "revokeArchonTitle": "Revoke {{aid}}?",
   "revokeArchonWarn": "Archon {{aid}} will be marked as revoked. All its JWT tokens will stop working immediately. New tokens cannot be issued.",

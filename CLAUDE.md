@@ -95,9 +95,9 @@ src/
       refs.ts                    — useServiceRefs hook (graceful 404 degraded)
     incarnations/
       IncarnationsList.tsx
-      IncarnationDetail.tsx      — tabs: Data summary / Spec / State / Schema / Hosts / Drift / History
+      IncarnationDetail.tsx      — tabs: Data summary / State / Schema / Hosts / Choirs / Drift / History
       IncarnationNewForm.tsx     — Create form + scenario dropdown + DynamicInputBuilder fallback
-      SpecTab.tsx / StateTab.tsx / SchemaTab.tsx / HostsTab.tsx
+      StateTab.tsx / SchemaTab.tsx / HostsTab.tsx / ChoirsTab.tsx
       ChipsInput.tsx, ScenarioPicker.tsx, ScenarioInputFields.tsx
       scenarioInputFields.helpers.ts — flat-map input_schema parser
       useServiceScenarios.ts      — GET /v1/services/:name/scenarios hook
@@ -177,7 +177,7 @@ src/
      `providers`, `cadences`, `synods`, `notifications`.
    - **Accessing a key:** `const { t } = useTranslation();` then `t('create')`
      (default-ns `common`) or with an explicit ns via a colon — `t('errors:generic')`,
-     `t('forms:addHostTitle', { name })`, `t('pages:noRoles')`.
+     `t('forms:destroyTitle', { name })`, `t('pages:noRoles')`.
    - **Pure (non-hook) functions** — error helpers (`rbac/errors.ts`,
      `services/errors.ts`, `RevokeArchonModal.prettyError`) use the global
      instance: `import i18n from '../../i18n'; const t = i18n.t.bind(i18n);`.
@@ -321,8 +321,10 @@ parallel (the PM decides).
 
 - `/runs` unified feed (UNION view across all run types: applies + tides +
   push runs + errand runs, with type/status/incarnation filters).
-- Hosts editing UI (backend `PATCH /v1/incarnations/:name/hosts` exists;
-  `HostsTab.tsx` is still read-only).
+- Roster editing is the only host editing there is: `PATCH /v1/incarnations/:name/hosts`
+  and the `spec.hosts[]` it edited were removed backend-side (NIM-330), and the UI
+  that still called it went with them (NIM-435). A declared role is a Choir Voice —
+  `ChoirsTab.tsx`; membership bind/unbind lives in `MembersSection.tsx`.
 - SSE auth handshake (query-token / cookie auth) so EventSource can carry auth.
 
 ## Environment

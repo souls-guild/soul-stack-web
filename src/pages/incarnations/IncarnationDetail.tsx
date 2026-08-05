@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   ArrowUp,
-  FileText,
   History as HistoryIcon,
   Layers,
   Lock,
@@ -27,14 +26,13 @@ import { UpgradeModal } from './UpgradeModal';
 import { DestroyModal } from './DestroyModal';
 import { HostsTab } from './HostsTab';
 import { ChoirsTab } from './ChoirsTab';
-import { SpecTab } from './SpecTab';
 import { StateTab } from './StateTab';
 import { SchemaTab } from './SchemaTab';
 import { IncarnationTraitsModal } from './IncarnationTraitsModal';
 import { TraitsChips } from './TraitsChips';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'drift' | 'spec' | 'state' | 'schema';
+type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'drift' | 'state' | 'schema';
 
 export function IncarnationDetail() {
   const { t } = useTranslation();
@@ -84,22 +82,16 @@ export function IncarnationDetail() {
     },
   });
 
-  // Summary aggregate for Overview: count spec/state fields, declared/runtime hosts.
+  // Summary aggregate for Overview: count state fields and connected hosts.
   // Call useMemo unconditionally (a hook must not sit under an if), values accessed via `?.`.
   const summary = useMemo(() => {
     const row = detail.data;
-    const spec = (row?.spec ?? null) as Record<string, unknown> | null;
     const state = (row?.state ?? null) as Record<string, unknown> | null;
-    const specKeys = spec && typeof spec === 'object' ? Object.keys(spec).length : 0;
     const stateKeys = state && typeof state === 'object' ? Object.keys(state).length : 0;
-    let declaredHosts = 0;
-    if (spec && Array.isArray((spec as Record<string, unknown>).hosts)) {
-      declaredHosts = ((spec as Record<string, unknown>).hosts as unknown[]).length;
-    }
     // onlineHosts — actual connected souls (coven=incarnation.name), the same
-    // source as HostsTab. Shows "N online" (+"M declared" if spec.hosts is non-empty).
+    // source as HostsTab. Shows "N online".
     const onlineHosts = connectedSouls.data?.items?.length ?? null;
-    return { specKeys, stateKeys, declaredHosts, onlineHosts };
+    return { stateKeys, onlineHosts };
   }, [detail.data, connectedSouls.data]);
 
   if (detail.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
@@ -229,9 +221,6 @@ export function IncarnationDetail() {
         <button type="button" role="tab" aria-selected={tab === 'overview'} className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
           {t('incarnations:tabOverview')}
         </button>
-        <button type="button" role="tab" aria-selected={tab === 'spec'} className={`${styles.tab} ${tab === 'spec' ? styles.tabActive : ''}`} onClick={() => setTab('spec')}>
-          <FileText size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabSpec')}
-        </button>
         <button type="button" role="tab" aria-selected={tab === 'state'} className={`${styles.tab} ${tab === 'state' ? styles.tabActive : ''}`} onClick={() => setTab('state')}>
           <Activity size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabState')}
         </button>
@@ -256,21 +245,10 @@ export function IncarnationDetail() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>{t('incarnations:dataSummaryTitle')}</h2>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-            {t('incarnations:dataSummaryDesc')} <strong>Spec</strong> {t('incarnations:dataSummarySpecTail')},{' '}
-            <strong>State</strong> {t('incarnations:dataSummaryStateTail')},{' '}
+            {t('incarnations:dataSummaryDesc')} <strong>State</strong> {t('incarnations:dataSummaryStateTail')},{' '}
             <strong>Schema</strong> {t('incarnations:dataSummarySchemaTail')}, <strong>Hosts</strong> {t('incarnations:dataSummaryHostsTail')}
           </p>
           <div className={styles.summaryGrid}>
-            <button type="button" className={styles.summaryCard} onClick={() => setTab('spec')}>
-              <span className={styles.summaryCardLabel}>
-                <FileText size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
-                Spec
-              </span>
-              <span className={styles.summaryCardValue}>
-                {summary.specKeys} {summary.specKeys === 1 ? t('incarnations:fieldOne') : t('incarnations:fieldMany')}
-              </span>
-              <span className={styles.summaryCardHint}>{t('incarnations:declaredByOperator')}</span>
-            </button>
             <button type="button" className={styles.summaryCard} onClick={() => setTab('state')}>
               <span className={styles.summaryCardLabel}>
                 <Activity size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />
@@ -295,9 +273,6 @@ export function IncarnationDetail() {
                 {summary.onlineHosts !== null
                   ? t('incarnations:hostsCardOnline', { n: summary.onlineHosts })
                   : t('incarnations:hostsCardLoading')}
-                {summary.declaredHosts > 0
-                  ? ` · ${t('incarnations:hostsCardDeclared', { n: summary.declaredHosts })}`
-                  : null}
               </span>
               <span className={styles.summaryCardHint}>{t('incarnations:hostsCardHint')}</span>
             </button>
@@ -323,8 +298,6 @@ export function IncarnationDetail() {
         </section>
       ) : null}
 
-      {tab === 'spec' ? <SpecTab spec={row.spec ?? null} /> : null}
-
       {tab === 'state' ? (
         <StateTab
           state={row.state ?? null}
@@ -342,12 +315,7 @@ export function IncarnationDetail() {
       ) : null}
 
       {tab === 'hosts' ? (
-        <HostsTab
-          incarnationName={row.name}
-          spec={row.spec ?? null}
-          state={row.state ?? null}
-          status={row.status}
-        />
+        <HostsTab incarnationName={row.name} state={row.state ?? null} />
       ) : null}
 
       {tab === 'choirs' ? (

@@ -15,7 +15,6 @@ const INCARNATION = {
   service_version: 'v2.0.0',
   state_schema_version: 3,
   covens: ['prod'],
-  spec: { hosts: [{ sid: 'host-a.local', role: 'master' }] },
   state: {},
   status: 'ready',
   created_by_aid: 'archon-alice',
