@@ -20,9 +20,10 @@ import { describe, it, expect } from 'vitest';
 //     ../soul-stack/docs/keeper/openapi.yaml is still what makes a backend
 //     removal visible at all (a CI freshness check is NIM-441).
 //   - It compares paths, not methods. Had the backend dropped only PATCH and
-//     kept a GET on the same path, this would stay green.
+//     kept a GET on the same path, this would stay green — it would have slept
+//     through its own founding case, had that removal spared the path (NIM-465).
 //   - It reads whole string literals. A path assembled from a prefix variable
-//     is invisible to it.
+//     is invisible to it, and nothing goes red when one appears (NIM-465).
 
 const SPEC = path.resolve('vendor/openapi/keeper.yaml');
 const SRC = path.resolve('src');
