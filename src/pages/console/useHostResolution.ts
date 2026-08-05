@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { keeperApi, type SoulListEntry } from '../../api/keeper';
 import {
+  SOULPRINT_FANOUT_LIMIT,
   compileSidRegex,
   hasAnyCriteria,
   matchSoulprint,
@@ -28,6 +29,16 @@ export interface HostResolution {
   sids: string[];
   loading: boolean;
   soulsUnavailable: boolean;
+  // The registry outgrew the read cap: `allSouls` is a prefix of it, so the scope
+  // preview is a lower bound rather than the answer.
+  soulsTruncated: boolean;
+  // Rows read, and rows the registry holds — the two numbers the warning quotes.
+  soulsScanned: number;
+  soulsTotal: number;
+  // The soulprint criterion has more candidates than it will read one by one, so
+  // it was not evaluated at all and `matched` is empty on purpose.
+  soulprintOverload: boolean;
+  soulprintCandidates: number;
   // Soulprint tokens the DSL did not recognize (inline warning).
   invalidSoulprint: string[];
   regexError: string | null;
@@ -38,9 +49,13 @@ export interface HostResolution {
 }
 
 export function useHostResolution(criteria: HostCriteria): HostResolution {
+  // Every page of the registry, not the first one: the criteria are matched against
+  // this list and the survivors become the hosts the wall connects to, so a host
+  // past the first page would be missing from the shells with nothing on screen to
+  // say so — the same silent drop the wizard had (NIM-448).
   const soulsQ = useQuery({
     queryKey: ['console.souls.list'],
-    queryFn: () => keeperApi.souls.list({ limit: 1000 }),
+    queryFn: () => keeperApi.souls.listAll(),
     staleTime: 30_000,
     retry: false,
   });
@@ -56,24 +71,32 @@ export function useHostResolution(criteria: HostCriteria): HostResolution {
     return allSouls.filter((s) => matchStableCriteria(s, criteria, sidRegexComp.re, membership.memberSids));
   }, [hasCriteria, allSouls, criteria, sidRegexComp.re, membership.memberSids]);
 
+  // NO criterion, NO array — react-query builds an observer per descriptor whether
+  // or not it is enabled, and the candidate set is no longer bounded by one page.
+  // Past SOULPRINT_FANOUT_LIMIT the stage is refused rather than run over part of
+  // the candidates: connecting to a slice of the scope is the failure this fixes.
   const soulprintActive = needsSoulprint(criteria);
+  const soulprintOverload = soulprintActive && stableMatched.length > SOULPRINT_FANOUT_LIMIT;
+  const soulprintEnabled = soulprintActive && !soulprintOverload;
   const soulprintQueries = useQueries({
-    queries: stableMatched.map((row) => ({
-      queryKey: ['soulprint', row.sid] as const,
-      queryFn: async () => {
-        try {
-          return await keeperApi.souls.getSoulprint(row.sid);
-        } catch {
-          return null;
-        }
-      },
-      enabled: soulprintActive,
-      staleTime: 60_000,
-    })),
+    queries: soulprintEnabled
+      ? stableMatched.map((row) => ({
+          queryKey: ['soulprint', row.sid] as const,
+          queryFn: async () => {
+            try {
+              return await keeperApi.souls.getSoulprint(row.sid);
+            } catch {
+              return null;
+            }
+          },
+          staleTime: 60_000,
+        }))
+      : [],
   });
-  const soulprintLoading = soulprintActive && soulprintQueries.some((r) => r.isLoading);
+  const soulprintLoading = soulprintEnabled && soulprintQueries.some((r) => r.isLoading);
 
   const matched = useMemo<SoulListEntry[]>(() => {
+    if (soulprintOverload) return [];
     if (!soulprintActive) return stableMatched;
     const out: SoulListEntry[] = [];
     for (let i = 0; i < stableMatched.length; i += 1) {
@@ -85,7 +108,7 @@ export function useHostResolution(criteria: HostCriteria): HostResolution {
     // soulprintQueries is a fresh array each render; the data it carries is
     // keyed by stableMatched, which is the real dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [soulprintActive, stableMatched, parsedSoulprint.rules, soulprintLoading]);
+  }, [soulprintActive, soulprintOverload, stableMatched, parsedSoulprint.rules, soulprintLoading]);
 
   return {
     allSouls,
@@ -93,6 +116,11 @@ export function useHostResolution(criteria: HostCriteria): HostResolution {
     sids: useMemo(() => matched.map((s) => s.sid), [matched]),
     loading: soulsQ.isLoading || soulprintLoading || membership.loading,
     soulsUnavailable: soulsQ.isError,
+    soulsTruncated: soulsQ.data?.truncated ?? false,
+    soulsScanned: allSouls.length,
+    soulsTotal: soulsQ.data?.total ?? 0,
+    soulprintOverload,
+    soulprintCandidates: stableMatched.length,
     invalidSoulprint: parsedSoulprint.invalid,
     regexError: sidRegexComp.error,
     hasCriteria,

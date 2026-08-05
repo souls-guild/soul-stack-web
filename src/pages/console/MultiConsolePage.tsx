@@ -317,6 +317,11 @@ export function MultiConsolePage() {
           matched={resolution.matched}
           loading={resolution.loading}
           soulsUnavailable={resolution.soulsUnavailable}
+          soulsTruncated={resolution.soulsTruncated}
+          soulsScanned={resolution.soulsScanned}
+          soulsTotal={resolution.soulsTotal}
+          soulprintOverload={resolution.soulprintOverload}
+          soulprintCandidates={resolution.soulprintCandidates}
           invalidSoulprint={resolution.invalidSoulprint}
           regexError={resolution.regexError}
           hasCriteria={resolution.hasCriteria}

@@ -11,7 +11,7 @@ import { Plug, X } from 'lucide-react';
 import { Badge, Button } from '../../components/primitives';
 import { ChipsInput } from '../incarnations/ChipsInput';
 import type { SoulListEntry } from '../../api/keeper';
-import type { HostCriteria } from '../run/hostSelector';
+import { SOULPRINT_FANOUT_LIMIT, type HostCriteria } from '../run/hostSelector';
 import type { MembershipFailure, UnresolvedIncarnation } from '../run/useIncarnationMembers';
 import { CONSOLE_SOFT_LIMIT } from './consoleSelection';
 import styles from './MultiConsole.module.css';
@@ -36,6 +36,11 @@ interface Props {
   matched: SoulListEntry[];
   loading: boolean;
   soulsUnavailable: boolean;
+  soulsTruncated: boolean;
+  soulsScanned: number;
+  soulsTotal: number;
+  soulprintOverload: boolean;
+  soulprintCandidates: number;
   invalidSoulprint: string[];
   regexError: string | null;
   hasCriteria: boolean;
@@ -52,6 +57,11 @@ export function ScopePicker({
   matched,
   loading,
   soulsUnavailable,
+  soulsTruncated,
+  soulsScanned,
+  soulsTotal,
+  soulprintOverload,
+  soulprintCandidates,
   invalidSoulprint,
   regexError,
   hasCriteria,
@@ -74,6 +84,12 @@ export function ScopePicker({
       {soulsUnavailable ? (
         <div className={`${styles.banner} ${styles.bannerDanger}`} data-testid="console-souls-error">
           {t('console:soulsUnavailable')}
+        </div>
+      ) : null}
+
+      {soulsTruncated ? (
+        <div className={`${styles.banner} ${styles.bannerWarn}`} data-testid="console-souls-truncated">
+          {t('console:soulsTruncated', { scanned: soulsScanned, total: soulsTotal })}
         </div>
       ) : null}
 
@@ -142,9 +158,17 @@ export function ScopePicker({
       </div>
 
       <div className={styles.scopePreview} data-testid="console-scope-preview">
+        {soulprintOverload ? (
+          <div className={styles.scopeWarn} data-testid="console-soulprint-overload">
+            {t('console:soulprintTooMany', {
+              count: soulprintCandidates,
+              limit: SOULPRINT_FANOUT_LIMIT,
+            })}
+          </div>
+        ) : null}
         {!hasCriteria ? (
           <span className={styles.scopeMuted}>{t('console:scopeEmpty')}</span>
-        ) : (
+        ) : soulprintOverload ? null : (
           <>
             <div className={styles.scopeCount}>
               <Badge tone={matched.length > 0 ? 'info' : 'warn'}>

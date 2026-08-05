@@ -79,6 +79,8 @@
   "selectNone": "Clear",
   "selectedOf": "{{selected}} of {{total}} selected",
   "selectionLabel": "Scope",
+  "soulprintTooMany": "The soulprint filter reads hosts one by one and covers at most {{limit}}; the other criteria match {{count}}. Narrow them first — filtering only part of the candidates would open shells on a narrower set than the scope describes.",
+  "soulsTruncated": "Read {{scanned}} of {{total}} registered hosts — the scope was matched against those only, so hosts beyond them will not get a shell. Narrow the scope.",
   "soulsUnavailable": "Souls list unavailable — the scope cannot be resolved right now.",
   "statusConnecting": "connecting…",
   "subtitle": "Live shells on a selection of VMs. Build the scope, connect, then work — per pane for one host, or through a tab's input for the whole group.",

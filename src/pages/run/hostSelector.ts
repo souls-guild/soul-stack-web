@@ -48,6 +48,18 @@ export function needsSoulprint(c: HostCriteria): boolean {
   return c.soulprint.trim().length > 0;
 }
 
+// Candidates the soulprint stage will fan out over — it reads one host at a time,
+// so its cost IS the candidate count.
+//
+// 1000 is what the ceiling already was: both callers used to resolve against a
+// single page of `GET /v1/souls`, so nothing that worked before this reaches it.
+// Since NIM-448 they read the whole registry, and a fleet of tens of thousands
+// would otherwise put a request and a react-query observer behind every host.
+// Past the limit the criterion is REFUSED, not applied to part of the candidates:
+// the reason for reading the whole registry is that the operator is never handed
+// a target quietly narrower than the criteria describe.
+export const SOULPRINT_FANOUT_LIMIT = 1000;
+
 // Compiled SID regex or null (for an empty / invalid pattern).
 //
 // The pattern is a full-match over SID (anchored `^(?:...)$`, `grep -x` semantics): otherwise

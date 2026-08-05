@@ -40,6 +40,7 @@ import {
 } from '../incarnations/scenarioInputFields.helpers';
 import {
   EMPTY_HOST_CRITERIA,
+  SOULPRINT_FANOUT_LIMIT,
   compileSidRegex,
   hasAnyCriteria,
   matchSoulprint,
@@ -477,13 +478,22 @@ export function RunWizard() {
   );
 
   // --- Host resolution for Command (live preview + submit). ---
-  // Always load the soul list (for preview); filtering is client-side.
+  // Always load the soul list (for preview); filtering is client-side. Every page
+  // of it, not the first: the criteria are matched against whatever this returns
+  // and the survivors are shipped as an explicit `target.sids`, so a host missing
+  // from the answer is a host missing from the run (NIM-448).
   const soulsListQ = useQuery({
     queryKey: ['run.command.souls.list'],
-    queryFn: () => keeperApi.souls.list({ limit: 1000 }),
+    queryFn: () => keeperApi.souls.listAll(),
     enabled: workload === 'command',
   });
   const allSouls = useMemo<SoulListEntry[]>(() => soulsListQ.data?.items ?? [], [soulsListQ.data]);
+  // The fleet outgrew the read cap: the criteria were matched against a prefix of
+  // the registry, so the preview is a lower bound. Said out loud in Step 2 rather
+  // than left for the operator to infer from a counter.
+  const soulsTruncated = soulsListQ.data?.truncated ?? false;
+  const soulsScanned = allSouls.length;
+  const soulsTotal = soulsListQ.data?.total ?? 0;
 
   const parsedSoulprint = useMemo(() => parseCriteriaSoulprint(hostCriteria), [hostCriteria]);
   const sidRegexComp = useMemo(() => compileSidRegex(hostCriteria.sidRegex), [hostCriteria.sidRegex]);
@@ -500,26 +510,43 @@ export function RunWizard() {
 
   // Stage 2: soulprint-fetch only for the already-filtered stable candidates and
   // only if a soulprint criterion is set.
+  //
+  // NO criterion, NO array. `enabled: false` stops the requests but not the
+  // observers: react-query builds one per descriptor, so handing it a descriptor
+  // per candidate costs the same whether or not it fetches. That was invisible
+  // while the candidate set could not exceed one page; against the whole registry
+  // (NIM-448) it locks the tab on a fleet of tens of thousands.
+  //
+  // And past SOULPRINT_FANOUT_LIMIT candidates the stage does not run at all —
+  // see the constant. Refusing is the point: evaluating the filter over a slice
+  // of the candidates and reporting the survivors as the target is the silent
+  // shortfall this whole change exists to remove.
   const soulprintActive = needsSoulprint(hostCriteria);
+  const soulprintOverload = soulprintActive && stableMatched.length > SOULPRINT_FANOUT_LIMIT;
+  const soulprintEnabled = workload === 'command' && soulprintActive && !soulprintOverload;
   const soulprintQueries = useQueries({
-    queries: stableMatched.map((row) => ({
-      queryKey: ['soulprint', row.sid] as const,
-      queryFn: async () => {
-        try {
-          return await keeperApi.souls.getSoulprint(row.sid);
-        } catch {
-          return null;
-        }
-      },
-      enabled: workload === 'command' && soulprintActive,
-      staleTime: 60_000,
-    })),
+    queries: soulprintEnabled
+      ? stableMatched.map((row) => ({
+          queryKey: ['soulprint', row.sid] as const,
+          queryFn: async () => {
+            try {
+              return await keeperApi.souls.getSoulprint(row.sid);
+            } catch {
+              return null;
+            }
+          },
+          staleTime: 60_000,
+        }))
+      : [],
   });
 
-  const soulprintLoading = soulprintActive && soulprintQueries.some((res) => res.isLoading);
+  const soulprintLoading = soulprintEnabled && soulprintQueries.some((res) => res.isLoading);
 
   // Stage 3: final SID list after soulprint rules.
   const resolvedSouls = useMemo<SoulListEntry[]>(() => {
+    // Nothing resolved, deliberately: the criteria have no answer we are willing
+    // to compute, and an empty target keeps Next disabled until they narrow.
+    if (soulprintOverload) return [];
     if (!soulprintActive) return stableMatched;
     const out: SoulListEntry[] = [];
     for (let i = 0; i < stableMatched.length; i++) {
@@ -529,9 +556,64 @@ export function RunWizard() {
     return out;
     // soulprintQueries — an array of result objects, referentially stable within a render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [soulprintActive, stableMatched, parsedSoulprint.rules, soulprintQueries.map((q) => q.data)]);
+  }, [
+    soulprintActive,
+    soulprintOverload,
+    stableMatched,
+    parsedSoulprint.rules,
+    soulprintQueries.map((q) => q.data),
+  ]);
 
   const resolvedSids = useMemo(() => resolvedSouls.map((s) => s.sid), [resolvedSouls]);
+
+  // A `?target_sids=` link names its hosts outright — the roster's own row set,
+  // when the link came from the Members table's run button. Those names are turned
+  // into a SID regex and re-resolved against the registry, so a SID the registry
+  // does not carry (out of the operator's `soul.list` scope, or a row the members
+  // table only had from telemetry) matches nothing and leaves without a word.
+  // Naming it is the whole point: the button promised THESE hosts.
+  //
+  // Only while the criteria are untouched. Once the operator edits them, hosts
+  // dropping out is what they asked for, and the notice would be noise.
+  // Deduplicated: a link repeating a SID asks for one host, and counting it twice
+  // would make "N of M" disagree with the row count the operator came from.
+  const requestedSids = useMemo(
+    () => Array.from(new Set(splitCsv(searchParams.get('target_sids') ?? ''))),
+    // read searchParams once on mount, like initialCriteria.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const criteriaUntouched = useMemo(
+    () => sameCriteria(hostCriteria, initialCriteria),
+    [hostCriteria, initialCriteria],
+  );
+  // A Cadence with a coven ships `target.coven[]` and lets the Keeper resolve the
+  // hosts on every tick (see buildRecipePayload) — the client's SID list is not
+  // the target, so a SID missing from the client's read says nothing about what
+  // will run. Only the runs that actually ship `target.sids` can under-deliver.
+  const shipsResolvedSids = !(runMode === 'cadence' && hostCriteria.covens.length > 0);
+  const unresolvedRequestedSids = useMemo(() => {
+    if (workload !== 'command' || requestedSids.length === 0 || !criteriaUntouched) return [];
+    if (!shipsResolvedSids) return [];
+    // No answer yet, or no answer at all: an unread registry resolves nothing, and
+    // blaming the SIDs for a failed request would point the operator at the wrong
+    // problem. The query's own error surfaces elsewhere.
+    if (soulsListQ.isLoading || soulsListQ.isError || !soulsListQ.data || soulprintLoading) {
+      return [];
+    }
+    const resolved = new Set(resolvedSids);
+    return requestedSids.filter((sid) => !resolved.has(sid));
+  }, [
+    workload,
+    requestedSids,
+    criteriaUntouched,
+    shipsResolvedSids,
+    soulsListQ.isLoading,
+    soulsListQ.isError,
+    soulsListQ.data,
+    soulprintLoading,
+    resolvedSids,
+  ]);
 
   // --- Incarnation resolution for Scenario (preview + multi-select). ---
   const incarnationsListQ = useQuery({
@@ -973,6 +1055,14 @@ export function RunWizard() {
             regexError={sidRegexComp.error}
             unresolvedIncarnations={membership.unresolved}
             runMode={runMode}
+            soulsTruncated={soulsTruncated}
+            soulsScanned={soulsScanned}
+            soulsTotal={soulsTotal}
+            soulprintOverload={soulprintOverload}
+            soulprintCandidates={stableMatched.length}
+            soulprintLimit={SOULPRINT_FANOUT_LIMIT}
+            unresolvedRequestedSids={unresolvedRequestedSids}
+            requestedSidCount={requestedSids.length}
           />
         ) : null}
 
@@ -1511,6 +1601,14 @@ function Step2CommandHosts({
   regexError,
   unresolvedIncarnations,
   runMode,
+  soulsTruncated,
+  soulsScanned,
+  soulsTotal,
+  soulprintOverload,
+  soulprintCandidates,
+  soulprintLimit,
+  unresolvedRequestedSids,
+  requestedSidCount,
 }: {
   value: HostCriteria;
   onChange: (next: HostCriteria) => void;
@@ -1520,9 +1618,18 @@ function Step2CommandHosts({
   regexError: string | null;
   unresolvedIncarnations: UnresolvedIncarnation[];
   runMode: RunMode;
+  soulsTruncated: boolean;
+  soulsScanned: number;
+  soulsTotal: number;
+  soulprintOverload: boolean;
+  soulprintCandidates: number;
+  soulprintLimit: number;
+  unresolvedRequestedSids: string[];
+  requestedSidCount: number;
 }) {
   const { t } = useTranslation();
   const sample = resolvedSouls.slice(0, 50);
+  const unresolvedSample = unresolvedRequestedSids.slice(0, 10);
   const active = hasAnyCriteria(value);
 
   // Footgun banners for Cadence (late-binding warnings).
@@ -1618,14 +1725,36 @@ function Step2CommandHosts({
       ) : null}
 
       <div className={styles.preview} aria-label={t('run:hostPreviewAria')}>
+        {soulsTruncated ? (
+          <div className={styles.warn} data-testid="souls-truncated-warn" style={{ marginBottom: 6 }}>
+            {t('run:hostsRegistryTruncated', { scanned: soulsScanned, total: soulsTotal })}
+          </div>
+        ) : null}
+        {soulprintOverload ? (
+          <div className={styles.warn} data-testid="soulprint-overload-warn" style={{ marginBottom: 6 }}>
+            {t('run:hostsSoulprintTooMany', { count: soulprintCandidates, limit: soulprintLimit })}
+          </div>
+        ) : null}
         {!active ? (
           <div>{t('run:hostCriteriaEmpty')}</div>
-        ) : (
+        ) : soulprintOverload ? null : (
           <>
             <div>
               <Badge tone="info">{t('run:hostsMatch', { count: resolvedSouls.length })}</Badge>
               {soulsLoading ? <span style={{ marginLeft: 8 }}>{t('loading')}</span> : null}
             </div>
+            {unresolvedRequestedSids.length > 0 ? (
+              <div className={styles.warn} data-testid="targets-unresolved-warn" style={{ marginTop: 6 }}>
+                {t('run:hostsTargetsUnresolved', {
+                  count: unresolvedRequestedSids.length,
+                  total: requestedSidCount,
+                  sids: unresolvedSample.join(', '),
+                })}
+                {unresolvedRequestedSids.length > unresolvedSample.length ? (
+                  <> {t('run:hostsMore', { count: unresolvedRequestedSids.length - unresolvedSample.length })}</>
+                ) : null}
+              </div>
+            ) : null}
             {sample.length > 0 ? (
               <div style={{ marginTop: 6 }}>
                 {sample.map((s) => (
@@ -2259,6 +2388,18 @@ function splitCsv(raw: string): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+// Whether the operator has left the criteria exactly as the deep-link built them.
+function sameCriteria(a: HostCriteria, b: HostCriteria): boolean {
+  return (
+    a.sidRegex === b.sidRegex &&
+    a.soulprint === b.soulprint &&
+    a.incarnations.length === b.incarnations.length &&
+    a.incarnations.every((v, i) => v === b.incarnations[i]) &&
+    a.covens.length === b.covens.length &&
+    a.covens.every((v, i) => v === b.covens[i])
+  );
 }
 
 

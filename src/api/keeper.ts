@@ -628,6 +628,89 @@ export interface ListSoulsQuery {
   cursor?: string;
 }
 
+/** Filters of `souls.listAll` — the page window is the loop's business, not the caller's. */
+export type ListAllSoulsQuery = Omit<ListSoulsQuery, 'offset' | 'limit' | 'cursor'>;
+
+export interface SoulListAllReply {
+  /** Every soul the loop read, deduplicated by SID, in server order. */
+  items: SoulListEntry[];
+  /** `total` of the last page read — the exact size of the set within the operator's scope. */
+  total: number;
+  /** The cap stopped the loop before the set ran out: `items` is a prefix, not the set. */
+  truncated: boolean;
+}
+
+/**
+ * Largest page `GET /v1/souls` serves. Asking for more is a 400 (`invalid limit
+ * 1001: must be <= 1000`), not a silent clamp, so this is the loop's step — not a
+ * number to raise.
+ */
+const SOULS_MAX_PAGE = 1000;
+
+/**
+ * Pages `souls.listAll` will read before giving up and reporting `truncated`.
+ * 20 x 1000 covers any fleet we have seen; past it the caller says out loud that
+ * it resolved against a prefix rather than quietly pretending otherwise.
+ */
+const SOULS_ALL_MAX_PAGES = 20;
+
+function fetchSoulsPage(q: ListSoulsQuery = {}): Promise<SoulListReply> {
+  return apiGet<SoulListReply>('/v1/souls', {
+    query: {
+      coven: q.coven,
+      status: q.status,
+      transport: q.transport,
+      // Omitted rather than sent as `false`: an absent filter and a disabled one
+      // mean the same thing to the server, and a bare `?unassigned=false` in the
+      // URL reads like a deliberate "show me the busy ones".
+      unassigned: q.unassigned ? true : undefined,
+      sid_prefix: q.sid_prefix,
+      offset: q.offset,
+      limit: q.limit,
+      cursor: q.cursor,
+    },
+  });
+}
+
+async function listAllSouls(
+  q: ListAllSoulsQuery,
+  maxPages: number,
+): Promise<SoulListAllReply> {
+  const items: SoulListEntry[] = [];
+  const seen = new Set<string>();
+  let total = 0;
+  // Offset advances by the page size, not by items.length: dedup can drop rows,
+  // and re-reading the window they came from would loop on the same page forever.
+  let offset = 0;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const reply = await fetchSoulsPage({ ...q, offset, limit: SOULS_MAX_PAGE });
+    total = reply.total;
+    const batch = reply.items ?? [];
+    for (const soul of batch) {
+      if (seen.has(soul.sid)) continue;
+      seen.add(soul.sid);
+      items.push(soul);
+    }
+    // The envelope still carries the two keyset fields the souls list stopped
+    // filling when its keyset mode was removed — the server builds one reply, by
+    // offset, with an exact total, and `omitempty` drops both. If either ever
+    // shows up again, this walk is reading a set it cannot page: `total` is an
+    // estimate, so `offset >= total` would end the loop early, and the offsets
+    // themselves may mean nothing. Say `truncated` and let the caller warn rather
+    // than hand back a prefix labelled complete — which is the whole bug this
+    // function exists to remove.
+    if (reply.next_cursor !== undefined || reply.total_approximate === true) {
+      return { items, total, truncated: true };
+    }
+    offset += SOULS_MAX_PAGE;
+    if (batch.length < SOULS_MAX_PAGE || offset >= total) {
+      return { items, total, truncated: false };
+    }
+  }
+  return { items, total, truncated: true };
+}
+
 export const keeperApi = {
   // health-probe, handy as a "is the token valid?" check (via /v1/incarnations).
   ping: () => apiGet<IncarnationListReply>('/v1/incarnations', { query: { limit: 1 } }),
@@ -892,22 +975,24 @@ export const keeperApi = {
   },
 
   souls: {
-    list: (q: ListSoulsQuery = {}) =>
-      apiGet<SoulListReply>('/v1/souls', {
-        query: {
-          coven: q.coven,
-          status: q.status,
-          transport: q.transport,
-          // Omitted rather than sent as `false`: an absent filter and a disabled one
-          // mean the same thing to the server, and a bare `?unassigned=false` in the
-          // URL reads like a deliberate "show me the busy ones".
-          unassigned: q.unassigned ? true : undefined,
-          sid_prefix: q.sid_prefix,
-          offset: q.offset,
-          limit: q.limit,
-          cursor: q.cursor,
-        },
-      }),
+    list: (q: ListSoulsQuery = {}) => fetchSoulsPage(q),
+    /**
+     * Every soul in the operator's scope, not the first page of them.
+     *
+     * `GET /v1/souls` serves at most 1000 rows per request and pages by offset with
+     * an exact `total` (there is no keyset mode on this endpoint), so "all souls"
+     * is a loop. A caller that asks once and filters the answer client-side does
+     * not resolve a target set — it resolves a page, and every host past row 1000
+     * drops out of the run with nothing on screen to say so (NIM-448).
+     *
+     * Stops early on the first short page (offset paging only under-fills at the
+     * end of the set) and dedupes by SID, because a registration landing mid-loop
+     * shifts rows between pages — the list is ordered `registered_at DESC, sid ASC`,
+     * so a new host prepends. Past `maxPages` it stops and says `truncated`: a
+     * bounded read the caller can be honest about beats an unbounded one.
+     */
+    listAll: (q: ListAllSoulsQuery = {}, maxPages = SOULS_ALL_MAX_PAGES) =>
+      listAllSouls(q, maxPages),
     get: (sid: string) => apiGet<SoulListEntry>(`/v1/souls/${encodeURIComponent(sid)}`),
     // GET /v1/souls/{sid}/telemetry — host-vitals: latest + window (sparklines,
     // newest-first) + freshness (collected_at/received_at, stale). NIM-86.

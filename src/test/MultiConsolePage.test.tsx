@@ -120,12 +120,13 @@ beforeEach(() => {
   sent.length = 0;
   hooks = null;
   socketClosed = false;
-  vi.spyOn(keeperApi.souls, 'list').mockResolvedValue({
+  // The scope resolves against the WHOLE registry, not its first page (NIM-448) —
+  // hence listAll, which pages until the set runs out.
+  vi.spyOn(keeperApi.souls, 'listAll').mockResolvedValue({
     items: SOULS,
     total: SOULS.length,
-    offset: 0,
-    limit: 1000,
-  } as Awaited<ReturnType<typeof keeperApi.souls.list>>);
+    truncated: false,
+  } as Awaited<ReturnType<typeof keeperApi.souls.listAll>>);
   vi.spyOn(keeperApi.incarnations, 'members').mockImplementation(async (name: string) => {
     const items = (MEMBERS[name] ?? []).map((sid) => ({
       sid,
