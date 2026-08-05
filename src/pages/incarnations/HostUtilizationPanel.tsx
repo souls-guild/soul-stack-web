@@ -129,6 +129,21 @@ export function HostUtilizationPanel({ incarnationName }: { incarnationName: str
   });
   const sorted = sortHostRows(rows, sortKey, sortDir);
 
+  // "Run command on these hosts" targets THESE hosts: the SIDs this table lists,
+  // which are the membership roster the backend resolved. It used to pass
+  // `target_coven=<incarnation name>` — since NIM-124 a Coven is a label and
+  // membership is the relation, so that ran on a different set in both
+  // directions: a member without the label was silently dropped, a labelled
+  // non-member silently added. On an arbitrary-command workload that is not a
+  // discrepancy anyone should have to notice. Built from `rows`, not `sorted`,
+  // so clicking a column header does not rewrite the link. No rows → no honest
+  // target, so the button is disabled rather than pointing at everything.
+  const targetSids = rows.map((r) => r.sid);
+  const runHref =
+    targetSids.length > 0
+      ? `/run?workload=command&target_sids=${encodeURIComponent(targetSids.join(','))}`
+      : null;
+
   function onSort(key: HostSortKey) {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
@@ -153,15 +168,25 @@ export function HostUtilizationPanel({ incarnationName }: { incarnationName: str
         <h2 className={common.sectionTitle} style={{ margin: 0 }}>
           Connected souls
         </h2>
-        <Link
-          to={`/run?workload=command&target_coven=${encodeURIComponent(incarnationName)}`}
-          aria-label={t('incarnations:runCommandOnHosts')}
-        >
-          <Button type="button" variant="primary">
+        {runHref ? (
+          <Link to={runHref} aria-label={t('incarnations:runCommandOnHosts')} data-testid="run-on-hosts">
+            <Button type="button" variant="primary">
+              <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+              {t('incarnations:runCommandOnHosts')}
+            </Button>
+          </Link>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            disabled
+            title={t('incarnations:runCommandNoHosts')}
+            data-testid="run-on-hosts-disabled"
+          >
             <Play size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
             {t('incarnations:runCommandOnHosts')}
           </Button>
-        </Link>
+        )}
       </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
         Member hosts of this incarnation. {t('incarnations:connectedSoulsDesc')}

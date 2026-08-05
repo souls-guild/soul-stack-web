@@ -1402,6 +1402,29 @@ describe('RunWizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
   });
 
+  // The receiving half of NIM-443: the Hosts tab hands over the roster it showed
+  // as an explicit SID list, so the run must reach exactly those hosts. The
+  // fixture's third soul carries the incarnation's name as a Coven label and is
+  // NOT in the list — under the old coven-targeted link it was the only one the
+  // run would have reached.
+  it('Pre-fill ?workload=command&target_sids → exactly those hosts, coven label ignored', async () => {
+    setupFetchStub({
+      souls: [
+        { sid: 'host-a.example.com', covens: ['dev'] },
+        { sid: 'host-b.example.com', covens: ['dev'] },
+        { sid: 'labelled-nonmember.example.com', covens: ['hello-dev'] },
+      ],
+    });
+    renderWizardWithRoutes('/run?workload=command&target_sids=host-a.example.com%2Chost-b.example.com');
+    expect(screen.getByLabelText('Command')).toBeChecked();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    const preview = screen.getByLabelText('Host preview').textContent ?? '';
+    expect(preview).toContain('host-a.example.com');
+    expect(preview).toContain('host-b.example.com');
+    expect(preview).not.toContain('labelled-nonmember.example.com');
+  });
+
   // --- Tests S-W5 (updated for S6): batch_mode / max_failures / require_alive ---
 
   async function reachStep4Command() {

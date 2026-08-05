@@ -205,6 +205,7 @@
   "rosterHint": "This scenario deploys onto the souls you pick below — the onboarded, online ones you can see.",
   "runAccepted": "Run accepted: scenario",
   "runAcceptedTail": ". History will update once the run completes.",
+  "runCommandNoHosts": "No hosts to run on — the list below is empty.",
   "runCommandOnHosts": "Run command on these hosts",
   "runFailedTaskAria": "Failed task",
   "runInputAria": "Run input",

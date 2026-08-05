@@ -279,6 +279,69 @@ describe('HostUtilizationPanel (membership rows ⋈ registry status)', () => {
     expect(await screen.findByTestId('spark-empty')).toBeInTheDocument();
   });
 
+  // NIM-443: the button says "these hosts", so it must carry the SIDs of the rows
+  // it stands over. `target_coven=<incarnation name>` is a DIFFERENT set since
+  // NIM-124 — the fixture's souls prove it, their coven is "dev" while the
+  // incarnation is "hello-dev", so a coven-targeted run would reach neither of them.
+  it('Run command carries the listed SIDs, never the incarnation as a coven label', async () => {
+    installFetchMock([
+      { method: 'GET', url: SOULS, body: soulsBody([soulItem('soul-docker-1'), soulItem('soul-docker-2')]) },
+      {
+        method: 'GET',
+        url: AGG,
+        body: aggBody([
+          { sid: 'soul-docker-1', stale: false, collected_at: '2026-05-26T10:00:00Z', latest: LATEST },
+          { sid: 'soul-docker-2', stale: false, collected_at: '2026-05-26T10:00:00Z', latest: LATEST2 },
+        ]),
+      },
+    ]);
+    render();
+    // Read the link only once the rows are on screen: before the fetch resolves
+    // the panel has nothing to target, and an empty target would pass the
+    // "no coven" half of this assertion for the wrong reason.
+    await waitFor(() => expect(screen.getByText('42%')).toBeInTheDocument());
+    const href = screen.getByTestId('run-on-hosts').getAttribute('href') ?? '';
+    const query = new URLSearchParams(href.slice(href.indexOf('?')));
+    expect(query.get('workload')).toBe('command');
+    expect(query.get('target_sids')).toBe('soul-docker-1,soul-docker-2');
+    expect(query.has('target_coven')).toBe(false);
+  });
+
+  // Sorting reorders the table, not the set the run reaches: a link that changed
+  // under a column click would make the target look like a function of the view.
+  it('Run command target is unchanged by a column sort', async () => {
+    installFetchMock([
+      { method: 'GET', url: SOULS, body: soulsBody([soulItem('h1.example.com'), soulItem('h2.example.com')]) },
+      {
+        method: 'GET',
+        url: AGG,
+        body: aggBody([
+          { sid: 'h1.example.com', stale: false, collected_at: '2026-05-26T10:00:00Z', latest: LATEST },
+          { sid: 'h2.example.com', stale: false, collected_at: '2026-05-26T10:00:00Z', latest: LATEST2 },
+        ]),
+      },
+    ]);
+    render();
+    await waitFor(() => expect(screen.getByText('42%')).toBeInTheDocument());
+    const before = screen.getByTestId('run-on-hosts').getAttribute('href');
+    expect(before).toContain('h1.example.com');
+    await userEvent.click(screen.getByTestId('host-th-cpu'));
+    expect(screen.getByTestId('run-on-hosts').getAttribute('href')).toBe(before);
+  });
+
+  // No rows means no honest target. The old link still offered a run — onto the
+  // coven, i.e. onto hosts the operator was not being shown.
+  it('no rows → Run command is disabled, not a link to everything', async () => {
+    installFetchMock([
+      { method: 'GET', url: SOULS, body: soulsBody([]) },
+      { method: 'GET', url: AGG, body: aggBody([]) },
+    ]);
+    render();
+    await waitFor(() => expect(screen.getByTestId('util-empty')).toBeInTheDocument());
+    expect(screen.queryByTestId('run-on-hosts')).not.toBeInTheDocument();
+    expect(screen.getByTestId('run-on-hosts-disabled')).toBeDisabled();
+  });
+
   it('Fresh age counts up live between refetches (useNow tick)', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-26T10:00:05Z')); // 5s after collection
