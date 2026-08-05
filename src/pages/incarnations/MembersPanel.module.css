@@ -101,6 +101,34 @@
   background: var(--surface);
 }
 
+/* Membership provenance inside the expanded row — bound_at / bound_by. */
+.memberFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5);
+  padding: var(--s-3) var(--s-2) 0;
+}
+
+.memberFact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.factLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.factValue {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
 .trends {
   display: flex;
   flex-direction: column;

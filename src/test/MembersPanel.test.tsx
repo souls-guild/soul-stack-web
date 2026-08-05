@@ -2,14 +2,17 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
-import { MembersSection } from '../pages/incarnations/MembersSection';
+import { MembersPanel } from '../pages/incarnations/MembersPanel';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
-// Roster UI over the NIM-209 membership endpoints. The invariants under guard:
-// a missing bound_by_aid never renders as "undefined", the destructive control
-// is hidden by RIGHT rather than by the server's answer, and a scope-narrowed or
+// The roster half of the merged panel (NIM-232 over the NIM-209 endpoints,
+// merged with the vitals table in NIM-444). The invariants under guard: a
+// missing bound_by_aid never renders as "undefined", the destructive control is
+// hidden by RIGHT rather than by the server's answer, and a scope-narrowed or
 // forbidden roster reads as an explanation instead of an error.
+//
+// The vitals columns of the same table are guarded in MembersPanelVitals.test.tsx.
 
 const ROSTER = {
   items: [
@@ -27,6 +30,10 @@ const ROSTER = {
   total: 2,
 };
 
+// The roster is the row source; telemetry only fills columns. These fixtures
+// answer it with nothing so the table is pure membership.
+const NO_TELEMETRY = { incarnation: 'redis-prod', truncated: false, hosts: [] };
+
 function permissions(perms: Array<{ resource: string; action: string }>) {
   return { permissions: perms.map((p) => ({ ...p, wildcard: false })) };
 }
@@ -37,7 +44,11 @@ const ALL_PERMS = permissions([
   { resource: 'incarnation', action: 'unbind-member' },
 ]);
 
-describe('MembersSection', () => {
+function render() {
+  renderWithProviders(<MembersPanel incarnationName="redis-prod" />);
+}
+
+describe('MembersPanel — roster', () => {
   beforeEach(() => {
     tokenStore.clear();
   });
@@ -46,23 +57,40 @@ describe('MembersSection', () => {
     installFetchMock([
       { method: 'GET', url: '/v1/me/permissions', body: ALL_PERMS },
       { method: 'GET', url: '/v1/incarnations/redis-prod/members', body: ROSTER },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
     ]);
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
 
     await waitFor(() => expect(screen.getByTestId('members-table')).toBeInTheDocument());
     expect(screen.getByText('host-a.local')).toBeInTheDocument();
-    expect(screen.getByText('archon-ops')).toBeInTheDocument();
-    const rowB = screen.getByText('host-b.local').closest('tr')!;
-    expect(rowB.textContent).toContain('—');
-    expect(rowB.textContent).not.toContain('undefined');
+    expect(screen.getByText('host-b.local')).toBeInTheDocument();
+    // Provenance moved into the row expansion when the two tables became one.
+    await userEvent.setup().click(screen.getByLabelText('Show details for host host-b.local'));
+    const facts = await screen.findByTestId('member-facts');
+    expect(facts.textContent).toContain('—');
+    expect(facts.textContent).not.toContain('undefined');
+  });
+
+  it('the operator who bound a host is on that host row, not on another', async () => {
+    installFetchMock([
+      { method: 'GET', url: '/v1/me/permissions', body: ALL_PERMS },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/members', body: ROSTER },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
+    ]);
+    render();
+
+    await waitFor(() => expect(screen.getByTestId('members-table')).toBeInTheDocument());
+    await userEvent.setup().click(screen.getByLabelText('Show details for host host-a.local'));
+    expect((await screen.findByTestId('member-facts')).textContent).toContain('archon-ops');
   });
 
   it('hides both actions when the rights are absent', async () => {
     installFetchMock([
       { method: 'GET', url: '/v1/me/permissions', body: permissions([{ resource: 'incarnation', action: 'get' }]) },
       { method: 'GET', url: '/v1/incarnations/redis-prod/members', body: ROSTER },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
     ]);
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
 
     await waitFor(() => expect(screen.getByTestId('members-table')).toBeInTheDocument());
     expect(screen.queryByTestId('bind-members-open')).not.toBeInTheDocument();
@@ -82,8 +110,9 @@ describe('MembersSection', () => {
         ]),
       },
       { method: 'GET', url: '/v1/incarnations/redis-prod/members', body: ROSTER },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
     ]);
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
 
     await waitFor(() => expect(screen.getByTestId('bind-members-open')).toBeInTheDocument());
     expect(screen.queryByTestId('unbind-member-host-a.local')).not.toBeInTheDocument();
@@ -98,8 +127,9 @@ describe('MembersSection', () => {
         status: 403,
         body: { title: 'forbidden', detail: 'permission incarnation.get required' },
       },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
     ]);
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
 
     await waitFor(() => expect(screen.getByTestId('members-forbidden')).toBeInTheDocument());
     expect(screen.getByTestId('members-forbidden').textContent).toMatch(/incarnation\.get/);
@@ -115,8 +145,9 @@ describe('MembersSection', () => {
         url: '/v1/incarnations/redis-prod/members',
         body: { items: [], offset: 0, limit: 0, total: 0 },
       },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
     ]);
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
 
     await waitFor(() => expect(screen.getByTestId('members-empty')).toBeInTheDocument());
     expect(screen.getByTestId('members-empty').textContent).toMatch(/scope/i);
@@ -130,8 +161,9 @@ describe('MembersSection', () => {
         url: '/v1/incarnations/redis-prod/members',
         body: { items: null, offset: 0, limit: 0, total: 0 },
       },
+      { method: 'GET', url: '/v1/incarnations/redis-prod/telemetry', body: NO_TELEMETRY },
     ]);
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
 
     await waitFor(() => expect(screen.getByTestId('members-empty')).toBeInTheDocument());
   });
@@ -145,14 +177,18 @@ describe('MembersSection', () => {
         deleteUrl = url;
         return new Response('', { status: 204 });
       }
-      const body = url.includes('/me/permissions') ? ALL_PERMS : ROSTER;
+      const body = url.includes('/me/permissions')
+        ? ALL_PERMS
+        : url.includes('/telemetry')
+          ? NO_TELEMETRY
+          : ROSTER;
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByTestId('unbind-member-host-a.local')).toBeInTheDocument());
     await user.click(screen.getByTestId('unbind-member-host-a.local'));
@@ -186,14 +222,18 @@ describe('MembersSection', () => {
           { status: 403, headers: { 'Content-Type': 'application/json' } },
         );
       }
-      const body = url.includes('/me/permissions') ? ALL_PERMS : ROSTER;
+      const body = url.includes('/me/permissions')
+        ? ALL_PERMS
+        : url.includes('/telemetry')
+          ? NO_TELEMETRY
+          : ROSTER;
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     });
 
-    renderWithProviders(<MembersSection incarnationName="redis-prod" />);
+    render();
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByTestId('unbind-member-host-a.local')).toBeInTheDocument());
     await user.click(screen.getByTestId('unbind-member-host-a.local'));

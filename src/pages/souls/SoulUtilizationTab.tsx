@@ -35,7 +35,7 @@ import {
 // Per-Soul host utilization (NIM-127, redesign). The soul telemetry endpoint carries the
 // full spectrum: latest snapshot + a short window for trends + freshness. This page owns
 // its own richer visuals (radial gauges + UtilTrend charts) — the shared Sparkline and the
-// incarnation HostUtilizationPanel are deliberately left untouched. Two placements share one
+// incarnation MembersPanel are deliberately left untouched. Two placements share one
 // query (dedup via the queryKey, see useSoulTelemetry): the full tab and the Overview strip.
 // Freshness comes from the backend `stale` flag; no latest → graceful "no data".
 

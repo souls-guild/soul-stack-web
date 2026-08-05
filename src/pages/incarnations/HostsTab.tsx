@@ -2,25 +2,22 @@ import { useTranslation } from 'react-i18next';
 import { Server } from 'lucide-react';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
-import { MembersSection } from './MembersSection';
-import { HostUtilizationPanel } from './HostUtilizationPanel';
+import { MembersPanel } from './MembersPanel';
 import styles from '../common.module.css';
 
 // Hosts tab for IncarnationDetail.
 //
 // Data sources:
-//   0. incarnation_membership — the ROSTER (MembersSection, NIM-209/NIM-232).
-//      The authoritative set a run resolves its targets from, and the only one
-//      of the three that is editable as a relation (bind/unbind). A declared
-//      role is a Voice (incarnation_choir_voices.role, NIM-330) — the Choirs
-//      tab owns it; the sections below the roster are projections and decide
-//      nothing about where a scenario actually rolls.
-//   1. Connected souls ⋈ utilization — the HostUtilizationPanel owns this unified
-//      section. Its rows come from GET .../telemetry, which the backend resolves
-//      from that same membership relation (NIM-124), left-joined with the souls
-//      registry for status/transport only — the join carries no coven filter,
-//      because a Coven is a label and membership is the relation.
-//   2. Per-host runtime data — incarnation.state.hosts[<sid>], written by a scenario.
+//   0. incarnation_membership — the ROSTER, with the hosts' vitals joined in
+//      (MembersPanel, NIM-209/NIM-232/NIM-444). The authoritative set a run
+//      resolves its targets from, and the only host relation that is editable
+//      here (bind/unbind). A declared role is a Voice
+//      (incarnation_choir_voices.role, NIM-330) — the Choirs tab owns it.
+//      Membership and vitals used to be two stacked tables; they were always the
+//      same set of hosts (GET .../telemetry resolves through the same relation,
+//      NIM-124), so they are one list now.
+//   1. Per-host runtime data — incarnation.state.hosts[<sid>], written by a
+//      scenario. A projection: it decides nothing about where a scenario rolls.
 
 // Per-host runtime data — convention: a scenario can write per-host state to
 // incarnation.state.hosts[<sid>] = {...}. The field is optional; if the scenario
@@ -53,9 +50,7 @@ export function HostsTab({ incarnationName, state }: Props) {
 
   return (
     <section className={styles.section}>
-      <MembersSection incarnationName={incarnationName} />
-
-      <HostUtilizationPanel incarnationName={incarnationName} />
+      <MembersPanel incarnationName={incarnationName} />
 
       <h2 className={styles.sectionTitle} style={{ marginTop: 16 }}>
         <Server size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />

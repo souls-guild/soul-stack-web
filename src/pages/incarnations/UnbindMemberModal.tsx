@@ -8,7 +8,7 @@ import styles from '../common.module.css';
 // Unbinding is not "remove a row from a list": the host leaves the roster that
 // EVERY future run resolves, so a scenario that used to reach it silently stops
 // doing so. Warning box + explicit checkbox + danger button. The mutation lives
-// in MembersSection; this is confirmation UI only.
+// in MembersPanel; this is confirmation UI only.
 
 interface Props {
   // sid = null → modal closed (nothing selected for unbinding).

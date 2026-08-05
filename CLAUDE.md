@@ -324,7 +324,8 @@ parallel (the PM decides).
 - Roster editing is the only host editing there is: `PATCH /v1/incarnations/:name/hosts`
   and the `spec.hosts[]` it edited were removed backend-side (NIM-330), and the UI
   that still called it went with them (NIM-435). A declared role is a Choir Voice —
-  `ChoirsTab.tsx`; membership bind/unbind lives in `MembersSection.tsx`.
+  `ChoirsTab.tsx`; membership bind/unbind lives in `MembersPanel.tsx`, which since
+  NIM-444 is also the vitals table — one list, a row per roster member.
 - SSE auth handshake (query-token / cookie auth) so EventSource can carry auth.
 
 ## Environment
