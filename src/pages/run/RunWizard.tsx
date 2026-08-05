@@ -289,7 +289,7 @@ export function RunWizard() {
   // the saved draft (navigation away/back between steps).
   const hasQueryIntent = useMemo(
     () =>
-      ['workload', 'service', 'scenario', 'incarnation', 'incarnation_regex', 'module', 'target_coven', 'target_regex', 'target_sids'].some(
+      ['workload', 'service', 'scenario', 'incarnation', 'incarnation_regex', 'module', 'target_incarnation', 'target_coven', 'target_regex', 'target_sids'].some(
         (k) => searchParams.has(k),
       ),
     [searchParams],
@@ -2364,13 +2364,27 @@ function Step4Options({
 // --- helpers ---
 
 // Restoring host-criteria from URL search-params (bulk-run actions from
-// list pages). target_coven -> covens; target_regex -> sidRegex;
-// target_sids -> sidRegex anchored-OR (exact SID list); target_where (raw CEL)
-// and target_glob are not mapped into the criteria DSL — ignored.
+// list pages). target_incarnation -> incarnations; target_coven -> covens;
+// target_regex -> sidRegex; target_sids -> sidRegex anchored-OR (exact SID
+// list); target_where (raw CEL) and target_glob are not mapped into the criteria
+// DSL — ignored.
+//
+// `target_incarnation` NAMES a set instead of enumerating it, which is the whole
+// point of it existing next to `target_sids` (NIM-451). A link that spells out
+// every SID grows with the fleet: over a 2000-host roster it reached 52 KB, and
+// Keeper caps request headers at 16 KiB on purpose (api/server.go), so reloading
+// or bookmarking such a link answers 431 — no reverse proxy required, and the
+// cliff arrives around 500-700 hosts, not thousands. This one is constant-size.
+//
+// It resolves through the roster (useIncarnationMembers → GET
+// /v1/incarnations/{name}/members), NOT through the Coven column that happens to
+// carry the same name — the distinction NIM-443 and NIM-449 exist for.
 function criteriaFromQuery(params: URLSearchParams): HostCriteria {
+  const incarnationRaw = params.get('target_incarnation');
   const covenRaw = params.get('target_coven');
   const regexRaw = params.get('target_regex');
   const sidsRaw = params.get('target_sids');
+  const incarnations = incarnationRaw ? splitCsv(incarnationRaw) : [];
   const covens = covenRaw ? splitCsv(covenRaw) : [];
   let sidRegex = regexRaw ?? '';
   if (!sidRegex && sidsRaw) {
@@ -2380,7 +2394,7 @@ function criteriaFromQuery(params: URLSearchParams): HostCriteria {
       sidRegex = `^(${escaped.join('|')})$`;
     }
   }
-  return { incarnations: [], covens, sidRegex, soulprint: '' };
+  return { incarnations, covens, sidRegex, soulprint: '' };
 }
 
 function splitCsv(raw: string): string[] {

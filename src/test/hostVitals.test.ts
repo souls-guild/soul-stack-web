@@ -13,6 +13,8 @@ import {
   busiestInode,
   skewMinutes,
   ageSeconds,
+  epochMs,
+  sortHostRows,
   minMaxLast,
   spanSeconds,
   sortDisksByUsage,
@@ -136,6 +138,68 @@ describe('hostVitals', () => {
     expect(ageSeconds('2026-05-26T10:01:00Z', now)).toBe(0);
     expect(ageSeconds(undefined, now)).toBeNull();
     expect(ageSeconds('bad', now)).toBeNull();
+  });
+
+  it('epochMs: parses to epoch ms, guards missing/broken', () => {
+    expect(epochMs('2026-05-26T10:00:00Z')).toBe(new Date('2026-05-26T10:00:00Z').getTime());
+    expect(epochMs(undefined)).toBeNull();
+    expect(epochMs('bad')).toBeNull();
+  });
+
+  // The `fresh` column sorts by snapshot AGE while the row carries a TIMESTAMP —
+  // ordering by the timestamp needs no clock, which is what lets a row be built
+  // from the replies alone instead of from one that ticks every second (NIM-451).
+  const vitalsRow = (sid: string, collectedMs: number | null) => ({
+    sid,
+    status: '',
+    cpu: null,
+    memPct: null,
+    diskPct: null,
+    net: null,
+    load1: null,
+    uptime: null,
+    collectedMs,
+  });
+  const epoch = (iso: string) => new Date(iso).getTime();
+
+  it('sortHostRows fresh: newest first on asc, no-telemetry sinks either way', () => {
+    const rows = [
+      vitalsRow('quiet', null),
+      vitalsRow('old', epoch('2026-05-26T09:00:00Z')),
+      vitalsRow('new', epoch('2026-05-26T10:00:00Z')),
+    ];
+    expect(sortHostRows(rows, 'fresh', 'asc').map((r) => r.sid)).toEqual(['new', 'old', 'quiet']);
+    expect(sortHostRows(rows, 'fresh', 'desc').map((r) => r.sid)).toEqual(['old', 'new', 'quiet']);
+  });
+
+  // A tie falls back to the SID, in BOTH directions and on BOTH tie paths (equal
+  // metric, and two rows that have no metric at all) — otherwise the order of
+  // equals is whatever the sort happened to do with the input order. Nothing
+  // covered this until NIM-451: blanking both tie-breaks passed the whole suite.
+  it('sortHostRows: ties break alphabetically by sid, in either direction', () => {
+    const same = epoch('2026-05-26T10:00:00Z');
+    const rows = [vitalsRow('zeta', same), vitalsRow('alpha', same), vitalsRow('mid', same)];
+    expect(sortHostRows(rows, 'fresh', 'asc').map((r) => r.sid)).toEqual(['alpha', 'mid', 'zeta']);
+    expect(sortHostRows(rows, 'fresh', 'desc').map((r) => r.sid)).toEqual(['alpha', 'mid', 'zeta']);
+
+    const noneAtAll = [vitalsRow('zeta', null), vitalsRow('alpha', null)];
+    expect(sortHostRows(noneAtAll, 'fresh', 'asc').map((r) => r.sid)).toEqual(['alpha', 'zeta']);
+    expect(sortHostRows(noneAtAll, 'fresh', 'desc').map((r) => r.sid)).toEqual(['alpha', 'zeta']);
+  });
+
+  // Where the OLD age-in-seconds tied, this one no longer does — and that is the
+  // intended refinement, not an accident, so it is pinned here. Both snapshots
+  // land in the same second, so both cells read the same "Ns ago"; the old metric
+  // floored them to one number and fell back to the SID, this one keeps the
+  // sub-second order. On a fleet reporting every 30s the tie is the common case,
+  // which is why the difference is worth stating rather than discovering.
+  it('sortHostRows fresh: snapshots inside one second order by timestamp, not by sid', () => {
+    const rows = [
+      vitalsRow('a-host', epoch('2026-05-26T10:00:05.100Z')),
+      vitalsRow('b-host', epoch('2026-05-26T10:00:05.900Z')),
+    ];
+    expect(sortHostRows(rows, 'fresh', 'asc').map((r) => r.sid)).toEqual(['b-host', 'a-host']);
+    expect(sortHostRows(rows, 'fresh', 'desc').map((r) => r.sid)).toEqual(['a-host', 'b-host']);
   });
 
   it('minMaxLast: ignores non-finite, last = newest finite', () => {

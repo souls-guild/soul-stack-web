@@ -123,6 +123,14 @@ export function ageSeconds(iso: string | undefined, nowMs: number): number | nul
   return Math.max(0, Math.floor((nowMs - t) / 1000));
 }
 
+// ISO timestamp → epoch ms; null if it is missing/unparsable. The clock-free half
+// of ageSeconds, for callers that only need to ORDER by age (see HostVitalsRow).
+export function epochMs(iso: string | undefined): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
 // min/max/current for a trend series (NIM-127 soul chart). Ignores non-finite
 // samples; null when the series has no finite point. `last` is the newest finite value.
 export function minMaxLast(values: number[]): { min: number; max: number; last: number } | null {
@@ -217,7 +225,7 @@ export type HostSortKey = 'host' | 'status' | 'cpu' | 'mem' | 'disk' | 'net' | '
 
 // Sort-relevant projection of a unified host row (connected soul ⋈ utilization). Numeric
 // fields are null when the host has no telemetry yet — those rows always sink to the bottom
-// on util-column sorts, regardless of direction. `ageSec` is the snapshot age (bigger = staler).
+// on util-column sorts, regardless of direction.
 export interface HostVitalsRow {
   sid: string;
   status: string;
@@ -227,7 +235,22 @@ export interface HostVitalsRow {
   net: number | null;
   load1: number | null;
   uptime: number | null;
-  ageSec: number | null;
+  // Epoch ms of the snapshot the metrics came from; null when the host has no
+  // telemetry. The `fresh` column sorts by snapshot AGE, and age is `now -
+  // collectedMs` — strictly decreasing in collectedMs, so ordering by the
+  // timestamp needs no clock at all. That is what lets a row be built from the
+  // replies alone rather than rebuilt once a second (NIM-451).
+  //
+  // It is not the identical order the old age-in-seconds gave, it is a REFINEMENT
+  // of it: that age was floored to whole seconds and clamped at zero, so two
+  // hosts collected 400 ms apart, or two hosts whose clocks put them in the
+  // future, used to tie and fall back to SID. They now order by timestamp. Every
+  // strict old ordering is preserved, and the pairs that changed are exactly the
+  // pairs whose Freshness cells read the same text — so the column never
+  // contradicts the order. The old behaviour was also not stable: the bucket
+  // edges moved with `now`, so rows could swap under a sort while the data sat
+  // still.
+  collectedMs: number | null;
 }
 
 // Unified hosts-table comparator (NIM-127). Copy — never mutates the input. `host`/`status`
@@ -255,7 +278,9 @@ export function sortHostRows<T extends HostVitalsRow>(rows: T[], key: HostSortKe
       case 'uptime':
         return r.uptime;
       case 'fresh':
-        return r.ageSec;
+        // Age ascending = timestamp descending. Negated so `asc` still means
+        // freshest-first and a null (no telemetry) still sinks.
+        return r.collectedMs == null ? null : -r.collectedMs;
       default:
         return null;
     }

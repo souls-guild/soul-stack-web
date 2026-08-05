@@ -423,13 +423,19 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     expect(screen.getByTestId('freshness-fresh')).toHaveTextContent('8s ago');
   });
 
-  // The roster now decides which hosts exist AND which SIDs the run button ships,
-  // so it has to keep polling. While it was a table of its own it did not, and
-  // the row set self-corrected only because the OTHER table (telemetry) was the
-  // one being polled. A host unbound elsewhere must leave the table and, more to
-  // the point, leave the run target — otherwise an arbitrary command reaches a
-  // host that is no longer a member, which is the very bug NIM-443 fixed.
-  it('a host unbound elsewhere leaves the table and the run target on the next poll', async () => {
+  // The roster decides which hosts exist on screen, so it has to keep polling.
+  // While it was a table of its own it did not, and the row set self-corrected
+  // only because the OTHER table (telemetry) was the one being polled.
+  //
+  // A host unbound elsewhere must also leave the run target — an arbitrary
+  // command reaching a host that is no longer a member is the bug NIM-443 fixed.
+  // Since NIM-451 the link cannot carry a stale host at all, because it carries
+  // no host list: it names the incarnation, and the wizard reads the roster when
+  // the run is submitted. So the assertion here is the stronger one — the link
+  // never mentions a SID — plus the row leaving the table on the next poll. That
+  // the wizard then targets the CURRENT roster is guarded on its own side, in
+  // RunWizard.test.tsx.
+  it('a host unbound elsewhere leaves the table, and the run link never carried it', async () => {
     vi.useFakeTimers();
     let rosterCalls = 0;
     vi.stubGlobal(
@@ -460,7 +466,7 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByText('h2.example.com')).toBeInTheDocument();
-    expect(screen.getByTestId('run-on-hosts').getAttribute('href')).toContain('h2.example.com');
+    expect(screen.getByTestId('run-on-hosts').getAttribute('href')).not.toContain('h2.example.com');
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(16000);
@@ -510,10 +516,17 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     });
   });
 
-  // NIM-443: the button says "these hosts", so it must carry the SIDs of the rows
-  // it stands over. `target_coven=<incarnation name>` is a DIFFERENT set since
-  // NIM-124 — a Coven is a label, membership is the relation.
-  it('Run command carries the listed SIDs, never the incarnation as a coven label', async () => {
+  // NIM-443: the button says "these hosts", and those hosts are the membership
+  // roster. `target_coven=<incarnation name>` is a DIFFERENT set since NIM-124 —
+  // a Coven is a label, membership is the relation — so the link must never fall
+  // back to it however convenient the matching name looks.
+  //
+  // It names the roster rather than enumerating it (NIM-451). Enumerating grew
+  // the URL with the fleet until a reload of it answered 431 against Keeper's
+  // 16 KiB header cap; the wizard resolves the name through the same roster
+  // endpoint under the same query key, so the two cannot disagree about what
+  // "these hosts" means.
+  it('Run command names the incarnation as a membership target, never as a coven label', async () => {
     roster(
       [memberItem('soul-docker-1'), memberItem('soul-docker-2')],
       [
@@ -529,22 +542,21 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     const href = screen.getByTestId('run-on-hosts').getAttribute('href') ?? '';
     const query = new URLSearchParams(href.slice(href.indexOf('?')));
     expect(query.get('workload')).toBe('command');
-    expect(query.get('target_sids')).toBe('soul-docker-1,soul-docker-2');
+    expect(query.get('target_incarnation')).toBe('hello-dev');
     expect(query.has('target_coven')).toBe(false);
   });
 
-  // A member without metrics is a target like any other: it is on the roster, so
-  // the run reaches it. Sourcing the link from telemetry alone would skip it.
-  it('Run command includes members that have no telemetry', async () => {
-    roster(
-      [memberItem('quiet.example.com'), memberItem('h1.example.com')],
-      [{ sid: 'h1.example.com', stale: false, collected_at: '2026-05-26T10:00:00Z', latest: LATEST }],
-    );
+  // The link cannot grow with the roster — that is the whole reason it names the
+  // set instead of listing it. A thousand members must produce the same URL as
+  // two, and it must stay far under the 16 KiB Keeper accepts in headers.
+  it('Run command link is the same length whatever the roster size', async () => {
+    const many = Array.from({ length: 1000 }, (_, i) => memberItem(`bulk-${String(i).padStart(6, '0')}.example.com`));
+    roster(many, []);
     render();
-    await waitFor(() => expect(screen.getByText('42%')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('members-table')).toBeInTheDocument());
     const href = screen.getByTestId('run-on-hosts').getAttribute('href') ?? '';
-    const sids = new URLSearchParams(href.slice(href.indexOf('?'))).get('target_sids');
-    expect(sids?.split(',').sort()).toEqual(['h1.example.com', 'quiet.example.com']);
+    expect(href).toBe('/run?workload=command&target_incarnation=hello-dev');
+    expect(href.length).toBeLessThan(512);
   });
 
   // Sorting reorders the table, not the set the run reaches: a link that changed
@@ -560,7 +572,7 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     render();
     await waitFor(() => expect(screen.getByText('42%')).toBeInTheDocument());
     const before = screen.getByTestId('run-on-hosts').getAttribute('href');
-    expect(before).toContain('h1.example.com');
+    expect(before).toContain('target_incarnation=hello-dev');
     await userEvent.click(screen.getByTestId('host-th-cpu'));
     expect(screen.getByTestId('run-on-hosts').getAttribute('href')).toBe(before);
   });

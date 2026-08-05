@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,19 +7,14 @@ import { Badge, Button, Dot } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { UtilTrend } from '../../components/UtilTrend';
 import { soulDot, soulTone } from '../../components/status';
-import {
-  keeperApi,
-  type HostTelemetry,
-  type IncarnationMember,
-  type SoulListEntry,
-  type SoulStatus,
-} from '../../api/keeper';
+import { keeperApi, type SoulStatus } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { useNow } from '../../hooks/useNow';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { BindMembersModal } from './BindMembersModal';
 import { UnbindMemberModal } from './UnbindMemberModal';
 import { bindSummary, prettyUnbindError, type BindOutcome } from './membership';
+import { buildRows } from './memberRows';
 import common from '../common.module.css';
 import styles from './MembersPanel.module.css';
 import {
@@ -76,7 +71,8 @@ import {
 //
 // Sparklines are a per-soul on-demand request (the window lives only on the soul
 // endpoint), mounted only while a row is expanded → no N-polling. Freshness comes
-// from the backend `stale` flag and counts up live via useNow between refetches.
+// from the backend `stale` flag and counts up live between refetches — off a clock
+// that reaches the freshness cells and nothing else, see TableClock.
 const REFETCH_MS = 15000;
 const MEMBERS_KEY = 'incarnation-members';
 const TELEMETRY_KEY = 'incarnation-telemetry';
@@ -102,55 +98,31 @@ const NATURAL_DIR: Record<HostSortKey, SortDir> = {
   fresh: 'asc',
 };
 
-interface HostRow {
-  sid: string;
-  // The Soul's status; '' when neither source knows the host. See buildRow for
-  // which of the two sources wins and why.
-  status: string;
-  boundAt: string | null;
-  boundByAid: string | null;
-  tele: HostTelemetry | null;
-  cpu: number | null;
-  memPct: number | null;
-  diskPct: number | null;
-  net: number | null;
-  load1: number | null;
-  uptime: number | null;
-  ageSec: number | null;
+// One ticking clock for the whole table, held BELOW the panel.
+//
+// The freshness column counts up live between the 15s refetches, which needs a
+// 1 Hz re-render — but only of the cells that show an age. While that clock was
+// panel state, every tick re-rendered everything: the derivation above plus every
+// cell of every row. It was affordable only because the aggregate's 2000-host cap
+// bounded the table; since NIM-444 the rows come from the roster, and
+// `incarnation.ListMembers` has no LIMIT at all.
+//
+// The provider takes the table as `children`, so a tick re-renders the provider,
+// React reuses the unchanged children element, and only the consumers below — the
+// Freshness cells and the one expanded row's charts — render again.
+const TableClock = createContext<number | null>(null);
+
+function TableClockProvider({ children }: { children: ReactNode }) {
+  const now = useNow(1000);
+  return <TableClock.Provider value={now}>{children}</TableClock.Provider>;
 }
 
-function buildRow(
-  sid: string,
-  member: IncarnationMember | null,
-  soul: SoulListEntry | null,
-  tele: HostTelemetry | null,
-  now: number,
-): HostRow {
-  const l = tele?.latest ?? null;
-  const disk = l ? busiestDisk(l.disks) : null;
-  return {
-    sid,
-    // The souls registry WINS over the roster's own status column, and the
-    // difference is not cosmetic: `GET /v1/souls` overlays PG with the live
-    // stream lease (ADR-006(a)), while `souls.status` in PG is a last-known
-    // snapshot the Reaper reconciles lazily. Reading the roster's copy showed a
-    // host as `connected` for minutes after it went away — verified against a
-    // running Keeper, where the two replies disagreed on the same host. The
-    // roster's value is the fallback for a host the registry page did not
-    // return; it is right for lifecycle statuses (pending/revoked/expired),
-    // which carry no lease and which the overlay leaves alone anyway.
-    status: soul?.status ?? member?.status ?? '',
-    boundAt: member?.bound_at ?? null,
-    boundByAid: member?.bound_by_aid ?? null,
-    tele,
-    cpu: l ? l.cpu_pct : null,
-    memPct: l ? ratioPct(l.mem_used_mb, l.mem_total_mb) : null,
-    diskPct: disk ? disk.pct : null,
-    net: l ? l.net_rx_bps + l.net_tx_bps : null,
-    load1: l ? l.load1 : null,
-    uptime: l ? l.uptime_sec : null,
-    ageSec: tele ? ageSeconds(tele.collected_at, now) : null,
-  };
+// Throws rather than defaulting to a number: a freshness cell rendered outside the
+// provider would otherwise silently show an age measured from the epoch.
+function useTableClock(): number {
+  const now = useContext(TableClock);
+  if (now == null) throw new Error('useTableClock outside TableClockProvider');
+  return now;
 }
 
 export function MembersPanel({ incarnationName }: { incarnationName: string }) {
@@ -164,7 +136,6 @@ export function MembersPanel({ incarnationName }: { incarnationName: string }) {
   const [unbindSid, setUnbindSid] = useState<string | null>(null);
   const [unbindError, setUnbindError] = useState<string | null>(null);
   const [lastBind, setLastBind] = useState<BindOutcome | null>(null);
-  const now = useNow(1000);
 
   // Buttons follow the RIGHT, not the server's answer: unbind is destructive and
   // has a permission of its own, so an operator without it must not see a
@@ -240,43 +211,53 @@ export function MembersPanel({ incarnationName }: { incarnationName: string }) {
   const utilForbidden = utilStatus === 403;
   const utilUnavailable = utilStatus === 404 || utilStatus === 501;
 
-  const memberItems = members.data?.items ?? [];
-  const hosts = util.data?.hosts ?? [];
-  const teleBySid = new Map<string, HostTelemetry>();
-  for (const h of hosts) teleBySid.set(h.sid, h);
-  const soulBySid = new Map<string, SoulListEntry>();
-  for (const s of souls.data?.items ?? []) soulBySid.set(s.sid, s);
+  const memberItems = members.data?.items;
+  const hosts = util.data?.hosts;
+  const soulItems = souls.data?.items;
 
-  const rows: HostRow[] = memberItems.map((m) =>
-    buildRow(m.sid, m, soulBySid.get(m.sid) ?? null, teleBySid.get(m.sid) ?? null, now),
-  );
-  // A telemetry host the roster reply did not carry is still a member — the two
-  // endpoints scope the same relation slightly differently, and a bind can land
-  // between the two fetches. Dropping it would hide a host the previous UI showed.
-  const rosterSids = new Set(rows.map((r) => r.sid));
-  for (const h of hosts) {
-    if (!rosterSids.has(h.sid)) rows.push(buildRow(h.sid, null, soulBySid.get(h.sid) ?? null, h, now));
-  }
-  const sorted = sortHostRows(rows, sortKey, sortDir);
-  const memberSids = rows.map((r) => r.sid);
+  // Derived from the three replies, so it is recomputed when THEY change — not on
+  // every render, and above all not on the freshness tick (see TableClock).
+  const rows = useMemo(() => buildRows(memberItems, hosts, soulItems), [memberItems, hosts, soulItems]);
+  const sorted = useMemo(() => sortHostRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
+  const memberSids = useMemo(() => rows.map((r) => r.sid), [rows]);
 
-  // "Run command on these hosts" targets THESE hosts: the SIDs this table lists,
-  // which are the membership roster (NIM-443). It used to pass
-  // `target_coven=<incarnation name>`, and since NIM-124 a Coven is a label while
-  // membership is the relation — so the run reached a different set in both
-  // directions. A host carrying the label without being a member was added. And
-  // a member without the label was DROPPED, because the wizard's Command
-  // workload resolves covens client-side against the raw `souls.coven` column
-  // (see run/hostSelector.ts) — the backend's own coven resolution would have
-  // found it, since it unions in the labels a host inherits from the
-  // incarnations it belongs to, this one's name included. Neither direction is a
-  // discrepancy anyone should have to notice on an arbitrary-command workload.
-  // Built from `rows`, not `sorted`, so clicking a column header does not
-  // rewrite the link. No rows → no honest target, so the button is disabled
-  // rather than pointing at everything that happens to carry the label.
+  // "Run command on these hosts" targets THESE hosts: the incarnation's
+  // membership roster (NIM-443). It used to pass `target_coven=<incarnation
+  // name>`, and since NIM-124 a Coven is a label while membership is the
+  // relation — so the run reached a different set in both directions: a host
+  // carrying the label without being a member was added, and a member without
+  // the label was dropped.
+  //
+  // It hands over the incarnation's NAME rather than the SIDs behind it. Both
+  // say "the roster", but only one of them stays a link. Spelling out the SIDs
+  // grew the URL with the fleet — 52 KB over a 2000-host roster, measured — and
+  // Keeper caps request headers at 16 KiB deliberately (api/server.go), so
+  // reloading, bookmarking or copying such a link answers 431. No reverse proxy
+  // needed for that, and with a comma costing three bytes once encoded the cliff
+  // lands around 500-700 hosts, not thousands. Clicking still worked, which is
+  // what made it a trap: the operator only found out on the reload.
+  //
+  // The name is resolved by run/useIncarnationMembers, through this same roster
+  // endpoint and under this same query key — so the wizard cannot be looking at
+  // a different roster than the table the operator clicked from. That resolution
+  // is what NIM-449 built; before it, a name meant the Coven column and this
+  // link could not have used one.
+  //
+  // Two consequences worth naming. The set is read when the run is submitted,
+  // not frozen when the button was clicked — a host unbound in between is no
+  // longer targeted, which is the answer this panel already gives everywhere
+  // else (it polls the roster for exactly that reason). And a host the table
+  // shows only because the telemetry aggregate named it — the union in
+  // buildRows — is NOT targeted, because it is not on the roster the wizard
+  // reads. That is the honest side of the trade: such a host is one the caller
+  // cannot see in their own roster scope, so naming it explicitly is how a run
+  // earns a 403 for the whole batch (NIM-450) rather than reaching it.
+  //
+  // No rows → no honest target, so the button is disabled rather than pointing
+  // at everything that happens to carry the label.
   const runHref =
     memberSids.length > 0
-      ? `/run?workload=command&target_sids=${encodeURIComponent(memberSids.join(','))}`
+      ? `/run?workload=command&target_incarnation=${encodeURIComponent(incarnationName)}`
       : null;
 
   const loading = (members.isLoading || util.isLoading) && rows.length === 0;
@@ -284,7 +265,7 @@ export function MembersPanel({ incarnationName }: { incarnationName: string }) {
   const rosterEmpty = !loading && rows.length === 0 && Boolean(members.data) && !members.error;
   // Rows exist but the aggregate reported no host at all: every metric is a dash,
   // and this says why.
-  const noVitals = rows.length > 0 && Boolean(util.data) && hosts.length === 0;
+  const noVitals = rows.length > 0 && Boolean(util.data) && (hosts?.length ?? 0) === 0;
   const colCount = 10 + (canUnbind ? 1 : 0);
 
   function onSort(key: HostSortKey) {
@@ -398,129 +379,130 @@ export function MembersPanel({ incarnationName }: { incarnationName: string }) {
       ) : null}
 
       {rows.length > 0 ? (
-        <table className={common.table} data-testid="members-table">
-          <thead>
-            <tr>
-              <SortHeader label={t('incarnations:utilHost')} col="host" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('host')} />
-              <SortHeader label={t('incarnations:utilStatus')} col="status" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('status')} />
-              <SortHeader label={t('incarnations:utilCpu')} col="cpu" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('cpu')} />
-              <SortHeader label={t('incarnations:utilMem')} col="mem" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('mem')} />
-              <SortHeader label={t('incarnations:utilDisk')} col="disk" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('disk')} />
-              <SortHeader label={t('incarnations:utilNet')} col="net" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('net')} />
-              <SortHeader label={t('incarnations:utilLoad')} col="load" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('load')} />
-              <SortHeader label={t('incarnations:utilUptime')} col="uptime" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('uptime')} />
-              <SortHeader label={t('incarnations:utilFresh')} col="fresh" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('fresh')} />
-              <th style={{ width: 1 }} />
-              {canUnbind ? <th style={{ width: 1 }} /> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((r) => {
-              const l = r.tele?.latest ?? null;
-              const open = expanded === r.sid;
-              const disk = l ? busiestDisk(l.disks) : null;
-              return (
-                <Fragment key={r.sid}>
-                  <tr>
-                    <td className="mono">
-                      <KeeperSidCell sid={r.sid} />
-                    </td>
-                    <td>
-                      {r.status ? (
-                        <span className={common.statusCell}>
-                          <Dot kind={soulDot(r.status as SoulStatus)} />
-                          <Badge tone={soulTone(r.status as SoulStatus)}>{r.status}</Badge>
-                        </span>
-                      ) : (
-                        <span className="mono">—</span>
-                      )}
-                    </td>
-                    {l ? (
-                      <>
-                        <td>
-                          <MetricCell value={formatPct(l.cpu_pct)} pct={l.cpu_pct} tone={utilTone(l.cpu_pct)} />
-                        </td>
-                        <td>
-                          <MetricCell
-                            value={`${formatMb(l.mem_used_mb)} / ${formatMb(l.mem_total_mb)}`}
-                            pct={r.memPct}
-                            tone={utilTone(r.memPct)}
-                          />
-                        </td>
-                        <td title={disk?.mount}>
-                          {disk ? (
-                            <MetricCell value={formatPct(disk.pct)} pct={disk.pct} tone={utilTone(disk.pct)} />
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="mono" title={`↓ ${formatBps(l.net_rx_bps)}  ↑ ${formatBps(l.net_tx_bps)}`}>
-                          <NetPair rx={l.net_rx_bps} tx={l.net_tx_bps} />
-                        </td>
-                        <td
-                          className="mono"
-                          title={`1m ${formatLoad(l.load1)} · 5m ${formatLoad(l.load5)} · 15m ${formatLoad(l.load15)}`}
-                        >
-                          {formatLoad(l.load1)}
-                        </td>
-                        <td className="mono">{formatUptime(l.uptime_sec)}</td>
-                      </>
-                    ) : (
-                      <td colSpan={6} className={styles.mutedCell} data-testid="util-nojoin">
-                        {t('incarnations:utilNoData')}
+        <TableClockProvider>
+          <table className={common.table} data-testid="members-table">
+            <thead>
+              <tr>
+                <SortHeader label={t('incarnations:utilHost')} col="host" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('host')} />
+                <SortHeader label={t('incarnations:utilStatus')} col="status" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('status')} />
+                <SortHeader label={t('incarnations:utilCpu')} col="cpu" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('cpu')} />
+                <SortHeader label={t('incarnations:utilMem')} col="mem" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('mem')} />
+                <SortHeader label={t('incarnations:utilDisk')} col="disk" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('disk')} />
+                <SortHeader label={t('incarnations:utilNet')} col="net" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('net')} />
+                <SortHeader label={t('incarnations:utilLoad')} col="load" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('load')} />
+                <SortHeader label={t('incarnations:utilUptime')} col="uptime" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('uptime')} />
+                <SortHeader label={t('incarnations:utilFresh')} col="fresh" active={sortKey} dir={sortDir} onSort={onSort} ariaSort={ariaSort('fresh')} />
+                <th style={{ width: 1 }} />
+                {canUnbind ? <th style={{ width: 1 }} /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((r) => {
+                const l = r.tele?.latest ?? null;
+                const open = expanded === r.sid;
+                const disk = l ? busiestDisk(l.disks) : null;
+                return (
+                  <Fragment key={r.sid}>
+                    <tr>
+                      <td className="mono">
+                        <KeeperSidCell sid={r.sid} />
                       </td>
-                    )}
-                    <td>
-                      <Freshness
-                        stale={r.tele?.stale ?? true}
-                        collectedAt={r.tele?.collected_at}
-                        hasData={Boolean(l)}
-                        now={now}
-                      />
-                    </td>
-                    <td>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        aria-label={t(open ? 'incarnations:memberCollapseAria' : 'incarnations:memberExpandAria', {
-                          sid: r.sid,
-                        })}
-                        onClick={() => setExpanded(open ? null : r.sid)}
-                      >
-                        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </Button>
-                    </td>
-                    {canUnbind ? (
+                      <td>
+                        {r.status ? (
+                          <span className={common.statusCell}>
+                            <Dot kind={soulDot(r.status as SoulStatus)} />
+                            <Badge tone={soulTone(r.status as SoulStatus)}>{r.status}</Badge>
+                          </span>
+                        ) : (
+                          <span className="mono">—</span>
+                        )}
+                      </td>
+                      {l ? (
+                        <>
+                          <td>
+                            <MetricCell value={formatPct(l.cpu_pct)} pct={l.cpu_pct} tone={utilTone(l.cpu_pct)} />
+                          </td>
+                          <td>
+                            <MetricCell
+                              value={`${formatMb(l.mem_used_mb)} / ${formatMb(l.mem_total_mb)}`}
+                              pct={r.memPct}
+                              tone={utilTone(r.memPct)}
+                            />
+                          </td>
+                          <td title={disk?.mount}>
+                            {disk ? (
+                              <MetricCell value={formatPct(disk.pct)} pct={disk.pct} tone={utilTone(disk.pct)} />
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="mono" title={`↓ ${formatBps(l.net_rx_bps)}  ↑ ${formatBps(l.net_tx_bps)}`}>
+                            <NetPair rx={l.net_rx_bps} tx={l.net_tx_bps} />
+                          </td>
+                          <td
+                            className="mono"
+                            title={`1m ${formatLoad(l.load1)} · 5m ${formatLoad(l.load5)} · 15m ${formatLoad(l.load15)}`}
+                          >
+                            {formatLoad(l.load1)}
+                          </td>
+                          <td className="mono">{formatUptime(l.uptime_sec)}</td>
+                        </>
+                      ) : (
+                        <td colSpan={6} className={styles.mutedCell} data-testid="util-nojoin">
+                          {t('incarnations:utilNoData')}
+                        </td>
+                      )}
+                      <td>
+                        <Freshness
+                          stale={r.tele?.stale ?? true}
+                          collectedAt={r.tele?.collected_at}
+                          hasData={Boolean(l)}
+                        />
+                      </td>
                       <td>
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => {
-                            setUnbindError(null);
-                            setUnbindSid(r.sid);
-                          }}
-                          aria-label={t('incarnations:memberUnbindAria', { sid: r.sid })}
-                          title={t('incarnations:memberUnbind')}
-                          data-testid={`unbind-member-${r.sid}`}
+                          aria-label={t(open ? 'incarnations:memberCollapseAria' : 'incarnations:memberExpandAria', {
+                            sid: r.sid,
+                          })}
+                          onClick={() => setExpanded(open ? null : r.sid)}
                         >
-                          <Unlink size={14} />
+                          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </Button>
                       </td>
-                    ) : null}
-                  </tr>
-                  {open ? (
-                    <tr className={styles.sparkRow}>
-                      <td colSpan={colCount}>
-                        <MemberFacts boundAt={r.boundAt} boundByAid={r.boundByAid} />
-                        {l ? <HostTrends sid={r.sid} now={now} /> : null}
-                      </td>
+                      {canUnbind ? (
+                        <td>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setUnbindError(null);
+                              setUnbindSid(r.sid);
+                            }}
+                            aria-label={t('incarnations:memberUnbindAria', { sid: r.sid })}
+                            title={t('incarnations:memberUnbind')}
+                            data-testid={`unbind-member-${r.sid}`}
+                          >
+                            <Unlink size={14} />
+                          </Button>
+                        </td>
+                      ) : null}
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {open ? (
+                      <tr className={styles.sparkRow}>
+                        <td colSpan={colCount}>
+                          <MemberFacts boundAt={r.boundAt} boundByAid={r.boundByAid} />
+                          {l ? <HostTrends sid={r.sid} /> : null}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </TableClockProvider>
       ) : null}
 
       {util.data?.truncated ? (
@@ -609,18 +591,20 @@ function SortHeader({
   );
 }
 
+// The only cell that reads the ticking clock, and the reason there is one — it
+// counts an age up live between refetches. Everything else in the row is a
+// function of the replies alone.
 function Freshness({
   stale,
   collectedAt,
   hasData,
-  now,
 }: {
   stale: boolean;
   collectedAt?: string;
   hasData: boolean;
-  now: number;
 }) {
   const { t } = useTranslation();
+  const now = useTableClock();
   if (!hasData) {
     return (
       <span className={styles.freshness} data-testid="freshness-nodata">
@@ -688,8 +672,9 @@ function NetPair({ rx, tx }: { rx: number; tx: number }) {
 // A specific host's trend charts + inode + skew — a separate per-soul request (a window exists
 // only in the soul endpoint). Mounted only when the row is expanded → no N-polling. Uses the same
 // shared UtilTrend charts as the soul page (CPU/Mem/Load1/Net↓/Net↑), one row across full width.
-function HostTrends({ sid, now }: { sid: string; now: number }) {
+function HostTrends({ sid }: { sid: string }) {
   const { t } = useTranslation();
+  const now = useTableClock();
   const q = useQuery({
     queryKey: ['soul-telemetry', sid],
     queryFn: () => keeperApi.souls.telemetry(sid),

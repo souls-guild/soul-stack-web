@@ -1531,6 +1531,70 @@ describe('RunWizard', () => {
     expect(preview).not.toContain('labelled-nonmember.example.com');
   });
 
+  // The receiving half of NIM-451. The Hosts tab stopped spelling out its roster
+  // in the link — over 2000 hosts that URL was 52 KB and a reload of it answered
+  // 431, Keeper capping request headers at 16 KiB on purpose — and hands over the
+  // incarnation's NAME instead. So the wizard has to turn that name into hosts,
+  // and it must do it through the membership roster, not the Coven column that
+  // carries the same name: the fixture below disagrees in both directions, so a
+  // resolver reading the column targets the wrong host at the same count.
+  it('Pre-fill ?workload=command&target_incarnation → the roster, resolved fresh, not the coven label', async () => {
+    const stub = setupFetchStub({
+      souls: [
+        // On the roster, never labelled.
+        { sid: 'db-1.example.com', covens: ['prod'] },
+        // Labelled with the incarnation's name, not on its roster.
+        { sid: 'web-1.example.com', covens: ['redis-prod'] },
+      ],
+      members: { 'redis-prod': ['db-1.example.com'] },
+    });
+    renderWizardWithRoutes('/run?workload=command&target_incarnation=redis-prod');
+    expect(screen.getByLabelText('Command')).toBeChecked();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    // The criterion arrived as a criterion, not as a SID list.
+    await waitFor(() =>
+      expect(screen.getByLabelText('Incarnations criterion').textContent).toContain('redis-prod'),
+    );
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    const preview = screen.getByLabelText('Host preview').textContent ?? '';
+    expect(preview).toContain('db-1.example.com');
+    expect(preview).not.toContain('web-1.example.com');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Run/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    // What actually goes to the backend is still an explicit SID list — the name
+    // is resolved here, so this is the assertion that the link means the roster.
+    const body = stub.posted?.body as { target: { sids: string[] } };
+    expect(body.target.sids).toEqual(['db-1.example.com']);
+  });
+
+  // A link that names an incarnation the caller cannot read must not quietly
+  // become "no hosts, run anyway" — the run has to stay blocked, and the reason
+  // has to be on screen. Same rule NIM-449 wrote for a typed-in name; this only
+  // checks that arriving by link does not route around it.
+  it('?target_incarnation naming an unreadable roster → named as unresolved, run stays blocked', async () => {
+    setupFetchStub({
+      souls: [{ sid: 'db-1.example.com', covens: ['prod'] }],
+      // No roster for this name → 404 from the fixture, as the keeper answers.
+      members: {},
+    });
+    renderWizardWithRoutes('/run?workload=command&target_incarnation=ghost-prod');
+    await userEvent.setup().click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/0 hosts match/));
+    expect(screen.getByLabelText('Incarnations criterion').textContent).toContain('ghost-prod');
+    // Named with its cause, not silently read as an empty incarnation.
+    expect(await screen.findByText(/Unknown incarnation: ghost-prod/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
+  });
+
   // --- Tests S-W5 (updated for S6): batch_mode / max_failures / require_alive ---
 
   async function reachStep4Command() {
