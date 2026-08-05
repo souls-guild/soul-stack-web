@@ -414,7 +414,6 @@ export function IncarnationsList() {
                   {t('incarnations:colCreated')}{sortArrow('created_at')}
                 </button>
               </th>
-              <th>{t('incarnations:colLastDrift')}</th>
             </tr>
           </thead>
           <tbody>
@@ -450,7 +449,6 @@ export function IncarnationsList() {
                   <TraitsChips traits={row.traits as Record<string, unknown> | null | undefined} maxVisible={3} />
                 </td>
                 <td className="mono" title={row.created_at}>{formatTimeAgo(row.created_at)}</td>
-                <td className="mono">{formatTimeAgo(row.last_drift_check_at)}</td>
               </tr>
             ))}
           </tbody>

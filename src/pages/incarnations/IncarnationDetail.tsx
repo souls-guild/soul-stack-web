@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   ArrowUp,
@@ -10,14 +10,13 @@ import {
   Lock,
   Play,
   RefreshCw,
-  Search,
   Tag,
   Trash,
   ExternalLink,
 } from 'lucide-react';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
-import { keeperApi, type DriftReport, type IncarnationRerunLastReply } from '../../api/keeper';
+import { keeperApi, type IncarnationRerunLastReply } from '../../api/keeper';
 import { incarnationDot, incarnationTone } from '../../components/status';
 import { ApiError } from '../../api/client';
 import { UnlockModal } from './UnlockModal';
@@ -32,16 +31,13 @@ import { IncarnationTraitsModal } from './IncarnationTraitsModal';
 import { TraitsChips } from './TraitsChips';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'drift' | 'state' | 'schema';
+type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'state' | 'schema';
 
 export function IncarnationDetail() {
   const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('overview');
-  const [drift, setDrift] = useState<DriftReport | null>(null);
-  const [driftError, setDriftError] = useState<string | null>(null);
 
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [rerunLastOpen, setRerunLastOpen] = useState(false);
@@ -68,18 +64,6 @@ export function IncarnationDetail() {
     queryKey: ['incarnation-souls', name],
     queryFn: () => keeperApi.souls.list({ coven: [name], limit: 200 }),
     enabled: Boolean(name),
-  });
-
-  const driftMu = useMutation({
-    mutationFn: () => keeperApi.incarnations.checkDrift(name),
-    onSuccess: (data) => {
-      setDrift(data);
-      setDriftError(null);
-      qc.invalidateQueries({ queryKey: ['incarnation', name] });
-    },
-    onError: (err) => {
-      setDriftError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
-    },
   });
 
   // Summary aggregate for Overview: count state fields and connected hosts.
@@ -146,14 +130,6 @@ export function IncarnationDetail() {
                 >
                   <Play size={14} /> {t('runScenario')}
                 </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => { setTab('drift'); driftMu.mutate(); }}
-                  disabled={driftMu.isPending}
-                  title={t('incarnations:actionCheckDrift')}
-                >
-                  <Search size={14} /> {driftMu.isPending ? t('scanning') : t('checkDrift')}
-                </Button>
                 <Button variant="secondary" onClick={() => setUpgradeOpen(true)} title={t('incarnations:actionUpgrade')}>
                   <ArrowUp size={14} /> {t('common:upgrade')}
                 </Button>
@@ -213,8 +189,6 @@ export function IncarnationDetail() {
         <span className={styles.metaVal}>{row.created_at}</span>
         <span className={styles.metaKey}>{t('common:colUpdatedAt')}</span>
         <span className={styles.metaVal}>{row.updated_at}</span>
-        <span className={styles.metaKey}>{t('incarnations:colLastDrift')}</span>
-        <span className={styles.metaVal}>{row.last_drift_check_at ?? '—'}</span>
       </div>
 
       <div className={styles.tabs} role="tablist">
@@ -235,9 +209,6 @@ export function IncarnationDetail() {
         </button>
         <button type="button" role="tab" aria-selected={tab === 'history'} className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`} onClick={() => setTab('history')}>
           <HistoryIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabHistory')}
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'drift'} className={`${styles.tab} ${tab === 'drift' ? styles.tabActive : ''}`} onClick={() => setTab('drift')}>
-          {t('incarnations:tabDriftCheck')}
         </button>
       </div>
 
@@ -282,17 +253,6 @@ export function IncarnationDetail() {
             <>
               <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('secStatusDetails')}</h2>
               <JsonViewer value={row.status_details} />
-            </>
-          ) : null}
-          {row.last_drift_summary ? (
-            <>
-              <h2 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('secLastDriftSummary')}</h2>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Badge tone="warn">drifted: {row.last_drift_summary.hosts_drifted ?? 0}</Badge>
-                <Badge tone="ok">clean: {row.last_drift_summary.hosts_clean ?? 0}</Badge>
-                <Badge tone="muted">unsupported: {row.last_drift_summary.hosts_unsupported ?? 0}</Badge>
-                <Badge tone="danger">failed: {row.last_drift_summary.hosts_failed ?? 0}</Badge>
-              </div>
             </>
           ) : null}
         </section>
@@ -376,37 +336,6 @@ export function IncarnationDetail() {
                 ))}
               </tbody>
             </table>
-          ) : null}
-        </section>
-      ) : null}
-
-      {tab === 'drift' ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{t('secCheckDrift')}</h2>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <Button variant="primary" onClick={() => driftMu.mutate()} disabled={driftMu.isPending}>
-              <Search size={14} /> {driftMu.isPending ? t('scanning') : t('driftScan')}
-            </Button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              POST /v1/incarnations/{row.name}/check-drift
-            </span>
-          </div>
-          {driftError ? <div className={styles.errorBox}>{driftError}</div> : null}
-          {row.last_drift_check_at ? (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {t('incarnations:lastServerCheck')} <span className="mono">{row.last_drift_check_at}</span>
-            </div>
-          ) : null}
-          {drift ? (
-            <>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <Badge tone="warn">drifted: {drift.summary.hosts_drifted}</Badge>
-                <Badge tone="ok">clean: {drift.summary.hosts_clean}</Badge>
-                <Badge tone="muted">unsupported: {drift.summary.hosts_unsupported}</Badge>
-                <Badge tone="danger">failed: {drift.summary.hosts_failed}</Badge>
-              </div>
-              <JsonViewer value={drift} />
-            </>
           ) : null}
         </section>
       ) : null}

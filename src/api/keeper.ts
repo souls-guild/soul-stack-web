@@ -48,7 +48,6 @@ export type GlobalRunEntry = components['schemas']['GlobalRunEntry'];
 export type RunsListReply = components['schemas']['RunsListReply'];
 export type RunsStatsBucket = components['schemas']['RunsStatsBucket'];
 export type RunsStatsReply = components['schemas']['RunsStatsReply'];
-export type DriftReport = components['schemas']['DriftReport'];
 export type IncarnationCreateRequest = components['schemas']['IncarnationCreateRequest'];
 export type IncarnationCreateReply = components['schemas']['IncarnationCreateReply'];
 export type IncarnationRunRequest = components['schemas']['IncarnationRunRequest'];
@@ -66,7 +65,6 @@ export type UpgradePathRef = components['schemas']['UpgradePathRef'];
 export type UpgradePathTarget = components['schemas']['UpgradePathTarget'];
 // StateSchemaMigration is already re-exported below (Schema explorer) — not redeclared here.
 export type IncarnationDestroyReply = components['schemas']['IncarnationDestroyReply'];
-export type IncarnationCheckDriftRequest = components['schemas']['IncarnationCheckDriftRequest'];
 
 export type SoulListEntry = components['schemas']['SoulListEntry'];
 export type SoulListReply = components['schemas']['SoulListReply'];
@@ -720,12 +718,6 @@ export const keeperApi = {
     runTasks: (name: string, applyId: string) =>
       apiGet<RunTasksReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(applyId)}/tasks`,
-      ),
-    checkDrift: (name: string, body: IncarnationCheckDriftRequest = {}) =>
-      apiSend<DriftReport>(
-        `/v1/incarnations/${encodeURIComponent(name)}/check-drift`,
-        'POST',
-        { body },
       ),
     unlock: (name: string, body: IncarnationUnlockRequest) =>
       apiSend<IncarnationUnlockReply>(

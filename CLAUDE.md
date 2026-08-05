@@ -95,7 +95,7 @@ src/
       refs.ts                    — useServiceRefs hook (graceful 404 degraded)
     incarnations/
       IncarnationsList.tsx
-      IncarnationDetail.tsx      — tabs: Data summary / State / Schema / Hosts / Choirs / Drift / History
+      IncarnationDetail.tsx      — tabs: Data summary / State / Schema / Hosts / Choirs / History
       IncarnationNewForm.tsx     — Create form + scenario dropdown + DynamicInputBuilder fallback
       StateTab.tsx / SchemaTab.tsx / HostsTab.tsx / ChoirsTab.tsx
       ChipsInput.tsx, ScenarioPicker.tsx, ScenarioInputFields.tsx
@@ -227,7 +227,7 @@ src/
        stale inventory entries. The scan stops at those three patterns on
        purpose: over all of JSX it is a false-positive generator (NIM-259).
      - **Detail panels come in two flavours.** Panels that label values with prose
-       (`Created at`, `Last drift check`) are translated; panels that dump a
+       (`Created at`, `Updated at`) are translated; panels that dump a
        payload key beside its value (`started_at`, `pkg_mgr`, `scope_size`) keep
        the wire name, because the label names the field the value came from.
      - **A new key's English value must match the literal it replaces.** The suite

@@ -222,6 +222,98 @@ describe('IncarnationDetail', () => {
     expect(writes).toEqual([]);
   });
 
+  it('offers no drift check and writes nothing, on a reply that still carries both drift fields', async () => {
+    // Verbatim GET /v1/incarnations/{name} from a live keeper whose row has
+    // last_drift_check_at and last_drift_summary SET — the columns and the
+    // endpoint are still there, they go with the backend half (NIM-446).
+    //
+    // Seeding both fields is the whole point. Every assertion below would also
+    // pass against a reply that simply omitted them, and would then be proving
+    // the fixture rather than the component: that is how the dead hosts editor
+    // stayed green for five weeks (NIM-435). Here the data the removed UI read
+    // is present and no UI reads it.
+    const writes: Array<{ method: string; url: string }> = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (method !== 'GET') writes.push({ method, url });
+      if (url.includes('/v1/souls')) {
+        return new Response(JSON.stringify({ items: [], offset: 0, limit: 200, total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/members')) {
+        return new Response(JSON.stringify({ items: [], total: 0 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          covens: ['dev'],
+          created_at: '2026-08-05T09:30:32.8937Z',
+          created_by_aid: 'archon-alice',
+          last_drift_check_at: '2026-08-05T10:14:01.576315Z',
+          last_drift_summary: {
+            hosts_clean: 1,
+            hosts_drifted: 1,
+            hosts_failed: 0,
+            hosts_unsupported: 0,
+            scanned_at: '0001-01-01T00:00:00Z',
+            total_hosts: 0,
+          },
+          name: 'nim445-fixture',
+          service: 'hello-world',
+          service_version: 'main',
+          state: {},
+          state_schema_version: 1,
+          status: 'ready',
+          status_details: null,
+          updated_at: '2026-08-05T09:30:32.8937Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/nim445-fixture',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'nim445-fixture' })).toBeInTheDocument();
+    });
+
+    // The action bar is drawn in full for status=ready, so the missing button
+    // below is a missing button and not a missing action bar.
+    expect(screen.getByRole('button', { name: /Run Scenario/i })).toBeInTheDocument();
+
+    // The page says nothing about drift, in any casing, anywhere. This one
+    // assertion replaces a row of label-shaped ones that all shared a hole:
+    // each was written from the English wording, and a control whose locale
+    // key had been deleted renders the bare key instead — `checkDrift`,
+    // `colLastDrift`, `tabDriftCheck` — which /Check Drift/i and friends do
+    // not match. Matching the substring catches the translated string, the
+    // key, and any future wording of either. It is only this blunt because
+    // the fixture status is `ready`: the one legitimate `drift` on an
+    // incarnation page is the status badge, and that lives on its own test.
+    expect(document.body.textContent ?? '').not.toMatch(/drift/i);
+
+    // And the timestamp behind the removed meta row is present and unread. It
+    // is worded in no locale file, so it holds when the assertion above is
+    // narrowed by someone who finds it too blunt.
+    expect(screen.queryByText(/2026-08-05T10:14:01/)).not.toBeInTheDocument();
+
+    // A separate property from the assertions above: no POST leaves the page.
+    // This is what a resurrected mutation firing from an effect would violate,
+    // and it is the half that matters most while POST .../check-drift is still
+    // a live route on the keeper.
+    expect(writes).toEqual([]);
+  });
+
   it('Overview summary card clicks the Hosts tab and shows per-host runtime data', async () => {
     installFetchMock([
       {

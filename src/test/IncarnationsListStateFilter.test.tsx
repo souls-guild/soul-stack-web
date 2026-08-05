@@ -61,7 +61,6 @@ const INCARNATIONS_REPLY = {
       status: 'ready',
       covens: ['prod'],
       created_at: new Date().toISOString(),
-      last_drift_check_at: null,
       state: {},
     },
     {
@@ -71,7 +70,6 @@ const INCARNATIONS_REPLY = {
       status: 'ready',
       covens: ['staging'],
       created_at: new Date().toISOString(),
-      last_drift_check_at: null,
       state: {},
     },
   ],

@@ -135,7 +135,6 @@ describe('IncarnationsList', () => {
               created_by_aid: 'archon-alice',
               created_at: '2026-05-25T10:00:00Z',
               updated_at: '2026-05-25T12:00:00Z',
-              last_drift_check_at: null,
             },
             {
               name: 'postgres-stage',
@@ -147,7 +146,6 @@ describe('IncarnationsList', () => {
               created_by_aid: 'archon-bob',
               created_at: '2026-05-20T10:00:00Z',
               updated_at: '2026-05-25T11:30:00Z',
-              last_drift_check_at: null,
             },
           ],
           offset: 0,
@@ -185,7 +183,6 @@ describe('IncarnationsList', () => {
               created_by_aid: 'archon-alice',
               created_at: '2026-05-25T10:00:00Z',
               updated_at: '2026-05-25T12:00:00Z',
-              last_drift_check_at: null,
             },
           ],
           offset: 0,
@@ -349,5 +346,95 @@ describe('IncarnationsList', () => {
       expect(screen.getByRole('link', { name: 'redis-prod' })).toBeInTheDocument();
     });
     expect(screen.getByRole('link', { name: 'postgres-stage' })).toBeInTheDocument();
+  });
+
+  it('drops the Last drift check column but keeps the drift STATUS (NIM-445 boundary)', async () => {
+    // Rows are verbatim /v1/incarnations items from a live keeper. The first
+    // still carries last_drift_check_at, so the missing column is the doing of
+    // the component and not of a fixture that quietly stopped sending it.
+    //
+    // The second row pins the other side of the ticket. `drift` is a status the
+    // backend assigns and the operator must keep seeing; only the check that
+    // used to produce it went. Whether the status outlives its producer is
+    // decided in NIM-446 — until then removing it here would be a second,
+    // unrequested change hiding inside this one.
+    installFetchMock([
+      {
+        method: 'GET',
+        url: '/v1/incarnations',
+        body: {
+          items: [
+            {
+              name: 'nim445-fixture',
+              service: 'hello-world',
+              service_version: 'main',
+              state_schema_version: 1,
+              covens: ['dev'],
+              status: 'ready',
+              created_by_aid: 'archon-alice',
+              created_at: '2026-08-05T09:30:32.8937Z',
+              updated_at: '2026-08-05T09:30:32.8937Z',
+              last_drift_check_at: '2026-08-05T10:14:01.576315Z',
+              last_drift_summary: {
+                hosts_clean: 1,
+                hosts_drifted: 1,
+                hosts_failed: 0,
+                hosts_unsupported: 0,
+                scanned_at: '0001-01-01T00:00:00Z',
+                total_hosts: 0,
+              },
+            },
+            {
+              name: 'postgres-stage',
+              service: 'postgres',
+              service_version: 'main',
+              state_schema_version: 1,
+              covens: ['stage'],
+              status: 'drift',
+              created_by_aid: 'archon-bob',
+              created_at: '2026-05-20T10:00:00Z',
+              updated_at: '2026-05-25T11:30:00Z',
+            },
+          ],
+          offset: 0,
+          limit: 100,
+          total: 2,
+        },
+      },
+    ]);
+
+    renderWithProviders(<IncarnationsList />, '/incarnations');
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'nim445-fixture' })).toBeInTheDocument());
+
+    const table = screen.getByRole('table');
+
+    // Column identity is asserted by SHAPE, not by the rendered label. Two
+    // reasons, both of which let a verbatim resurrection of this column through
+    // an earlier version of this test:
+    //   - A header reads t('incarnations:colLastDrift'), and with the key
+    //     deleted i18next renders the bare key `colLastDrift` — which no regex
+    //     built from the English wording matches.
+    //   - The cell read formatTimeAgo(row.last_drift_check_at), which returns
+    //     "29m ago" and never the timestamp, so watching for the ISO string
+    //     was an assertion that could not fail.
+    // A count survives both: a seventh column is a seventh column whatever it
+    // renders and whatever it is called.
+    const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent?.trim() ?? '');
+    expect(headers).toEqual(['Name', 'Service', 'Status', 'Covens', 'Traits', 'Created ↓']);
+    for (const row of within(table).getAllByRole('row').slice(1)) {
+      expect(within(row).getAllByRole('cell')).toHaveLength(headers.length);
+    }
+
+    // No drift-check control anywhere on the page, under either the translated
+    // label or the bare key. This page has no write-tracking fixture, so an
+    // affordance is caught by its presence rather than by the request it fires.
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.textContent ?? '').not.toMatch(/drift/i);
+    }
+
+    // Still there: the status badge and its filter option.
+    expect(within(table).getByText('drift')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'drift' })).toBeInTheDocument();
   });
 });
