@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { criteriaFromQuery, describeCriteria, globToRegexSource } from '../pages/console/consoleSelection';
 import { consoleHrefFrom } from '../pages/console/consoleLink';
-import { compileSidRegex } from '../pages/run/hostSelector';
+import { EMPTY_HOST_CRITERIA, compileSidRegex } from '../pages/run/hostSelector';
 
 function fromQuery(qs: string) {
   return criteriaFromQuery(new URLSearchParams(qs));
@@ -76,6 +76,7 @@ describe('describeCriteria', () => {
   it('renders the live scope as chips', () => {
     expect(
       describeCriteria({
+        ...EMPTY_HOST_CRITERIA,
         incarnations: ['mongoshard'],
         covens: ['payments'],
         sidRegex: 'mongo-.*',
@@ -85,9 +86,7 @@ describe('describeCriteria', () => {
   });
 
   it('omits empty criteria', () => {
-    expect(describeCriteria({ incarnations: [], covens: ['web'], sidRegex: '', soulprint: '' })).toEqual([
-      'coven=web',
-    ]);
+    expect(describeCriteria({ ...EMPTY_HOST_CRITERIA, covens: ['web'] })).toEqual(['coven=web']);
   });
 });
 

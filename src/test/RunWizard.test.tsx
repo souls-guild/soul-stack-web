@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,6 +8,17 @@ import type { ReactNode } from 'react';
 import { RunWizard } from '../pages/run/RunWizard';
 import { tokenStore } from '../api/tokenStore';
 import { CONSTRAINTS } from '../api/constraints.gen';
+
+// A pre-flight verdict costs a 400ms debounce plus a round trip. The library default of
+// 1000ms leaves almost no margin once the whole suite shares the machine, and a test that
+// times out under load reports a bug that is not there. Kept well under vitest's own 5s
+// per-test ceiling so a real failure still surfaces as its assertion, not as a timeout.
+const PREFLIGHT_WAIT = 3000;
+
+// Budget for proving a banner never appears. Charged in full on every green run, so it
+// buys only what it must: the stub answers synchronously, and the anchor assertion before
+// it has already proved the request went out — this covers the render that follows.
+const NEVER_APPEARS_WAIT = 800;
 
 function renderWizardWithRoutes(initialPath = '/run') {
   const qc = new QueryClient({
@@ -1818,14 +1829,24 @@ describe('RunWizard', () => {
     expect('fail_threshold' in body).toBe(false);
   });
 
-  it('S6: snapshot target (regex/sids) → client-side batch preview, preview endpoint NOT called', async () => {
-    // Command with sidRegex — snapshot-target. Preview endpoint should not be hit.
-    const previewCalls: string[] = [];
-    const stub = setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: [] }] });
+  it('S6: snapshot target (regex/sids) → batch count stays client-side, preview only pre-flights the target', async () => {
+    // Since NIM-450 a snapshot target DOES hit /v1/voyages/preview — as a permission
+    // pre-flight, because that endpoint runs the same gates as create. What must not
+    // happen is the reply driving the batch display: the client already knows the scope,
+    // and a preview answering about a different one would be shown as fact.
+    const previewBodies: Record<string, unknown>[] = [];
+    setupFetchStub({ souls: [{ sid: 'db-1.example.com', covens: [] }, { sid: 'db-2.example.com', covens: [] }] });
     const baseFetch = globalThis.fetch;
     vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      if (url.includes('/v1/voyages/preview')) previewCalls.push(url);
+      if (url.includes('/v1/voyages/preview')) {
+        previewBodies.push(JSON.parse(String(init?.body ?? '{}')));
+        // Deliberately wrong scope: if the UI ever renders this, the assertion below trips.
+        return new Response(
+          JSON.stringify({ kind: 'command', scope_size: 99, total_batches: 99, batch_mode: 'barrier' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
       return baseFetch(input, init);
     }) as typeof fetch);
 
@@ -1835,21 +1856,23 @@ describe('RunWizard', () => {
     await user.click(screen.getByLabelText('Command'));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await user.type(screen.getByLabelText('SID regex'), 'db-.*');
-    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
     await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
     await user.click(screen.getByRole('button', { name: /Next/ }));
     await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
 
-    // Enter batch — preview should not be hit (snapshot-target).
     await user.type(screen.getByLabelText('Batch'), '1');
-    await waitFor(() => expect(screen.getByLabelText('Batch')).toHaveValue('1'));
+    await waitFor(() => expect(screen.getByTestId('batch-preview')).toHaveTextContent(/2 batch\(es\) for 2 units/));
+    expect(screen.getByTestId('batch-preview')).not.toHaveTextContent('99');
 
-    // preview was not called.
-    expect(previewCalls).toHaveLength(0);
-
-    void stub; // Suppress unused var warning.
+    // The pre-flight asked about exactly the hosts the run would touch.
+    await waitFor(() => expect(previewBodies.length).toBeGreaterThan(0));
+    expect((previewBodies.at(-1) as { target: { sids: string[] } }).target.sids).toEqual([
+      'db-1.example.com',
+      'db-2.example.com',
+    ]);
   });
 
   it('S6: late-binding coven target → preview endpoint called (debounced)', async () => {
@@ -2165,3 +2188,574 @@ function setupFetchStubWithHeralds(heraldNames: string[]) {
   }) as typeof fetch);
   return base;
 }
+
+/**
+ * NIM-450: an explicit SID target the operator cannot narrow.
+ *
+ * Since NIM-443 the roster button and Bulk Run both hand the wizard a concrete host list.
+ * That list resolves under `soul.list`; the run is authorized under `errand.run`. When the
+ * latter is narrower the backend does not trim — it refuses the whole run (403 naming the
+ * host), which is the honest answer but left the operator with a target wired into a link
+ * and no way to act on it.
+ */
+describe('RunWizard — narrowing an explicit host target (NIM-450)', () => {
+  beforeEach(() => {
+    tokenStore.set('test-token');
+  });
+
+  const SOULS = [
+    { sid: 'db-1.example.com', covens: ['prod'] },
+    { sid: 'db-2.example.com', covens: ['prod'] },
+  ];
+
+  // Drives the wizard from a bulk-run link (the shape MembersPanel and SoulsList emit)
+  // to step 4, with the pre-flight answering however the caller says.
+  async function reachStep4FromLink(previewReply: (body: Record<string, unknown>) => Response) {
+    const stub = setupFetchStub({ souls: SOULS });
+    const baseFetch = globalThis.fetch;
+    const previewBodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        previewBodies.push(body);
+        return previewReply(body);
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+
+    renderWizardWithRoutes('/run?workload=command&target_sids=db-1.example.com,db-2.example.com');
+    const user = userEvent.setup();
+    // A deep link pre-fills the criteria but still opens on step 1 (workload).
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+    return { stub, user, previewBodies };
+  }
+
+  const ok = () =>
+    new Response(JSON.stringify({ kind: 'command', scope_size: 2, total_batches: 1, batch_mode: 'barrier' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  const deniedOn = (sid: string) =>
+    new Response(
+      JSON.stringify({
+        type: 'https://soul-stack.com/errors/forbidden',
+        title: 'Forbidden',
+        status: 403,
+        detail: `operator lacks errand.run on target host ${sid}`,
+      }),
+      { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
+    );
+
+  it('a host unchecked in the Hosts step leaves the submitted target', async () => {
+    const stub = setupFetchStub({ souls: SOULS });
+    renderWizardWithRoutes('/run?workload=command&target_sids=db-1.example.com,db-2.example.com');
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByLabelText('Include db-2.example.com in the target'));
+    await waitFor(() => expect(screen.getByTestId('hosts-excluded')).toHaveTextContent('1 dropped'));
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /^Run$/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const post = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
+    expect((post!.body as { target: { sids: string[] } }).target.sids).toEqual(['db-1.example.com']);
+  });
+
+  it('unchecking every host blocks Next instead of submitting an empty run', async () => {
+    setupFetchStub({ souls: SOULS });
+    renderWizardWithRoutes('/run?workload=command&target_sids=db-1.example.com,db-2.example.com');
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByLabelText('Include db-1.example.com in the target'));
+    await user.click(screen.getByLabelText('Include db-2.example.com in the target'));
+
+    await waitFor(() => expect(screen.getByTestId('hosts-all-excluded')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
+  });
+
+  it('the pre-flight surfaces the refusal before submit and drops the host it names', async () => {
+    const excluded = new Set<string>();
+    const { user, previewBodies } = await reachStep4FromLink((body) => {
+      const sids = (body as { target: { sids: string[] } }).target.sids;
+      const denied = sids.find((s) => s === 'db-2.example.com' && !excluded.has(s));
+      return denied ? deniedOn(denied) : ok();
+    });
+
+    const banner = await screen.findByTestId('preflight-denied', {}, { timeout: PREFLIGHT_WAIT });
+    expect(banner).toHaveTextContent('operator lacks errand.run on target host db-2.example.com');
+
+    await user.click(screen.getByRole('button', { name: /Drop db-2.example.com from the target/ }));
+    excluded.add('db-2.example.com');
+
+    // Clearing needs the debounce plus a round trip, same as raising it did.
+    await waitFor(() => expect(screen.queryByTestId('preflight-denied')).not.toBeInTheDocument(), {
+      timeout: PREFLIGHT_WAIT,
+    });
+    await waitFor(
+      () => expect((previewBodies.at(-1) as { target: { sids: string[] } }).target.sids).toEqual(['db-1.example.com']),
+      { timeout: PREFLIGHT_WAIT },
+    );
+  });
+
+  it('a pre-flight failure that is not a 403 never stands between the operator and the run', async () => {
+    // Tempo throttling, a network blip, a keeper that has not got the endpoint: none of
+    // these prove the run is forbidden, and the backend still gets the final word on submit.
+    const { stub, user, previewBodies } = await reachStep4FromLink(
+      () =>
+        new Response(JSON.stringify({ status: 429, title: 'Too Many Requests', detail: 'tempo exceeded' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/problem+json' },
+        }),
+    );
+
+    // The pre-flight must have actually run and failed first — asserting the banner is
+    // absent before the request even fires proves nothing. Then give the failure the same
+    // window the 403 case needs to paint its banner, and require that none appears.
+    await waitFor(() => expect(previewBodies.length).toBeGreaterThan(0), { timeout: PREFLIGHT_WAIT });
+    await expect(screen.findByTestId('preflight-denied', {}, { timeout: NEVER_APPEARS_WAIT })).rejects.toThrow();
+
+    await user.click(screen.getByRole('button', { name: /^Run$/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+    const post = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
+    expect((post!.body as { target: { sids: string[] } }).target.sids).toEqual([
+      'db-1.example.com',
+      'db-2.example.com',
+    ]);
+  });
+
+  it('a Cadence is not pre-flighted: its create checks errand.run bare and resolves at spawn', async () => {
+    const previewBodies: Record<string, unknown>[] = [];
+    setupFetchStub({ souls: SOULS });
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) {
+        previewBodies.push(JSON.parse(String(init?.body ?? '{}')));
+        return deniedOn('db-2.example.com');
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+
+    renderWizardWithRoutes('/run?workload=command&target_sids=db-1.example.com,db-2.example.com&recurrence=true');
+    const user = userEvent.setup();
+    // A deep link pre-fills the criteria but still opens on step 1 (workload).
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
+
+    // Assert the silence AFTER the window in which a probe would have gone out: the target
+    // key is debounced by 400ms, so checking on arrival at step 4 proves only that the
+    // clock has not run yet. A one-off run in this same state fires within this budget —
+    // see the sibling voyage tests.
+    await new Promise((resolve) => setTimeout(resolve, NEVER_APPEARS_WAIT));
+    expect(previewBodies).toHaveLength(0);
+    expect(screen.queryByTestId('preflight-denied')).not.toBeInTheDocument();
+  });
+
+  it('dropping a host from a coven target sends the snapshot, not the coven the tick would re-resolve', async () => {
+    const cadencePosts: Record<string, unknown>[] = [];
+    setupFetchStub({ souls: SOULS });
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if ((init?.method ?? 'GET').toUpperCase() === 'POST' && url.includes('/v1/cadences')) {
+        cadencePosts.push(JSON.parse(String(init?.body ?? '{}')));
+        return new Response(JSON.stringify({ cadence_id: 'cad-01' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+
+    renderWizardWithRoutes('/run?workload=command&target_coven=prod&recurrence=true');
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByLabelText('Include db-2.example.com in the target'));
+    await waitFor(() => expect(screen.getByTestId('cadence-excluded-snapshot-warn')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByTestId('cadence-name'), 'nightly-uptime');
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
+
+    await waitFor(() => expect(cadencePosts).toHaveLength(1));
+    const target = (cadencePosts[0] as { target: { sids?: string[]; coven?: string[] } }).target;
+    expect(target.sids).toEqual(['db-1.example.com']);
+    expect(target.coven).toBeUndefined();
+  });
+});
+
+/**
+ * NIM-450 follow-ups from review: the pre-flight must not speak for a flow it does not
+ * describe, and dropping a host must be reversible and self-explaining.
+ */
+describe('RunWizard — pre-flight boundaries and reversibility (NIM-450)', () => {
+  beforeEach(() => {
+    tokenStore.set('test-token');
+  });
+
+  const SOULS = [
+    { sid: 'db-1.example.com', covens: ['prod'] },
+    { sid: 'db-2.example.com', covens: ['prod'] },
+  ];
+
+  const deniedOn = (sid: string) =>
+    new Response(
+      JSON.stringify({
+        type: 'https://soul-stack.com/errors/forbidden',
+        title: 'Forbidden',
+        status: 403,
+        detail: `operator lacks errand.run on target host ${sid}`,
+      }),
+      { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
+    );
+
+  const previewOk = (scope: number, batches: number) =>
+    new Response(
+      JSON.stringify({ kind: 'command', scope_size: scope, total_batches: batches, batch_mode: 'barrier' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+
+  // Layers a pre-flight answer over the shared stub. MUST run after setupFetchStub —
+  // that one replaces global fetch wholesale and would otherwise swallow this.
+  function stubPreview(reply: (body: Record<string, unknown>) => Response) {
+    const bodies: Record<string, unknown>[] = [];
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) {
+        const body = JSON.parse(String(init?.body ?? '{}'));
+        bodies.push(body);
+        return reply(body);
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+    return bodies;
+  }
+
+  // Walks a pre-filled link to the Options step with `uptime` as the command.
+  async function walkToOptions(query: string, user: ReturnType<typeof userEvent.setup>) {
+    renderWizardWithRoutes(query);
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+  }
+
+  async function fillCommandAndAdvance(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+  }
+
+  it('a dropped host goes back into the target when re-checked', async () => {
+    const stub = setupFetchStub({ souls: SOULS });
+    const user = userEvent.setup();
+    await walkToOptions('/run?workload=command&target_sids=db-1.example.com,db-2.example.com', user);
+
+    const box = () => screen.getByLabelText('Include db-2.example.com in the target');
+    await user.click(box());
+    await waitFor(() => expect(screen.getByTestId('hosts-excluded')).toHaveTextContent('1 dropped'));
+    await user.click(box());
+    await waitFor(() => expect(screen.queryByTestId('hosts-excluded')).not.toBeInTheDocument());
+
+    await fillCommandAndAdvance(user);
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /^Run$/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    const post = stub.posts.find((p) => p.url.includes('/v1/voyages') && !p.url.includes('/preview'));
+    expect((post!.body as { target: { sids: string[] } }).target.sids).toEqual([
+      'db-1.example.com',
+      'db-2.example.com',
+    ]);
+  });
+
+  it('a coven target with a dropped host is counted as the snapshot it will submit', async () => {
+    // Without the exclusion forcing the snapshot form, step 4 would count batches over the
+    // coven Keeper re-resolves (2 hosts) while the run leaves as a snapshot of 1 — the
+    // number on screen would describe a different run than the one that goes.
+    setupFetchStub({ souls: SOULS });
+    const bodies = stubPreview(() => previewOk(2, 2));
+    const user = userEvent.setup();
+    await walkToOptions('/run?workload=command&target_coven=prod', user);
+
+    await user.click(screen.getByLabelText('Include db-2.example.com in the target'));
+    await waitFor(() => expect(screen.getByTestId('hosts-excluded')).toHaveTextContent('1 dropped'));
+
+    await fillCommandAndAdvance(user);
+    await waitFor(() => expect(screen.getByLabelText('Batch')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Batch'), '1');
+
+    await waitFor(() => expect(screen.getByTestId('batch-preview')).toHaveTextContent(/1 batch\(es\) for 1 units/));
+    // And the probe asked about the snapshot, never about the coven.
+    await waitFor(() => expect(bodies.length).toBeGreaterThan(0), { timeout: PREFLIGHT_WAIT });
+    expect(bodies.every((b) => (b as { target: { coven?: string[] } }).target.coven === undefined)).toBe(true);
+  });
+
+  it('a Cadence gets no denial banner even when the pre-flight endpoint refuses', async () => {
+    // A coven target keeps the preview call alive (it is what counts the batches), but a
+    // cadence recipe is authorized BARE and its target resolved only at spawn — a per-host
+    // refusal here describes a run that is not the one being created.
+    setupFetchStub({ souls: SOULS });
+    const bodies = stubPreview(() => deniedOn('db-2.example.com'));
+    const user = userEvent.setup();
+    await walkToOptions('/run?workload=command&target_coven=prod&recurrence=true', user);
+
+    await fillCommandAndAdvance(user);
+    await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
+
+    // The probe really ran and really refused; the banner still must not appear.
+    await waitFor(() => expect(bodies.length).toBeGreaterThan(0), { timeout: PREFLIGHT_WAIT });
+    await expect(screen.findByTestId('preflight-denied', {}, { timeout: NEVER_APPEARS_WAIT })).rejects.toThrow();
+  });
+
+  it('toggling require_alive re-asks the pre-flight instead of keeping the old verdict', async () => {
+    setupFetchStub({ souls: SOULS });
+    const bodies = stubPreview((body) =>
+      (body as { require_alive?: boolean }).require_alive ? previewOk(1, 1) : deniedOn('db-2.example.com'),
+    );
+    const user = userEvent.setup();
+    await walkToOptions('/run?workload=command&target_sids=db-1.example.com,db-2.example.com', user);
+    await fillCommandAndAdvance(user);
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+
+    await screen.findByTestId('preflight-denied', {}, { timeout: PREFLIGHT_WAIT });
+    await user.click(screen.getByLabelText('require_alive'));
+
+    await waitFor(() => expect(bodies.some((b) => (b as { require_alive?: boolean }).require_alive)).toBe(true), {
+      timeout: PREFLIGHT_WAIT,
+    });
+    await waitFor(() => expect(screen.queryByTestId('preflight-denied')).not.toBeInTheDocument(), {
+      timeout: PREFLIGHT_WAIT,
+    });
+  });
+
+  it('dropping the last host explains itself on the Options step, not two steps away', async () => {
+    // The refusal always names whichever host is still first, so the Drop button walks the
+    // target down to empty — and the Hosts step's own "nothing left" warning is not here.
+    setupFetchStub({ souls: SOULS });
+    stubPreview((body) => deniedOn((body as { target: { sids: string[] } }).target.sids[0]));
+    const user = userEvent.setup();
+    await walkToOptions('/run?workload=command&target_sids=db-1.example.com,db-2.example.com', user);
+    await fillCommandAndAdvance(user);
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+
+    const dropName = /Drop (.*) from the target/;
+    const first = await screen.findByRole('button', { name: dropName }, { timeout: PREFLIGHT_WAIT });
+    const firstLabel = first.textContent ?? '';
+    await user.click(first);
+    // Wait for the NEXT verdict — the same button text would mean the refetch has not
+    // landed and a second click would re-drop the host already gone.
+    const second = await screen.findByRole(
+      'button',
+      { name: (name: string) => dropName.test(name) && name !== firstLabel },
+      { timeout: PREFLIGHT_WAIT },
+    );
+    await user.click(second);
+
+    await waitFor(() => expect(screen.getByTestId('target-empty-after-drop')).toBeInTheDocument(), {
+      timeout: PREFLIGHT_WAIT,
+    });
+    expect(screen.getByRole('button', { name: /^Run$/ })).toBeDisabled();
+  });
+});
+
+/**
+ * NIM-450, third review pass: branches the earlier tests reached past without touching.
+ */
+describe('RunWizard — pre-flight branches the happy path skips (NIM-450)', () => {
+  beforeEach(() => {
+    tokenStore.set('test-token');
+  });
+
+  const SOULS = [
+    { sid: 'db-1.example.com', covens: ['prod'] },
+    { sid: 'db-2.example.com', covens: ['prod'] },
+  ];
+
+  const deniedOn = (sid: string) =>
+    new Response(
+      JSON.stringify({
+        type: 'https://soul-stack.com/errors/forbidden',
+        title: 'Forbidden',
+        status: 403,
+        detail: `operator lacks errand.run on target host ${sid}`,
+      }),
+      { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
+    );
+
+  it('a refusal on a coven target is reported without blaming a host', async () => {
+    // A late-binding target has no snapshot to drop a host from — the console gate can
+    // still refuse it per host. Naming one anyway would send the operator to remove a
+    // host the target never listed.
+    setupFetchStub({ souls: SOULS });
+    const baseFetch = globalThis.fetch;
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) {
+        bodies.push(JSON.parse(String(init?.body ?? '{}')));
+        return deniedOn('db-2.example.com');
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+
+    renderWizardWithRoutes('/run?workload=command&target_coven=prod');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    const banner = await screen.findByTestId('preflight-denied', {}, { timeout: PREFLIGHT_WAIT });
+    expect(banner).toHaveTextContent('operator lacks errand.run on target host db-2.example.com');
+    expect(within(banner).queryByRole('button')).toBeNull();
+    // It really was the coven that was asked about.
+    expect((bodies.at(-1) as { target: { coven?: string[] } }).target.coven).toEqual(['prod']);
+  });
+
+  it('switching the module re-asks instead of carrying the old verdict over', async () => {
+    // The console gate is per module: a refusal earned by core.cmd.shell says nothing
+    // about core.noop.
+    setupFetchStub({ souls: SOULS });
+    const baseFetch = globalThis.fetch;
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/v1/voyages/preview')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { module?: string };
+        bodies.push(body);
+        return String(body.module).startsWith('core.cmd')
+          ? deniedOn('db-2.example.com')
+          : new Response(
+              JSON.stringify({ kind: 'command', scope_size: 2, total_batches: 1, batch_mode: 'barrier' }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            );
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+
+    renderWizardWithRoutes('/run?workload=command&target_sids=db-1.example.com,db-2.example.com');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await screen.findByTestId('preflight-denied', {}, { timeout: PREFLIGHT_WAIT });
+
+    // Back to Params, pick a module the gate does not cover.
+    await user.click(screen.getByRole('button', { name: /3\.\s*Params/ }));
+    await waitFor(() => expect(screen.getByTestId('module-picker-control')).toBeInTheDocument());
+    await user.click(screen.getByTestId('module-picker-control'));
+    await user.type(screen.getByTestId('module-picker-search'), 'exec');
+    await user.click(await screen.findByTestId('module-option-core.exec'));
+    // Switching modules resets the params form; the step gate needs it filled again.
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toHaveValue(''));
+    await user.type(screen.getByTestId('field-multiline-cmd'), '/usr/bin/uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Concurrency')).toBeInTheDocument());
+
+    await waitFor(
+      () => expect(bodies.some((b) => String((b as { module?: string }).module).startsWith('core.exec'))).toBe(true),
+      { timeout: PREFLIGHT_WAIT },
+    );
+    await waitFor(() => expect(screen.queryByTestId('preflight-denied')).not.toBeInTheDocument(), {
+      timeout: PREFLIGHT_WAIT,
+    });
+  });
+
+  it('a Cadence on an explicit host list is not warned about coven re-resolution', async () => {
+    // That warning explains why a coven target degrades to a snapshot. A target that was
+    // a snapshot to begin with has nothing to degrade.
+    setupFetchStub({ souls: SOULS });
+    renderWizardWithRoutes('/run?workload=command&target_sids=db-1.example.com,db-2.example.com&recurrence=true');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByLabelText('Include db-2.example.com in the target'));
+    await waitFor(() => expect(screen.getByTestId('hosts-excluded')).toHaveTextContent('1 dropped'));
+
+    expect(screen.queryByTestId('cadence-excluded-snapshot-warn')).not.toBeInTheDocument();
+  });
+
+  it('re-scoping past a dropped host restores late-binding instead of freezing a snapshot', async () => {
+    // `excluded` is a delta, not a selection: once the criteria no longer resolve to the
+    // dropped host, nothing is being dropped and a coven recipe may go back to being
+    // resolved on every tick.
+    const cadencePosts: Record<string, unknown>[] = [];
+    setupFetchStub({
+      souls: [
+        { sid: 'db-1.example.com', covens: ['prod'] },
+        { sid: 'db-2.example.com', covens: ['prod'] },
+        { sid: 'web-1.example.com', covens: ['web'] },
+      ],
+    });
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if ((init?.method ?? 'GET').toUpperCase() === 'POST' && url.includes('/v1/cadences')) {
+        cadencePosts.push(JSON.parse(String(init?.body ?? '{}')));
+        return new Response(JSON.stringify({ cadence_id: 'cad-01' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch);
+
+    renderWizardWithRoutes('/run?workload=command&target_coven=prod&recurrence=true');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/2 hosts match/));
+    await user.click(screen.getByLabelText('Include db-2.example.com in the target'));
+    await waitFor(() => expect(screen.getByTestId('cadence-excluded-snapshot-warn')).toBeInTheDocument());
+
+    // Move the criteria off the dropped host entirely.
+    const covenChip = screen.getByLabelText('Coven labels');
+    await user.click(within(covenChip).getByRole('button', { name: /prod/ }));
+    await user.type(covenChip.querySelector('input') as HTMLInputElement, 'web ');
+    await waitFor(() => expect(screen.getByLabelText('Host preview').textContent).toMatch(/1 hosts match/));
+    await waitFor(() => expect(screen.queryByTestId('cadence-excluded-snapshot-warn')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('field-multiline-cmd')).toBeInTheDocument());
+    await user.type(screen.getByTestId('field-multiline-cmd'), 'uptime');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByTestId('cadence-name'), 'nightly-uptime');
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
+
+    await waitFor(() => expect(cadencePosts).toHaveLength(1), { timeout: PREFLIGHT_WAIT });
+    const target = (cadencePosts[0] as { target: { sids?: string[]; coven?: string[] } }).target;
+    expect(target.coven).toEqual(['web']);
+    expect(target.sids).toBeUndefined();
+  });
+});

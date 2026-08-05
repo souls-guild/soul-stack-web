@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { compileSidRegex, matchStableCriteria, EMPTY_HOST_CRITERIA } from '../pages/run/hostSelector';
+import {
+  EMPTY_HOST_CRITERIA,
+  activeExclusions,
+  applyExclusions,
+  compileSidRegex,
+  deniedHostFromDetail,
+  matchStableCriteria,
+  previewTargetKeyForSids,
+  sidsFromPreviewKey,
+  visibleHostRows,
+} from '../pages/run/hostSelector';
 import type { SoulListEntry } from '../api/keeper';
 
 function soul(sid: string, covens: string[] = []): SoulListEntry {
@@ -130,5 +140,111 @@ describe('matchStableCriteria — the incarnations criterion is membership, not 
   it('with no incarnation criterion the roster is ignored entirely', () => {
     const covenOnly = { ...EMPTY_HOST_CRITERIA, covens: ['prod'] };
     expect(matchStableCriteria(memberNoLabel, covenOnly, null, NO_MEMBERS)).toBe(true);
+  });
+});
+
+/**
+ * NIM-450: the resolved list comes from `soul.list`, the run is authorized under
+ * `errand.run`. When the latter is narrower the backend refuses the WHOLE run over one
+ * host it does not cover, so the target has to be reducible and the refusal has to point
+ * at a host the operator can actually find in their own list.
+ */
+describe('exclusions — the resolved set minus what the operator dropped', () => {
+  const resolved = ['db-1.example.com', 'db-2.example.com', 'db-10.example.com'];
+
+  it('no exclusions → the resolution is the target, same array identity', () => {
+    expect(applyExclusions(resolved, EMPTY_HOST_CRITERIA)).toBe(resolved);
+    expect(activeExclusions(resolved, EMPTY_HOST_CRITERIA)).toEqual([]);
+  });
+
+  it('drops the named host and reports it as active', () => {
+    const c = { ...EMPTY_HOST_CRITERIA, excluded: ['db-2.example.com'] };
+    expect(applyExclusions(resolved, c)).toEqual(['db-1.example.com', 'db-10.example.com']);
+    expect(activeExclusions(resolved, c)).toEqual(['db-2.example.com']);
+  });
+
+  it('an exclusion the criteria no longer resolve to is inert', () => {
+    // Re-scoping to another coven must not carry a stale removal into the new target:
+    // otherwise a host the operator never touched here goes missing from the run.
+    const c = { ...EMPTY_HOST_CRITERIA, excluded: ['web-9.example.com'] };
+    expect(applyExclusions(resolved, c)).toEqual(resolved);
+    expect(activeExclusions(resolved, c)).toEqual([]);
+  });
+});
+
+describe('deniedHostFromDetail — which host the refusal named', () => {
+  // One SID is a suffix of the other, which FQDNs routinely are (`redis.example.com`
+  // inside `my-redis.example.com`). Scanning in list order would then blame the shorter
+  // host for its neighbour: the operator drops a host they were allowed to run on and
+  // the run stays refused for exactly the same reason.
+  const target = ['redis.example.com', 'my-redis.example.com'];
+
+  it('finds the host the backend named', () => {
+    expect(
+      deniedHostFromDetail('operator lacks errand.run on target host redis.example.com', target),
+    ).toBe('redis.example.com');
+  });
+
+  it('prefers the longest match, so a SID contained in another is not blamed for it', () => {
+    expect(
+      deniedHostFromDetail('operator lacks errand.run on target host my-redis.example.com', target),
+    ).toBe('my-redis.example.com');
+  });
+
+  it('a reworded message that names no target host yields null, not a guess', () => {
+    expect(deniedHostFromDetail('operator lacks required permission errand.run', target)).toBeNull();
+    expect(deniedHostFromDetail('', target)).toBeNull();
+  });
+});
+
+describe('visibleHostRows — the cap must never hide a removal', () => {
+  const rows = Array.from({ length: 60 }, (_, i) => ({ sid: `db-${i}.example.com` }));
+
+  it('without removals it is just the head of the resolution', () => {
+    expect(visibleHostRows(rows, EMPTY_HOST_CRITERIA, 50)).toHaveLength(50);
+    expect(visibleHostRows(rows, EMPTY_HOST_CRITERIA, 50).at(-1)!.sid).toBe('db-49.example.com');
+  });
+
+  it('a host dropped past the cap is pulled up so its checkbox exists', () => {
+    // Without this the operator drops host 55 from the step-4 banner and then cannot
+    // put it back: the row it lives on is never rendered.
+    const c = { ...EMPTY_HOST_CRITERIA, excluded: ['db-55.example.com'] };
+    const shown = visibleHostRows(rows, c, 50).map((r) => r.sid);
+    expect(shown).toHaveLength(51);
+    expect(shown).toContain('db-55.example.com');
+  });
+
+  it('a dropped host already inside the cap is not duplicated', () => {
+    const c = { ...EMPTY_HOST_CRITERIA, excluded: ['db-3.example.com'] };
+    const shown = visibleHostRows(rows, c, 50).map((r) => r.sid);
+    expect(shown).toHaveLength(50);
+    expect(shown.filter((s) => s === 'db-3.example.com')).toHaveLength(1);
+  });
+
+  it('the hidden count stays truthful when rows are pulled up', () => {
+    // The UI renders "and N more" as total - rendered; a rescued row must move that number.
+    const c = { ...EMPTY_HOST_CRITERIA, excluded: ['db-55.example.com', 'db-56.example.com'] };
+    const shown = visibleHostRows(rows, c, 50);
+    expect(rows.length - shown.length).toBe(8);
+  });
+});
+
+describe('preview key — producer and parser stay symmetric', () => {
+  it('round-trips the asked-about SIDs', () => {
+    const key = previewTargetKeyForSids(['db-1.example.com', 'db-2.example.com'], 'core.cmd.shell');
+    expect(sidsFromPreviewKey(key)).toEqual(['db-1.example.com', 'db-2.example.com']);
+  });
+
+  it('the module is part of the key, so a verdict does not outlive a module switch', () => {
+    const a = previewTargetKeyForSids(['db-1.example.com'], 'core.cmd.shell');
+    const b = previewTargetKeyForSids(['db-1.example.com'], 'core.pkg.installed');
+    expect(a).not.toBe(b);
+  });
+
+  it('a key that is not a SID target yields no hosts rather than throwing', () => {
+    // The late-binding key carries covens, and there is no key at all before step 4.
+    expect(sidsFromPreviewKey(null)).toEqual([]);
+    expect(sidsFromPreviewKey(JSON.stringify({ covens: ['prod'] }))).toEqual([]);
+    expect(sidsFromPreviewKey('not json')).toEqual([]);
   });
 });

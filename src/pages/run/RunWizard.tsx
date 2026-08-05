@@ -41,7 +41,13 @@ import {
 import {
   EMPTY_HOST_CRITERIA,
   SOULPRINT_FANOUT_LIMIT,
+  activeExclusions,
+  applyExclusions,
   compileSidRegex,
+  deniedHostFromDetail,
+  previewTargetKeyForSids,
+  sidsFromPreviewKey,
+  visibleHostRows,
   hasAnyCriteria,
   matchSoulprint,
   matchStableCriteria,
@@ -400,6 +406,7 @@ export function RunWizard() {
         ...d,
         incarnations: asArray(d.incarnations, EMPTY_HOST_CRITERIA.incarnations),
         covens: asArray(d.covens, EMPTY_HOST_CRITERIA.covens),
+        excluded: asArray(d.excluded, EMPTY_HOST_CRITERIA.excluded),
       };
     }
     return hasCriteriaFromQuery ? initialCriteria : EMPTY_HOST_CRITERIA;
@@ -615,6 +622,17 @@ export function RunWizard() {
     resolvedSids,
   ]);
 
+  // The criteria resolve under `soul.list`, but the run is authorized under `errand.run`.
+  // A narrower `errand.run` refuses the WHOLE run on one host it does not cover, so the
+  // operator has to be able to drop that host — including when the target arrived
+  // pre-filled from a bulk-run link and no checkbox ever existed for it.
+  const targetSids = useMemo(() => applyExclusions(resolvedSids, hostCriteria), [resolvedSids, hostCriteria]);
+  const excludedSids = useMemo(() => activeExclusions(resolvedSids, hostCriteria), [resolvedSids, hostCriteria]);
+
+  const excludeHost = useCallback((sid: string) => {
+    setHostCriteria((prev) => (prev.excluded.includes(sid) ? prev : { ...prev, excluded: [...prev.excluded, sid] }));
+  }, []);
+
   // --- Incarnation resolution for Scenario (preview + multi-select). ---
   const incarnationsListQ = useQuery({
     queryKey: ['run.scenario.incarnations.list', scenarioState.service],
@@ -652,9 +670,10 @@ export function RunWizard() {
     if (workload === 'scenario') {
       return Boolean(scenarioState.service && scenarioState.scenario);
     }
-    // command: Step2 — host selection; needs at least one criterion AND a non-empty resolution.
-    return hasAnyCriteria(hostCriteria) && resolvedSids.length > 0;
-  }, [workload, scenarioState, hostCriteria, resolvedSids]);
+    // command: Step2 — host selection; needs at least one criterion AND a non-empty target
+    // (a resolution the operator excluded down to zero is just as unrunnable as no match).
+    return hasAnyCriteria(hostCriteria) && targetSids.length > 0;
+  }, [workload, scenarioState, hostCriteria, targetSids]);
 
   // Empty required fields of the scenario's typed input_schema (mirrors backend 422).
   // Accounts for show_when: hidden fields are excluded from the gate.
@@ -824,9 +843,10 @@ export function RunWizard() {
       // The backend Voyage-resolver supports `target.coven[]` for kind=command and
       // resolves them into a host snapshot on every tick — new coven members get picked up.
       //
-      // Exception: if coven isn't set (the operator only set sidRegex/soulprint),
-      // declared-target would be empty -> fallback to snapshot sids (UI warns).
-      if (forCadence && hostCriteria.covens.length > 0) {
+      // Exception: if coven isn't set (the operator only set sidRegex/soulprint), or if
+      // hosts were dropped from the target (a declared coven is re-resolved on every tick
+      // and would run on them again) -> fallback to snapshot sids (UI warns).
+      if (forCadence && hostCriteria.covens.length > 0 && excludedSids.length === 0) {
         const declaredTarget: VoyageTarget = { coven: hostCriteria.covens };
         // where isn't evaluated in the MVP (backend stores it, doesn't apply it), but
         // we pass it for future compatibility, in case the operator set it via the UI.
@@ -843,7 +863,7 @@ export function RunWizard() {
         kind: 'command',
         module: moduleName,
         input: Object.keys(input).length > 0 ? input : undefined,
-        target: { sids: resolvedSids },
+        target: { sids: targetSids },
       };
     }
   }
@@ -932,10 +952,12 @@ export function RunWizard() {
   //
   // For Command: coven[] non-empty -> late-binding.
   // For Scenario: incarnations[] — snapshot (list known after regex resolution).
-  const isLateBinding = workload === 'command' && hostCriteria.covens.length > 0 && hostCriteria.sidRegex.trim().length === 0 && hostCriteria.soulprint.trim().length === 0;
+  // Dropped hosts force the snapshot form: a declared coven is re-resolved by Keeper and
+  // would put them back.
+  const isLateBinding = workload === 'command' && hostCriteria.covens.length > 0 && hostCriteria.sidRegex.trim().length === 0 && hostCriteria.soulprint.trim().length === 0 && excludedSids.length === 0;
 
-  // Scope for snapshot-count: for scenario = number of incarnations; for command = number of resolved SIDs.
-  const snapshotScope = workload === 'scenario' ? scenarioState.incarnations.length : resolvedSids.length;
+  // Scope for snapshot-count: for scenario = number of incarnations; for command = target size.
+  const snapshotScope = workload === 'scenario' ? scenarioState.incarnations.length : targetSids.length;
 
   // Local computation of the batch count for a snapshot target.
   // batch = '' | 'N' | 'N%'. For window — always 1 (batch isn't used in window semantics).
@@ -955,17 +977,49 @@ export function RunWizard() {
     return Math.ceil(snapshotScope / n);
   }, [options.batch, options.batchMode, snapshotScope]);
 
-  // Preview request for a late-binding target (debounce on TARGET change — not on batch input).
+  const previewModule = commandState.moduleState
+    ? `${commandState.moduleName}.${commandState.moduleState}`
+    : commandState.moduleName;
+
+  // Pre-flight for a one-off Command run. /v1/voyages/preview runs the SAME resolve and
+  // the SAME gates as create without persisting anything, so a 403 here IS the refusal the
+  // operator would get on submit — surfaced before they compose the command.
+  //
+  // Cadence is deliberately excluded: its create checks `errand.run` — and the console
+  // gate — BARE, and resolves the target only at spawn time. A per-host verdict here would
+  // tell the operator a recipe will be refused that the backend accepts.
+  const preflightApplies = workload === 'command' && runMode === 'voyage';
+
+  // The explicit host list a refusal can name. Empty for a late-binding (coven) target:
+  // there is no snapshot to drop a host from, so such a refusal is reported without a
+  // remedy rather than blamed on an arbitrary host.
+  const preflightSids = useMemo(
+    () => (preflightApplies && !isLateBinding && previewModule ? targetSids : []),
+    [preflightApplies, isLateBinding, previewModule, targetSids],
+  );
+
+  // Preview request (debounce on TARGET change — not on batch input).
   // Builds the preview body like buildRecipePayload() + buildOptionsPayload(), but without a draft.
   // We cannot call build* inside useMemo/useCallback (they read state via closure),
   // so we compute primitive keys right here for a stable queryKey.
-  const previewTargetKey = isLateBinding
-    ? JSON.stringify({ covens: hostCriteria.covens.slice().sort() })
-    : null;
+  const previewTargetKey = useMemo(
+    () =>
+      isLateBinding
+        ? JSON.stringify({ covens: hostCriteria.covens.slice().sort() })
+        : preflightSids.length > 0
+          ? previewTargetKeyForSids(preflightSids, previewModule)
+          : null,
+    [isLateBinding, hostCriteria.covens, preflightSids, previewModule],
+  );
 
-  // Build the preview body only when needed (lazy, only for late-binding).
+  // Build the preview body only when needed (lazy).
   const buildPreviewBody = useCallback((): VoyageCreateRequest | null => {
-    if (!isLateBinding) return null;
+    const target: VoyageTarget | null = isLateBinding
+      ? { coven: hostCriteria.covens }
+      : preflightSids.length > 0
+        ? { sids: preflightSids }
+        : null;
+    if (!target) return null;
     const moduleName = commandState.moduleState
       ? `${commandState.moduleName}.${commandState.moduleState}`
       : commandState.moduleName;
@@ -976,7 +1030,7 @@ export function RunWizard() {
     return {
       kind: 'command',
       module: moduleName,
-      target: { coven: hostCriteria.covens },
+      target,
       concurrency,
       batch_mode: options.batchMode,
       batch,
@@ -985,22 +1039,45 @@ export function RunWizard() {
       require_alive: options.requireAlive,
       on_failure: options.onFailure,
     };
-  }, [isLateBinding, commandState, hostCriteria.covens, options]);
+  }, [isLateBinding, preflightSids, commandState, hostCriteria.covens, options]);
 
   // Debounce the target key for the preview request: change queryKey only after the target settles.
   const previewTargetKeyDebounced = useDebounce(previewTargetKey, 400);
 
+  // require_alive belongs in the key, not just in the body: it changes which hosts the
+  // backend resolves, so a stale verdict would otherwise survive the operator toggling it
+  // — either accusing a host the filter just removed, or staying silent about one it
+  // brought back. The other body fields do not move the resolve.
   const previewQ = useQuery({
-    queryKey: ['voyage.preview', previewTargetKeyDebounced, options.batchMode],
+    queryKey: ['voyage.preview', previewTargetKeyDebounced, options.batchMode, options.requireAlive],
     queryFn: async () => {
       const body = buildPreviewBody();
       if (!body) return null;
       return keeperApi.voyages.preview(body);
     },
-    enabled: isLateBinding && previewTargetKeyDebounced !== null && step === 4,
+    enabled: previewTargetKeyDebounced !== null && step === 4,
     staleTime: 30_000,
     retry: false,
   });
+
+  // The hosts the pre-flight ACTUALLY asked about. The key is debounced and the target is
+  // not, so matching a refusal against the on-screen target would, for the 400 ms after an
+  // edit, hunt the previous verdict's host in the new list and quietly drop the button.
+  const preflightSidsAsked = useMemo(
+    () => sidsFromPreviewKey(previewTargetKeyDebounced),
+    [previewTargetKeyDebounced],
+  );
+
+  // Only a 403 is actionable. Every other pre-flight failure (429 Tempo, a network blip,
+  // an endpoint that isn't there) is graceful-degraded away: the backend stays the
+  // authority on submit, and a flaky probe must never stand between the operator and a
+  // run it cannot actually prove is forbidden.
+  const preflightDenial = useMemo(() => {
+    if (!preflightApplies) return null;
+    const err = previewQ.error;
+    if (!(err instanceof ApiError) || err.status !== 403) return null;
+    return { detail: err.detail, sid: deniedHostFromDetail(err.detail, preflightSidsAsked) };
+  }, [preflightApplies, previewQ.error, preflightSidsAsked]);
 
   // The furthest step reachable by validation (gate per step). The stepper marks
   // "done" only for steps actually completed and blocks jumping forward past an invalid
@@ -1093,6 +1170,38 @@ export function RunWizard() {
             onInvalidMapChange={setCommandInvalidMaps}
             onPatternErrorChange={setCommandPatternErrors}
           />
+        ) : null}
+
+        {/* Above the options, not next to the Run button: this says the run will be
+            refused, which is a reason to stop reading the form rather than a footnote to
+            it. The options block is long enough that anything under it is below the fold
+            on arrival. */}
+        {step === 4 && preflightDenial ? (
+          <div className={pageStyles.errorBox} data-testid="preflight-denied">
+            <div>{t('run:preflightDenied', { message: preflightDenial.detail })}</div>
+            {preflightDenial.sid ? (
+              <div style={{ marginTop: 8 }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => excludeHost(preflightDenial.sid as string)}
+                >
+                  {t('run:preflightDropHost', { sid: preflightDenial.sid })}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Dropping the last host is reachable from the button above, and the Hosts step
+            owns the usual "nothing left" warning — without this the submit button just
+            goes dead with its reason two steps away. Keyed on the criteria having resolved
+            to something first: an empty resolve is a different problem (still loading a
+            roster, or matching nothing) that the Hosts step explains. */}
+        {step === 4 && workload === 'command' && resolvedSids.length > 0 && targetSids.length === 0 ? (
+          <div className={pageStyles.errorBox} data-testid="target-empty-after-drop">
+            {t('run:targetEmptyAfterDrop')}
+          </div>
         ) : null}
 
         {step === 4 ? (
@@ -1628,9 +1737,25 @@ function Step2CommandHosts({
   requestedSidCount: number;
 }) {
   const { t } = useTranslation();
-  const sample = resolvedSouls.slice(0, 50);
   const unresolvedSample = unresolvedRequestedSids.slice(0, 10);
   const active = hasAnyCriteria(value);
+  const excludedSet = useMemo(() => new Set(value.excluded), [value.excluded]);
+
+  // The first 50 resolved hosts, plus every dropped host beyond them: a checkbox the
+  // operator cannot reach is a host they cannot put back.
+  const sample = useMemo(() => visibleHostRows(resolvedSouls, value), [resolvedSouls, value]);
+  const excludedCount = useMemo(
+    () => activeExclusions(resolvedSouls.map((s) => s.sid), value).length,
+    [resolvedSouls, value],
+  );
+  const targetCount = resolvedSouls.length - excludedCount;
+
+  function toggleHost(sid: string, included: boolean) {
+    onChange({
+      ...value,
+      excluded: included ? value.excluded.filter((s) => s !== sid) : [...value.excluded, sid],
+    });
+  }
 
   // Footgun banners for Cadence (late-binding warnings).
   // earlyBinding: coven is set, but regex/soulprint are also present — they are snapshot-only.
@@ -1643,6 +1768,9 @@ function Step2CommandHosts({
     runMode === 'cadence' &&
     value.covens.length === 0 &&
     (value.sidRegex.trim().length > 0 || value.soulprint.trim().length > 0);
+  // Dropping hosts from a coven target also forces the snapshot form — otherwise Keeper
+  // would resolve the coven afresh on every tick and run on them again.
+  const cadenceExcludedSnapshotWarn = runMode === 'cadence' && value.covens.length > 0 && excludedCount > 0;
 
   return (
     <>
@@ -1723,6 +1851,11 @@ function Step2CommandHosts({
           {t('run:cadenceEarlyBindingWarn')}
         </div>
       ) : null}
+      {cadenceExcludedSnapshotWarn ? (
+        <div className={styles.warn} data-testid="cadence-excluded-snapshot-warn" style={{ marginBottom: 4 }}>
+          {t('run:cadenceExcludedSnapshotWarn')}
+        </div>
+      ) : null}
 
       <div className={styles.preview} aria-label={t('run:hostPreviewAria')}>
         {soulsTruncated ? (
@@ -1741,6 +1874,11 @@ function Step2CommandHosts({
           <>
             <div>
               <Badge tone="info">{t('run:hostsMatch', { count: resolvedSouls.length })}</Badge>
+              {excludedCount > 0 ? (
+                <span style={{ marginLeft: 8 }} data-testid="hosts-excluded">
+                  {t('run:hostsExcluded', { count: excludedCount })}
+                </span>
+              ) : null}
               {soulsLoading ? <span style={{ marginLeft: 8 }}>{t('loading')}</span> : null}
             </div>
             {unresolvedRequestedSids.length > 0 ? (
@@ -1758,7 +1896,18 @@ function Step2CommandHosts({
             {sample.length > 0 ? (
               <div style={{ marginTop: 6 }}>
                 {sample.map((s) => (
-                  <div key={s.sid}>{s.sid}</div>
+                  <label key={s.sid} style={{ display: 'block', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={!excludedSet.has(s.sid)}
+                      onChange={(e) => toggleHost(s.sid, e.target.checked)}
+                      aria-label={t('run:hostIncludeAria', { sid: s.sid })}
+                      style={{ marginRight: 6 }}
+                    />
+                    <span style={excludedSet.has(s.sid) ? { color: 'var(--text-faint)', textDecoration: 'line-through' } : undefined}>
+                      {s.sid}
+                    </span>
+                  </label>
                 ))}
                 {resolvedSouls.length > sample.length ? (
                   <div style={{ color: 'var(--text-faint)' }}>
@@ -1769,6 +1918,9 @@ function Step2CommandHosts({
             ) : null}
             {!soulsLoading && resolvedSouls.length === 0 ? (
               <span className={styles.warn}>{t('run:targetEmptyError')}</span>
+            ) : null}
+            {!soulsLoading && resolvedSouls.length > 0 && targetCount === 0 ? (
+              <span className={styles.warn} data-testid="hosts-all-excluded">{t('run:hostsAllExcluded')}</span>
             ) : null}
           </>
         )}
@@ -2394,7 +2546,7 @@ function criteriaFromQuery(params: URLSearchParams): HostCriteria {
       sidRegex = `^(${escaped.join('|')})$`;
     }
   }
-  return { incarnations, covens, sidRegex, soulprint: '' };
+  return { incarnations, covens, sidRegex, soulprint: '', excluded: [] };
 }
 
 function splitCsv(raw: string): string[] {

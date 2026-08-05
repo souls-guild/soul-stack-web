@@ -14,6 +14,7 @@
 //   covens       — list of Coven labels; OR within.
 //   sidRegex     — RE2 pattern over SID, full-match (anchored `^(?:...)$`, like `grep -x`).
 //   soulprint    — DSL string (soulprintFilter.ts), AND within.
+//   excluded     — hosts the operator dropped from the resolved set (see below).
 
 import type { SoulListEntry, SoulprintFacts } from '../../api/keeper';
 import { parseSoulprintFilter, applyFilter, type FilterRule } from '../souls/soulprintFilter';
@@ -23,6 +24,10 @@ export interface HostCriteria {
   covens: string[];
   sidRegex: string;
   soulprint: string;
+  // Removals from the resolved set, not a selection. The criteria keep resolving on
+  // their own, so an entry that no longer matches anything is inert instead of
+  // silently shrinking a target the operator re-scoped later.
+  excluded: string[];
 }
 
 export const EMPTY_HOST_CRITERIA: HostCriteria = {
@@ -30,6 +35,7 @@ export const EMPTY_HOST_CRITERIA: HostCriteria = {
   covens: [],
   sidRegex: '',
   soulprint: '',
+  excluded: [],
 };
 
 // Recognized soulprint-DSL rules + invalid tokens (for inline-warn).
@@ -110,7 +116,8 @@ export function matchSoulprint(facts: SoulprintFacts | undefined, rules: FilterR
   return applyFilter(facts, rules);
 }
 
-// Whether any criterion is active (to block submit on empty scope).
+// Whether any criterion is active (to block submit on empty scope). Exclusions do
+// not count — dropping hosts narrows a target, it never defines one.
 export function hasAnyCriteria(c: HostCriteria): boolean {
   return (
     c.incarnations.length > 0 ||
@@ -118,4 +125,67 @@ export function hasAnyCriteria(c: HostCriteria): boolean {
     c.sidRegex.trim().length > 0 ||
     c.soulprint.trim().length > 0
   );
+}
+
+// The resolved hosts that survive the operator's exclusions — the actual run target.
+export function applyExclusions(resolved: string[], c: HostCriteria): string[] {
+  if (c.excluded.length === 0) return resolved;
+  const dropped = new Set(c.excluded);
+  return resolved.filter((sid) => !dropped.has(sid));
+}
+
+// The exclusions that actually bite right now (∩ with what the criteria resolve to).
+// Callers gate on this rather than on `excluded.length`, so a leftover entry from an
+// earlier criteria set does not, say, silently turn a late-binding target into a snapshot.
+export function activeExclusions(resolved: string[], c: HostCriteria): string[] {
+  if (c.excluded.length === 0) return [];
+  const dropped = new Set(c.excluded);
+  return resolved.filter((sid) => dropped.has(sid));
+}
+
+// The rows the Hosts step can act on: the head of the resolution, plus every dropped host
+// past it. The list is capped so a thousand-host resolution does not become a thousand
+// checkboxes — but a host the operator cannot reach is a host they cannot put back, so a
+// removal is never allowed to hide below the cap. The "and N more" counter stays honest
+// because it counts what is NOT rendered (total minus these rows).
+export function visibleHostRows<T extends { sid: string }>(
+  resolved: readonly T[],
+  c: HostCriteria,
+  limit = 50,
+): T[] {
+  const head = resolved.slice(0, limit);
+  if (c.excluded.length === 0) return head;
+  const dropped = new Set(c.excluded);
+  const shown = new Set(head.map((row) => row.sid));
+  return [...head, ...resolved.slice(limit).filter((row) => dropped.has(row.sid) && !shown.has(row.sid))];
+}
+
+// The pre-flight target, encoded as a string so the query key changes only when the target
+// settles, and decoded back. Producer and parser live together on purpose: a parser that
+// drifts from its producer reads an answer as being about a target it was never about.
+export function previewTargetKeyForSids(sids: string[], module: string): string {
+  return JSON.stringify({ sids, module });
+}
+
+export function sidsFromPreviewKey(key: string | null): string[] {
+  if (key === null) return [];
+  try {
+    const asked = JSON.parse(key) as { sids?: unknown };
+    return Array.isArray(asked.sids) ? (asked.sids as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Which of the hosts WE asked for the backend named in a refusal.
+//
+// The pre-flight 403 carries the offending SID inside a prose detail, so this does not
+// parse the sentence — it looks for a target SID inside it. A reworded message degrades
+// to "no host identified" (the text is still shown to the operator), never to the wrong
+// host. Longest match first: one SID can contain another, as FQDNs routinely do
+// (`redis.example.com` sits inside `my-redis.example.com`).
+export function deniedHostFromDetail(detail: string, targetSids: string[]): string | null {
+  if (!detail) return null;
+  const byLength = [...targetSids].sort((a, b) => b.length - a.length);
+  return byLength.find((sid) => sid.length > 0 && detail.includes(sid)) ?? null;
 }
