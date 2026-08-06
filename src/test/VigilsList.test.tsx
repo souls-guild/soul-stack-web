@@ -14,7 +14,7 @@ const SAMPLE = {
       interval: '30s',
       params: { service: 'redis' },
       enabled: true,
-      sid: 'host01.example.com',
+      subject: { sid: ['host01.example.com'] },
       created_at: '2026-05-01T00:00:00Z',
       updated_at: '2026-05-01T00:00:00Z',
     },
@@ -24,7 +24,7 @@ const SAMPLE = {
       interval: '15s',
       params: { path: '/etc/redis.conf', recursive: false },
       enabled: false,
-      coven: ['prod', 'redis-master'],
+      subject: { coven: ['prod', 'redis-master'] },
       created_at: '2026-05-02T00:00:00Z',
       updated_at: '2026-05-02T00:00:00Z',
     },
@@ -47,9 +47,10 @@ describe('VigilsList', () => {
       expect(screen.getByText('redis-down')).toBeInTheDocument();
       expect(screen.getByText('config-changed')).toBeInTheDocument();
     });
-    // subject renders: sid for the first one, coven for the second.
-    expect(screen.getByText('host01.example.com')).toBeInTheDocument();
-    expect(screen.getByText('prod, redis-master')).toBeInTheDocument();
+    // subject renders in the grammar an operator writes it in: sid for the
+    // first one, coven for the second.
+    expect(screen.getByText('sid=host01.example.com')).toBeInTheDocument();
+    expect(screen.getByText('coven=prod,redis-master')).toBeInTheDocument();
   });
 
   it('the "enabled only" filter hides disabled Vigils', async () => {

@@ -1062,7 +1062,7 @@ export interface paths {
         get?: never;
         /**
          * Replace operator-set trait labels of an incarnation
-         * @description Wholesale replacement of incarnation.traits (ADR-060) - source of truth, projected onto souls.traits of member hosts. Permission incarnation.traits-set.
+         * @description Wholesale replacement of incarnation.traits (ADR-060) - the labels of the incarnation itself. Member hosts are not touched: a host carries only the traits an operator set on it (NIM-281). Permission incarnation.traits-set.
          */
         put: operations["setIncarnationTraits"];
         post?: never;
@@ -2111,7 +2111,7 @@ export interface paths {
         put?: never;
         /**
          * Bulk assignment of trait-tags to hosts
-         * @description Bulk merge/replace/remove of operator-set trait-tags attached to HOSTS (souls.traits jsonb) on hosts under selector ∩ coven-scope. A host's effective traits are these unioned with the traits of every incarnation it belongs to (ADR-080): labelling the incarnation covers hosts that join later, labelling the host covers exactly one. Permission soul.traits-assign; merge/replace additionally require every pair to lie inside the operator's own trait-scope (gate b). partial -> 200 status:partial.
+         * @description Bulk merge/replace/remove of operator-set trait-tags attached to HOSTS (souls.traits jsonb) on hosts under selector ∩ coven-scope. These are a host's whole set of traits: belonging to an incarnation attaches nothing (NIM-281), so a host carries exactly the pairs an operator put on it. Permission soul.traits-assign; merge/replace additionally require every pair to lie inside the operator's own trait-scope (gate b). partial -> 200 status:partial.
          */
         post: operations["assignSoulTraits"];
         delete?: never;
@@ -2928,8 +2928,6 @@ export interface components {
             action_scenario: string;
             /** @description minimum interval between triggers per-(decree, subject) */
             cooldown?: string;
-            /** @description subject Coven tags (XOR with sid) */
-            coven?: string[];
             /** @description whether the rule is active (default true) */
             enabled?: boolean;
             /** @description target incarnation of the reaction (required) */
@@ -2938,8 +2936,8 @@ export interface components {
             name: string;
             /** @description Vigil name whose Portent the rule reacts to */
             on_beacon: string;
-            /** @description subject — single specific SID (XOR with coven) */
-            sid?: string;
+            /** @description which hosts may fire the rule — exactly one of sid / incarnation / coven / trait */
+            subject: components["schemas"]["Subject"];
             /** @description opt. CEL predicate over event.data; compile-checked */
             where?: string;
         };
@@ -2956,7 +2954,6 @@ export interface components {
             action_input: unknown;
             action_scenario: string;
             cooldown: string;
-            coven?: string[];
             /** Format: date-time */
             created_at: string;
             created_by_aid?: string;
@@ -2964,7 +2961,7 @@ export interface components {
             incarnation_name: string;
             name: string;
             on_beacon: string;
-            sid?: string;
+            subject: components["schemas"]["Subject"];
             /** Format: date-time */
             updated_at: string;
             where?: string;
@@ -3902,14 +3899,12 @@ export interface components {
         RiteCreateRequest: {
             /** @description allow-list; shape depends on Omen source_type (passed through as-is) */
             allow: unknown;
-            /** @description grant subject by Coven label (XOR with sid) */
-            coven?: string;
             /** @description false - broker (MVP-1); true - delegation (MVP-2) */
             delegate?: boolean;
             /** @description Omen the grant belongs to */
             omen: string;
-            /** @description grant subject by specific SID (XOR with coven) */
-            sid?: string;
+            /** @description which hosts the grant covers — exactly one of sid / incarnation / coven / trait */
+            subject: components["schemas"]["Subject"];
             /**
              * Format: int64
              * @description token use-count limit; vault-delegate only
@@ -3923,7 +3918,6 @@ export interface components {
         };
         RiteView: {
             allow: unknown;
-            coven?: string;
             /** Format: date-time */
             created_at: string;
             created_by_aid?: string;
@@ -3931,7 +3925,7 @@ export interface components {
             /** Format: int64 */
             id: number;
             omen: string;
-            sid?: string;
+            subject: components["schemas"]["Subject"];
             /** Format: int64 */
             token_num_uses?: number;
             token_ttl?: string;
@@ -4344,9 +4338,9 @@ export interface components {
         SoulCovenAssignSelector: {
             /** @description no host filter (entire registry ∩ scope) */
             all?: boolean;
-            /** @description hosts carrying this Coven tag, own or inherited from an incarnation they belong to, that incarnation's name included (ADR-080) */
+            /** @description hosts carrying this Coven tag on themselves; belonging to an incarnation attaches no tag (NIM-281) */
             coven?: string;
-            /** @description members of this incarnation, resolved from incarnation_membership — a membership question, never answered from the label union above (ADR-008 amendment NIM-124) */
+            /** @description members of this incarnation, resolved from incarnation_membership — a membership question, never answered from the tags above (ADR-008 amendment NIM-124) */
             incarnation?: string;
             /** @description point list of hosts (SID = FQDN) */
             sids?: string[] | null;
@@ -4654,6 +4648,28 @@ export interface components {
             /** Format: int64 */
             to: number;
         };
+        Subject: {
+            /** @description Coven labels — reaches a host carrying one of them, and every member of an incarnation carrying one */
+            coven?: string[] | null;
+            /** @description service+name pair — reaches every host that is a member of that incarnation */
+            incarnation?: components["schemas"]["SubjectIncarnation"];
+            /** @description exact SIDs — reaches those hosts and nothing else */
+            sid?: string[] | null;
+            /** @description trait key/value — the same two-level reach as coven, on the traits map */
+            trait?: components["schemas"]["SubjectTrait"];
+        };
+        SubjectIncarnation: {
+            /** @description incarnation name (unique within the service) */
+            name: string;
+            /** @description service the incarnation belongs to */
+            service: string;
+        };
+        SubjectTrait: {
+            /** @description trait key */
+            key: string;
+            /** @description trait value; a scalar trait matches by text, a list trait by membership */
+            value: string;
+        };
         SynodCreateRequest: {
             /** @description human-readable group description for UI/audit */
             description?: string;
@@ -4835,8 +4851,6 @@ export interface components {
         VigilCreateRequest: {
             /** @description core-beacon address (e.g. 'core.beacon.file_changed') */
             check: string;
-            /** @description subject Coven tags (XOR with sid) */
-            coven?: string[];
             /** @description whether the check is active (default true) */
             enabled?: boolean;
             /** @description check frequency (duration convention, e.g. '30s') */
@@ -4845,8 +4859,8 @@ export interface components {
             name: string;
             /** @description check parameters; shape depends on check (passed through as-is) */
             params?: unknown;
-            /** @description subject — single specific SID (XOR with coven) */
-            sid?: string;
+            /** @description which hosts run the check — exactly one of sid / incarnation / coven / trait */
+            subject: components["schemas"]["Subject"];
         };
         VigilListReply: {
             items: components["schemas"]["VigilView"][] | null;
@@ -4859,7 +4873,6 @@ export interface components {
         };
         VigilView: {
             check: string;
-            coven?: string[];
             /** Format: date-time */
             created_at: string;
             created_by_aid?: string;
@@ -4867,7 +4880,7 @@ export interface components {
             interval: string;
             name: string;
             params: unknown;
-            sid?: string;
+            subject: components["schemas"]["Subject"];
             /** Format: date-time */
             updated_at: string;
         };
@@ -13082,7 +13095,7 @@ export interface operations {
     listSouls: {
         parameters: {
             query?: {
-                /** @description filter by Coven label, own or inherited from an incarnation the host belongs to, that incarnation's name included (ADR-080); repeatable — matches ANY of the labels; AND within scope */
+                /** @description filter by Coven label the host carries itself; belonging to an incarnation attaches no label (NIM-281); repeatable — matches ANY of the labels; AND within scope */
                 coven?: string[] | null;
                 /** @description filter by status; outside enum -> 422 */
                 status?: "pending" | "connected" | "disconnected" | "revoked" | "expired" | "destroyed";

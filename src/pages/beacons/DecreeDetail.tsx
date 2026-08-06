@@ -6,6 +6,7 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
+import { formatSubject } from './subject';
 import styles from '../common.module.css';
 
 export function DecreeDetail() {
@@ -86,13 +87,7 @@ export function DecreeDetail() {
           <Link to={`/vigils/${encodeURIComponent(d.on_beacon)}`}>{d.on_beacon}</Link>
         </span>
         <span className={styles.metaKey}>{t('common:colSubject')}</span>
-        <span className={styles.metaVal}>
-          {d.sid
-            ? `sid: ${d.sid}`
-            : d.coven && d.coven.length > 0
-              ? `coven: ${d.coven.join(', ')}`
-              : t('beacons:subjectAnyVigil')}
-        </span>
+        <span className={styles.metaVal}>{formatSubject(d.subject) ?? t('beacons:subjectNone')}</span>
         <span className={styles.metaKey}>{t('common:colIncarnation')}</span>
         <span className={styles.metaVal}>
           <Link to={`/incarnations/${encodeURIComponent(d.incarnation_name)}`}>

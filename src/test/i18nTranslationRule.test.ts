@@ -53,7 +53,7 @@ const TECHNICAL = [
   'admin:rbacScopeKey_incarnation', 'admin:rbacScopeKey_service', 'admin:rbacScopeKey_coven',
   'admin:rbacScopeKey_host', 'admin:auditExpand', 'admin:auditArchonPrefix', 'admin:helpMcpTitle',
   'admin:auditCorrelationId', 'admin:svcRefreshLabel',
-  'beacons:errCovenKebab', 'beacons:errActionScenarioSnake', 'beacons:celWhereAria',
+  'beacons:errActionScenarioSnake', 'beacons:celWhereAria',
   'common:pushApply',
   'common:colAid', 'common:colApplyId', 'common:colErrandId', 'common:colId',
   'common:colIpv4', 'common:colIpv6', 'common:colKid', 'common:colMac', 'common:colMtu',
@@ -87,7 +87,7 @@ const PLACEHOLDERS = [
   'admin:rbacScopeTraitValuePlaceholder', 'admin:auditTypePlaceholder',
   'admin:auditArchonAidPlaceholder', 'admin:auditCorrelationPlaceholder',
   'admin:loginTokenPlaceholder',
-  'beacons:covenPlaceholder',
+  'beacons:covenPlaceholder', 'beacons:subjectSidPlaceholder',
   'console:scopeIncarnationsPlaceholder', 'console:scopeCovensPlaceholder',
   'console:scopeSidRegexPlaceholder', 'console:scopeSoulprintPlaceholder',
   'console:groupQueryPlaceholder',
@@ -151,7 +151,7 @@ const SCAN_DIRS = ['src/pages', 'src/components'];
 // field the value came from.
 const WIRE_FIELD_LABELS = [
   'arch', 'attempt', 'available_mb', 'batch_size', 'by', 'changed', 'cleanup_stale',
-  'codename', 'collected_at', 'concurrency', 'count', 'covens', 'created_at', 'destiny',
+  'codename', 'collected_at', 'concurrency', 'count', 'coven', 'covens', 'created_at', 'destiny',
   'distro', 'dry_run', 'duration_ms', 'error', 'exit_code', 'expires_at', 'expires_at: ',
   'family', 'finished_at', 'fqdn', 'hostname', 'init_system', 'keys', 'kind', 'label',
   'labels', 'matched', 'mode', 'model', 'module', 'on_failure', 'pkg_mgr', 'primary_ip',

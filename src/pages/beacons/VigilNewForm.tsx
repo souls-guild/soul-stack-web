@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -7,6 +7,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type VigilCreateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
+import { SubjectPicker } from './SubjectPicker';
+import { useSubjectDraft } from './useSubjectDraft';
+import { buildSubject, validateSubjectDraft } from './subject';
 import {
   KNOWN_BEACONS,
   isKnownBeacon,
@@ -148,8 +151,10 @@ export function VigilNewForm() {
   const [serverError, setServerError] = useState<string | null>(null);
   // typed-params live separately — turned into params_json on submit.
   const [typedParams, setTypedParams] = useState<Record<string, unknown>>({ recursive: false });
-  // covenInput — line/comma-separated; split into an array on submit.
-  const [covenInput, setCovenInput] = useState('');
+  // The subject is required and is one of four dimensions — it lives outside
+  // the zod schema, see ./subject.ts.
+  const subject = useSubjectDraft();
+  const [subjectError, setSubjectError] = useState<string | null>(null);
   // useRawParams = true → edit params manually as JSON (for unknown check).
   const [useRawParams, setUseRawParams] = useState(false);
 
@@ -165,22 +170,12 @@ export function VigilNewForm() {
       name: '',
       interval: '30s',
       check: KNOWN_BEACONS[0],
-      sid: '',
-      coven: [],
       enabled: true,
       params_json: '{"recursive":false}',
     },
   });
 
   const check = watch('check');
-  const coven = useMemo(
-    () =>
-      covenInput
-        .split(/[\s,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [covenInput],
-  );
 
   const create = useMutation({
     mutationFn: (body: VigilCreateRequest) => keeperApi.vigils.create(body),
@@ -248,16 +243,22 @@ export function VigilNewForm() {
 
   function onSubmit(values: VigilFormInput) {
     setServerError(null);
+    // Stop here rather than let keeper answer 400 "unknown field in request
+    // body" — `additionalProperties: false` fires before `required`, so the
+    // server's rejection names neither the field nor the missing subject.
+    const draft = subject.read();
+    const badSubject = validateSubjectDraft(draft);
+    setSubjectError(badSubject);
+    if (badSubject) return;
     const params = buildParamsForSubmit(values);
     const body: VigilCreateRequest = {
       name: values.name,
+      subject: buildSubject(draft),
       interval: values.interval,
       check: values.check,
       params: params as VigilCreateRequest['params'],
       enabled: values.enabled,
     };
-    if (values.sid) body.sid = values.sid;
-    else if (coven.length > 0) body.coven = coven;
     create.mutate(body);
   }
 
@@ -268,12 +269,6 @@ export function VigilNewForm() {
     else if (next === 'core.beacon.port_closed') setTypedParams({ host: '127.0.0.1' });
     else if (next === 'core.beacon.http_unhealthy') setTypedParams({ expected_code: 200 });
     else setTypedParams({});
-  }
-
-  // Sync coven from the text field into the form, so the validator sees it.
-  // (we don't validate coven separately — we take it via useMemo on submit).
-  function syncCovenToForm() {
-    setValue('coven', coven, { shouldValidate: false });
   }
 
   return (
@@ -288,7 +283,13 @@ export function VigilNewForm() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      {/* The subject is checked on the invalid path too: zod runs first, so
+          without it a form with both an empty name and an empty subject would
+          report them one click at a time. */}
+      <form
+        onSubmit={handleSubmit(onSubmit, () => setSubjectError(validateSubjectDraft(subject.read())))}
+        noValidate
+      >
         <section className={styles.section} aria-label={t('beacons:baseFieldsLegend')}>
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.formFields}>
@@ -339,40 +340,12 @@ export function VigilNewForm() {
           </div>
         </section>
 
-        <section className={styles.section} aria-label={t('beacons:subjectXorLegend')}>
-          <h2 className={styles.sectionTitle}>{t('colSubject')}</h2>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {t('beacons:subjectVigilHint', { sid: 'sid', coven: 'coven' })}
-          </div>
-          <div className={styles.formFields}>
-            <Input
-              label="sid (FQDN)"
-              mono
-              {...register('sid')}
-              placeholder="host01.example.com"
-              error={errors.sid?.message ? t(errors.sid.message) : undefined}
-              disabled={coven.length > 0}
-            />
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 240 }}>
-              <span className={styles.metaKey}>{t('beacons:covenSpaceComma')}</span>
-              <input
-                value={covenInput}
-                onChange={(e) => { setCovenInput(e.target.value); }}
-                onBlur={syncCovenToForm}
-                placeholder={t('beacons:covenPlaceholder')}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  fontFamily: 'var(--font-mono)',
-                }}
-                disabled={Boolean(watch('sid'))}
-              />
-              <span className={styles.metaKey}>{t('beacons:covenTagCount', { count: coven.length })}</span>
-            </label>
-          </div>
-        </section>
+        <SubjectPicker
+          value={subject.draft}
+          onChange={(patch) => { subject.set(patch); setSubjectError(null); }}
+          hintKey="beacons:subjectVigilHint"
+          error={subjectError ?? undefined}
+        />
 
         <section className={styles.section} aria-label={t('common:colParams')}>
           <h2 className={styles.sectionTitle}>{t('colParams')}</h2>

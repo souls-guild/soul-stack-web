@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Pager } from '../../components/primitives';
+import { formatSubject } from './subject';
 import styles from '../common.module.css';
 
 function shortCel(s: string | undefined, max = 80): string {
@@ -77,6 +78,7 @@ export function DecreesList() {
               <tr>
                 <th>{t('colName')}</th>
                 <th>{t('common:colOnBeacon')}</th>
+                <th>{t('colSubject')}</th>
                 <th>{t('common:colWhereCel')}</th>
                 <th>{t('colAction')}</th>
                 <th>{t('common:colIncarnation')}</th>
@@ -91,6 +93,7 @@ export function DecreesList() {
                     <Link to={`/decrees/${encodeURIComponent(d.name)}`}>{d.name}</Link>
                   </td>
                   <td className="mono">{d.on_beacon}</td>
+                  <td className="mono">{formatSubject(d.subject) ?? t('beacons:subjectNone')}</td>
                   <td className="mono" title={d.where}>{shortCel(d.where)}</td>
                   <td className="mono">{d.action_scenario}</td>
                   <td className="mono">

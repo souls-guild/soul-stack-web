@@ -6,6 +6,7 @@ import { keeperApi, type VigilView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Pager } from '../../components/primitives';
 import { KNOWN_BEACONS } from './schemas';
+import { formatSubject } from './subject';
 import styles from '../common.module.css';
 
 function shortJson(v: unknown, max = 60): string {
@@ -16,12 +17,6 @@ function shortJson(v: unknown, max = 60): string {
   } catch {
     return String(v);
   }
-}
-
-function subjectCell(v: VigilView): string {
-  if (v.sid) return v.sid;
-  if (v.coven && v.coven.length > 0) return v.coven.join(', ');
-  return '—';
 }
 
 export function VigilsList() {
@@ -141,7 +136,7 @@ export function VigilsList() {
                     <Link to={`/vigils/${encodeURIComponent(v.name)}`}>{v.name}</Link>
                   </td>
                   <td className="mono">{v.check}</td>
-                  <td className="mono">{subjectCell(v)}</td>
+                  <td className="mono">{formatSubject(v.subject) ?? t('beacons:subjectNone')}</td>
                   <td className="mono">{v.interval}</td>
                   <td className="mono" title={JSON.stringify(v.params)}>{shortJson(v.params)}</td>
                   <td>

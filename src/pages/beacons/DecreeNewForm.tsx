@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -7,6 +7,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type DecreeCreateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
+import { SubjectPicker } from './SubjectPicker';
+import { useSubjectDraft } from './useSubjectDraft';
+import { buildSubject, validateSubjectDraft } from './subject';
 import { decreeFormSchema, type DecreeFormInput } from './schemas';
 import styles from '../common.module.css';
 
@@ -15,7 +18,11 @@ export function DecreeNewForm() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [covenInput, setCovenInput] = useState('');
+  // Required, one of four dimensions — see ./subject.ts. Distinct from
+  // incarnation_name below: the subject says which hosts may FIRE the rule,
+  // incarnation_name is the TARGET the reaction runs against.
+  const subject = useSubjectDraft();
+  const [subjectError, setSubjectError] = useState<string | null>(null);
 
   // Pull in the list of Vigils and Incarnations for UX (datalist).
   const vigils = useQuery({
@@ -30,8 +37,6 @@ export function DecreeNewForm() {
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<DecreeFormInput>({
     resolver: zodResolver(decreeFormSchema),
@@ -39,8 +44,6 @@ export function DecreeNewForm() {
       name: '',
       on_beacon: '',
       where: '',
-      sid: '',
-      coven: [],
       incarnation_name: '',
       action_scenario: '',
       action_input_json: '{}',
@@ -48,15 +51,6 @@ export function DecreeNewForm() {
       enabled: false, // default-deny, operator enables explicitly.
     },
   });
-
-  const coven = useMemo(
-    () =>
-      covenInput
-        .split(/[\s,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [covenInput],
-  );
 
   const create = useMutation({
     mutationFn: (body: DecreeCreateRequest) => keeperApi.decrees.create(body),
@@ -73,6 +67,13 @@ export function DecreeNewForm() {
 
   function onSubmit(values: DecreeFormInput) {
     setServerError(null);
+    // Same reason as the Vigil form: a malformed subject comes back as 400
+    // "unknown field in request body" / a bare "Malformed request", naming
+    // nothing an operator can act on.
+    const draft = subject.read();
+    const badSubject = validateSubjectDraft(draft);
+    setSubjectError(badSubject);
+    if (badSubject) return;
     let actionInput: Record<string, unknown> = {};
     try {
       actionInput = JSON.parse(values.action_input_json || '{}') as Record<string, unknown>;
@@ -82,6 +83,7 @@ export function DecreeNewForm() {
     const body: DecreeCreateRequest = {
       name: values.name,
       on_beacon: values.on_beacon,
+      subject: buildSubject(draft),
       incarnation_name: values.incarnation_name,
       action_scenario: values.action_scenario,
       action_input: actionInput as DecreeCreateRequest['action_input'],
@@ -89,13 +91,7 @@ export function DecreeNewForm() {
     };
     if (values.where) body.where = values.where;
     if (values.cooldown) body.cooldown = values.cooldown;
-    if (values.sid) body.sid = values.sid;
-    else if (coven.length > 0) body.coven = coven;
     create.mutate(body);
-  }
-
-  function syncCovenToForm() {
-    setValue('coven', coven, { shouldValidate: false });
   }
 
   return (
@@ -110,7 +106,11 @@ export function DecreeNewForm() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      {/* Also on the invalid path — see the same note in VigilNewForm. */}
+      <form
+        onSubmit={handleSubmit(onSubmit, () => setSubjectError(validateSubjectDraft(subject.read())))}
+        noValidate
+      >
         <section className={styles.section} aria-label={t('beacons:baseFieldsLegend')}>
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.filters}>
@@ -183,40 +183,12 @@ export function DecreeNewForm() {
           </label>
         </section>
 
-        <section className={styles.section} aria-label={t('beacons:subjectXorLegend')}>
-          <h2 className={styles.sectionTitle}>{t('colSubject')}</h2>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {t('beacons:subjectDecreeHint', { sid: 'sid', coven: 'coven' })}
-          </div>
-          <div className={styles.filters}>
-            <Input
-              label="sid (FQDN)"
-              mono
-              {...register('sid')}
-              placeholder="host01.example.com"
-              error={errors.sid?.message ? t(errors.sid.message) : undefined}
-              disabled={coven.length > 0}
-            />
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 240 }}>
-              <span className={styles.metaKey}>{t('beacons:covenSpaceComma')}</span>
-              <input
-                value={covenInput}
-                onChange={(e) => setCovenInput(e.target.value)}
-                onBlur={syncCovenToForm}
-                placeholder={t('beacons:covenPlaceholder')}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
-                  fontFamily: 'var(--font-mono)',
-                }}
-                disabled={Boolean(watch('sid'))}
-              />
-              <span className={styles.metaKey}>{t('beacons:covenTagCount', { count: coven.length })}</span>
-            </label>
-          </div>
-        </section>
+        <SubjectPicker
+          value={subject.draft}
+          onChange={(patch) => { subject.set(patch); setSubjectError(null); }}
+          hintKey="beacons:subjectDecreeHint"
+          error={subjectError ?? undefined}
+        />
 
         <section className={styles.section} aria-label={t('common:colAction')}>
           <h2 className={styles.sectionTitle}>{t('colAction')}</h2>

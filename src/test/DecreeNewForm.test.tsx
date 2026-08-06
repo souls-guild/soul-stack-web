@@ -35,6 +35,7 @@ describe('DecreeNewForm', () => {
       action_input: {},
       cooldown: '',
       enabled: false,
+      subject: { sid: ['host01.example.com'] },
       created_at: '2026-05-27T00:00:00Z',
       updated_at: '2026-05-27T00:00:00Z',
     };
@@ -83,6 +84,8 @@ describe('DecreeNewForm', () => {
     await user.type(screen.getByLabelText(/on_beacon/i), 'redis-config-changed');
     await user.type(screen.getByLabelText(/^Incarnation$/i), 'redis-prod');
     await user.type(screen.getByLabelText(/action_scenario/i), 'restart');
+    const sidChips = screen.getByTestId('subject-sid');
+    await user.type(sidChips.querySelector('input') as HTMLInputElement, 'host01.example.com ');
 
     await user.click(screen.getByRole('button', { name: /Create Decree/i }));
 
@@ -95,5 +98,37 @@ describe('DecreeNewForm', () => {
     expect(payload.incarnation_name).toBe('redis-prod');
     expect(payload.action_scenario).toBe('restart');
     expect(payload.enabled).toBe(false);
+    // The subject is the Decree's own selector — the incarnation the reaction
+    // targets travels in incarnation_name and must not be read as one.
+    expect(payload.subject).toEqual({ sid: ['host01.example.com'] });
+  });
+
+  it('a subject is required: submitting with an empty one sends nothing', async () => {
+    const postSpy = vi.fn();
+    installFetchMock([
+      { method: 'GET', url: '/v1/vigils', body: EMPTY_VIGILS },
+      { method: 'GET', url: '/v1/incarnations', body: EMPTY_INCS },
+    ]);
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if ((init?.method ?? 'GET').toUpperCase() === 'POST' && url.startsWith('/v1/decrees')) postSpy();
+      return baseFetch(input, init);
+    }));
+
+    renderWithProviders(<DecreeNewForm />, '/decrees/new');
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'restart-on-config');
+    await user.type(screen.getByLabelText(/on_beacon/i), 'redis-config-changed');
+    await user.type(screen.getByLabelText(/^Incarnation$/i), 'redis-prod');
+    await user.type(screen.getByLabelText(/action_scenario/i), 'restart');
+    // incarnation_name is filled in — it is NOT a subject.
+    await user.click(screen.getByRole('button', { name: /Create Decree/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/at least one SID is required/i)).toBeInTheDocument();
+    });
+    expect(postSpy).not.toHaveBeenCalled();
   });
 });

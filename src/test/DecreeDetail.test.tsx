@@ -10,7 +10,7 @@ const SAMPLE = {
   name: 'restart-on-config',
   on_beacon: 'redis-config-changed',
   where: 'portent.kind == "core.beacon.file_changed" && portent.path == "/etc/redis.conf"',
-  coven: ['prod'],
+  subject: { coven: ['prod'] },
   incarnation_name: 'redis-prod',
   action_scenario: 'restart',
   action_input: { force: true },
@@ -49,6 +49,8 @@ describe('DecreeDetail', () => {
     // action scenario / incarnation in meta
     expect(screen.getByText('restart')).toBeInTheDocument();
     expect(screen.getByText('redis-prod')).toBeInTheDocument();
+    // the subject is the Decree's own selector, not the target incarnation
+    expect(screen.getByText('coven=prod')).toBeInTheDocument();
     // Recent fires placeholder
     expect(screen.getByText(/Recent fires/i)).toBeInTheDocument();
   });

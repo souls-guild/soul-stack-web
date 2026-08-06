@@ -22,17 +22,10 @@ const durationSchema = z
   .min(1, 'beacons:errDurationRequired')
   .regex(/^\d+(ms|s|m|h)$/, 'beacons:errDurationFormat');
 
-// SID — XOR with coven (checked in the form, not the schema).
-const sidSchema = z
-  .string()
-  .max(253, 'beacons:errSidMax')
-  .regex(/^[a-zA-Z0-9._-]+$/, 'beacons:errSidChars')
-  .optional()
-  .or(z.literal(''));
-
-const covenItemSchema = z
-  .string()
-  .regex(/^[a-z0-9][a-z0-9-]*$/, 'beacons:errCovenKebab');
+// The subject is NOT part of these schemas. It is one of four alternative
+// shapes, two of them pairs, and it is validated by validateSubjectDraft in
+// ./subject.ts — the same function both forms call, so there is one answer to
+// "is this subject legal" rather than one per form.
 
 // --- Vigil: per-check forms ---
 
@@ -106,23 +99,11 @@ export const vigilFormSchema = z
     name: nameSchema,
     interval: durationSchema,
     check: z.string().min(1, 'beacons:errCheckRequired'),
-    sid: sidSchema,
-    coven: z.array(covenItemSchema),
     enabled: z.boolean(),
     // params — per-check dynamics; validated separately on top of the kind schema.
     params_json: z.string(),
   })
   .superRefine((v, ctx) => {
-    // XOR coven/sid.
-    const hasSid = !!(v.sid && v.sid.length > 0);
-    const hasCoven = v.coven.length > 0;
-    if (hasSid && hasCoven) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['sid'],
-        message: 'beacons:errSidCovenXor',
-      });
-    }
     // params_json must be a JSON object.
     try {
       const parsed = JSON.parse(v.params_json || '{}');
@@ -172,8 +153,6 @@ export const decreeFormSchema = z
     name: nameSchema,
     on_beacon: nameSchema, // Vigil name — same kebab-case pattern.
     where: z.string().optional().or(z.literal('')),
-    sid: sidSchema,
-    coven: z.array(covenItemSchema),
     incarnation_name: z
       .string()
       .min(1, 'beacons:errIncarnationRequired')
@@ -187,15 +166,6 @@ export const decreeFormSchema = z
     enabled: z.boolean(), // default-deny: opt-in for safety; default set in defaultValues.
   })
   .superRefine((v, ctx) => {
-    const hasSid = !!(v.sid && v.sid.length > 0);
-    const hasCoven = v.coven.length > 0;
-    if (hasSid && hasCoven) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['sid'],
-        message: 'beacons:errSidCovenXor',
-      });
-    }
     try {
       const parsed = JSON.parse(v.action_input_json || '{}');
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {

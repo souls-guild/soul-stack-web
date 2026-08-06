@@ -11,7 +11,7 @@ const SAMPLE = {
       name: 'restart-on-config',
       on_beacon: 'redis-config-changed',
       where: 'portent.kind == "core.beacon.file_changed"',
-      coven: ['prod'],
+      subject: { coven: ['prod'] },
       incarnation_name: 'redis-prod',
       action_scenario: 'restart',
       action_input: {},
@@ -37,6 +37,7 @@ describe('DecreesList', () => {
     expect(screen.getByRole('heading', { name: /Decrees/i })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText('restart-on-config')).toBeInTheDocument();
+      expect(screen.getByText('coven=prod')).toBeInTheDocument();
     });
     expect(screen.getByText('redis-config-changed')).toBeInTheDocument();
     expect(screen.getByText('restart')).toBeInTheDocument();
