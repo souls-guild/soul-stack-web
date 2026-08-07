@@ -79,10 +79,38 @@ describe('PushApply', () => {
         const badges = screen.queryAllByText('success');
         expect(badges.length).toBeGreaterThan(0);
       },
-      { timeout: 5000 },
+      // Must clear the 2000ms refetchInterval in PushApply.tsx with room to spare:
+      // the first poll goes out as soon as the query is enabled and answers
+      // "running", so the badge cannot appear before the second one an interval
+      // later -- roughly two seconds of wall clock that no amount of CPU shortens.
+      // This was 5000ms, exactly the test timeout it sits inside, so it could never
+      // actually fire: a genuinely broken poll reported itself as a bare "Test timed
+      // out in 5000ms" with nothing about polling in it. Kept strictly under the
+      // `it` budget below so the diagnostic that names the badge is the one that wins.
+      { timeout: 6000 },
     );
     // host01 appears both in the textarea-inventory and the host table -- hence getAll.
     const occurrences = screen.getAllByText('host01');
     expect(occurrences.length).toBeGreaterThanOrEqual(1);
-  });
+    // One real interval -- two polls, ~2s -- plus form entry leaves too little of the
+    // 5000ms default to be comfortable, so this `it` gets 8000 rather than the suite
+    // getting a raised testTimeout. It is also the one cost in this suite that the
+    // worker-pool cap in vite.config.ts cannot reduce, because it is wall clock and
+    // not CPU (NIM-467/NIM-468).
+    //
+    // Driving the interval with fake timers instead was tried and does not currently
+    // work here; it is a real piece of work, not a one-liner, and is deferred rather
+    // than dismissed. Measured, in order of how far each got:
+    //   - `waitFor` under fake timers hangs by construction. @testing-library/dom
+    //     gates fake-timer detection on `typeof jest !== 'undefined'`, false under
+    //     vitest, so it polls a clock nobody advances.
+    //   - userEvent under fake timers hangs too, with `advanceTimers` and with
+    //     `delay: null` alike -- which is why every fake-timer test in this suite
+    //     drives the DOM with fireEvent instead (RedisUsersTable.test.tsx:122).
+    //   - fireEvent under fake timers gets furthest and still fails: the second poll
+    //     demonstrably goes out, and its reply is dropped rather than rendered, the
+    //     panel staying on "running". React commits that update on a macrotask the
+    //     fake clock does not own, so `act` has already returned by the time it
+    //     lands. Finishing it means solving that, not adding another flush.
+  }, 8000);
 });

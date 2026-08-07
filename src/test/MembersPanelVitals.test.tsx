@@ -544,6 +544,11 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     expect(query.get('workload')).toBe('command');
     expect(query.get('target_incarnation')).toBe('hello-dev');
     expect(query.has('target_coven')).toBe(false);
+    // Naming the set is also the whole point at two members, not just at scale —
+    // otherwise the only guard against a return to `?target_sids=` would be the
+    // thousand-row test below, and that one is the first thing anybody deletes
+    // when it looks expensive.
+    expect(query.has('target_sids')).toBe(false);
   });
 
   // The link cannot grow with the roster — that is the whole reason it names the
@@ -557,7 +562,20 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     const href = screen.getByTestId('run-on-hosts').getAttribute('href') ?? '';
     expect(href).toBe('/run?workload=command&target_incarnation=hello-dev');
     expect(href.length).toBeLessThan(512);
-  });
+    // A thousand rows is documentation, not a threshold: MembersPanel branches on
+    // `memberSids.length > 0`, so two members would fail this assertion the same
+    // way if the link ever went back to enumerating. What the number records is the
+    // scale at which the enumerating link actually broke — a few hundred hosts was
+    // enough to put `?target_sids=` past the 16 KiB Keeper accepts in headers — so
+    // the property a reader takes away is "constant", not merely "shorter".
+    //
+    // That scale also makes this the most expensive mount in the suite, and that is
+    // the only reason it carries a budget. With the worker-pool cap in vite.config.ts
+    // it measures ~1.5s idle and ~3.9s under deliberate CPU contention: passing, but
+    // the closest test here to the 5000ms default. 8000 is explicit headroom for a
+    // slower machine, stated at this `it` rather than raised globally so that a NEW
+    // four-second test still fails and gets looked at (NIM-467).
+  }, 8000);
 
   // Sorting reorders the table, not the set the run reaches: a link that changed
   // under a column click would make the target look like a function of the view.
