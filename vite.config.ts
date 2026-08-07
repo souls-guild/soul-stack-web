@@ -5,18 +5,26 @@ import { defineConfig, configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // Vitest sizes its fork pool to availableParallelism — max(cores - 1, 1) in run mode —
-// and every fork builds its own jsdom environment (~1.4s) and holds it for the whole
-// file. What that oversubscribes on a many-core workstation is memory and GC, not CPU,
-// so past a point more forks make each INDIVIDUAL test slower. Measured cold on this
-// suite (NIM-467/NIM-468), varying the visible core count with taskset:
+// and every fork builds its own jsdom environment and holds it for the whole file. Past
+// a point more forks make each INDIVIDUAL test slower. Measured cold on this suite
+// (NIM-467/NIM-468), holding the machine at 24 visible cores and varying ONLY the pool:
 //
-//   cores   forks   slowest test (MembersPanelVitals, 1000 rows)   wall clock
-//      24      23                                         3078ms         41s
-//       4       3                                         1462ms        106s
+//   forks   slowest test (MembersPanelVitals, 1000 rows)
+//      23                                         3078ms
+//       8                                    1904ms (1.62x)
 //
-// i.e. 23 forks ran that test 2.1x slower than 3 did. That is what walked integration
-// tests up to vitest's 5000ms default and made the failing file look random from run
-// to run — the pool, not the individual tests, was the variable.
+// against a mean of 1798ms over three further 8-fork cold runs, i.e. 1.71x. That is what
+// walked integration tests up to vitest's 5000ms default and made the failing file look
+// random from run to run — the pool, not the individual tests, was the variable.
+//
+// The mechanism is CPU contention, and the number that matters is PHYSICAL cores rather
+// than the one availableParallelism reports: this box is a 12-core Ryzen presenting 24
+// threads via SMT, so 23 forks plus the main process oversubscribe it roughly 2:1 and
+// SMT siblings then split each core's real throughput. It is not memory — an earlier
+// revision of this comment claimed memory and GC, which was never measured and does not
+// survive the arithmetic (~50 GB free, zero swap, and jsdom environments that cost
+// hundreds of megabytes in total). The inflation shows up evenly across transform, setup,
+// import and environment time, which is the signature of general contention, not of GC.
 //
 // The subtraction is load-bearing, not cosmetic. CI runners have 4 vCPU, where vitest
 // picks 3 forks on its own; capping at min(cores, 8) would hand CI a FOURTH fork and
