@@ -196,12 +196,27 @@ describe('useIncarnationRosterSizes — how many hosts a scenario will reach', (
     tokenStore.clear();
   });
 
-  it('counts the roster the operator may see, from the reply\'s own `total`', async () => {
-    vi.stubGlobal('fetch', async () =>
-      new Response(JSON.stringify(ROSTER), {
+  it('counts the roster the operator may see, and never asks the souls list for a coven', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      seen.push(url);
+      if (url.startsWith('/v1/souls')) {
+        // The LABELLED answer again, one host and no SID in common with the
+        // roster. A fan-out that went back to the column counts 1 where 2 is
+        // right, so the number below tells the two sources apart on its own —
+        // a stub answering the roster to every URL would not.
+        return new Response(
+          JSON.stringify({ items: [STRANGER], offset: 0, limit: 200, total: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify(ROSTER), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      }));
+      });
+    });
 
     const { result } = renderHook(
       () => useIncarnationRosterSizes([INCARNATION_NAME], true),
@@ -210,6 +225,9 @@ describe('useIncarnationRosterSizes — how many hosts a scenario will reach', (
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.sizeByName.get(INCARNATION_NAME)).toBe(2);
+
+    expect(seen.some((u) => u.includes(`/v1/incarnations/${INCARNATION_NAME}/members`))).toBe(true);
+    expect(seen.some((u) => u.startsWith('/v1/souls') && u.includes('coven='))).toBe(false);
   });
 
   it('leaves a name whose roster failed ABSENT rather than zero', async () => {
