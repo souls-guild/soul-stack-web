@@ -162,9 +162,16 @@ export function MembersPanel({ incarnationName }: { incarnationName: string }) {
     refetchInterval: REFETCH_MS,
   });
 
-  // VITALS for those rows. Resolves the same membership relation, but through a
-  // different scope gate (it unions in inherited labels, ADR-080), so its host
-  // set can be slightly wider — hence the union below rather than a lookup.
+  // VITALS for those rows. Resolves the same membership relation, caps it, then
+  // filters down to the caller's soul-read scope — both narrowing steps only
+  // remove, so at any single instant its host set is a SUBSET of the roster.
+  //
+  // That is a statement about one instant, and these are TWO fetches on two
+  // independent timers. A bind landing between them gives the vitals reply a SID
+  // the older roster reply does not carry, which is why `buildRows` unions the two
+  // instead of looking vitals up per member: a host that just joined keeps its row
+  // rather than blinking out until the roster catches up. Starting from the roster
+  // is the other half — a member with no vitals still has to appear.
   const util = useQuery({
     queryKey: [TELEMETRY_KEY, incarnationName],
     queryFn: () => keeperApi.incarnations.telemetry(incarnationName),

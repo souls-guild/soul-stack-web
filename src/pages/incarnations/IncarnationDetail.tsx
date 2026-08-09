@@ -58,25 +58,51 @@ export function IncarnationDetail() {
     enabled: Boolean(name) && tab === 'history',
   });
 
-  // Connected souls for the Overview "Hosts" card — the same source as HostsTab.
+  // The roster for the Overview "Hosts" card — the membership relation, the same
+  // list the Hosts tab shows. NOT the set a scenario run acts on: that one is
+  // resolved server-side with no caller scope and then cut down to the hosts
+  // holding a live presence lease, so it is neither a subset nor a superset of
+  // this one (see [useIncarnationRosterSizes]).
   // Always loaded (not only on tab=hosts) so Overview shows the real count.
-  const connectedSouls = useQuery({
-    queryKey: ['incarnation-souls', name],
-    queryFn: () => keeperApi.souls.list({ coven: [name], limit: 200 }),
+  //
+  // This read `GET /v1/souls?coven=<name>` while ADR-080 had a host inherit the
+  // name of every incarnation it belonged to; NIM-281 reverted that, so the label
+  // and the roster are now different sets and the card counted the wrong one.
+  // Same query key as the Hosts tab, so the card and the tab cannot disagree.
+  const roster = useQuery({
+    queryKey: ['incarnation-members', name],
+    queryFn: () => keeperApi.incarnations.members(name),
     enabled: Boolean(name),
+    // A 403 here is an ordinary answer for a narrow scope, not a blip. Retrying
+    // it three times would leave the card sitting on its loading state for
+    // seconds before it could say so — the other readers of this key already
+    // fail fast for the same reason.
+    retry: false,
   });
 
-  // Summary aggregate for Overview: count state fields and connected hosts.
+  // Summary aggregate for Overview: count state fields and roster members.
   // Call useMemo unconditionally (a hook must not sit under an if), values accessed via `?.`.
   const summary = useMemo(() => {
     const row = detail.data;
     const state = (row?.state ?? null) as Record<string, unknown> | null;
     const stateKeys = state && typeof state === 'object' ? Object.keys(state).length : 0;
-    // onlineHosts — actual connected souls (coven=incarnation.name), the same
-    // source as HostsTab. Shows "N online".
-    const onlineHosts = connectedSouls.data?.items?.length ?? null;
-    return { stateKeys, onlineHosts };
-  }, [detail.data, connectedSouls.data]);
+    // `total` rather than `items.length` because it is the field that names the
+    // count — the endpoint is unpaginated today and the server derives both from
+    // the same slice, so the two agree, and `total` is the one that keeps agreeing
+    // if paging is ever added.
+    //
+    // What the number means: the roster AS THIS OPERATOR MAY SEE IT. The server
+    // narrows the reply to the hosts inside the caller's soul scope, so a narrow
+    // scope legitimately shows fewer hosts than are bound. That is the contract,
+    // not a miscount — hence "in the roster" and not "the roster has".
+    const memberHosts = roster.data?.total ?? null;
+    return { stateKeys, memberHosts };
+  }, [detail.data, roster.data]);
+
+  // 403 is "you may not read this roster" and everything else is "it did not
+  // arrive" — one is about the operator's permissions and the other about
+  // retrying, so the card must not merge them into one apology.
+  const rosterForbidden = roster.error instanceof ApiError && roster.error.status === 403;
 
   if (detail.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
   if (detail.error) {
@@ -240,10 +266,21 @@ export function IncarnationDetail() {
             </button>
             <button type="button" className={styles.summaryCard} onClick={() => setTab('hosts')}>
               <span className={styles.summaryCardLabel}>Hosts</span>
-              <span className={styles.summaryCardValue}>
-                {summary.onlineHosts !== null
-                  ? t('incarnations:hostsCardOnline', { n: summary.onlineHosts })
-                  : t('incarnations:hostsCardLoading')}
+              {/* An ellipsis that never resolves is the card claiming to still be
+                  working. A roster this operator may not read is a settled answer,
+                  and the Add-Voice picker on this same page says so out loud — the
+                  surface that shows the NUMBER must not be the one that stays
+                  quiet about where the number went. */}
+              <span className={styles.summaryCardValue} data-testid="hosts-card-value">
+                {summary.memberHosts !== null
+                  ? t('incarnations:hostsCardMembers', { n: summary.memberHosts })
+                  : roster.error
+                    ? t(
+                        rosterForbidden
+                          ? 'incarnations:hostsCardForbidden'
+                          : 'incarnations:hostsCardUnreadable',
+                      )
+                    : t('incarnations:hostsCardLoading')}
               </span>
               <span className={styles.summaryCardHint}>{t('incarnations:hostsCardHint')}</span>
             </button>

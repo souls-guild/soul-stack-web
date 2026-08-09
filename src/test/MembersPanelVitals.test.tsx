@@ -166,9 +166,11 @@ describe('MembersPanel — vitals (roster rows ⋈ telemetry)', () => {
     expect(screen.getByTestId('util-empty')).toBeInTheDocument();
   });
 
-  // Telemetry scopes the same relation through a slightly wider gate (inherited
-  // labels), and a bind can land between the two fetches. Such a host is still a
-  // member — dropping it would hide a host the previous UI did show.
+  // Both endpoints resolve the same relation under the same scope, so the vitals
+  // reply cannot name a host the roster lacks at one instant — but they are two
+  // fetches on two timers, and a bind landing between them produces exactly this
+  // row. Such a host is already a member; dropping it would blink it out of the
+  // table for a refresh cycle right after an operator bound it.
   it('telemetry host the roster reply did not carry → row still shown, status "—"', async () => {
     roster(
       [],

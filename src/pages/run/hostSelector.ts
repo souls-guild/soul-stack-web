@@ -90,6 +90,13 @@ export function compileSidRegex(raw: string): { re: RegExp | null; error: string
 // so that a call site cannot quietly fall back to the coven column NIM-449 took
 // this criterion off. While the rosters are in flight the set is empty and the
 // criterion matches nothing — the caller reports "resolving", never "no hosts".
+//
+// The two are separate questions and the covens criterion answers only its own:
+// it matches the host's OWN `covens` column and nothing else, which is what
+// keeper's `?coven=` matches. There is no inheritance to fold in — NIM-281 took
+// it out of every reader, so a host bound to an incarnation carries no label for
+// it, and a host tagged with a string that spells an incarnation's name is not a
+// member. Reaching an incarnation's hosts is the criterion above.
 export function matchStableCriteria(
   soul: SoulListEntry,
   c: HostCriteria,

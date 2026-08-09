@@ -13,6 +13,20 @@ describe('IncarnationDetail', () => {
   });
   it('renders incarnation detail and Overview summary with navigation to State/Schema/Hosts', async () => {
     installFetchMock([
+      // Before the bare incarnation route — installFetchMock matches by prefix.
+      {
+        method: 'GET',
+        url: '/v1/incarnations/redis-prod/members',
+        body: {
+          items: [
+            { sid: 'agent-04.local', status: 'connected', bound_at: '2026-05-20T10:00:00Z' },
+            { sid: 'soul-debian-01.local', status: 'connected', bound_at: '2026-05-20T10:00:00Z' },
+          ],
+          offset: 0,
+          limit: 50,
+          total: 2,
+        },
+      },
       {
         method: 'GET',
         url: '/v1/incarnations/redis-prod',
@@ -37,20 +51,6 @@ describe('IncarnationDetail', () => {
           last_drift_check_at: '2026-05-25T11:30:00Z',
         },
       },
-      // Connected souls for Overview Hosts card (real online count).
-      {
-        method: 'GET',
-        url: '/v1/souls',
-        body: {
-          items: [
-            { sid: 'agent-04.local', status: 'active', covens: ['redis-prod'], transport: 'agent' },
-            { sid: 'soul-debian-01.local', status: 'active', covens: ['redis-prod'], transport: 'agent' },
-          ],
-          offset: 0,
-          limit: 200,
-          total: 2,
-        },
-      },
     ]);
 
     renderWithProviders(
@@ -66,10 +66,12 @@ describe('IncarnationDetail', () => {
 
     // Default tab - Overview, we see Data summary.
     expect(screen.getByRole('heading', { name: 'Data summary' })).toBeInTheDocument();
-    // Hosts card: 2 online (from souls API) — the only count left, a declared
-    // list no longer exists.
+    // Hosts card: the roster — the membership relation. Not a count of hosts
+    // labelled `redis-prod`: a bind attaches no label, so that set is a different
+    // one. (Nor is it what a run acts on — that set is resolved with no caller
+    // scope and then cut to hosts holding a live lease.)
     await waitFor(() => {
-      expect(screen.getByText(/2 online/i)).toBeInTheDocument();
+      expect(screen.getByText(/2 in the roster/i)).toBeInTheDocument();
     });
 
     // Action-bar for status=ready.
@@ -93,6 +95,63 @@ describe('IncarnationDetail', () => {
     // service@version appears both in Schema-tab meta block and in incarnation header.
     expect(screen.getAllByText('v2.0.0').length).toBeGreaterThan(0);
   });
+
+  // The card is the only place on Overview that carries the roster count, so when
+  // the roster does not arrive it is also the only place that can say so. Left on
+  // its loading state it claims to still be working, forever — and this page tells
+  // the operator outright, one panel over, that a 403 on this very endpoint is an
+  // answer and not a wait.
+  for (const c of [
+    { name: 'a roster it may not read', status: 403, title: 'Forbidden', expect: /no permission/i },
+    { name: 'a roster that failed to load', status: 500, title: 'Server error', expect: /unavailable/i },
+  ]) {
+    it(`Hosts card names ${c.name} instead of showing a loading ellipsis`, async () => {
+      installFetchMock([
+        {
+          method: 'GET',
+          url: '/v1/incarnations/redis-prod/members',
+          status: c.status,
+          body: { title: c.title, detail: 'nope' },
+        },
+        {
+          method: 'GET',
+          url: '/v1/incarnations/redis-prod',
+          body: {
+            name: 'redis-prod',
+            service: 'redis',
+            service_version: 'v2.0.0',
+            state_schema_version: 3,
+            covens: ['prod'],
+            state: {},
+            status: 'ready',
+            created_by_aid: 'archon-alice',
+            created_at: '2026-05-20T10:00:00Z',
+            updated_at: '2026-05-25T12:00:00Z',
+          },
+        },
+      ]);
+
+      renderWithProviders(
+        <Routes>
+          <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+        </Routes>,
+        '/incarnations/redis-prod',
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'redis-prod' })).toBeInTheDocument();
+      });
+
+      const value = await screen.findByTestId('hosts-card-value');
+      await waitFor(() => expect(value.textContent ?? '').toMatch(c.expect));
+      // The ellipsis is the loading state. Still on screen here, it would be the
+      // card telling the operator to keep waiting for something that has already
+      // come back with an answer.
+      expect(value.textContent).not.toBe('…');
+      // And no number: a roster that did not arrive must not read as an empty one.
+      expect(value.textContent ?? '').not.toMatch(/\d/);
+    });
+  }
 
   it('top-level key filter in State works', async () => {
     installFetchMock([

@@ -102,10 +102,12 @@ export function SidPicker({
   // ★ EXACTLY ONE FILTER, and it is not about ownership. Two narrower ones were tried
   // and are wrong:
   //
-  //   - by the incarnation's declared covens. A host inherits an incarnation's labels
-  //     only once it BELONGS to it (ADR-080), so a candidate for an incarnation that
-  //     does not exist yet cannot carry them. Filtering by them asks a host to already
-  //     hold the label it would get by being picked.
+  //   - by the incarnation's declared covens. Binding attaches NO label (NIM-281):
+  //     a host's covens are exactly what an operator put there, and belonging to an
+  //     incarnation never adds its labels or its name. So this filter asks a candidate
+  //     to already carry a label that being picked would not have given it either —
+  //     it hides the hosts the operator most likely wants and keeps only the ones
+  //     somebody happened to tag by hand.
   //   - by "unassigned". Membership is M:N (NIM-124) — a host legitimately runs several
   //     incarnations — so belonging to one is not a reason to hide it. That filter
   //     silently shrank the pool the operator was choosing from.

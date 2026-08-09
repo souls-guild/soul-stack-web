@@ -92,10 +92,11 @@ describe('matchStableCriteria — sidRegex applied via compiled re', () => {
   });
 });
 
-// NIM-449. Membership is `incarnation_membership`, not the coven column — and an
-// incarnation's name being a label its members inherit is exactly what made the
-// two look interchangeable. Every fixture here has them disagree, so a resolver
-// that went back to reading `souls.coven` fails on the SIDs, not just the count.
+// NIM-449. Membership is `incarnation_membership`, not the coven column — and the
+// brief period when a member inherited the incarnation's name as a label is exactly
+// what made the two look interchangeable. NIM-281 ended it. Every fixture here has
+// them disagree, so a resolver that went back to reading `souls.coven` fails on the
+// SIDs, not just the count.
 describe('matchStableCriteria — the incarnations criterion is membership, not a label', () => {
   const c = { ...EMPTY_HOST_CRITERIA, incarnations: ['redis-prod'] };
   // Bound to redis-prod, carries only its own tag.

@@ -22,15 +22,31 @@ const INCARNATION = {
   updated_at: '2026-05-25T12:00:00Z',
 };
 
-const SOULS = {
+// The roster the Add-Voice picker offers: `incarnation_membership`, not a label.
+const MEMBERS = {
   items: [
-    { sid: 'host-a.local', transport: 'agent', status: 'connected', registered_at: '2026-05-27T00:00:00Z' },
-    { sid: 'host-b.local', transport: 'agent', status: 'connected', registered_at: '2026-05-27T00:00:00Z' },
+    { sid: 'host-a.local', status: 'connected', bound_at: '2026-05-27T00:00:00Z', bound_by_aid: 'archon-alice' },
+    { sid: 'host-b.local', status: 'connected', bound_at: '2026-05-27T00:00:00Z', bound_by_aid: 'archon-alice' },
   ],
   offset: 0,
   limit: 200,
   total: 2,
 };
+
+// The souls registry answers the SAME hosts under no coven at all — belonging to
+// redis-prod attaches no label (NIM-281). Kept deliberately disjoint from MEMBERS
+// so a picker that went back to `GET /v1/souls?coven=redis-prod` finds nothing to
+// offer and the selectOptions below fails, instead of passing on a coincidence.
+const SOULS = {
+  items: [
+    { sid: 'stranger.local', transport: 'agent', status: 'connected', covens: ['redis-prod'], registered_at: '2026-05-27T00:00:00Z' },
+  ],
+  offset: 0,
+  limit: 200,
+  total: 1,
+};
+
+const MEMBERS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
 
 const CHOIRS_EMPTY = { items: [], offset: 0, limit: 100, total: 0 };
 
@@ -312,6 +328,12 @@ describe('ChoirsTab', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (url.includes('/members')) {
+        return new Response(JSON.stringify(MEMBERS), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('/v1/souls')) {
         return new Response(JSON.stringify(SOULS), {
           status: 200,
@@ -386,6 +408,12 @@ describe('ChoirsTab', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (url.includes('/members')) {
+        return new Response(JSON.stringify(MEMBERS), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       if (url.includes('/v1/souls')) {
         return new Response(JSON.stringify(SOULS), {
           status: 200,
@@ -420,10 +448,139 @@ describe('ChoirsTab', () => {
     await user.click(screen.getByTestId('add-voice-submit'));
 
     await waitFor(() => {
-      // New text: coven=<incarnationName>, link to Souls registry.
-      expect(screen.getByText(/coven=redis-prod/i)).toBeInTheDocument();
-      expect(screen.getByText(/Souls/i)).toBeInTheDocument();
+      // The message names the act that actually fixes it — binding on the Hosts
+      // tab — and says outright that a Coven does not. It used to send the
+      // operator to assign `coven=redis-prod` in the Souls registry, which under
+      // NIM-281 attaches a label and no membership: they would come back, hit the
+      // same 422, and have no reason to doubt the instruction.
+      expect(screen.getByTestId('add-voice-error')).toHaveTextContent(/not a member of the incarnation/i);
+      expect(screen.getByTestId('add-voice-error')).toHaveTextContent(/Hosts tab/i);
+      expect(screen.queryByText(/coven=redis-prod/i)).not.toBeInTheDocument();
     });
+  });
+
+  // --- the picker has nothing to offer, for two different reasons ---
+
+  it('empty roster → says to bind a host, not that everyone is already a Voice', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.includes('/voices')) {
+        return new Response(JSON.stringify(VOICES_EMPTY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/choirs')) {
+        return new Response(JSON.stringify(CHOIRS_ONE), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/members')) {
+        return new Response(JSON.stringify(MEMBERS_EMPTY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/v1/souls')) {
+        return new Response(JSON.stringify(SOULS), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify(INCARNATION), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/redis-prod',
+    );
+
+    await waitFor(() => screen.getByRole('heading', { name: 'redis-prod' }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Choirs/i }));
+
+    await waitFor(() => screen.getByTestId('choir-toggle-primaries'));
+    await user.click(screen.getByTestId('choir-toggle-primaries'));
+
+    await waitFor(() => screen.getByText(/Add Voice/i));
+    await user.click(screen.getByText(/Add Voice/i));
+
+    // Nobody is bound yet, so there is nothing to pick and no Voice to have taken
+    // it. "Every member is already a Voice" would send the operator looking for a
+    // roster that does not exist; the fix is on the Hosts tab.
+    await waitFor(() => expect(screen.getByText(/bind one on the Hosts tab/i)).toBeInTheDocument());
+    expect(screen.queryByText(/already a Voice/i)).not.toBeInTheDocument();
+  });
+
+  it('forbidden roster → says the roster is unreadable, not that the incarnation is empty', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.includes('/voices')) {
+        return new Response(JSON.stringify(VOICES_EMPTY), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/choirs')) {
+        return new Response(JSON.stringify(CHOIRS_ONE), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/members')) {
+        // Reading the roster needs `incarnation.get` on THIS incarnation, which is a
+        // narrower right than the one that opened this page. 403 here is an ordinary
+        // answer for a legitimately scoped operator, not a broken backend.
+        return new Response(JSON.stringify({ title: 'Forbidden', detail: 'out of scope' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/problem+json' },
+        });
+      }
+      if (url.includes('/v1/souls')) {
+        return new Response(JSON.stringify(SOULS), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify(INCARNATION), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name" element={<IncarnationDetail />} />
+      </Routes>,
+      '/incarnations/redis-prod',
+    );
+
+    await waitFor(() => screen.getByRole('heading', { name: 'redis-prod' }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /Choirs/i }));
+
+    await waitFor(() => screen.getByTestId('choir-toggle-primaries'));
+    await user.click(screen.getByTestId('choir-toggle-primaries'));
+
+    await waitFor(() => screen.getByText(/Add Voice/i));
+    await user.click(screen.getByText(/Add Voice/i));
+
+    // An empty dropdown and no message is the same picture as "no host is bound" —
+    // the very thing the test above proves this screen now states outright. Those
+    // two must not collapse into one, or the honest message makes the silent case
+    // read as a fact.
+    const err = await screen.findByTestId('voice-roster-error');
+    expect(err.textContent).toMatch(/may not read/i);
+    expect(screen.queryByText(/bind one on the Hosts tab/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/already a Voice/i)).not.toBeInTheDocument();
   });
 
   // --- deleting a Voice ---

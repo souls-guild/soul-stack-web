@@ -296,15 +296,34 @@ function AddVoiceModal({ open, incarnationName, choirName, existingVoiceSids, on
   const [position, setPosition] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Incarnation hosts — list of souls with coven=incarnationName (same as HostsTab).
-  const souls = useQuery({
-    queryKey: ['incarnation-souls', incarnationName],
-    queryFn: () => keeperApi.souls.list({ coven: [incarnationName], limit: 200 }),
+  // Candidates are the incarnation's ROSTER (`incarnation_membership`) — the same
+  // relation the Hosts tab lists, and the one the server checks before it admits
+  // a Voice: a host outside it comes back 422 however it is labelled.
+  //
+  // This used to read `GET /v1/souls?coven=<incarnationName>`, which agreed with
+  // the roster only while ADR-080 had a host inherit the name of every
+  // incarnation it belonged to. NIM-281 reverted that, so the query now gets both
+  // halves wrong: a member nobody tagged never appears in the picker, and a host
+  // merely carrying a tag spelled like the incarnation is offered and then
+  // refused. Same query key as MembersPanel and run/useIncarnationMembers, so the
+  // three cannot show three different rosters for one incarnation.
+  const roster = useQuery({
+    queryKey: ['incarnation-members', incarnationName],
+    queryFn: () => keeperApi.incarnations.members(incarnationName),
     enabled: open,
   });
 
   const existing = new Set(existingVoiceSids);
-  const candidates = (souls.data?.items ?? []).filter((s) => !existing.has(s.sid));
+  const candidates = (roster.data?.items ?? []).filter((m) => !existing.has(m.sid));
+
+  // A picker that cannot read the roster must SAY so. The old query hit
+  // `GET /v1/souls`, which any operator with a soul scope could read; the roster
+  // needs `incarnation.get` on this incarnation, so 403 is an ordinary answer here
+  // and not a broken screen — MembersPanel soft-degrades the identical endpoint the
+  // same way. Left silent, an empty dropdown reads as "no host is bound", which is
+  // the one other thing this picker now says explicitly.
+  const rosterStatus = roster.error instanceof ApiError ? roster.error.status : null;
+  const rosterForbidden = rosterStatus === 403;
 
   const mu = useMutation({
     mutationFn: () =>
@@ -373,7 +392,7 @@ function AddVoiceModal({ open, incarnationName, choirName, existingVoiceSids, on
       <form noValidate>
         <label style={fieldWrapStyle}>
           <span style={labelStyle}>SID <span style={{ color: 'var(--danger)' }}>*</span></span>
-          {souls.isLoading ? (
+          {roster.isLoading ? (
             <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{t('incarnations:soulsLoading')}</span>
           ) : (
             <select
@@ -384,16 +403,35 @@ function AddVoiceModal({ open, incarnationName, choirName, existingVoiceSids, on
               data-testid="voice-sid-select"
             >
               <option value="">{t('incarnations:selectSid')}</option>
-              {candidates.map((s) => (
-                <option key={s.sid} value={s.sid}>
-                  {s.sid}{s.status ? ` (${s.status})` : ''}
+              {/* SID alone: a roster row's `status` is the stale `souls.status`
+                  snapshot, and annotating a picker with a presence that may be
+                  hours old reads as a reason not to pick a host. */}
+              {candidates.map((m) => (
+                <option key={m.sid} value={m.sid}>
+                  {m.sid}
                 </option>
               ))}
             </select>
           )}
-          {souls.data && candidates.length === 0 ? (
+          {/* Two different empty pickers, and they ask for different things. An
+              incarnation with no members at all cannot have a Voice added to it
+              until somebody binds a host — telling that operator "they are all
+              Voices already" sends them looking for a list that does not exist. */}
+          {roster.data && candidates.length === 0 ? (
             <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-              {t('incarnations:allSoulsAreVoices')}
+              {(roster.data.items ?? []).length === 0
+                ? t('incarnations:noMembersForVoice')
+                : t('incarnations:allSoulsAreVoices')}
+            </span>
+          ) : null}
+          {roster.error ? (
+            <span
+              style={{ fontSize: 12.5, color: 'var(--text-muted)' }}
+              data-testid="voice-roster-error"
+            >
+              {rosterForbidden
+                ? t('incarnations:rosterForbiddenForVoice')
+                : t('incarnations:rosterUnreadableForVoice')}
             </span>
           ) : null}
         </label>
@@ -428,7 +466,11 @@ function AddVoiceModal({ open, incarnationName, choirName, existingVoiceSids, on
           {t('incarnations:addVoiceHint')}
         </p>
 
-        {formError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{formError}</div> : null}
+        {formError ? (
+          <div className={styles.errorBox} style={{ marginTop: 12 }} data-testid="add-voice-error">
+            {formError}
+          </div>
+        ) : null}
       </form>
     </Modal>
   );

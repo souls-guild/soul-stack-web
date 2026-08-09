@@ -741,8 +741,9 @@ export const keeperApi = {
     },
     get: (name: string) =>
       apiGet<IncarnationGetReply>(`/v1/incarnations/${encodeURIComponent(name)}`),
-    // GET /v1/incarnations/{name}/telemetry — host-vitals aggregate over the coven's hosts
-    // (latest+stale per host, no window). NIM-86. Empty souls / out of scope → hosts:[].
+    // GET /v1/incarnations/{name}/telemetry — host-vitals aggregate over the incarnation's
+    // MEMBER hosts (`incarnation_membership`, NIM-124 — never a Coven label spelled like the
+    // name), latest+stale per host, no window. NIM-86. Empty souls / out of scope → hosts:[].
     telemetry: (name: string) =>
       apiGet<IncarnationTelemetryReply>(
         `/v1/incarnations/${encodeURIComponent(name)}/telemetry`,

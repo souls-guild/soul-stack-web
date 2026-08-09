@@ -9,9 +9,10 @@
 //     form. An operator must never be offered a host they could not otherwise see, and
 //     reusing the scoped list is what makes that structural instead of re-stated.
 //     ★ The two narrower filters this started with are BOTH wrong and are pinned as
-//     such below: an incarnation's covens are inherited only once a host belongs to it
-//     (ADR-080), so a candidate cannot carry them; and membership is M:N (NIM-124), so
-//     serving one incarnation is no reason to hide a host from another.
+//     such below: a Coven label is attached by an operator and by nobody else, so
+//     wanting to join an incarnation gives a candidate no reason to carry one named
+//     after it; and membership is M:N (NIM-124), so serving one incarnation is no
+//     reason to hide a host from another.
 //  2. THE COUNT COMES FROM THE TOPOLOGY, never a literal — it moves when shards or
 //     replicas move, and the picker closes once it is met.
 //  3. NO DECLARATION, NO PICKER: a plain sid field is untouched.
@@ -97,9 +98,10 @@ describe('roster picker — catalog', () => {
     // Membership is M:N: a host serving another incarnation is a legitimate candidate,
     // and hiding it silently shrinks the pool the operator is choosing from.
     expect(q.unassigned).toBeUndefined();
-    // An incarnation's covens reach its hosts by INHERITANCE, once they belong to it —
-    // a candidate for an incarnation that does not exist yet cannot carry them. Asking
-    // for them would demand the label that being picked would grant.
+    // A Coven label exists only where an operator attached it, and joining an
+    // incarnation attaches none. Asking for a label named after an incarnation that
+    // does not exist yet would demand a tag nothing in this flow ever grants — the
+    // catalog would come back empty and the operator would never learn why.
     expect(q.coven).toBeUndefined();
 
     // form-prep is the OTHER catalog and must stay out of this path: it is addressed per

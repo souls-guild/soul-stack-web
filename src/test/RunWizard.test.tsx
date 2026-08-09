@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { RunWizard } from '../pages/run/RunWizard';
+import { ROSTER_SIZE_FANOUT_LIMIT } from '../pages/run/useIncarnationMembers';
 import { tokenStore } from '../api/tokenStore';
 import { CONSTRAINTS } from '../api/constraints.gen';
 
@@ -83,6 +84,14 @@ interface FetchStubOpts {
   // Rosters by incarnation name (GET /v1/incarnations/{name}/members, NIM-124).
   // A name absent here answers 404, as the keeper does for an unknown incarnation.
   members?: Record<string, string[]>;
+  // Rosters that answer an error instead of a list, by name -> HTTP status. 403
+  // is the real one: the endpoint narrows its reply to the caller's soul scope
+  // and refuses outright when the caller may not list souls at all.
+  memberErrors?: Record<string, number>;
+  // Rosters that never answer, so the screen can be read while they are still in
+  // flight. A resolved-but-empty stub cannot show that state: it is gone by the
+  // time the first assertion runs.
+  deferMembers?: boolean;
 }
 
 const DEFAULT_MODULES: ModuleStub[] = [
@@ -122,6 +131,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
   const soulprints = opts.soulprints ?? {};
   const modules = opts.modules ?? DEFAULT_MODULES;
   const members = opts.members ?? {};
+  const memberErrors = opts.memberErrors ?? {};
   const ref: { posted: CapturedPost | null; posts: CapturedPost[] } = { posted: null, posts: [] };
 
   vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -186,6 +196,9 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     const membersMatch = url.match(/\/v1\/incarnations\/([^/?]+)\/members$/);
     if (membersMatch) {
       const name = decodeURIComponent(membersMatch[1]);
+      if (opts.deferMembers) return new Promise<Response>(() => {});
+      const status = memberErrors[name];
+      if (status) return json({ title: 'Forbidden', detail: `roster of ${name}` }, status);
       const roster = members[name];
       if (!roster) return json({ title: 'Not Found', detail: `incarnation ${name} not found` }, 404);
       const items = roster.map((sid) => ({
@@ -255,6 +268,19 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     return new Response('{}', { status: 404 });
   }) as typeof fetch);
   return ref;
+}
+
+// Records every URL the wizard asks for, on top of whatever stub is already
+// installed. `setupFetchStub` answers requests but keeps no log of the GETs, and
+// what some assertions need is the request that must NOT have gone out.
+function watchFetchUrls(): string[] {
+  const inner = globalThis.fetch;
+  const seen: string[] = [];
+  vi.stubGlobal('fetch', ((input: RequestInfo | URL, init?: RequestInit) => {
+    seen.push(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
+    return inner(input, init);
+  }) as typeof fetch);
+  return seen;
 }
 
 describe('RunWizard', () => {
@@ -405,6 +431,138 @@ describe('RunWizard', () => {
     const vBody = voyagePosts[0].body as { target: { incarnations: string[] } };
     expect(vBody.target.incarnations.sort()).toEqual(['redis-a', 'redis-b']);
     expect(vBody.target.incarnations).not.toContain('pg-1');
+  });
+
+  it('Scenario: host counts come from the roster, and are not read before the step that shows them', async () => {
+    setupFetchStub({
+      incarnationNames: ['redis-prod'],
+      members: { 'redis-prod': ['a.local', 'b.local'] },
+    });
+    const seen = watchFetchUrls();
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    // The service is chosen, so the incarnation list is already in — which is the
+    // whole point of asserting here. One roster request per incarnation of the
+    // service is a fan-out the operator may never look at: it is spent on step 2,
+    // where no count is on screen and Back to step 1 is still one click away.
+    await waitFor(() => expect(seen.some((u) => u.includes('/v1/incarnations?'))).toBe(true));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled());
+    expect(seen.some((u) => u.includes('/members'))).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    // 2 — the roster. The souls stub holds no host at all, so this number can only
+    // have come from `/members`; a count read off the label column would be 0.
+    const list = screen.getByLabelText('Matched incarnations');
+    await waitFor(() => expect(within(list).getByText(/2 in the roster/)).toBeInTheDocument());
+    // And the badge the operator actually reads before pressing Run.
+    expect(screen.getByText('2 in the rosters')).toBeInTheDocument();
+    // Which is a roster size, not what the run will reach: the server resolves
+    // the run's hosts with no caller scope and then drops the ones without a live
+    // lease. The badge sits on the last screen before Run, so it has to say so.
+    expect(screen.getByTestId('total-hosts-hint').textContent ?? '').toMatch(/not the run's reach/i);
+    expect(seen.some((u) => u.includes('/v1/incarnations/redis-prod/members'))).toBe(true);
+    expect(seen.some((u) => u.startsWith('/v1/souls') && u.includes('coven='))).toBe(false);
+  });
+
+  it('Scenario: a roster this operator may not read SAYS so, and says the run still targets it', async () => {
+    setupFetchStub({
+      incarnationNames: ['redis-prod', 'redis-staging'],
+      members: { 'redis-staging': ['b.local'] },
+      // The narrow-scope answer, on one of the two names only: the other still
+      // resolves, so a blanket "nothing could be read" would not fit either.
+      memberErrors: { 'redis-prod': 403 },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    const list = screen.getByLabelText('Matched incarnations');
+    await waitFor(() => expect(within(list).getByText(/1 in the roster/)).toBeInTheDocument());
+
+    // The dash on the forbidden row is the whole point: without the notice it is
+    // the same dash the over-cap case gets, and the operator cannot tell "not
+    // readable by you" from "not read" from "no hosts".
+    const notice = await screen.findByTestId('host-count-forbidden');
+    expect(notice.textContent).toContain('redis-prod');
+    expect(notice.textContent).not.toContain('redis-staging');
+    // And the part that decides what the operator does next: the run does NOT
+    // drop that incarnation. Saying only "unknown" would read as "excluded".
+    expect(notice.textContent ?? '').toMatch(/still targets/i);
+    expect(screen.getAllByText(/hosts: —/).length).toBe(1);
+  });
+
+  it('Scenario: rosters still in flight read as PENDING, not as unknown', async () => {
+    // Never-answering rosters: the row has no count, exactly as it has none when
+    // the roster came back forbidden. Two causes, and only one of them means the
+    // count is never coming.
+    setupFetchStub({ incarnationNames: ['redis-prod'], deferMembers: true });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    const list = screen.getByLabelText('Matched incarnations');
+    await waitFor(() => expect(within(list).getByText('redis-prod')).toBeInTheDocument());
+    await waitFor(() => expect(within(list).getByText(/hosts: …/)).toBeInTheDocument());
+    // The em dash is what a settled "no count" looks like. On screen here it
+    // would be the wizard reporting a verdict on a request still in the air.
+    expect(within(list).queryByText(/hosts: —/)).toBeNull();
+    // And no notice: nothing has failed, so there is nothing to explain yet.
+    expect(screen.queryByTestId('host-count-forbidden')).toBeNull();
+    expect(screen.queryByTestId('host-count-failed')).toBeNull();
+    expect(screen.queryByTestId('host-count-unknown')).toBeNull();
+  });
+
+  it('Scenario: past the roster fan-out cap the screen SAYS the counts are unread', async () => {
+    const names = Array.from({ length: ROSTER_SIZE_FANOUT_LIMIT + 1 }, (_, i) => `redis-${i}`);
+    setupFetchStub({ incarnationNames: names });
+    const seen = watchFetchUrls();
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-0'),
+    );
+
+    // Every row reads "unknown" and the cap is the only reason — so the reason has
+    // to be on screen. Silence here is a screen that looks broken to an operator
+    // who cannot tell "not read" from "no hosts".
+    const notice = await screen.findByTestId('host-count-over-cap');
+    expect(notice.textContent).toContain(String(ROSTER_SIZE_FANOUT_LIMIT));
+    expect(screen.getAllByText(/hosts: —/).length).toBe(names.length);
+    expect(seen.some((u) => u.includes('/members'))).toBe(false);
   });
 
   it('Scenario invalid regex → 0 matches, submit disabled', async () => {

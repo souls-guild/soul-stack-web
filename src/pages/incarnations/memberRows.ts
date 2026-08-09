@@ -52,9 +52,14 @@ export function buildRow(
 
 // ROW SOURCE is the roster; telemetry and the souls registry only fill columns of
 // a row that already exists. The union at the end is the other half of that rule:
-// a host the aggregate named but the roster reply did not carry is still a member
-// — the two endpoints scope the same relation slightly differently, and a bind can
-// land between the two fetches — so it keeps its row rather than disappearing.
+// a host the aggregate named but the roster reply did not carry is still a member,
+// so it keeps its row rather than disappearing.
+//
+// Both endpoints resolve the same relation under the same soul-read scope, and the
+// aggregate only narrows further (cap, then scope), so at one instant it cannot
+// name a host the roster lacks. The two are separate fetches on separate timers,
+// though, and a bind landing between them is exactly that case — the union covers
+// the gap between the two replies, not a difference in what they mean.
 export function buildRows(
   members: readonly IncarnationMember[] | null | undefined,
   hosts: readonly HostTelemetry[] | null | undefined,

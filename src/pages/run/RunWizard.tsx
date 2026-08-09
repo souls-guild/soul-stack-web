@@ -57,6 +57,9 @@ import {
 } from './hostSelector';
 import {
   useIncarnationMembers,
+  useIncarnationRosterSizes,
+  totalRosterSize,
+  ROSTER_SIZE_FANOUT_LIMIT,
   type MembershipFailure,
   type UnresolvedIncarnation,
 } from './useIncarnationMembers';
@@ -640,30 +643,35 @@ export function RunWizard() {
     enabled: workload === 'scenario' && Boolean(scenarioState.service),
   });
 
-  // Souls by covens=incarnation-name -> host count for each incarnation.
   const incarnationNames = useMemo(
     () => (incarnationsListQ.data?.items ?? []).map((i) => i.name),
     [incarnationsListQ.data],
   );
-  const incarnationSoulsQ = useQuery({
-    queryKey: ['run.scenario.incarnation.souls', incarnationNames],
-    queryFn: () => keeperApi.souls.list({ coven: incarnationNames, limit: 1000 }),
-    enabled: workload === 'scenario' && incarnationNames.length > 0,
-  });
-  // Map incarnation-name -> host count (by coven membership). undefined if souls
-  // are still loading or the endpoint is unavailable — then show the name without a count.
+
+  // Host count per incarnation, read from each ROSTER — the relation a scenario
+  // run fans out over.
+  //
+  // It used to be a single `GET /v1/souls?coven=<all the names>` with the reply's
+  // label column tallied per name. That agreed with the roster only while ADR-080
+  // had a host inherit the name of every incarnation it belonged to; NIM-281
+  // reverted the inheritance, so the tally counts whoever happens to carry a tag
+  // spelled like an incarnation — every member nobody tagged is missing from a
+  // number the operator reads as the size of the fan-out.
+  //
+  // A name whose roster did not arrive keeps NO entry, and the picker renders
+  // that as an unknown count rather than as zero.
+  //
+  // Gated on the step that shows the numbers, not merely on the workload: this is
+  // one request per incarnation of the service, and the service is already chosen
+  // on step 2. Without the step in the condition, picking a service fires the whole
+  // fan-out immediately for counts the operator may never reach.
+  const rosterSizes = useIncarnationRosterSizes(incarnationNames, workload === 'scenario' && step >= 3);
   const hostCountByIncarnation = useMemo<Record<string, number> | undefined>(() => {
-    const souls = incarnationSoulsQ.data?.items;
-    if (!souls) return undefined;
+    if (rosterSizes.sizeByName.size === 0) return undefined;
     const counts: Record<string, number> = {};
-    for (const name of incarnationNames) counts[name] = 0;
-    for (const s of souls) {
-      for (const cv of s.covens ?? []) {
-        if (cv in counts) counts[cv] += 1;
-      }
-    }
+    for (const [name, size] of rosterSizes.sizeByName) counts[name] = size;
     return counts;
-  }, [incarnationSoulsQ.data, incarnationNames]);
+  }, [rosterSizes.sizeByName]);
 
   // --- Step validation. ---
   const canAdvanceFromStep2 = useMemo(() => {
@@ -1150,6 +1158,9 @@ export function RunWizard() {
             incarnationsLoading={incarnationsListQ.isLoading}
             incarnationNames={incarnationNames}
             hostCountByIncarnation={hostCountByIncarnation}
+            hostCountOverCap={rosterSizes.overCap}
+            hostCountLoading={rosterSizes.loading}
+            unreadRosters={rosterSizes.unresolved}
             usePerField={usePerField}
             inputSchema={inputSchema}
             selectedScenarioMeta={selectedScenarioMeta}
@@ -1474,6 +1485,9 @@ function Step3ScenarioIncarnations({
   incarnationsLoading,
   incarnationNames,
   hostCountByIncarnation,
+  hostCountOverCap,
+  hostCountLoading,
+  unreadRosters,
   usePerField,
   inputSchema,
   selectedScenarioMeta,
@@ -1492,6 +1506,9 @@ function Step3ScenarioIncarnations({
   incarnationsLoading: boolean;
   incarnationNames: string[];
   hostCountByIncarnation: Record<string, number> | undefined;
+  hostCountOverCap: boolean;
+  hostCountLoading: boolean;
+  unreadRosters: UnresolvedIncarnation[];
   usePerField: boolean;
   inputSchema: ScenarioInputSchema | undefined;
   selectedScenarioMeta: ServiceScenarioInfo | undefined;
@@ -1547,10 +1564,10 @@ function Step3ScenarioIncarnations({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchedKey]);
 
-  const totalHosts = useMemo(() => {
-    if (!hostCountByIncarnation) return undefined;
-    return matched.reduce((acc, n) => acc + (hostCountByIncarnation[n] ?? 0), 0);
-  }, [hostCountByIncarnation, matched]);
+  const totalHosts = useMemo(
+    () => totalRosterSize(matched, hostCountByIncarnation),
+    [hostCountByIncarnation, matched],
+  );
 
   return (
     <>
@@ -1573,6 +1590,37 @@ function Step3ScenarioIncarnations({
         <div className={styles.fieldLabel} style={{ marginBottom: 6 }}>
           {t('run:incarnationMatchedOf', { matched: matched.length, total: incarnationNames.length })}
         </div>
+        {/* Past the fan-out cap every row below reads "unknown", and nothing else on
+            screen says why. The notice also has to head off the obvious next move:
+            the cap counts the SERVICE's incarnations, not the filtered ones, so
+            tightening the filter changes nothing about it. */}
+        {hostCountOverCap ? (
+          <div className={styles.warn} style={{ marginBottom: 6 }} data-testid="host-count-over-cap">
+            {t('run:hostCountOverCap', {
+              count: incarnationNames.length,
+              limit: ROSTER_SIZE_FANOUT_LIMIT,
+            })}
+          </div>
+        ) : null}
+        {/* Below the cap a blank count is an ANSWER, not a wait, and the three
+            answers are three different next steps. Left unsaid, every one of them
+            renders as the same dash the over-cap case explains — and the run goes
+            ahead on those incarnations regardless, which is the part the operator
+            has to be told. */}
+        {UNRESOLVED_KEYS.map((reason) => {
+          const names = unreadRosters.filter((u) => u.reason === reason).map((u) => u.name);
+          if (names.length === 0) return null;
+          return (
+            <div
+              key={reason}
+              className={styles.warn}
+              style={{ marginBottom: 6 }}
+              data-testid={`host-count-${reason}`}
+            >
+              {t(UNREAD_ROSTER_KEY[reason], { names: names.join(', ') })}
+            </div>
+          );
+        })}
         <div
           style={{
             maxHeight: 240,
@@ -1607,8 +1655,15 @@ function Step3ScenarioIncarnations({
                 }}
               >
                 {name}
+                {/* Three states, not two: a count still on its way is not the
+                    same news as one that will never come, and the dash is what
+                    the notices above explain. */}
                 <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>
-                  {count === undefined ? t('run:hostCountUnknown') : t('run:hostCount', { count })}
+                  {count !== undefined
+                    ? t('run:hostCount', { count })
+                    : hostCountLoading
+                      ? t('run:hostCountLoading')
+                      : t('run:hostCountUnknown')}
                 </span>
               </div>
             );
@@ -1628,6 +1683,16 @@ function Step3ScenarioIncarnations({
             </>
           ) : null}
         </div>
+        {/* The number counts the roster as THIS operator may read it; the run
+            resolves its hosts server-side with no caller scope and then drops the
+            ones without a live lease. So it is short of the run in one direction
+            and over it in the other, and the badge sits on the last screen before
+            Run — where it would otherwise read as a promise. */}
+        {totalHosts !== undefined ? (
+          <span className={styles.hint} data-testid="total-hosts-hint">
+            {t('run:totalHostsHint')}
+          </span>
+        ) : null}
       </div>
 
       {usePerField && inputSchema ? (
@@ -1698,6 +1763,17 @@ const UNRESOLVED_INCARNATION_KEY: Record<MembershipFailure, string> = {
   failed: 'run:hostIncarnationUnresolved',
 };
 const UNRESOLVED_KEYS = Object.keys(UNRESOLVED_INCARNATION_KEY) as MembershipFailure[];
+
+// Same three causes on the scenario step, and deliberately NOT the same strings.
+// There the roster decides which hosts are targeted, so a failure drops them; here
+// the run targets every matching incarnation either way and only the COUNT is
+// lost. Reusing the wording above would tell the operator hosts were dropped when
+// nothing was.
+const UNREAD_ROSTER_KEY: Record<MembershipFailure, string> = {
+  unknown: 'run:hostCountUnknownIncarnation',
+  forbidden: 'run:hostCountForbidden',
+  failed: 'run:hostCountUnreadable',
+};
 
 // Step 2 Command: rich host selector. Criteria are combined (AND between different ones,
 // OR within a list). Live preview of the resolved list + counter.

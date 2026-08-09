@@ -534,7 +534,7 @@ export function IncarnationNewForm() {
             <span>
               {t('incarnations:provisionHostWarningBody', {
                 n: provisionWarning,
-                coven: watch('name') || '…',
+                name: watch('name') || '…',
               })}
             </span>
           </div>

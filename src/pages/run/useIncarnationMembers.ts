@@ -2,14 +2,19 @@
 // actually hold.
 //
 // Membership is the `incarnation_membership` relation (NIM-124), NOT the
-// `souls.coven` column — even though an incarnation's name is also a label its
-// members inherit. Reading the criterion off that column, as this resolver did
-// until NIM-449, is wrong in both directions: a member that never got the label
-// is dropped, and a host tagged with the name without being bound is targeted.
-// The backend does not make that mistake — it resolves a coven over the
-// EFFECTIVE label union, which membership feeds — but the wizard and the console
-// resolve client-side and send an explicit SID list, so their answer is the
-// final one and nothing downstream corrects it.
+// `souls.coven` column. The two were briefly interchangeable: under ADR-080 a
+// host inherited the labels — and the NAME — of every incarnation it belonged
+// to, which is exactly what made reading the criterion off that column look
+// right. NIM-281 reverted that inheritance in full, in every reader: a label
+// exists only where an operator attached it, and belonging attaches nothing. So
+// the column now answers a strictly different question, and the criterion read
+// off it is wrong in both directions — a member nobody tagged is dropped, and a
+// host tagged with the name without being bound is targeted.
+//
+// The backend draws the same line (`?coven=` is a label question over
+// `souls.coven` alone; membership is answered from the relation), but the wizard
+// and the console resolve client-side and send an explicit SID list, so their
+// answer is the final one and nothing downstream corrects it.
 //
 // One request per name; the results are OR'ed, because the criterion means "in
 // ANY of these incarnations". A name whose roster does not arrive contributes
@@ -95,4 +100,115 @@ export function useIncarnationMembers(names: string[]): IncarnationMembership {
   }, [dataKey]);
 
   return { memberSids, loading, unresolved };
+}
+
+// How many names this resolver will read rosters for. One request per name, and
+// the scenario picker lists every incarnation of a service, so the fan-out is
+// bounded rather than left to grow with the fleet. Past the cap NOTHING is read
+// and every size is unknown — a partial tally would read as a complete one.
+export const ROSTER_SIZE_FANOUT_LIMIT = 100;
+
+export interface RosterSizes {
+  // Roster size per name. A name is ABSENT when its size was not read — the
+  // request failed, is still in flight, or the list was past the cap. Absent is
+  // NOT zero: a caller that defaults it puts a number on screen that is quietly
+  // short of what the run will reach.
+  sizeByName: ReadonlyMap<string, number>;
+  loading: boolean;
+  // The list outgrew the cap, so no size was read at all.
+  overCap: boolean;
+  // Why a name has no size, when the reason is an answer rather than a wait.
+  // Three causes, three different next steps — and without them a blank count
+  // is indistinguishable from a count still on its way.
+  unresolved: UnresolvedIncarnation[];
+}
+
+const EMPTY_SIZES: ReadonlyMap<string, number> = new Map<string, number>();
+
+// Roster size of each named incarnation, counted over `incarnation_membership`.
+//
+// The size comes from the reply's `total` — the field that names the count. The
+// endpoint is unpaginated today and the server derives `total` and `items` from
+// one slice, so it agrees with `items.length`; it is the field that keeps agreeing
+// if paging is ever added.
+//
+// THIS IS THE ROSTER, NOT THE RUN'S REACH, and the two miss each other in both
+// directions:
+//   - the reply is narrowed to the hosts inside the CALLER's soul scope
+//     (`("soul","list")`), while a scenario run resolves its own hosts through
+//     `topology.LoadIncarnationHosts`, which takes no claims at all and is
+//     therefore narrowed by nobody. A narrow scope shows FEWER hosts than the
+//     run touches;
+//   - the reply carries every member whatever its status, while the run keeps
+//     only members that are non-terminal AND hold a live presence lease. Hosts
+//     that are merely offline are counted here and skipped there.
+// Callers must not present this number as what the run will do.
+//
+// Same query key as [useIncarnationMembers] and MembersPanel, so a name read
+// here and resolved there cannot come back as two different rosters.
+export function useIncarnationRosterSizes(names: string[], enabled: boolean): RosterSizes {
+  const overCap = names.length > ROSTER_SIZE_FANOUT_LIMIT;
+  const active = enabled && names.length > 0 && !overCap;
+
+  const results = useQueries({
+    queries: active
+      ? names.map((name) => ({
+          queryKey: ['incarnation-members', name] as const,
+          queryFn: () => keeperApi.incarnations.members(name),
+          staleTime: 30_000,
+          retry: false,
+        }))
+      : [],
+  });
+
+  const loading = results.some((r) => r.isLoading);
+
+  // Same reasoning as the memo above: useQueries returns a fresh array each
+  // render, and what actually changes is the per-name status and the count.
+  const dataKey = results.map((r, i) => `${names[i]}|${r.status}|${r.data?.total ?? ''}`).join(';');
+
+  const sizeByName = useMemo<ReadonlyMap<string, number>>(() => {
+    if (!active) return EMPTY_SIZES;
+    const out = new Map<string, number>();
+    for (let i = 0; i < results.length; i += 1) {
+      const total = results[i].data?.total;
+      if (typeof total === 'number') out.set(names[i], total);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataKey, active]);
+
+  const unresolved = useMemo<UnresolvedIncarnation[]>(() => {
+    if (!active) return [];
+    const out: UnresolvedIncarnation[] = [];
+    for (let i = 0; i < results.length; i += 1) {
+      if (results[i].isError) out.push({ name: names[i], reason: failureOf(results[i].error) });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataKey, active]);
+
+  return { sizeByName, loading, overCap, unresolved };
+}
+
+// How many hosts the whole fan-out reaches — or `undefined` when that cannot be
+// said yet.
+//
+// UNKNOWN STAYS UNKNOWN. One name whose roster did not arrive makes the sum
+// unknowable, and treating it as zero would badge a total quietly short of what
+// the run will touch — the one number the operator reads before pressing Run, and
+// the kind of shortfall nothing later on the screen contradicts. A missing badge
+// asks a question; a wrong badge answers one.
+export function totalRosterSize(
+  names: readonly string[],
+  counts: Record<string, number> | undefined,
+): number | undefined {
+  if (!counts) return undefined;
+  let total = 0;
+  for (const name of names) {
+    const size = counts[name];
+    if (size === undefined) return undefined;
+    total += size;
+  }
+  return total;
 }

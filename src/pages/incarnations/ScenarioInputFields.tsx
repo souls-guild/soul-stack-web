@@ -1231,7 +1231,8 @@ interface ProvisionFieldProps {
   value: ScenarioFieldValue;
   onChange: (v: ScenarioFieldValue) => void;
   labelOverride?: string;
-  // Incarnation name (for the "coven <name>" hint).
+  // Incarnation name, for the hint shown when provisioning is off — it names the
+  // incarnation whose roster the run will use, not a Coven to assign.
   incarnationName?: string;
 }
 
@@ -1359,7 +1360,7 @@ function ProvisionField({ name, prop, value, onChange, labelOverride, incarnatio
             color: 'var(--text-faint)',
           }}
         >
-          {t('incarnations:provisionDisabledHint', { coven: incarnationName || '…' })}
+          {t('incarnations:provisionDisabledHint', { name: incarnationName || '…' })}
         </div>
       )}
     </div>
