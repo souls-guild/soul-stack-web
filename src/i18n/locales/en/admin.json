@@ -318,7 +318,7 @@
   "rbacDerivationTitle": "Derive from",
   "rbacDerivedFrom": "derived from {{name}}",
   "rbacDescription": "Description",
-  "rbacDescriptionPlaceholder": "Manage Souls, read fleet state",
+  "rbacDescriptionPlaceholder": "Manage Souls, read their state",
   "rbacEditBuiltinWarn": "This is a builtin role — the server will return 409 role-builtin. Editing is disabled.",
   "rbacEditReplaceProse": "Replace semantics: the checked set fully replaces the existing one. Tick the permissions you need in the catalog below.",
   "rbacEffectiveCountTitle": "stored rows → what the role actually grants once the parent is applied",

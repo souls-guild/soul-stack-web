@@ -338,4 +338,38 @@ describe('i18n translation rule', () => {
         'in the scanned patterns. Drop them from the list.',
     ).toEqual([]);
   });
+
+  // Vocabulary the product rules out: the "fleet" metaphor (we speak of Souls)
+  // and borrowed config-management jargon (CLAUDE.md, dictionary invariant).
+  //
+  // Both are stated as permanent rules, and both still shipped in visible
+  // strings — in English as well as Russian, so it was the original wording at
+  // fault, not the translation. A rule written only in prose does not hold.
+  //
+  // "master" is deliberately NOT banned: it names a Redis replication role in
+  // placeholder examples ("redis-master", "master / replica"), where it is the
+  // real term and not the metaphor.
+  const BANNED_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
+    [/fleet/i, 'the fleet metaphor — say Souls, or name the hosts'],
+    [/флот/i, 'the fleet metaphor — say Souls, or name the hosts'],
+    [/\bminions?\b/i, 'borrowed config-management jargon'],
+    [/\bgrains?\b/i, 'borrowed config-management jargon'],
+    [/\bpillars?\b/i, 'borrowed config-management jargon'],
+    [/state\.apply/i, 'borrowed config-management jargon'],
+  ];
+
+  it('locale values avoid vocabulary the dictionary rules out', () => {
+    const hits: string[] = [];
+    for (const [side, dir] of [['en', EN_DIR], ['ru', RU_DIR]] as const) {
+      for (const ns of namespaces) {
+        for (const [key, value] of Object.entries(loadNs(dir, ns))) {
+          if (typeof value !== 'string') continue;
+          for (const [pattern, reason] of BANNED_WORDS) {
+            if (pattern.test(value)) hits.push(`${side}/${ns}:${key} — ${reason} — "${value}"`);
+          }
+        }
+      }
+    }
+    expect(hits, 'These strings use vocabulary the product dictionary rules out.').toEqual([]);
+  });
 });

@@ -324,7 +324,7 @@
   "utilStatus": "Status",
   "utilSwap": "Swap",
   "utilTrends": "Trends",
-  "utilTruncated": "Metrics cover only part of the roster (large fleet) — the rows without them read \"—\".",
+  "utilTruncated": "Metrics cover only part of the roster (large host count) — the rows without them read \"—\".",
   "utilUnavailable": "Host telemetry is unavailable — this Keeper doesn't support host vitals (older version) or the subsystem is disabled.",
   "utilUptime": "Uptime",
   "utilWindowEmpty": "Metrics window is empty — not enough snapshots for a sparkline.",
