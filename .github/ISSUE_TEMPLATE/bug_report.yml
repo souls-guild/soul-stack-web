@@ -42,7 +42,7 @@ body:
       description: Which part of the UI.
       options:
         - Run wizard
-        - Registry (Services / Incarnations / Souls / Providers / Plugins)
+        - Registry (Services / Incarnations / Souls / Plugins)
         - Identity & RBAC (Archons / roles / tokens)
         - Runs & history (Tides / Errand runs / push runs)
         - Audit

@@ -9,9 +9,13 @@ import { isSigilDisabled } from './sigilUtils';
 import { Badge, Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// Known Sigil registry namespaces (see /v1/plugins/sigils schema description).
-// `mod` = SoulModule + soul_beacon, `cloud` = CloudDriver, `ssh` = SshProvider.
-const KNOWN_NAMESPACES = ['mod', 'cloud', 'ssh'] as const;
+// Known Sigil registry namespaces. NOT taken from the vendored /v1/plugins/sigils
+// schema description, which still says `cloud/ssh/mod`: the engine rebuilt that
+// registry and the vendored copy has not caught up (deferred, see NIM-762).
+// `mod` = SoulModule + soul_beacon, `ssh` = SshProvider. There is no `cloud`
+// namespace: the CloudDriver contract is gone (NIM-761) and a cloud driver is
+// now an ordinary SoulModule declaring `side: keeper`, so it registers as `mod`.
+const KNOWN_NAMESPACES = ['mod', 'ssh'] as const;
 
 type StatusFilter = '' | 'active' | 'revoked';
 

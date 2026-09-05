@@ -31,7 +31,7 @@ A full operator console for a Keeper cluster:
 
 - **Run wizard** — the primary entry point for every work run (scenario + Tide /
   multi-target Errand / push), with typed input from the scenario's `input_schema`.
-- **Registry** — Services, Incarnations, Souls (with typed Soulprint), Providers, Plugins.
+- **Registry** — Services, Incarnations, Souls (with typed Soulprint), Plugins.
 - **Identity & access** — Archons (operators), RBAC roles and permissions, token issue /
   revoke.
 - **Runs & history** — Tides, Errand runs, and push runs, with live progress and per-host

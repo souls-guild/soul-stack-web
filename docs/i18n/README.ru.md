@@ -31,8 +31,7 @@ Web-UI поставляется отдельным репозиторием и �
 
 - **Run-визард** — основная точка входа для любого прогона (scenario + Tide /
   multi-target Errand / push), с типизированным вводом из `input_schema` сценария.
-- **Реестр** — Services, Incarnations, Souls (с типизированным Soulprint), Providers,
-  Plugins.
+- **Реестр** — Services, Incarnations, Souls (с типизированным Soulprint), Plugins.
 - **Identity и доступ** — Archons (операторы), RBAC-роли и права, выпуск / отзыв токенов.
 - **Прогоны и история** — Tides, Errand runs и push runs с живым прогрессом и разбивкой
   по хостам.

@@ -44,7 +44,7 @@ body:
       description: Which part of the UI does this touch?
       options:
         - Run wizard
-        - Registry (Services / Incarnations / Souls / Providers / Plugins)
+        - Registry (Services / Incarnations / Souls / Plugins)
         - Identity & RBAC (Archons / roles / tokens)
         - Runs & history (Tides / Errand runs / push runs)
         - Audit

@@ -128,7 +128,8 @@ describe('PluginDetail', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: /Plugin kinds/i }));
     expect(screen.getByText(/soul_module/i)).toBeInTheDocument();
-    expect(screen.getByText(/cloud_driver/i)).toBeInTheDocument();
     expect(screen.getByText(/ssh_provider/i)).toBeInTheDocument();
+    // NIM-761 removed the CloudDriver contract — the kinds tab must not offer it.
+    expect(screen.queryByText(/cloud_driver/i)).not.toBeInTheDocument();
   });
 });

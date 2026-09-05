@@ -18,7 +18,7 @@ reader-facing content and stays in Russian (see the i18n section below).
 
 - Operator UI (vite dev on 5173, served under base `/ui/`) — **the Run Wizard is
   the primary entry point** plus ~30 pages (Operators / Services / Incarnations /
-  Souls / Plugins / RBAC / Providers / Vigils / Decrees / Oracle fires / Tides /
+  Souls / Plugins / RBAC / Vigils / Decrees / Oracle fires / Tides /
   Errand runs / Push runs / Errands / Cadences / Synods / Notifications /
   Settings / Audit log).
 - Broad unit + integration suite (112 test files / 1272 cases: vitest +
@@ -174,7 +174,7 @@ src/
      `SUPPORTED_LANGS` (for the toggle). No locale rebuild needed for non-default.
    - Namespace structure (identical across en/ru): `common`, `forms`, `errors`,
      `pages`, `admin`, `souls`, `incarnations`, `run`, `runhistory`, `beacons`,
-     `providers`, `cadences`, `synods`, `notifications`.
+     `cadences`, `synods`, `notifications`.
    - **Accessing a key:** `const { t } = useTranslation();` then `t('create')`
      (default-ns `common`) or with an explicit ns via a colon — `t('errors:generic')`,
      `t('forms:destroyTitle', { name })`, `t('pages:noRoles')`.

@@ -15,7 +15,6 @@ type Tab = 'overview' | 'audit' | 'kinds';
 // Plugin-kind title (structural — contract names) + i18n key for summary.
 const KIND_INFO: Record<string, { title: string; summaryKey: string }> = {
   mod: { title: 'soul_module / soul_beacon', summaryKey: 'admin:pluginKindModSummary' },
-  cloud: { title: 'cloud_driver', summaryKey: 'admin:pluginKindCloudSummary' },
   ssh: { title: 'ssh_provider', summaryKey: 'admin:pluginKindSshSummary' },
 };
 

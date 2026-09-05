@@ -24,7 +24,7 @@ describe('PluginRegisterForm', () => {
     );
     const user = userEvent.setup();
     // namespace with uppercase - not kebab-case.
-    await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'BAD_NS');
+    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'BAD_NS');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'good-name');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
@@ -57,7 +57,7 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'mod');
+    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'mod');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
@@ -86,7 +86,7 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'mod');
+    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'mod');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
@@ -111,7 +111,7 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/mod \/ cloud \/ ssh/i), 'mod');
+    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'mod');
     await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));

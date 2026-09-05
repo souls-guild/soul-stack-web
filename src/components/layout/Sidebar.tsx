@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Package,
   Puzzle,
-  Cloud,
   ShieldCheck,
   Eye,
   Scroll,
@@ -73,7 +72,6 @@ const WORKLOADS: NavItem[] = [
 // What it runs on and what extends it.
 const INFRASTRUCTURE: NavItem[] = [
   { to: '/souls', labelKey: 'navSouls', icon: Users },
-  { to: '/providers', labelKey: 'navProviders', icon: Cloud, matchPrefix: '/providers' },
   { to: '/plugins', labelKey: 'navPlugins', icon: Puzzle, matchPrefix: '/plugins' },
 ];
 

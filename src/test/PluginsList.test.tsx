@@ -18,8 +18,8 @@ const SAMPLE = {
       revoked_at: null,
     },
     {
-      namespace: 'cloud',
-      name: 'soul-cloud-aws',
+      namespace: 'ssh',
+      name: 'soul-ssh-openssh',
       ref: 'v0.3.1',
       sha256: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
       allowed_by_aid: 'archon-bob',
@@ -65,7 +65,7 @@ describe('PluginsList', () => {
     expect(screen.getByRole('heading', { name: /Plugins/i })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText('soul-mod-acme')).toBeInTheDocument();
-      expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
+      expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
     });
     // SHA-256 is shown as a prefix, not the full value.
     expect(screen.getByTitle(SAMPLE.items[0].sha256)).toBeInTheDocument();
@@ -76,9 +76,9 @@ describe('PluginsList', () => {
     renderWithProviders(<PluginsList />, '/plugins');
     await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'cloud', pressed: false }));
+    await user.click(screen.getByRole('button', { name: 'ssh', pressed: false }));
     expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
-    expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
+    expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
   });
 
   it('status select filters active vs revoked', async () => {
@@ -88,7 +88,7 @@ describe('PluginsList', () => {
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText(/Status/i), 'revoked');
     expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
-    expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
+    expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
   });
 
   it('search by name — case-insensitive contains', async () => {
@@ -96,9 +96,9 @@ describe('PluginsList', () => {
     renderWithProviders(<PluginsList />, '/plugins');
     await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'AWS');
+    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'OPENSSH');
     expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
-    expect(screen.getByText('soul-cloud-aws')).toBeInTheDocument();
+    expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
   });
 
   // -- Guard tests: clickable links --------------------------------------
@@ -113,7 +113,7 @@ describe('PluginsList', () => {
     const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
     expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
 
-    // archon-bob allowed soul-cloud-aws
+    // archon-bob allowed soul-ssh-openssh
     const linkBob = screen.getByRole('link', { name: 'archon-bob' });
     expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
   });

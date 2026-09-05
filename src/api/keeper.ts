@@ -264,11 +264,6 @@ export interface ListVoyagesQuery {
 export type PushProvider = components['schemas']['PushProvider'];
 export type PushProviderListReply = components['schemas']['PushProviderListReply'];
 
-// Cloud-Provider — cloud provider registry (ADR-017). Types from gen.
-export type Provider = components['schemas']['Provider'];
-export type ProviderCreateRequest = components['schemas']['ProviderCreateRequest'];
-export type ProviderListReply = components['schemas']['ProviderListReply'];
-
 // Synod — groups of Archons (ADR-049). Types from gen.
 export type SynodView = components['schemas']['SynodView'];
 export type SynodListReply = components['schemas']['SynodListReply'];
@@ -1426,26 +1421,6 @@ export const keeperApi = {
     // DELETE /v1/heralds/{name} -> 204. Cascades to delete Tidings.
     delete: (name: string) =>
       apiSend<void>(`/v1/heralds/${encodeURIComponent(name)}`, 'DELETE'),
-  },
-
-  // Cloud-Providers — cloud provider registry (ADR-017). Create/list/delete;
-  // update is not supported by the contract. credentials — dual-mode (value XOR
-  // credentials_ref, ADR-064); the secret is never returned by the server (only credentials_ref).
-  providers: {
-    // GET /v1/providers -> ProviderListReply.
-    list: (q: ListPagedQuery = {}) =>
-      apiGet<ProviderListReply>('/v1/providers', {
-        query: { offset: q.offset, limit: q.limit },
-      }),
-    // GET /v1/providers/{name} -> Provider.
-    get: (name: string) =>
-      apiGet<Provider>(`/v1/providers/${encodeURIComponent(name)}`),
-    // POST /v1/providers -> 201 Provider.
-    create: (body: ProviderCreateRequest) =>
-      apiSend<Provider>('/v1/providers', 'POST', { body }),
-    // DELETE /v1/providers/{name} -> 204 (409 if dependent Profiles exist).
-    delete: (name: string) =>
-      apiSend<void>(`/v1/providers/${encodeURIComponent(name)}`, 'DELETE'),
   },
 
   // HeraldTypeCatalog — catalog of Herald-channel types (ADR-052 amendment, ADR-042
