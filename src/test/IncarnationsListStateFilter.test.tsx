@@ -33,7 +33,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 const SERVICES_REPLY = {
-  items: [{ name: 'redis', ref: 'main' }, { name: 'postgres', ref: 'v2' }],
+  items: [{ id: 'redis', ref: 'main' }, { id: 'postgres', ref: 'v2' }],
   total: 2,
 };
 
@@ -55,7 +55,7 @@ const STATE_SCHEMA_REPLY = {
 const INCARNATIONS_REPLY = {
   items: [
     {
-      name: 'redis-prod',
+      id: 'redis-prod',
       service: 'redis',
       service_version: 'main',
       status: 'ready',
@@ -64,7 +64,7 @@ const INCARNATIONS_REPLY = {
       state: {},
     },
     {
-      name: 'redis-staging',
+      id: 'redis-staging',
       service: 'redis',
       service_version: 'main',
       status: 'ready',
@@ -287,17 +287,19 @@ describe('IncarnationsList — state filter', () => {
       expect(screen.getByText('redis-prod')).toBeInTheDocument();
     });
 
-    // Click on the Name column - sort should change.
+    // Click the identity column — sort should change. The field sent is `id`:
+    // the keeper's whitelist is created_at|id|status|service|state.<field>, and
+    // `name` is refused with a 422 that replaces the table with an error banner.
     capturedUrl = null;
     // Sort button is inside th; find by full text.
     const sortButtons = screen.getAllByRole('button');
-    const nameBtn = sortButtons.find((b) => b.textContent?.trim().startsWith('Name'));
-    expect(nameBtn).toBeDefined();
-    await userEvent.click(nameBtn!);
+    const idBtn = sortButtons.find((b) => b.textContent?.trim().startsWith('Label'));
+    expect(idBtn).toBeDefined();
+    await userEvent.click(idBtn!);
 
     await waitFor(() => {
       expect(capturedUrl).not.toBeNull();
-      expect(capturedUrl).toContain('sort=name');
+      expect(capturedUrl).toContain('sort=id');
       expect(capturedUrl).toContain('sort_dir=asc');
     });
   });
@@ -375,12 +377,12 @@ describe('IncarnationsList — state filter', () => {
         return json({ service: 'redis', ref: 'main', scenarios: [{ name: 'restart', kind: 'operational' }] });
       }
       if (url.includes('/v1/services')) {
-        return json({ items: [{ name: 'redis', ref: 'main' }], total: 1 });
+        return json({ items: [{ id: 'redis', ref: 'main' }], total: 1 });
       }
       if (url.includes('/v1/incarnations')) {
         return json({
           items: INCARNATION_NAMES.map((name) => ({
-            name, service: 'redis', service_version: 'main',
+            id: name, service: 'redis', service_version: 'main',
             state_schema_version: 1, covens: ['prod'], status: 'ready',
             created_by_aid: 'archon-x', created_at: '', updated_at: '',
           })),

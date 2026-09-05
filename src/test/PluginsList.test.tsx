@@ -9,19 +9,35 @@ import { tokenStore } from '../api/tokenStore';
 const SAMPLE = {
   items: [
     {
-      namespace: 'mod',
-      name: 'soul-mod-acme',
+      alias: 'acme',
+      source: 'https://git.example.com/soul-mod-acme.git',
       ref: 'v1.0.0',
-      sha256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+      kind: 'git',
+      artifacts: [
+        {
+          os: 'linux',
+          arch: 'amd64',
+          path: 'soul-mod-acme_linux_amd64',
+          sha256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+        },
+      ],
       allowed_by_aid: 'archon-alice',
       allowed_at: '2026-05-01T00:00:00Z',
       revoked_at: null,
     },
     {
-      namespace: 'ssh',
-      name: 'soul-ssh-openssh',
+      alias: 'nexus-tool',
+      source: 'https://nexus.example.com/soul-mod-nexus-tool/',
       ref: 'v0.3.1',
-      sha256: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      kind: 'artifact',
+      artifacts: [
+        {
+          os: 'linux',
+          arch: 'arm64',
+          path: 'soul-mod-nexus-tool_linux_arm64',
+          sha256: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+        },
+      ],
       allowed_by_aid: 'archon-bob',
       allowed_at: '2026-04-20T00:00:00Z',
       revoked_at: '2026-05-05T00:00:00Z',
@@ -64,41 +80,52 @@ describe('PluginsList', () => {
     renderWithProviders(<PluginsList />, '/plugins');
     expect(screen.getByRole('heading', { name: /Plugins/i })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText('soul-mod-acme')).toBeInTheDocument();
-      expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
+      expect(screen.getByText('acme')).toBeInTheDocument();
+      expect(screen.getByText('nexus-tool')).toBeInTheDocument();
     });
-    // SHA-256 is shown as a prefix, not the full value.
-    expect(screen.getByTitle(SAMPLE.items[0].sha256)).toBeInTheDocument();
+    // The list shows how many artifacts the release published; the digests
+    // themselves live on the detail page, one per platform.
+    expect(screen.getByText(SAMPLE.items[0].source)).toBeInTheDocument();
   });
 
-  it('namespace chip narrows the results', async () => {
+  it('kind chip narrows the results', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
-    await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('acme')).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'ssh', pressed: false }));
-    expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
-    expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'artifact', pressed: false }));
+    expect(screen.queryByText('acme')).not.toBeInTheDocument();
+    expect(screen.getByText('nexus-tool')).toBeInTheDocument();
   });
 
   it('status select filters active vs revoked', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
-    await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('acme')).toBeInTheDocument());
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText(/Status/i), 'revoked');
-    expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
-    expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
+    expect(screen.queryByText('acme')).not.toBeInTheDocument();
+    expect(screen.getByText('nexus-tool')).toBeInTheDocument();
   });
 
-  it('search by name — case-insensitive contains', async () => {
+  it('search matches the alias — case-insensitive contains', async () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
-    await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('acme')).toBeInTheDocument());
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'OPENSSH');
-    expect(screen.queryByText('soul-mod-acme')).not.toBeInTheDocument();
-    expect(screen.getByText('soul-ssh-openssh')).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText(/acme/i), 'NEXUS');
+    expect(screen.queryByText('acme')).not.toBeInTheDocument();
+    expect(screen.getByText('nexus-tool')).toBeInTheDocument();
+  });
+
+  it('search also matches the source, not only the alias', async () => {
+    installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
+    renderWithProviders(<PluginsList />, '/plugins');
+    await waitFor(() => expect(screen.getByText('acme')).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText(/acme/i), 'nexus.example.com');
+    expect(screen.queryByText('acme')).not.toBeInTheDocument();
+    expect(screen.getByText('nexus-tool')).toBeInTheDocument();
   });
 
   // -- Guard tests: clickable links --------------------------------------
@@ -107,13 +134,13 @@ describe('PluginsList', () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: SAMPLE }]);
     renderWithProviders(<PluginsList />, '/plugins');
 
-    await waitFor(() => expect(screen.getByText('soul-mod-acme')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('acme')).toBeInTheDocument());
 
-    // archon-alice allowed soul-mod-acme
+    // archon-alice allowed acme
     const linkAlice = screen.getByRole('link', { name: 'archon-alice' });
     expect(linkAlice).toHaveAttribute('href', '/archons/archon-alice');
 
-    // archon-bob allowed soul-ssh-openssh
+    // archon-bob allowed nexus-tool
     const linkBob = screen.getByRole('link', { name: 'archon-bob' });
     expect(linkBob).toHaveAttribute('href', '/archons/archon-bob');
   });
@@ -122,10 +149,11 @@ describe('PluginsList', () => {
     const specialSample = {
       items: [
         {
-          namespace: 'mod',
-          name: 'soul-mod-test',
+          alias: 'test',
+          source: 'https://git.example.com/soul-mod-test.git',
           ref: 'v1.0.0',
-          sha256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          kind: 'git',
+          artifacts: [],
           allowed_by_aid: 'archon-special+one',
           allowed_at: '2026-05-01T00:00:00Z',
           revoked_at: null,
@@ -135,7 +163,7 @@ describe('PluginsList', () => {
     installFetchMock([{ method: 'GET', url: '/v1/plugins/sigils', body: specialSample }]);
     renderWithProviders(<PluginsList />, '/plugins');
 
-    await waitFor(() => expect(screen.getByText('soul-mod-test')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('test')).toBeInTheDocument());
 
     const link = screen.getByRole('link', { name: 'archon-special+one' });
     expect(link).toHaveAttribute('href', `/archons/${encodeURIComponent('archon-special+one')}`);

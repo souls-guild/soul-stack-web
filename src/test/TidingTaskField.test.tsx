@@ -21,7 +21,7 @@ import { KNOWN_EVENT_TYPE_AREAS } from '../pages/notifications/eventTypes';
 // ── Sample data ──────────────────────────────────────────────────────────────
 
 const HERALD = {
-  name: 'ops-webhook',
+  id: 'ops-webhook',
   type: 'webhook',
   config: { url: 'https://hooks.example.com/notify' },
   secret_ref: null,
@@ -32,7 +32,7 @@ const HERALD = {
 };
 
 const TIDING_BASE: Tiding = {
-  name: 'run-failures',
+  id: 'run-failures',
   herald: 'ops-webhook',
   event_types: ['incarnation.run_completed'],
   only_failures: false,
@@ -102,7 +102,6 @@ function setupNotifMock(opts: { tidingDetail?: Tiding } = {}) {
           { name: 'cadence.*' },
         ],
         point_events: [
-          { name: 'incarnation.drift_checked' },
           { name: 'incarnation.run_completed' },
         ],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -177,7 +176,7 @@ describe('TidingModal — task field', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'task-tiding');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'task-tiding');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-incarnation.run_completed'));
@@ -203,7 +202,7 @@ describe('TidingModal — task field', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'no-task-tiding');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'no-task-tiding');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));

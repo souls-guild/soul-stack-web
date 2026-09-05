@@ -9,14 +9,14 @@ import { tokenStore } from '../api/tokenStore';
 const SAMPLE = {
   items: [
     {
-      name: 'redis',
+      id: 'redis',
       git: 'https://git.example.com/services/redis.git',
       ref: 'v2.0.0',
       created_at: '2026-04-01T00:00:00Z',
       updated_at: '2026-05-01T00:00:00Z',
     },
     {
-      name: 'postgres',
+      id: 'postgres',
       git: 'https://git.example.com/services/postgres.git',
       ref: 'main',
       refresh: '5m',

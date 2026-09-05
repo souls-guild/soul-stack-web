@@ -95,7 +95,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     renderNotif();
     const { dialog, user } = await openCreate();
 
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'tg1');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'tg1');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
 
@@ -120,7 +120,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     renderNotif();
     const { dialog, user } = await openCreate();
 
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'tg2');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'tg2');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
 
@@ -141,7 +141,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     renderNotif();
     const { dialog, user } = await openCreate();
 
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'wh1');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'wh1');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
     await user.type(within(dialog).getByTestId('herald-field-url'), 'https://example.com/hook');
@@ -165,7 +165,7 @@ describe('Herald dual-mode secret (NIM-11)', () => {
     renderNotif();
     const { dialog, user } = await openCreate();
 
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'tg3');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'tg3');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
     await user.click(within(dialog).getByTestId('herald-secret-bot_token-mode-value'));

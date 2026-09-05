@@ -8,7 +8,7 @@ import { tokenStore } from '../api/tokenStore';
 const SAMPLE = {
   items: [
     {
-      name: 'restart-on-config',
+      id: 'restart-on-config',
       on_beacon: 'redis-config-changed',
       where: 'portent.kind == "core.beacon.file_changed"',
       subject: { coven: ['prod'] },

@@ -23,7 +23,6 @@ export const KNOWN_EVENT_TYPE_AREAS = [
   'command_run.*',
   'voyage.*',
   'cadence.*',
-  'incarnation.drift_checked',
   'incarnation.run_completed',
 ] as const;
 

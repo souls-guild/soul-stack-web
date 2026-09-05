@@ -71,7 +71,7 @@ const ROSTER = {
 };
 
 const INCARNATION_ROW = {
-  name: INCARNATION_NAME,
+  id: INCARNATION_NAME,
   service: 'redis',
   service_version: 'v2.0.0',
   state_schema_version: 3,

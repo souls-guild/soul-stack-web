@@ -10,11 +10,15 @@ import { z } from 'zod';
 // them via t(fieldError.message). See the i18n rule in CLAUDE.md.
 
 // kebab-case 1..63 — mirrors the openapi pattern.
-const nameSchema = z
+const idSchema = z
   .string()
-  .min(1, 'beacons:errNameRequired')
-  .max(63, 'beacons:errNameMax')
-  .regex(/^[a-z0-9-]{1,63}$/, 'beacons:errNameKebab');
+  .min(1, 'beacons:errIdRequired')
+  .max(63, 'beacons:errIdMax')
+  .regex(/^[a-z0-9-]{1,63}$/, 'beacons:errIdKebab');
+
+// Display caption: free text, optional, constrained by nothing. It derives no
+// address, so there is no pattern it could violate.
+const labelSchema = z.string();
 
 // Go duration convention: 30s / 1m / 1h. Minimal validation — suffix h/m/s/ms.
 const durationSchema = z
@@ -96,7 +100,8 @@ export function isKnownBeacon(c: string): c is KnownBeacon {
 // Top-level Vigil schema: common fields + params (either discriminated or raw JSON).
 export const vigilFormSchema = z
   .object({
-    name: nameSchema,
+    id: idSchema,
+    label: labelSchema,
     interval: durationSchema,
     check: z.string().min(1, 'beacons:errCheckRequired'),
     enabled: z.boolean(),
@@ -150,8 +155,9 @@ export function httpUnhealthyToParams(v: HttpUnhealthyInput): Record<string, unk
 
 export const decreeFormSchema = z
   .object({
-    name: nameSchema,
-    on_beacon: nameSchema, // Vigil name — same kebab-case pattern.
+    id: idSchema,
+    label: labelSchema,
+    on_beacon: idSchema, // Vigil id — same kebab-case pattern.
     where: z.string().optional().or(z.literal('')),
     incarnation_name: z
       .string()

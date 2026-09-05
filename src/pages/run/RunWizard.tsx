@@ -22,6 +22,7 @@ import type {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
+import { entityCaption } from '../../components/entityCaption';
 import { useServiceScenarios } from '../incarnations/useServiceScenarios';
 import { useServiceDirectives } from '../incarnations/useServiceDirectives';
 import { runnableScenarios } from '../incarnations/reservedScenarios';
@@ -644,7 +645,7 @@ export function RunWizard() {
   });
 
   const incarnationNames = useMemo(
-    () => (incarnationsListQ.data?.items ?? []).map((i) => i.name),
+    () => (incarnationsListQ.data?.items ?? []).map((i) => i.id),
     [incarnationsListQ.data],
   );
 
@@ -1440,8 +1441,8 @@ function Step2ScenarioSelect({
         >
           <option value="">{t('run:selectServicePlaceholder')}</option>
           {(servicesQ.data?.items ?? []).map((s) => (
-            <option key={s.name} value={s.name}>
-              {s.name} ({s.ref})
+            <option key={s.id} value={s.id}>
+              {entityCaption(s)} ({s.ref})
             </option>
           ))}
         </select>

@@ -12,51 +12,48 @@ import styles from '../common.module.css';
 
 type Tab = 'overview' | 'audit' | 'kinds';
 
-// Plugin-kind title (structural — contract names) + i18n key for summary.
+// How the plugin arrives. Replaced the namespace list (mod/cloud/ssh): a grant no
+// longer carries a namespace, and `cloud` named the CloudDriver contract, which
+// no longer exists.
 const KIND_INFO: Record<string, { title: string; summaryKey: string }> = {
-  mod: { title: 'soul_module / soul_beacon', summaryKey: 'admin:pluginKindModSummary' },
-  ssh: { title: 'ssh_provider', summaryKey: 'admin:pluginKindSshSummary' },
+  git: { title: 'git', summaryKey: 'admin:pluginKindGitSummary' },
+  artifact: { title: 'artifact', summaryKey: 'admin:pluginKindArtifactSummary' },
 };
 
 export function PluginDetail() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { namespace = '', name = '', ref = '' } = useParams<{
-    namespace: string;
-    name: string;
-    ref: string;
-  }>();
+  const { alias = '' } = useParams<{ alias: string }>();
   const [tab, setTab] = useState<Tab>('overview');
 
-  // No GET /v1/plugins/sigils/{ns}/{name}/{ref} in the API — look up from the list.
+  // No GET /v1/plugins/sigils/{alias} in the API — look up from the list.
   const list = useQuery({
     queryKey: ['plugins.sigils.list'],
     queryFn: () => keeperApi.plugins.sigils.list(),
   });
 
   const row: PluginSigilView | undefined = useMemo(() => {
-    return (list.data?.items ?? []).find(
-      (it) => it.namespace === namespace && it.name === name && it.ref === ref,
-    );
-  }, [list.data, namespace, name, ref]);
+    return (list.data?.items ?? []).find((it) => it.alias === alias);
+  }, [list.data, alias]);
 
   // Audit history for allow/revoke by correlation_id is not possible (id is not exposed).
   // We filter by type=plugin.allowed / plugin.revoked and look for events whose payload
-  // contains the matching (ns, name, ref).
+  // carries the matching alias — the one key both payloads share, since revoke writes
+  // nothing else.
   //
   // The names used to be `plugin.sigil.*`, which the keeper has never emitted — so this
   // panel was permanently empty and the danger badge below unreachable. Nothing caught it
   // until the audit event-type enum became generated and the comparison stopped
   // type-checking (NIM-371 refreshed the vendored spec).
   const audit = useQuery({
-    queryKey: ['plugins.sigil.audit', namespace, name, ref],
+    queryKey: ['plugins.sigil.audit', alias],
     queryFn: () =>
       keeperApi.audit.list({
         type: ['plugin.allowed', 'plugin.revoked'],
         limit: 200,
       }),
-    enabled: tab === 'audit' && Boolean(namespace && name && ref),
+    enabled: tab === 'audit' && Boolean(alias),
   });
 
   const matched = useMemo<AuditEvent[]>(() => {
@@ -64,12 +61,12 @@ export function PluginDetail() {
     return (audit.data?.items ?? []).filter((ev) => {
       const p = ev.payload as Record<string, unknown> | undefined;
       if (!p) return false;
-      return p.namespace === namespace && p.name === name && p.ref === ref;
+      return p.alias === alias;
     });
-  }, [audit.data, namespace, name, ref]);
+  }, [audit.data, alias]);
 
   const revokeMut = useMutation({
-    mutationFn: () => keeperApi.plugins.sigils.revoke(namespace, name, ref),
+    mutationFn: () => keeperApi.plugins.sigils.revoke(alias),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plugins.sigils.list'] });
       // After revoke the page keeps working (revoked_at appears),
@@ -117,13 +114,10 @@ export function PluginDetail() {
     return (
       <div className={styles.page}>
         <div className={styles.crumbs}>
-          <Link to="/plugins">plugins</Link> /{' '}
-          <span className="mono">
-            {namespace}/{name}@{ref}
-          </span>
+          <Link to="/plugins">plugins</Link> / <span className="mono">{alias}</span>
         </div>
         <div className={styles.empty}>
-          {t('admin:pluginNotFound')} <code className="mono">{namespace}/{name}@{ref}</code> {t('admin:pluginNotFound2')}{' '}
+          {t('admin:pluginNotFound')} <code className="mono">{alias}</code> {t('admin:pluginNotFound2')}{' '}
           <code className="mono">POST /v1/plugins/sigils</code>.
         </div>
       </div>
@@ -131,23 +125,21 @@ export function PluginDetail() {
   }
 
   const revoked = Boolean(row.revoked_at);
+  const artifacts = row.artifacts ?? [];
 
   return (
     <div className={styles.page}>
       <div>
         <div className={styles.crumbs}>
-          <Link to="/plugins">plugins</Link> /{' '}
-          <span className="mono">
-            {row.namespace}/{row.name}@{row.ref}
-          </span>
+          <Link to="/plugins">plugins</Link> / <span className="mono">{row.alias}</span>
         </div>
         <div className={styles.header}>
           <div>
             <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Award size={22} /> {row.name}
+              <Award size={22} /> {row.alias}
             </h1>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-              <Badge tone="info">{row.namespace}</Badge>
+              <Badge tone="info">{row.kind}</Badge>
               <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                 @{row.ref}
               </span>
@@ -170,7 +162,7 @@ export function PluginDetail() {
               disabled={revoked || revokeMut.isPending}
               onClick={() => {
                 const ok = window.confirm(
-                  t('pages:revokeSigilConfirm', { sigil: `${row.namespace}/${row.name}@${row.ref}` }),
+                  t('pages:revokeSigilConfirm', { sigil: `${row.alias}@${row.ref}` }),
                 );
                 if (ok) revokeMut.mutate();
               }}
@@ -223,12 +215,14 @@ export function PluginDetail() {
       {tab === 'overview' ? (
         <>
           <div className={styles.meta}>
-            <span className={styles.metaKey}>{t('common:colNamespace')}</span>
-            <span className={styles.metaVal}>{row.namespace}</span>
-            <span className={styles.metaKey}>{t('common:colName')}</span>
-            <span className={styles.metaVal}>{row.name}</span>
+            <span className={styles.metaKey}>{t('admin:pluginColAlias')}</span>
+            <span className={styles.metaVal}>{row.alias}</span>
+            <span className={styles.metaKey}>{t('admin:pluginColSource')}</span>
+            <span className={styles.metaVal} style={{ wordBreak: 'break-all' }}>{row.source}</span>
             <span className={styles.metaKey}>{t('common:colRef')}</span>
             <span className={styles.metaVal}>{row.ref}</span>
+            <span className={styles.metaKey}>{t('common:colKind')}</span>
+            <span className={styles.metaVal}>{row.kind}</span>
             <span className={styles.metaKey}>{t('common:colAllowedAt')}</span>
             <span className={styles.metaVal}>{row.allowed_at}</span>
             <span className={styles.metaKey}>{t('common:colAllowedBy')}</span>
@@ -239,12 +233,39 @@ export function PluginDetail() {
             <span className={styles.metaVal}>{row.revoked_at ?? '—'}</span>
           </div>
 
-          <section className={styles.section} aria-label="sha256">
-            <h2 className={styles.sectionTitle}>{t('admin:pluginSha256Title')}</h2>
+          <section className={styles.section} aria-label={t('admin:pluginArtifactsAria')}>
+            <h2 className={styles.sectionTitle}>{t('admin:pluginArtifactsTitle')}</h2>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-              {t('admin:pluginSha256Prose')}
+              {t('admin:pluginArtifactsProse')}
             </p>
-            <Sha256Block sha256={row.sha256} />
+            {artifacts.length === 0 ? (
+              <div className={styles.empty} style={{ padding: 'var(--s-3)' }}>
+                {t('admin:pluginArtifactsEmpty')}
+              </div>
+            ) : (
+              <table className={styles.table} data-testid="plugin-artifacts-table">
+                <thead>
+                  <tr>
+                    <th>{t('admin:pluginColOs')}</th>
+                    <th>{t('admin:pluginColArch')}</th>
+                    <th>{t('admin:pluginColPath')}</th>
+                    <th>{t('common:colSha256')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {artifacts.map((a) => (
+                    <tr key={`${a.os}/${a.arch}/${a.path}`}>
+                      <td className="mono">{a.os}</td>
+                      <td className="mono">{a.arch}</td>
+                      <td className="mono" style={{ wordBreak: 'break-all' }}>{a.path}</td>
+                      <td>
+                        <Sha256Block sha256={a.sha256} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </section>
         </>
       ) : null}
@@ -299,10 +320,10 @@ export function PluginDetail() {
             {t('admin:pluginKindsProse')}
           </p>
           <ul style={{ fontSize: 13, lineHeight: 1.6, paddingLeft: 18 }}>
-            {Object.entries(KIND_INFO).map(([ns, info]) => (
-              <li key={ns}>
+            {Object.entries(KIND_INFO).map(([k, info]) => (
+              <li key={k}>
                 <code className="mono">
-                  <Badge tone={ns === row.namespace ? 'info' : 'muted'}>{ns}</Badge>
+                  <Badge tone={k === row.kind ? 'info' : 'muted'}>{k}</Badge>
                 </code>{' '}
                 — <strong>{info.title}</strong>. {t(info.summaryKey)}
               </li>
@@ -323,10 +344,6 @@ function Sha256Block({ sha256 }: { sha256: string }) {
         display: 'flex',
         gap: 10,
         alignItems: 'center',
-        padding: 10,
-        background: 'var(--surface-2)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
         fontFamily: 'var(--font-mono)',
         fontSize: 12,
         wordBreak: 'break-all',

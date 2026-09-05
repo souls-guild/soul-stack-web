@@ -11,24 +11,27 @@ import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// kebab-case; the same pattern appears in openapi for plugin namespace/name.
+// kebab-case; the openapi pattern for the registration alias.
 const KEBAB_RE = /^[a-z][a-z0-9-]*$/;
 // Tag-ref like v1.2.3 (a single path segment — a branch-ref with a slash the
-// server will reject with 422; see /v1/plugins/sigils/{namespace}/{name}/{ref} description).
-const TAG_REF_RE = /^[A-Za-z0-9._-]+$/;
+// server will reject with 422; see PluginSigilAllowRequest.ref).
+const TAG_REF_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 // Messages — i18n keys under namespace `admin`; rendered via t(fieldError.message).
 const schema = z.object({
-  namespace: z
+  alias: z
     .string()
     .trim()
     .min(1, 'admin:pluginErrRequired')
     .regex(KEBAB_RE, 'admin:pluginErrKebab'),
-  name: z
+  // The git remote the module repository is fetched from. Not pattern-checked
+  // here: the keeper resolves it and answers 404 when it cannot, which is a
+  // better error than a regex guess at what a valid remote looks like.
+  source: z
     .string()
     .trim()
     .min(1, 'admin:pluginErrRequired')
-    .regex(KEBAB_RE, 'admin:pluginErrKebab'),
+    .max(2048, 'admin:pluginErrSourceTooLong'),
   ref: z
     .string()
     .trim()
@@ -51,7 +54,7 @@ export function PluginRegisterForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { namespace: '', name: '', ref: '' },
+    defaultValues: { alias: '', source: '', ref: '' },
   });
 
   const allowMut = useMutation({
@@ -60,8 +63,8 @@ export function PluginRegisterForm() {
       setReply(data);
       setServerError(null);
       qc.invalidateQueries({ queryKey: ['plugins.sigils.list'] });
-      // Don't leave the page right away — the operator should see the computed sha256.
-      // The "To entry" button navigates to detail after the fact-check.
+      // Don't leave the page right away — the operator should see the per-artifact
+      // digests the keeper computed. The "To entry" button navigates after that check.
       void vars;
     },
     onError: (err) => {
@@ -104,20 +107,20 @@ export function PluginRegisterForm() {
       <form className={styles.section} onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className={styles.filters}>
           <Input
-            label={t('admin:pluginFieldNamespace')}
-            placeholder={t('admin:pluginNamespacePlaceholder')}
+            label={t('admin:pluginFieldAlias')}
+            placeholder={t('admin:pluginAliasPlaceholder')}
             mono
-            hint={t('admin:pluginNamespaceHint')}
-            error={errors.namespace?.message ? t(errors.namespace.message) : undefined}
-            {...register('namespace')}
+            hint={t('admin:pluginAliasHint')}
+            error={errors.alias?.message ? t(errors.alias.message) : undefined}
+            {...register('alias')}
           />
           <Input
-            label={t('admin:pluginFieldName')}
-            placeholder={t('admin:pluginNamePlaceholderAcme')}
+            label={t('admin:pluginFieldSource')}
+            placeholder={t('admin:pluginSourcePlaceholder')}
             mono
-            hint={t('admin:pluginNameHint')}
-            error={errors.name?.message ? t(errors.name.message) : undefined}
-            {...register('name')}
+            hint={t('admin:pluginSourceHint')}
+            error={errors.source?.message ? t(errors.source.message) : undefined}
+            {...register('source')}
           />
           <Input
             label={t('admin:pluginFieldRef')}
@@ -149,23 +152,33 @@ export function PluginRegisterForm() {
         >
           <h2 className={styles.sectionTitle}>{t('admin:pluginAllowedTitle')}</h2>
           <div className={styles.meta}>
-            <span className={styles.metaKey}>{t('common:colNamespace')}</span>
-            <span className={styles.metaVal}>{reply.namespace}</span>
-            <span className={styles.metaKey}>{t('common:colName')}</span>
-            <span className={styles.metaVal}>{reply.name}</span>
+            <span className={styles.metaKey}>{t('admin:pluginColAlias')}</span>
+            <span className={styles.metaVal}>{reply.alias}</span>
+            <span className={styles.metaKey}>{t('admin:pluginColSource')}</span>
+            <span className={styles.metaVal} style={{ wordBreak: 'break-all' }}>{reply.source}</span>
             <span className={styles.metaKey}>{t('common:colRef')}</span>
             <span className={styles.metaVal}>{reply.ref}</span>
+            <span className={styles.metaKey}>{t('common:colKind')}</span>
+            <span className={styles.metaVal}>{reply.kind}</span>
             <span className={styles.metaKey}>{t('common:colSha256Keeper')}</span>
-            <span className={styles.metaVal}>{reply.sha256}</span>
+            <span className={styles.metaVal} data-testid="plugin-allowed-digests">
+              {(reply.artifacts ?? []).length === 0 ? (
+                '—'
+              ) : (
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {(reply.artifacts ?? []).map((a) => (
+                    <span key={`${a.os}/${a.arch}/${a.path}`} className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>
+                      {a.os}/{a.arch} — {a.sha256}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button
               variant="primary"
-              onClick={() =>
-                navigate(
-                  `/plugins/${encodeURIComponent(reply.namespace)}/${encodeURIComponent(reply.name)}/${encodeURIComponent(reply.ref)}`,
-                )
-              }
+              onClick={() => navigate(`/plugins/${encodeURIComponent(reply.alias)}`)}
             >
               {t('admin:pluginGoToRecord')}
             </Button>

@@ -148,7 +148,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/augur/omens/{name}": {
+    "/v1/augur/omens/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -167,6 +167,26 @@ export interface paths {
          * @description Deletes an Omen cascadingly (related Rites, ADR-025). Permission omen.delete. 404 - record absent.
          */
         delete: operations["deleteOmen"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/augur/omens/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Omen display caption
+         * @description Replaces the display caption of one Omen (ADR-0085). Permission omen.label-set, audit omen.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. This is the registry's only mutation: endpoint and auth_ref stay immutable, because the Rites granted against an Omen must not silently follow it to a different external system. The caption participates in nothing derived, so changing it moves nothing.
+         */
+        put: operations["setOmenLabel"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -432,7 +452,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/decrees/{name}": {
+    "/v1/decrees/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -451,6 +471,26 @@ export interface paths {
          * @description Deletes a Decree cascading (cooldown state, ADR-030). Permission decree.delete. 404 -- record absent.
          */
         delete: operations["deleteDecree"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decrees/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Decree display caption
+         * @description Replaces the display caption of one Decree (ADR-0085). Permission decree.label-set, audit decree.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. The reactor is untouched: cooldown state (oracle_fires) and the circuit breaker (oracle_circuit) are keyed on the name, so no trigger history moves and no breaker resets.
+         */
+        put: operations["setDecreeLabel"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -584,7 +624,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/heralds/{name}": {
+    "/v1/heralds/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -607,6 +647,26 @@ export interface paths {
          * @description Deletes the Herald cascadingly (related Tidings, ADR-052). Permission herald.delete. 404 — record absent.
          */
         delete: operations["deleteHerald"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/heralds/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Herald display caption
+         * @description Replaces the display caption of one Herald channel (ADR-0085). Permission herald.label-set, audit herald.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. Narrower than PUT /v1/heralds/{id}, deliberately: that one REPLACES the channel, so granting a caption edit through it would have granted a rewrite of secret_ref. The caption participates in nothing derived - in particular it is NOT the `<entity>` segment of secret/herald/<entity>/<field>, which is `name` - so changing it moves nothing and orphans no signing secret.
+         */
+        put: operations["setHeraldLabel"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -636,7 +696,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/resolve-name": {
+    "/v1/incarnations/resolve-id": {
         parameters: {
             query?: never;
             header?: never;
@@ -646,17 +706,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Resolve the name a create would compose
-         * @description Live preview for the create form: composes the incarnation name from the chosen create scenario's name_template over the input so far, reports its length against the ceiling, and whether the name is free. Composition runs server-side — the same code the create runs — so the previewed name cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed name is measured against the caller's scope, and the occupying service is named only to a caller who may see it.
+         * Resolve the id a create would compose
+         * @description Live preview for the create form: composes the incarnation id from the chosen create scenario's id_template over the input so far, reports its length against the ceiling, and whether the id is free. Composition runs server-side — the same code the create runs — so the previewed id cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed id is measured against the caller's scope, and the occupying service is named only to a caller who may see it.
          */
-        post: operations["resolveIncarnationName"];
+        post: operations["resolveIncarnationID"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}": {
+    "/v1/incarnations/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -680,27 +740,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/check-drift": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Check incarnation drift (Scry)
-         * @description Sync dry_run converge -> DriftReport (ADR-031 Slice B). Informational status=drift marking. Permission incarnation.check-drift.
-         */
-        post: operations["checkIncarnationDrift"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/incarnations/{name}/choirs": {
+    "/v1/incarnations/{id}/choirs": {
         parameters: {
             query?: never;
             header?: never;
@@ -724,7 +764,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/choirs/{choir}": {
+    "/v1/incarnations/{id}/choirs/{choir}": {
         parameters: {
             query?: never;
             header?: never;
@@ -744,7 +784,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/choirs/{choir}/voices": {
+    "/v1/incarnations/{id}/choirs/{choir}/voices": {
         parameters: {
             query?: never;
             header?: never;
@@ -768,7 +808,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/choirs/{choir}/voices/{sid}": {
+    "/v1/incarnations/{id}/choirs/{choir}/voices/{sid}": {
         parameters: {
             query?: never;
             header?: never;
@@ -788,7 +828,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/history": {
+    "/v1/incarnations/{id}/history": {
         parameters: {
             query?: never;
             header?: never;
@@ -808,7 +848,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/members": {
+    "/v1/incarnations/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the incarnation display caption
+         * @description Replaces the display caption of one incarnation (ADR-0085). Permission incarnation.label-set, audit incarnation.label_changed, same incarnation scope as every other incarnation mutation. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. Deliberately narrower than PUT .../traits beside it: a trait pair is a live scope dimension, so stamping one grants visibility and needs a second gate; a caption is in no dimension of anything. It is NOT segment 3 of the derived secret path, NOT the RBAC incarnation= scope value and NOT the CEL root (incarnation.label does not resolve) - so changing it moves nothing, and it is allowed while the incarnation is applying or error_locked because no run reads it.
+         */
+        put: operations["setIncarnationLabel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{id}/members": {
         parameters: {
             query?: never;
             header?: never;
@@ -832,7 +892,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/members/{sid}": {
+    "/v1/incarnations/{id}/members/{sid}": {
         parameters: {
             query?: never;
             header?: never;
@@ -852,7 +912,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/rerun-last": {
+    "/v1/incarnations/{id}/rerun-last": {
         parameters: {
             query?: never;
             header?: never;
@@ -872,7 +932,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/runs": {
+    "/v1/incarnations/{id}/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -892,7 +952,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/runs/{apply_id}": {
+    "/v1/incarnations/{id}/runs/{apply_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -912,7 +972,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/runs/{apply_id}/events": {
+    "/v1/incarnations/{id}/runs/{apply_id}/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -932,7 +992,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/runs/{apply_id}/tasks": {
+    "/v1/incarnations/{id}/runs/{apply_id}/tasks": {
         parameters: {
             query?: never;
             header?: never;
@@ -941,7 +1001,7 @@ export interface paths {
         };
         /**
          * Incarnation run tasks (plan + per-host)
-         * @description Task plan of one apply_id (plan_index/name/module/no_log/passage) + per-host status/output/error from the audit log (task.executed) joined by plan_index. Foreign apply_id / outside RBAC scope -> 404. Permission incarnation.history. Read-only.
+         * @description Task plan of one apply_id (plan_index/name/module/passage) + per-host status/output/error from the audit log (task.executed) joined by plan_index. Foreign apply_id / outside RBAC scope -> 404. Permission incarnation.history. Read-only.
          */
         get: operations["getIncarnationRunTasks"];
         put?: never;
@@ -952,7 +1012,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/scenarios/{scenario}": {
+    "/v1/incarnations/{id}/scenarios/{scenario}": {
         parameters: {
             query?: never;
             header?: never;
@@ -972,7 +1032,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/scenarios/{scenario}/form-prefill": {
+    "/v1/incarnations/{id}/scenarios/{scenario}/form-prefill": {
         parameters: {
             query?: never;
             header?: never;
@@ -992,7 +1052,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/secrets/reveal": {
+    "/v1/incarnations/{id}/secrets/reveal": {
         parameters: {
             query?: never;
             header?: never;
@@ -1003,7 +1063,7 @@ export interface paths {
         put?: never;
         /**
          * Reveal plaintext of an incarnation secret
-         * @description Resolves the plaintext of a secret declared in the service's revealable_secrets, from Vault. Permission incarnation.view-secrets (removes the mask, strictly more privileged than incarnation.get). key must be in the current-state enumerate array. Audit incarnation.secret_revealed (without the value). Out of scope -> 404.
+         * @description Resolves the plaintext of a secret the service declared as type: secret in its state_schema, from Vault at the derived path. Permission incarnation.view-secrets (removes the mask, strictly more privileged than incarnation.get). key must be present in the current-state collection, and must be empty for a scalar secret. Audit incarnation.secret_revealed (without the value). Out of scope -> 404.
          */
         post: operations["incarnationRevealSecret"];
         delete?: never;
@@ -1012,7 +1072,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/secrets/revealable": {
+    "/v1/incarnations/{id}/secrets/revealable": {
         parameters: {
             query?: never;
             header?: never;
@@ -1021,7 +1081,7 @@ export interface paths {
         };
         /**
          * List revealable secrets of an incarnation
-         * @description Discovery of the service's revealable_secrets + keys from the current-state enumerate array. Read-only, no audit. Permission incarnation.view-secrets (existence-gate). Out of scope -> 404.
+         * @description Discovery of the secrets the service declared as type: secret in its state_schema + the keys present in the current state. Read-only, no audit. Permission incarnation.view-secrets (existence-gate). Out of scope -> 404.
          */
         get: operations["incarnationRevealableSecrets"];
         put?: never;
@@ -1032,7 +1092,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/telemetry": {
+    "/v1/incarnations/{id}/telemetry": {
         parameters: {
             query?: never;
             header?: never;
@@ -1052,7 +1112,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/traits": {
+    "/v1/incarnations/{id}/traits": {
         parameters: {
             query?: never;
             header?: never;
@@ -1062,7 +1122,7 @@ export interface paths {
         get?: never;
         /**
          * Replace operator-set trait labels of an incarnation
-         * @description Wholesale replacement of incarnation.traits (ADR-060) - the labels of the incarnation itself. Member hosts are not touched: a host carries only the traits an operator set on it (NIM-281). Permission incarnation.traits-set.
+         * @description Wholesale replacement of incarnation.traits (ADR-060) - the labels of the incarnation itself. Member hosts are not touched: a host carries only the traits an operator set on it (NIM-281). Permission incarnation.traits-set, over two gates: the incarnation lies inside the operator scope, and every pair stamped must lie inside the operator's own trait-scope - an incarnation-attached pair grants every role scoped on it sight of the incarnation, so a pair the operator does not hold is refused 422 (the same rule the per-host soul.traits-assign applies).
          */
         put: operations["setIncarnationTraits"];
         post?: never;
@@ -1072,7 +1132,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/unlock": {
+    "/v1/incarnations/{id}/unlock": {
         parameters: {
             query?: never;
             header?: never;
@@ -1092,7 +1152,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/upgrade": {
+    "/v1/incarnations/{id}/upgrade": {
         parameters: {
             query?: never;
             header?: never;
@@ -1112,7 +1172,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/incarnations/{name}/upgrade-paths": {
+    "/v1/incarnations/{id}/upgrade-paths": {
         parameters: {
             query?: never;
             header?: never;
@@ -1331,7 +1391,7 @@ export interface paths {
         put?: never;
         /**
          * Allow a plugin (Sigil)
-         * @description Registers (namespace,name,ref) in the plugin integrity allow-list with SHA-256 signature (ADR-026 S4a). Permission plugin.allow. 404 — plugin not in the host cache. 409 — release already active.
+         * @description Approves the artifact registered under {alias} on the identity (source, ref), signing its SHA-256 and schema document (ADR-026 S4a, re-keyed by NIM-377). Permission plugin.allow. 404 — no artifact under that alias in the host cache. 409 — the alias is taken, or (source, ref) is already approved. 422 — malformed or reserved alias.
          */
         post: operations["allowPluginSigil"];
         delete?: never;
@@ -1340,7 +1400,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/plugins/sigils/{namespace}/{name}/{ref}": {
+    "/v1/plugins/sigils/{alias}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1352,7 +1412,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke Sigil
-         * @description Removes the active release (namespace,name,ref) from allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — active record absent.
+         * @description Removes the active grant registered under {alias} from the allow-list (ADR-026 S4a). Permission plugin.revoke. 404 — no active grant for that alias.
          */
         delete: operations["revokePluginSigil"];
         options?: never;
@@ -1393,7 +1453,7 @@ export interface paths {
         };
         /**
          * List Push Providers (paged)
-         * @description Registry of Push Providers with pagination and name_pattern filter (ADR-032 S7-2). Permission push-provider.list. Read-only, no audit.
+         * @description Registry of Push Providers with pagination and id_pattern filter (ADR-032 S7-2). Permission push-provider.list. Read-only, no audit.
          */
         get: operations["listPushProviders"];
         put?: never;
@@ -1408,7 +1468,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/push-providers/{name}": {
+    "/v1/push-providers/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1431,6 +1491,26 @@ export interface paths {
          * @description Deletes a Push Provider record (ADR-032 S7-2). Permission push-provider.delete. 404 — record absent.
          */
         delete: operations["deletePushProvider"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/push-providers/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Push-Provider display caption
+         * @description Replaces the display caption of one Push-Provider (ADR-0085). Permission push-provider.label-set, audit push-provider.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. Unlike PUT /v1/push-providers/{id} this publishes NO invalidation: the dispatcher snapshot carries params, and a caption is not one of them. The identifier in the path is NOT touched.
+         */
+        put: operations["setPushProviderLabel"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1649,13 +1729,13 @@ export interface paths {
         };
         /**
          * List of Services
-         * @description Registry of Services (sort name ASC, ADR-028). Permission service.list. Read-only, no audit.
+         * @description Registry of Services (sort id ASC, ADR-028). Permission service.list. Read-only, no audit.
          */
         get: operations["listServices"];
         put?: never;
         /**
          * Register a Service
-         * @description Registers the Service in the service_registry (ADR-028). Permission service.register. 409 - name taken. 404 - caller AID missing from the operator registry.
+         * @description Registers the Service in the service_registry (ADR-028). Permission service.register. 409 - id taken. 404 - caller AID missing from the operator registry.
          */
         post: operations["registerService"];
         delete?: never;
@@ -1664,7 +1744,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}": {
+    "/v1/services/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1673,14 +1753,14 @@ export interface paths {
         };
         /**
          * Service card
-         * @description Metadata of a single registry entry by name (ADR-028). Permission service.list. Read-only, no audit.
+         * @description Metadata of a single registry entry by id (ADR-028). Permission service.list. Read-only, no audit.
          */
         get: operations["getService"];
         put?: never;
         post?: never;
         /**
          * Remove a Service from the registry
-         * @description Deletes the registry entry by name + invalidates caches (ADR-028). Permission service.deregister. 404 - entry absent.
+         * @description Deletes the registry entry by id + invalidates caches (ADR-028). Permission service.deregister. 404 - entry absent.
          */
         delete: operations["deregisterService"];
         options?: never;
@@ -1692,7 +1772,7 @@ export interface paths {
         patch: operations["updateService"];
         trace?: never;
     };
-    "/v1/services/{name}/compat": {
+    "/v1/services/{id}/compat": {
         parameters: {
             query?: never;
             header?: never;
@@ -1712,7 +1792,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}/dependencies": {
+    "/v1/services/{id}/dependencies": {
         parameters: {
             query?: never;
             header?: never;
@@ -1732,7 +1812,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}/directives": {
+    "/v1/services/{id}/directives": {
         parameters: {
             query?: never;
             header?: never;
@@ -1752,7 +1832,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}/refs": {
+    "/v1/services/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Service display caption
+         * @description Replaces the display caption of one Service registry entry (ADR-0085). Permission service.label-set, audit service.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `id`. Narrower than PATCH /v1/services/{id}, which re-points git/ref and invalidates every artifact cache. The caption participates in nothing derived - in particular it is NOT segment 2 of the derived secret path <mount>/<service>/<incarnation>/<state-field>, and not the artifact cache directory - so changing it orphans no secret and re-clones nothing.
+         */
+        put: operations["setServiceLabel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/services/{id}/refs": {
         parameters: {
             query?: never;
             header?: never;
@@ -1772,7 +1872,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}/scenarios": {
+    "/v1/services/{id}/scenarios": {
         parameters: {
             query?: never;
             header?: never;
@@ -1792,7 +1892,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}/state-schema": {
+    "/v1/services/{id}/state-schema": {
         parameters: {
             query?: never;
             header?: never;
@@ -1812,7 +1912,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/services/{name}/telemetry": {
+    "/v1/services/{id}/telemetry": {
         parameters: {
             query?: never;
             header?: never;
@@ -1821,7 +1921,7 @@ export interface paths {
         };
         /**
          * default host-vitals telemetry config of a Service + allowed collectors
-         * @description Effective default (per-service, without an incarnation) host-vitals config of the service (enabled/interval_sec/collectors) from the manifest `telemetry:` + known_collectors (full allowed set for the UI, ADR-042 backend-driven, ADR-072). Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for pinned commit-SHA ref, otherwise no-cache (mutable branch/tag). A service without a telemetry block -> manifest defaults (enabled=true, interval_sec=30, all collectors) + 200. 502 - loader failed. Not to be confused with /v1/incarnations/{name}/telemetry (runtime host-vitals from Redis, NIM-86).
+         * @description Effective default (per-service, without an incarnation) host-vitals config of the service (enabled/interval_sec/collectors) from the manifest `telemetry:` + known_collectors (full allowed set for the UI, ADR-042 backend-driven, ADR-072). Permission service.list. Read-only, no audit. ETag=snapshot SHA1; If-None-Match -> 304. Cache-Control: immutable+year for pinned commit-SHA ref, otherwise no-cache (mutable branch/tag). A service without a telemetry block -> manifest defaults (enabled=true, interval_sec=30, all collectors) + 200. 502 - loader failed. Not to be confused with /v1/incarnations/{id}/telemetry (runtime host-vitals from Redis, NIM-86).
          */
         get: operations["getServiceTelemetry"];
         put?: never;
@@ -2038,7 +2138,11 @@ export interface paths {
         get: operations["getSoul"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Forget a host
+         * @description Erase a host from the registry and release what it held: revoke its seeds, burn its unused bootstrap tokens, close its EventStream across the cluster and purge its Redis keys. The souls row goes, and with it — through ON DELETE CASCADE — its seeds, its unburnt bootstrap tokens, its incarnation memberships and its Choir Voices; all four counts are in the reply. IRREVERSIBLE, and legal in any state (including connected). A forgotten host cannot reconnect: seed auth is an allowlist and its allowlist entry is gone. Permission soul.forget. 503 - the cluster-wide teardown notice could not be sent and NOTHING was deleted.
+         */
+        delete: operations["forgetSoul"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2055,7 +2159,7 @@ export interface paths {
         put?: never;
         /**
          * Run Errand on a Soul
-         * @description Pull ad-hoc module exec on a single host (ADR-033). 200 sync (terminal up to server-cap 30s) or 202 + Location async-escalation. Permission errand.run. 404 - Soul not connected.
+         * @description Pull ad-hoc module exec on a single host (ADR-033). 200 sync (terminal up to server-cap 30s) or 202 + Location async-escalation. Permission errand.run. 404 - Soul not connected. 400 - dry_run requested for a verb-shell module (no pure-read Plan exists on any host, so no upgrade fixes it). 409 - dry_run requested and the target Soul did not announce the dry_run capability (it would apply for real).
          */
         post: operations["ErrandExec"];
         delete?: never;
@@ -2316,7 +2420,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tidings/{name}": {
+    "/v1/tidings/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2339,6 +2443,26 @@ export interface paths {
          * @description Removes the Tiding subscription rule by name (ADR-052). Permission tiding.delete. 404 — record absent.
          */
         delete: operations["deleteTiding"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tidings/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Tiding display caption
+         * @description Replaces the display caption of one Tiding rule (ADR-0085). Permission tiding.label-set, audit tiding.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. Narrower than PUT /v1/tidings/{id}, which replaces the whole rule. The caption participates in nothing derived and is not the `herald` FK.
+         */
+        put: operations["setTidingLabel"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2368,7 +2492,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/vigils/{name}": {
+    "/v1/vigils/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2392,6 +2516,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/vigils/{id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Vigil display caption
+         * @description Replaces the display caption of one Vigil (ADR-0085). Permission vigil.label-set, audit vigil.label_changed. The caption is free text - capitals and spaces are allowed and nothing validates its form; null clears it and consumers fall back to showing `name`. This is the registry's only operator mutation: interval, check and subject stay immutable because the Souls holding a VigilSnapshot were already told what to run. The caption participates in nothing derived - a Decree reacts through `on_beacon`, which is the name - so changing it moves nothing.
+         */
+        put: operations["setVigilLabel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/voyages": {
         parameters: {
             query?: never;
@@ -2407,7 +2551,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Voyage
-         * @description Unified batch run (ADR-043). RBAC-by-kind: scenario->incarnation.run, command->errand.run (fail-closed, in the handler). Tempo per-AID rate-limit.
+         * @description Unified batch run (ADR-043). RBAC-by-kind: scenario->incarnation.run, command->errand.run (fail-closed, in the handler). Tempo per-AID rate-limit. 400 - kind=command with dry_run on a verb-shell module: refused at creation, before a scope is resolved and a row written, since it could only fan out one identical failure per host.
          */
         post: operations["createVoyage"];
         delete?: never;
@@ -2427,7 +2571,7 @@ export interface paths {
         put?: never;
         /**
          * Dry-resolve scope Voyage
-         * @description Preview of the number of units/batches WITHOUT creating a Voyage (ADR-043 amendment 4). Same validation/resolve/RBAC as Create. Without revealing the SID list. Read-like - no audit.
+         * @description Preview of the number of units/batches WITHOUT creating a Voyage (ADR-043 amendment 4). Same validation/resolve/RBAC as Create, so the same 400 for kind=command with dry_run on a verb-shell module. Without revealing the SID list. Read-like - no audit.
          */
         post: operations["previewVoyage"];
         delete?: never;
@@ -2498,7 +2642,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.drift_checked" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "provider.created" | "provider.deleted" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -2766,8 +2910,8 @@ export interface components {
         };
         CompatEntityView: {
             compatible: boolean;
+            id: string;
             kind: string;
-            name: string;
             ref?: string;
             window: components["schemas"]["CompatWindowView"];
         };
@@ -2834,10 +2978,12 @@ export interface components {
             cooldown?: string;
             /** @description whether the rule is active (default true) */
             enabled?: boolean;
+            /** @description Decree name (kebab-case, 1..63) */
+            id: string;
             /** @description target incarnation of the reaction (required) */
             incarnation_name: string;
-            /** @description Decree name (kebab-case, 1..63) */
-            name: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /** @description Vigil name whose Portent the rule reacts to */
             on_beacon: string;
             /** @description which hosts may fire the rule — exactly one of sid / incarnation / coven / trait */
@@ -2862,8 +3008,9 @@ export interface components {
             created_at: string;
             created_by_aid?: string;
             enabled: boolean;
+            id: string;
             incarnation_name: string;
-            name: string;
+            label?: string;
             on_beacon: string;
             subject: components["schemas"]["Subject"];
             /** Format: date-time */
@@ -2901,51 +3048,6 @@ export interface components {
             /** Format: int64 */
             scanned_incarnations: number;
             truncated?: boolean;
-        };
-        DriftHostReport: {
-            sid: string;
-            status: string;
-            tasks: components["schemas"]["DriftTaskResult"][] | null;
-        };
-        DriftReport: {
-            /** Format: date-time */
-            checked_at: string;
-            hosts: components["schemas"]["DriftHostReport"][] | null;
-            incarnation: string;
-            scenario_ref: string;
-            summary: components["schemas"]["DriftSummary"];
-        };
-        DriftScanSummary: {
-            /** Format: int64 */
-            hosts_clean: number;
-            /** Format: int64 */
-            hosts_drifted: number;
-            /** Format: int64 */
-            hosts_failed: number;
-            /** Format: int64 */
-            hosts_unsupported: number;
-            /** Format: date-time */
-            scanned_at: string;
-            /** Format: int64 */
-            total_hosts: number;
-        };
-        DriftSummary: {
-            /** Format: int64 */
-            hosts_clean: number;
-            /** Format: int64 */
-            hosts_drifted: number;
-            /** Format: int64 */
-            hosts_failed: number;
-            /** Format: int64 */
-            hosts_unsupported: number;
-        };
-        DriftTaskResult: {
-            action?: string;
-            changed: boolean;
-            /** Format: int64 */
-            idx: number;
-            message?: string;
-            module: string;
         };
         ErrandAccepted: {
             /** @description ULID of the started Errand */
@@ -2989,13 +3091,13 @@ export interface components {
             stdout_truncated?: boolean;
         };
         ErrandRunRequest: {
-            /** @description only for PlanReadSafe modules; verb module (shell/exec) -> 400 */
+            /** @description only for PlanReadSafe modules; a verb-shell module (core.cmd.shell / core.exec.run) has no pure-read Plan on any host -> 400; target soul must announce the dry_run capability -> 409 otherwise */
             dry_run?: boolean;
             /** @description input for the module (validated against input_schema) */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description fully-qualified <ns>.<name>.<state> (core.cmd.shell / core.exec.run / ErrandReadSafe module) */
+            /** @description fully-qualified <ns>.<name>.<state>; without dry_run - core.cmd.shell / core.exec.run / an ErrandReadSafe module, with dry_run - a PlanReadSafe module */
             module: string;
             /**
              * Format: int64
@@ -3044,7 +3146,8 @@ export interface components {
             created_at: string;
             created_by_aid?: string;
             enabled: boolean;
-            name: string;
+            id: string;
+            label?: string;
             secret_ref?: string;
             type: string;
             /** Format: date-time */
@@ -3058,7 +3161,9 @@ export interface components {
             /** @description channel enabled (omitted → true) */
             enabled?: boolean;
             /** @description Herald channel name (kebab-case, 1..63), unique in the cluster */
-            name: string;
+            id: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /** @description opt. plaintext webhook signing-token (dual-mode, ADR-064): keeper writes it into Vault itself; XOR with secret_ref. Requires TLS-front (secret_ingest.accept_plaintext) */
             secret?: string;
             /** @description opt. vault-ref on webhook signing-token (vault:<mount>/<path>); XOR with secret */
@@ -3126,12 +3231,6 @@ export interface components {
             title: string;
             type: string;
         };
-        IncarnationCheckDriftRequest: {
-            /** @description override converge parameters (ADR-031 Slice B) */
-            input?: {
-                [key: string]: unknown;
-            };
-        };
         IncarnationCreateReply: {
             apply_id?: string;
             incarnation: string;
@@ -3141,12 +3240,14 @@ export interface components {
             covens?: string[] | null;
             /** @description name of start scenario (mechanism for multiple creates, scenario with create:true). Empty: service offers create scenarios → 422 create_scenario_required; service without them → bare incarnation (ready without run) */
             create_scenario?: string;
+            /** @description new instance id (kebab-case, immutable); omit when the create scenario declares id_template (ADR-0079) — then it is composed server-side from input components. */
+            id?: string;
             /** @description input for selected create scenario */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description new instance name (kebab-case); omit when the create scenario declares name_template (ADR-0079) — then it is composed server-side from input components */
-            name?: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root - in particular incarnation.label does not resolve in CEL */
+            label?: string;
             /** @description service name from registry (ADR-029) */
             service: string;
             /** @description operator-set trait labels (key → scalar|list of scalars), ADR-060 */
@@ -3156,6 +3257,7 @@ export interface components {
         };
         IncarnationDestroyReply: {
             apply_id: string;
+            unreleased?: components["schemas"]["UnreleasedResourcesReply"];
         };
         IncarnationFormPrefillReply: {
             /** @description field → current value from incarnation.state (prefill-hint) */
@@ -3170,10 +3272,8 @@ export interface components {
             created_at: string;
             created_by_aid: string | null;
             created_scenario?: string;
-            /** Format: date-time */
-            last_drift_check_at?: string;
-            last_drift_summary?: components["schemas"]["DriftScanSummary"];
-            name: string;
+            id: string;
+            label?: string;
             service: string;
             service_version: string;
             state: {
@@ -3267,34 +3367,34 @@ export interface components {
             /** @description free text confirmation */
             reason: string;
         };
-        IncarnationResolveNameReply: {
-            /** @description no incarnation holds this name (meaningful only when valid) */
+        IncarnationResolveIDReply: {
+            /** @description no incarnation holds this id (meaningful only when valid) */
             available: boolean;
-            /** @description the name a create with this input would produce; carries the offending value when invalid */
-            composed_name: string;
-            /** @description the chosen create scenario composes the name from name_template (ADR-0079); false → the operator names the incarnation */
+            /** @description the id a create with this input would produce; carries the offending value when invalid */
+            composed_id: string;
+            /** @description the chosen create scenario composes the id from id_template (ADR-0079); false → the operator names the incarnation */
             composes: boolean;
-            /** @description why the name could not be composed or was rejected, in operator terms */
+            /** @description why the id could not be composed or was rejected, in operator terms */
             invalid_reason?: string;
             /**
              * Format: int64
-             * @description character count of composed_name
+             * @description character count of composed_id
              */
             length: number;
             /**
              * Format: int64
-             * @description the incarnation name ceiling — server-sourced so the form does not restate it
+             * @description the incarnation id ceiling — server-sourced so the form does not restate it
              */
             max_length: number;
-            /** @description service of the incarnation holding the name — only when the caller may see it */
+            /** @description service of the incarnation holding the id — only when the caller may see it */
             taken_by_service?: string;
-            /** @description composed_name is a legal incarnation name */
+            /** @description composed_id is a legal incarnation id */
             valid: boolean;
         };
-        IncarnationResolveNameRequest: {
+        IncarnationResolveIDRequest: {
             /** @description declared environment tags of the intended create — scope parity with POST /v1/incarnations, not part of the composition */
             covens?: string[] | null;
-            /** @description chosen create scenario, whose name_template composes the name */
+            /** @description chosen create scenario, whose id_template composes the id */
             create_scenario?: string;
             /** @description the create input so far — partial is expected, this is a live preview */
             input?: {
@@ -3308,19 +3408,21 @@ export interface components {
             value: string;
         };
         IncarnationRevealSecretRequest: {
-            /** @description element key of the current-state enumerate array (element.name) */
-            key: string;
-            /** @description id of the revealable secret (revealable_secrets of the service manifest) */
+            /** @description element key of the current-state collection; empty for a scalar secret */
+            key?: string;
+            /** @description id of the declared secret: the state_schema field, or <field>.<property> for a collection */
             secret_id: string;
         };
         IncarnationRevealableSecretItem: {
-            /** @description allowed keys (element.name of the current state) */
+            /** @description true when reveal needs a key; false for one secret per incarnation */
+            collection: boolean;
+            /** @description allowed keys of the current state (empty for a scalar secret) */
             keys: string[] | null;
             /** @description label for UI */
             label: string;
             /** @description id of the secret (passed as secret_id on reveal) */
             secret_id: string;
-            /** @description state path of the array (tail enumerate, e.g. redis_users) */
+            /** @description top-level state_schema field holding the secret (e.g. redis_users) */
             state_path: string;
         };
         IncarnationRevealableSecretsReply: {
@@ -3333,12 +3435,12 @@ export interface components {
             scenario: string;
         };
         IncarnationRunRequest: {
+            /** @description echo path-id (ignored) */
+            id?: string;
             /** @description scenario input */
             input?: {
                 [key: string]: unknown;
             };
-            /** @description echo path-name (ignored) */
-            name?: string;
             /** @description echo path-scenario (ignored) */
             scenario?: string;
         };
@@ -3368,7 +3470,7 @@ export interface components {
             };
         };
         /**
-         * @description Runtime instance status. In proto the constants have a family-prefix (INCARNATION_STATUS_READY), in the JSON API - short forms. `drift` - an informational Scry status (ADR-031), NOT blocking: remediation = a regular apply, which on success returns the incarnation to `ready`.
+         * @description Runtime instance status. In proto the constants have a family-prefix (INCARNATION_STATUS_READY), in the JSON API - short forms. `drift` - informational, NOT blocking: the DB state is ahead of the hosts after a legacy upgrade (ADR-031(d)); remediation = a regular apply, which on success returns the incarnation to `ready`.
          * @enum {string}
          */
         IncarnationStatus: "provisioning" | "ready" | "applying" | "error_locked" | "migration_failed" | "drift" | "destroying" | "destroy_failed";
@@ -3379,7 +3481,7 @@ export interface components {
             truncated: boolean;
         };
         IncarnationUnlockReply: {
-            name: string;
+            id: string;
             previous_status: components["schemas"]["IncarnationStatus"];
             status: components["schemas"]["IncarnationStatus"];
             /** Format: date-time */
@@ -3387,8 +3489,8 @@ export interface components {
             unlocked_by_aid: string;
         };
         IncarnationUnlockRequest: {
-            /** @description echo path-name (ignored) */
-            name?: string;
+            /** @description echo path-id (ignored) */
+            id?: string;
             /** @description free text confirmation */
             reason: string;
         };
@@ -3404,8 +3506,8 @@ export interface components {
             run_apply_id?: string;
         };
         IncarnationUpgradeRequest: {
-            /** @description echo path-name (ignored) */
-            name?: string;
+            /** @description echo path-id (ignored) */
+            id?: string;
             /** @description target service version (git-ref) */
             to_version: string;
         };
@@ -3423,6 +3525,10 @@ export interface components {
             password: string;
             /** @description username for LDAP search-bind */
             username: string;
+        };
+        LabelSetRequest: {
+            /** @description Display caption: free text, may carry capitals and spaces. null - or an omitted field, or an empty body - clears it, after which consumers show the identifier instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root: changing it moves nothing */
+            label?: string | null;
         };
         ModuleCatalogItem: {
             description?: string;
@@ -3503,7 +3609,9 @@ export interface components {
             /** @description external system URL (not a secret) */
             endpoint: string;
             /** @description Omen name (kebab-case, 1..63) */
-            name: string;
+            id: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /**
              * @description external system type; a value outside the enum -> 422
              * @enum {string}
@@ -3525,7 +3633,8 @@ export interface components {
             created_at: string;
             created_by_aid?: string;
             endpoint: string;
-            name: string;
+            id: string;
+            label?: string;
             source_type: string;
         };
         Operator: {
@@ -3596,32 +3705,42 @@ export interface components {
             items: components["schemas"]["PermissionCatalogItem"][] | null;
         };
         PluginSigilAllowReply: {
-            name: string;
-            namespace: string;
+            alias: string;
+            artifacts: components["schemas"]["PluginSigilArtifactView"][] | null;
+            /** @enum {string} */
+            kind: "git" | "artifact";
             ref: string;
-            sha256: string;
+            source: string;
         };
         PluginSigilAllowRequest: {
-            /** @description plugin name (as in manifest.name) */
-            name: string;
-            /** @description plugin namespace (type — cloud/ssh/mod) */
-            namespace: string;
-            /** @description git-tag-ref of the release (stable tag, no slashes) */
+            /** @description registration alias — address level 1 (lowercase kebab-case); must not be a reserved name */
+            alias: string;
+            /** @description git-tag-ref of the release (stable tag, no slashes; signed) */
             ref: string;
+            /** @description artifact source: the git remote the module repository was fetched from (signed) */
+            source: string;
+        };
+        PluginSigilArtifactView: {
+            arch: string;
+            os: string;
+            path: string;
+            sha256: string;
         };
         PluginSigilListReply: {
             items: components["schemas"]["PluginSigilView"][] | null;
         };
         PluginSigilView: {
+            alias: string;
             /** Format: date-time */
             allowed_at: string;
             allowed_by_aid: string;
-            name: string;
-            namespace: string;
+            artifacts: components["schemas"]["PluginSigilArtifactView"][] | null;
+            /** @enum {string} */
+            kind: "git" | "artifact";
             ref: string;
             /** Format: date-time */
             revoked_at?: string;
-            sha256: string;
+            source: string;
         };
         ProvisioningPolicyReply: {
             allowed_methods: string[] | null;
@@ -3671,7 +3790,8 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             created_by_aid: string;
-            name: string;
+            id: string;
+            label?: string;
             params: {
                 [key: string]: unknown;
             };
@@ -3680,8 +3800,10 @@ export interface components {
             updated_by_aid?: string;
         };
         PushProviderCreateRequest: {
-            /** @description Push Provider name (= plugins.ssh_providers[].name) */
-            name: string;
+            /** @description Push Provider id (= plugins.ssh_providers[].name) */
+            id: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /** @description opaque params; sensitive — vault-refs (values are not logged) */
             params?: {
                 [key: string]: unknown;
@@ -3875,9 +3997,8 @@ export interface components {
         };
         RunTaskEntry: {
             hosts: components["schemas"]["RunTaskHostEntry"][] | null;
+            id: string;
             module: string;
-            name: string;
-            no_log: boolean;
             params?: {
                 [key: string]: unknown;
             };
@@ -3957,7 +4078,7 @@ export interface components {
             last_24h: components["schemas"]["RunsStatsBucket"];
         };
         Scenario: {
-            composes_name?: boolean;
+            composes_id?: boolean;
             create?: boolean;
             description?: string;
             form?: components["schemas"]["ScenarioForm"];
@@ -4030,8 +4151,10 @@ export interface components {
         ServiceRegisterRequest: {
             /** @description git source of the service repo (URL; not a secret) */
             git: string;
-            /** @description Service name (kebab-case) */
-            name: string;
+            /** @description Service id (kebab-case, immutable) */
+            id: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the id instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /** @description git ref (tag/branch) - Service version (ADR-007) */
             ref: string;
             /** @description opt. auto-refresh duration ('5m'); omitted - no auto-refresh */
@@ -4078,7 +4201,8 @@ export interface components {
             created_at: string;
             created_by_aid?: string;
             git: string;
-            name: string;
+            id: string;
+            label?: string;
             ref: string;
             refresh?: string;
             /** Format: date-time */
@@ -4211,6 +4335,23 @@ export interface components {
              * @enum {string}
              */
             transport: "agent" | "ssh";
+        };
+        SoulForgetReply: {
+            /** Format: int64 */
+            bootstraps_burned: number;
+            broadcast: boolean;
+            /** Format: int64 */
+            cache_keys_purged: number;
+            /** Format: int64 */
+            choir_voices_removed: number;
+            local_stream_closed: boolean;
+            /** Format: int64 */
+            memberships_severed: number;
+            /** Format: int64 */
+            seeds_revoked: number;
+            sid: string;
+            status_before: string;
+            warnings: string[] | null;
         };
         SoulHistoryItem: {
             /** Format: date-time */
@@ -4554,8 +4695,9 @@ export interface components {
             ephemeral?: boolean;
             event_types: string[] | null;
             herald: string;
+            id: string;
             incarnation?: string;
-            name: string;
+            label?: string;
             only_changes: boolean;
             only_failures: boolean;
             projection?: string[];
@@ -4575,12 +4717,14 @@ export interface components {
             enabled?: boolean;
             /** @description list of event-types in run scope (area-glob or exact); empty -> 422 */
             event_types: string[] | null;
-            /** @description Herald channel name for delivery (FK on heralds.name) */
+            /** @description Herald channel name for delivery (FK on heralds.id) */
             herald: string;
+            /** @description Tiding rule name (kebab-case, 1..63) */
+            id: string;
             /** @description opt. selector binding to the source incarnation */
             incarnation?: string;
-            /** @description Tiding rule name (kebab-case, 1..63) */
-            name: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /** @description deliver only on changes (omitted → false) */
             only_changes?: boolean;
             /** @description deliver only failures (omitted → false) */
@@ -4622,6 +4766,14 @@ export interface components {
             projection?: string[];
             /** @description opt. selector subscribing to a task; absence clears it */
             task?: string;
+        };
+        UnreleasedResourcesReply: {
+            /** @description cloud Provider name in the registry that owns the VMs below; empty when the incarnation recorded no provisioned cloud — either it provisions none, or the create failed before the driver committed one */
+            provider?: string;
+            /** @description member hosts (incarnation_membership) whose souls, seeds and bootstrap tokens were NOT revoked — the membership rows themselves are gone with the record */
+            sids?: string[] | null;
+            /** @description provider VM ids NOT destroyed — these machines are still running at the provider and must be reclaimed by hand. Empty does NOT mean no machines exist: the ids are read from incarnation.state, which a failed create never committed */
+            vm_ids?: string[] | null;
         };
         UpgradePathRef: {
             commit: string;
@@ -4690,10 +4842,12 @@ export interface components {
             check: string;
             /** @description whether the check is active (default true) */
             enabled?: boolean;
+            /** @description Vigil name (kebab-case, 1..63) */
+            id: string;
             /** @description check frequency (duration convention, e.g. '30s') */
             interval: string;
-            /** @description Vigil name (kebab-case, 1..63) */
-            name: string;
+            /** @description Display caption: free text, may carry capitals and spaces (ADR-0085). Omitted means consumers show the name instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root */
+            label?: string;
             /** @description check parameters; shape depends on check (passed through as-is) */
             params?: unknown;
             /** @description which hosts run the check — exactly one of sid / incarnation / coven / trait */
@@ -4714,8 +4868,9 @@ export interface components {
             created_at: string;
             created_by_aid?: string;
             enabled: boolean;
+            id: string;
             interval: string;
-            name: string;
+            label?: string;
             params: unknown;
             subject: components["schemas"]["Subject"];
             /** Format: date-time */
@@ -4813,6 +4968,7 @@ export interface components {
             batch_size?: number;
             /** Format: int64 */
             concurrency?: number;
+            /** @description for kind=command - each per-host Errand asks the module for a Plan instead of Apply; a verb-shell module (core.cmd.shell / core.exec.run) has no pure-read Plan on any host -> 400 */
             dry_run?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
@@ -5415,7 +5571,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Omen name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -5474,7 +5630,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Omen name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -5486,6 +5642,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setOmenLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Omen name */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OmenView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {
@@ -6571,7 +6799,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Decree name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -6630,7 +6858,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Decree name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -6642,6 +6870,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setDecreeLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Decree name */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecreeView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {
@@ -7116,7 +7416,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Herald channel name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -7175,7 +7475,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Herald channel name (immutable) */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -7247,7 +7547,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Herald channel name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -7259,6 +7559,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setHeraldLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Herald channel name (immutable) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Herald"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {
@@ -7311,7 +7683,7 @@ export interface operations {
                 status?: string;
                 /** @description exact-match by covens[] (ADR-008); invalid label → 422 */
                 coven?: string;
-                /** @description sort field (created_at/name/status/service or state.<field>) */
+                /** @description sort field (created_at/id/status/service or state.<field>) */
                 sort?: string;
                 /** @description sort direction (asc/desc) */
                 sort_dir?: string;
@@ -7438,7 +7810,7 @@ export interface operations {
             };
         };
     };
-    resolveIncarnationName: {
+    resolveIncarnationID: {
         parameters: {
             query?: never;
             header?: never;
@@ -7447,7 +7819,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["IncarnationResolveNameRequest"];
+                "application/json": components["schemas"]["IncarnationResolveIDRequest"];
             };
         };
         responses: {
@@ -7457,7 +7829,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IncarnationResolveNameReply"];
+                    "application/json": components["schemas"]["IncarnationResolveIDReply"];
                 };
             };
             /** @description Forbidden */
@@ -7494,8 +7866,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -7556,8 +7928,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -7628,85 +8000,13 @@ export interface operations {
             };
         };
     };
-    checkIncarnationDrift: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description incarnation name */
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["IncarnationCheckDriftRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DriftReport"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["HumaProblemError"];
-                };
-            };
-        };
-    };
     listChoirs: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -7755,8 +8055,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -7836,8 +8136,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description Choir name */
                 choir: string;
             };
@@ -7895,8 +8195,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description Choir name */
                 choir: string;
             };
@@ -7947,8 +8247,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description Choir name */
                 choir: string;
             };
@@ -8030,8 +8330,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description Choir name */
                 choir: string;
                 /** @description SID (FQDN) of a host */
@@ -8102,8 +8402,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8165,13 +8465,85 @@ export interface operations {
             };
         };
     };
+    setIncarnationLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncarnationGetReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listIncarnationMembers: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8229,8 +8601,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8301,8 +8673,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description SID (FQDN) of the host to unbind */
                 sid: string;
             };
@@ -8360,8 +8732,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8437,8 +8809,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8505,8 +8877,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description run ULID; non-ULID → 400 */
                 apply_id: string;
             };
@@ -8575,8 +8947,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description run ULID; someone else's/nonexistent -> 403 (anti-enum) */
                 apply_id: string;
             };
@@ -8645,8 +9017,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description run ULID; non-ULID → 400 */
                 apply_id: string;
             };
@@ -8715,8 +9087,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description scenario name */
                 scenario: string;
             };
@@ -8807,8 +9179,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
                 /** @description scenario name */
                 scenario: string;
             };
@@ -8868,8 +9240,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8931,8 +9303,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -8990,8 +9362,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -9040,8 +9412,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -9112,8 +9484,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -9193,8 +9565,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -9277,8 +9649,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description incarnation name */
-                name: string;
+                /** @description incarnation id */
+                id: string;
             };
             cookie?: never;
         };
@@ -10033,12 +10405,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description plugin namespace */
-                namespace: string;
-                /** @description plugin name */
-                name: string;
-                /** @description git-tag-ref of the release */
-                ref: string;
+                /** @description registration alias of the grant to revoke */
+                alias: string;
             };
             cookie?: never;
         };
@@ -10199,8 +10567,8 @@ export interface operations {
     listPushProviders: {
         parameters: {
             query?: {
-                /** @description LIKE-prefix filter by name (optional) */
-                name_pattern?: string;
+                /** @description LIKE-prefix filter by id (optional) */
+                id_pattern?: string;
                 /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
                 /** @description page size 1..1000 (out-of-range → 400) */
@@ -10333,8 +10701,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Push Provider name */
-                name: string;
+                /** @description Push Provider id */
+                id: string;
             };
             cookie?: never;
         };
@@ -10392,8 +10760,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Push Provider name */
-                name: string;
+                /** @description Push Provider id */
+                id: string;
             };
             cookie?: never;
         };
@@ -10464,8 +10832,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Push Provider name */
-                name: string;
+                /** @description Push Provider id */
+                id: string;
             };
             cookie?: never;
         };
@@ -10477,6 +10845,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setPushProviderLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Push Provider id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushProvider"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {
@@ -11324,8 +11764,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11383,8 +11823,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11440,8 +11880,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Service name (immutable) */
-                name: string;
+                /** @description Service id (immutable) */
+                id: string;
             };
             cookie?: never;
         };
@@ -11518,8 +11958,8 @@ export interface operations {
                 "If-None-Match"?: string;
             };
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11591,8 +12031,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11667,8 +12107,8 @@ export interface operations {
                 "If-None-Match"?: string;
             };
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11732,13 +12172,85 @@ export interface operations {
             };
         };
     };
+    setServiceLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Service id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listServiceRefs: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11808,8 +12320,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11879,8 +12391,8 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -11953,8 +12465,8 @@ export interface operations {
                 "If-None-Match"?: string;
             };
             path: {
-                /** @description Service name */
-                name: string;
+                /** @description Service id */
+                id: string;
             };
             cookie?: never;
         };
@@ -12791,6 +13303,74 @@ export interface operations {
             };
         };
     };
+    forgetSoul: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description SID (FQDN) of Soul */
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoulForgetReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     ErrandExec: {
         parameters: {
             query?: never;
@@ -12846,6 +13426,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13884,7 +14473,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Tiding rule name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -13943,7 +14532,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Tiding rule name (immutable) */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -14015,7 +14604,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Tiding rule name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -14027,6 +14616,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setTidingLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Tiding rule name (immutable) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tiding"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {
@@ -14202,7 +14863,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Vigil name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -14261,7 +14922,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Vigil name */
-                name: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -14273,6 +14934,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setVigilLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Vigil name */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VigilView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {

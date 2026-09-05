@@ -9,7 +9,7 @@ import { tokenStore } from '../api/tokenStore';
 const SAMPLE = {
   items: [
     {
-      name: 'redis-down',
+      id: 'redis-down',
       check: 'core.beacon.service_down',
       interval: '30s',
       params: { service: 'redis' },
@@ -19,7 +19,7 @@ const SAMPLE = {
       updated_at: '2026-05-01T00:00:00Z',
     },
     {
-      name: 'config-changed',
+      id: 'config-changed',
       check: 'core.beacon.file_changed',
       interval: '15s',
       params: { path: '/etc/redis.conf', recursive: false },

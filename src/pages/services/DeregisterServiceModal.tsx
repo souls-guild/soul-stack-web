@@ -13,7 +13,9 @@ interface Props {
   onClose: () => void;
 }
 
-// DELETE /v1/services/{name} — removes the registry entry. Git repo is untouched.
+// DELETE /v1/services/{id} — removes the registry entry. Git repo is untouched.
+// Names the service by its id, not its caption: a destructive confirmation has to
+// name the key it acts on, and two services may carry the same caption.
 export function DeregisterServiceModal({ open, service, onClose }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -21,7 +23,7 @@ export function DeregisterServiceModal({ open, service, onClose }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const mu = useMutation({
-    mutationFn: () => keeperApi.services.deregister(service.name),
+    mutationFn: () => keeperApi.services.deregister(service.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services.list'] });
       onClose();
@@ -39,7 +41,7 @@ export function DeregisterServiceModal({ open, service, onClose }: Props) {
   return (
     <Modal
       open={open}
-      title={t('forms:deregisterServiceTitle', { name: service.name })}
+      title={t('forms:deregisterServiceTitle', { name: service.id })}
       onClose={close}
       footer={
         <>
@@ -71,7 +73,7 @@ export function DeregisterServiceModal({ open, service, onClose }: Props) {
           marginBottom: 12,
         }}
       >
-        {t('admin:svcDeregisterRecordPrefix')} <strong>{service.name}</strong> {t('admin:svcDeregisterWarn')}{' '}
+        {t('admin:svcDeregisterRecordPrefix')} <strong>{service.id}</strong> {t('admin:svcDeregisterWarn')}{' '}
         <span className="mono">{service.git}</span> {t('admin:svcDeregisterWarn2')}
       </div>
       {serverError ? (

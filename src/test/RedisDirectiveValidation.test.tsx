@@ -317,14 +317,14 @@ describe('NIM-76 #7 day-2 update_config takes the version from state.redis_versi
         return json({ service: 'redis', ref: 'main', scenarios });
       }
       if (url.includes('/v1/services')) {
-        return json({ items: [{ name: 'redis', ref: 'main' }], offset: 0, limit: 50, total: 1 });
+        return json({ items: [{ id: 'redis', ref: 'main' }], offset: 0, limit: 50, total: 1 });
       }
       // single incarnation GET — state.redis_version = 8.2.2
       if (/\/v1\/incarnations\/redis-prod(\?|$)/.test(url)) {
-        return json({ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, status: 'ready', state: { redis_version: '8.2.2' }, status_details: {}, created_at: '', updated_at: '' });
+        return json({ id: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, status: 'ready', state: { redis_version: '8.2.2' }, status_details: {}, created_at: '', updated_at: '' });
       }
       if (url.includes('/v1/incarnations')) {
-        return json({ items: [{ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_at: '', updated_at: '' }], offset: 0, limit: 50, total: 1 });
+        return json({ items: [{ id: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_at: '', updated_at: '' }], offset: 0, limit: 50, total: 1 });
       }
       return new Response('{}', { status: 404 });
     }) as typeof fetch);
@@ -405,7 +405,7 @@ describe('NIM-76 FIX-2 day-2 fan-out over >1 incarnation → graceful', () => {
         return json({ service: 'redis', ref: 'main', scenarios });
       }
       if (url.includes('/v1/services')) {
-        return json({ items: [{ name: 'redis', ref: 'main' }], offset: 0, limit: 50, total: 1 });
+        return json({ items: [{ id: 'redis', ref: 'main' }], offset: 0, limit: 50, total: 1 });
       }
       if (url.includes('/v1/incarnations')) {
         return json({

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Pager } from '../../components/primitives';
+import { EntityIdCell } from '../../components/EntityIdCell';
 import { formatSubject } from './subject';
 import styles from '../common.module.css';
 
@@ -76,7 +77,7 @@ export function DecreesList() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>{t('colName')}</th>
+                <th>{t('colLabel')}</th>
                 <th>{t('common:colOnBeacon')}</th>
                 <th>{t('colSubject')}</th>
                 <th>{t('common:colWhereCel')}</th>
@@ -88,9 +89,9 @@ export function DecreesList() {
             </thead>
             <tbody>
               {items.map((d) => (
-                <tr key={d.name}>
+                <tr key={d.id}>
                   <td>
-                    <Link to={`/decrees/${encodeURIComponent(d.name)}`}>{d.name}</Link>
+                    <EntityIdCell entity={d} to={`/decrees/${encodeURIComponent(d.id)}`} />
                   </td>
                   <td className="mono">{d.on_beacon}</td>
                   <td className="mono">{formatSubject(d.subject) ?? t('beacons:subjectNone')}</td>

@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, X } from 'lucide-react';
+import { applyLabelAfterCreate } from '../../api/applyLabel';
+import { canonicalJson } from '../../api/canonicalJson';
 import { keeperApi, type Tiding, type TidingCreateRequest, type TidingUpdateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Modal, Button, Input } from '../../components/primitives';
+import { entityCaption } from '../../components/entityCaption';
 import { useEventTypeCatalog } from './eventTypes';
 import styles from '../common.module.css';
 
@@ -124,7 +127,10 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
   const tc = (k: string) => t(`common:${k}`);
   const qc = useQueryClient();
 
-  const [name, setName] = useState('');
+  const [id, setId] = useState('');
+  const [label, setLabel] = useState('');
+  // Set when the entity was created but its caption write was refused.
+  const [labelNotice, setLabelNotice] = useState<string | null>(null);
   const [herald, setHerald] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [customType, setCustomType] = useState('');
@@ -148,7 +154,8 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
   useEffect(() => {
     if (!open) return;
     if (editing) {
-      setName(editing.name);
+      setId(editing.id);
+      setLabel(editing.label ?? '');
       setHerald(editing.herald);
       setSelectedTypes(editing.event_types ?? []);
       setOnlyFailures(editing.only_failures ?? false);
@@ -160,7 +167,9 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
       setAnnotationPairs(kvFromRecord(editing.annotations as Record<string, unknown> | null | undefined));
       setProjectionPaths(editing.projection ?? []);
     } else {
-      setName('');
+      setId('');
+      setLabel('');
+      setLabelNotice(null);
       setHerald('');
       setSelectedTypes([]);
       setCustomType('');
@@ -176,18 +185,60 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
   }, [open, editing, initialCadence]);
 
   const createMu = useMutation({
-    mutationFn: (body: TidingCreateRequest) => keeperApi.tidings.create(body),
-    onSuccess: () => {
+    // The caption travels on its own endpoint after the create: the keeper accepts
+    // `label` in the create body and drops it (see applyLabelAfterCreate).
+    mutationFn: async (body: TidingCreateRequest) => {
+      const td = await keeperApi.tidings.create(body);
+      return applyLabelAfterCreate((b) => keeperApi.tidings.setLabel(td.id, b), label);
+    },
+    onSuccess: (labelError) => {
       qc.invalidateQueries({ queryKey: ['tidings.list'] });
+      if (labelError) {
+        setLabelNotice(labelError);
+        return;
+      }
       onClose();
     },
   });
 
+  // The update body the record as loaded would produce — used only to tell a
+  // caption-only save from a real edit. Mirrors the shape built in handleSubmit.
+  function bodyFromEditing(): TidingUpdateRequest | null {
+    if (!editing) return null;
+    const annotations = editing.annotations as TidingUpdateRequest['annotations'];
+    const projection = editing.projection ?? [];
+    return {
+      herald: editing.herald,
+      event_types: editing.event_types ?? [],
+      only_failures: editing.only_failures ?? false,
+      only_changes: editing.only_changes ?? false,
+      incarnation: editing.incarnation || undefined,
+      cadence: editing.cadence || undefined,
+      task: editing.task || undefined,
+      enabled: editing.enabled,
+      ...(annotations && Object.keys(annotations).length > 0 ? { annotations } : {}),
+      ...(projection.length > 0 ? { projection } : {}),
+    };
+  }
+
   const updateMu = useMutation({
-    mutationFn: (body: TidingUpdateRequest) => keeperApi.tidings.update(editing!.name, body),
+    // TidingUpdateRequest replaces the rule and carries no label, so a changed
+    // caption is a second request against PUT /v1/tidings/{id}/label.
+    mutationFn: async (body: TidingUpdateRequest) => {
+      // Skip the replace when only the caption moved: PUT replaces the rule and
+      // writes a `tiding.updated` audit event. Anything this form cannot
+      // round-trip compares unequal and still sends.
+      if (canonicalJson(body) !== canonicalJson(bodyFromEditing())) {
+        await keeperApi.tidings.update(editing!.id, body);
+      }
+      const next = label.trim();
+      if (next !== (editing!.label ?? '')) {
+        await keeperApi.tidings.setLabel(editing!.id, { label: next ? next : null });
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tidings.list'] });
-      qc.invalidateQueries({ queryKey: ['tiding.get', editing!.name] });
+      qc.invalidateQueries({ queryKey: ['tiding.get', editing!.id] });
       onClose();
     },
   });
@@ -236,7 +287,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
       updateMu.mutate(body);
     } else {
       const body: TidingCreateRequest = {
-        name,
+        id,
         herald,
         event_types: finalTypes,
         only_failures: onlyFailures,
@@ -260,22 +311,43 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {!editing && (
+        {editing ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={styles.metaKey}>{t('notifications:tidingFieldName')} *</span>
+            <span className={styles.metaKey}>{t('common:colId')}</span>
+            <Input data-testid="tiding-id-input" value={editing.id} readOnly mono />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {t('notifications:tidingFieldIdImmutableHint')}
+            </span>
+          </label>
+        ) : (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className={styles.metaKey}>{t('common:colId')} *</span>
             <Input
-              data-testid="tiding-name-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              data-testid="tiding-id-input"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
               placeholder="my-run-alerts"
               required
               pattern="^[a-z0-9-]{1,63}$"
             />
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              {t('notifications:tidingFieldNameHint')}
+              {t('notifications:tidingFieldIdHint')}
             </span>
           </label>
         )}
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className={styles.metaKey}>{t('common:colLabel')}</span>
+          <Input
+            data-testid="tiding-label-input"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="My run alerts"
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {t('notifications:tidingFieldLabelHint')}
+          </span>
+        </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className={styles.metaKey}>{t('notifications:tidingFieldHerald')} *</span>
@@ -293,7 +365,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           >
             <option value="">{t('notifications:tidingFieldHeraldPlaceholder')}</option>
             {heraldItems.map((h) => (
-              <option key={h.name} value={h.name}>{h.name}</option>
+              <option key={h.id} value={h.id}>{entityCaption(h)}</option>
             ))}
           </select>
         </label>
@@ -491,6 +563,11 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           {t('notifications:tidingFieldEnabled')}
         </label>
 
+        {labelNotice ? (
+          <div role="alert" className={styles.errorBox} data-testid="tiding-label-notice">
+            {labelNotice}
+          </div>
+        ) : null}
         {error ? (
           <div role="alert" className={styles.errorBox}>
             {error instanceof ApiError
@@ -506,7 +583,7 @@ export function TidingModal({ open, onClose, editing, initialCadence }: Props) {
           <Button
             variant="primary"
             type="submit"
-            disabled={isPending || !herald || selectedTypes.length === 0}
+            disabled={Boolean(labelNotice) || isPending || !herald || selectedTypes.length === 0}
           >
             {editing ? tc('save') : tc('create')}
           </Button>

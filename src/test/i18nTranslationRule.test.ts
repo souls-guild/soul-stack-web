@@ -48,7 +48,7 @@ const ENTITY_NAMES = [
 const TECHNICAL = [
   'admin:svcTabRefs', 'admin:svcMetaGit', 'admin:svcMetaRef', 'admin:svcColGit',
   'admin:svcColRef', 'admin:svcRefsColCommit', 'admin:svcIncColRef', 'admin:svcRefsTitle',
-  'admin:pluginNamespaceHint', 'admin:pluginErrKebab', 'admin:pluginFieldRef',
+  'admin:pluginErrKebab', 'admin:pluginFieldRef',
   'admin:rbacErrRoleNamePattern',
   'admin:rbacScopeKey_incarnation', 'admin:rbacScopeKey_service', 'admin:rbacScopeKey_coven',
   'admin:rbacScopeKey_host', 'admin:auditExpand', 'admin:auditArchonPrefix', 'admin:helpMcpTitle',
@@ -79,10 +79,11 @@ const TECHNICAL = [
 
 // Example values shown inside inputs — samples of real data, not prose.
 const PLACEHOLDERS = [
-  'admin:svcNamePlaceholder', 'admin:svcNamePlaceholderRedis', 'admin:svcRefPlaceholder',
+  'admin:svcNamePlaceholder', 'admin:svcIdPlaceholderRedis', 'admin:svcLabelPlaceholderRedis',
+  'admin:svcRefPlaceholder',
   'admin:svcRefPlaceholderMain', 'admin:svcRefreshPlaceholder', 'admin:svcGitPlaceholder',
   'admin:pluginNamePlaceholder', 'admin:pluginRegisterCrumbsRefPlaceholder',
-  'admin:pluginNamespacePlaceholder', 'admin:pluginNamePlaceholderAcme', 'admin:pluginRefPlaceholder',
+  'admin:pluginAliasPlaceholder', 'admin:pluginSourcePlaceholder', 'admin:pluginRefPlaceholder',
   'admin:rbacRoleNamePlaceholder', 'admin:rbacScopeTraitKeyPlaceholder',
   'admin:rbacScopeTraitValuePlaceholder', 'admin:auditTypePlaceholder',
   'admin:auditArchonAidPlaceholder', 'admin:auditCorrelationPlaceholder',
@@ -166,7 +167,7 @@ const WIRE_FIELD_LABELS = [
 const TECHNICAL_A11Y_NAMES = [
   'SID', 'batch_mode_barrier', 'batch_mode_window', 'cleanup_stale_versions',
   'correlation_id', 'dry_run', 'enabled-only', 'group-roles', 'provisioning-policy',
-  'require_alive', 'schedule_kind_cron', 'schedule_kind_interval', 'sha256',
+  'require_alive', 'schedule_kind_cron', 'schedule_kind_interval',
 ];
 
 const LITERAL_PROPER_NAMES = ['Soul Stack'];

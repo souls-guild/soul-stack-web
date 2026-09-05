@@ -2,16 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
-import { keeperApi, type IncarnationResolveNameReply } from '../../api/keeper';
+import { keeperApi, type IncarnationResolveIDReply } from '../../api/keeper';
 
 /**
- * Live preview of the incarnation name a create scenario composes from its input
+ * Live preview of the incarnation id a create scenario composes from its input
  * components. Stands where the Name field stands for a scenario that does NOT
- * compose — the operator does not type this name, so the form owes them a look at
- * it before the create makes it permanent (the name is the immutable primary key;
+ * compose — the operator does not type this id, so the form owes them a look at
+ * it before the create makes it permanent (the id is the immutable primary key;
  * a wrong one costs a destroy and a re-create).
  *
- * The name is NOT composed here. The keeper resolves it through the same code the
+ * The id is NOT composed here. The keeper resolves it through the same code the
  * create runs, because the template blocks are CEL and a second evaluator in the
  * browser would spell a number or a bool differently and show one identity while
  * the create made another. This component sends the input and renders the answer.
@@ -26,7 +26,7 @@ const NEAR_LIMIT_MARGIN = 8;
 /** Milliseconds of quiet before asking the keeper — one call per pause, not per key. */
 const DEBOUNCE_MS = 300;
 
-export interface ComposedNamePreviewProps {
+export interface ComposedIdPreviewProps {
   service: string;
   scenario: string;
   /** The create input as filled so far. Partial is the normal case. */
@@ -35,7 +35,7 @@ export interface ComposedNamePreviewProps {
   covens: string[];
 }
 
-export function ComposedNamePreview({ service, scenario, input, covens }: ComposedNamePreviewProps) {
+export function ComposedIdPreview({ service, scenario, input, covens }: ComposedIdPreviewProps) {
   const { t } = useTranslation();
 
   // Serialize the request into the query key. Sorting the input keys keeps the key
@@ -56,9 +56,9 @@ export function ComposedNamePreview({ service, scenario, input, covens }: Compos
   }, [requestKey]);
 
   const q = useQuery({
-    queryKey: ['incarnations.resolveName', settledKey],
+    queryKey: ['incarnations.resolveId', settledKey],
     queryFn: () =>
-      keeperApi.incarnations.resolveName({
+      keeperApi.incarnations.resolveId({
         service,
         create_scenario: scenario,
         input,
@@ -68,12 +68,12 @@ export function ComposedNamePreview({ service, scenario, input, covens }: Compos
     retry: false,
   });
 
-  const reply = q.data as IncarnationResolveNameReply | undefined;
+  const reply = q.data as IncarnationResolveIDReply | undefined;
   const stale = settledKey !== requestKey;
 
   return (
     <div
-      data-testid="composed-name-preview"
+      data-testid="composed-id-preview"
       style={{
         padding: '10px 12px',
         border: '1px solid var(--border)',
@@ -85,22 +85,22 @@ export function ComposedNamePreview({ service, scenario, input, covens }: Compos
       }}
     >
       <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-        {t('incarnations:composedNameLabel')}
+        {t('incarnations:composedIdLabel')}
       </span>
 
-      <ComposedNameValue reply={reply} error={q.error} loading={q.isLoading || stale} />
+      <ComposedIdValue reply={reply} error={q.error} loading={q.isLoading || stale} />
 
       <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
-        {t('incarnations:composedNameHint')}
+        {t('incarnations:composedIdHint')}
       </span>
     </div>
   );
 }
 
 /**
- * The answer line: the name plus whatever the operator has to know about it.
+ * The answer line: the id plus whatever the operator has to know about it.
  *
- * Every state renders the SAME three rows — name, counter, status — because this
+ * Every state renders the SAME three rows — id, counter, status — because this
  * panel sits above the rest of the form and updates on every keystroke. A row that
  * appears and disappears (a reason line, an availability line) shoves the fields
  * below it up and down while the operator is typing into them. So the rows are
@@ -112,12 +112,12 @@ export function ComposedNamePreview({ service, scenario, input, covens }: Compos
  * and wraps, and letting the panel grow by a line when it appears would be the same
  * jump in a smaller form.
  */
-function ComposedNameValue({
+function ComposedIdValue({
   reply,
   error,
   loading,
 }: {
-  reply: IncarnationResolveNameReply | undefined;
+  reply: IncarnationResolveIDReply | undefined;
   error: unknown;
   loading: boolean;
 }) {
@@ -135,7 +135,7 @@ function ComposedNameValue({
       </span>
 
       <span
-        data-testid="composed-name-counter"
+        data-testid="composed-id-counter"
         style={{ fontSize: 12, minHeight: 16, color: view.counterTone }}
       >
         {view.counter || '\u00a0'}
@@ -153,7 +153,7 @@ function ComposedNameValue({
 
 /** What the three rows say for the current reply. One place, so no state leaves a row stale. */
 function describe(
-  reply: IncarnationResolveNameReply | undefined,
+  reply: IncarnationResolveIDReply | undefined,
   error: unknown,
   loading: boolean,
   t: (key: string, opts?: Record<string, unknown>) => string,
@@ -161,68 +161,68 @@ function describe(
   const base = {
     value: '',
     valueTone: 'var(--text)',
-    valueTestId: 'composed-name-value',
+    valueTestId: 'composed-id-value',
     counter: '',
     counterTone: 'var(--text-faint)',
     status: '',
     statusTone: 'var(--text-muted)',
-    statusTestId: 'composed-name-status',
+    statusTestId: 'composed-id-status',
   };
 
-  // A refused or unreachable preview must say so rather than look like "no name
+  // A refused or unreachable preview must say so rather than look like "no id
   // yet": the operator would otherwise keep typing at a form that has stopped
-  // answering. A 403 is the create's own refusal arriving early — the composed name
+  // answering. A 403 is the create's own refusal arriving early — the composed id
   // or a declared coven is outside their scope — so its detail is the useful text.
   if (error) {
     return {
       ...base,
-      status: error instanceof ApiError && error.detail ? error.detail : t('incarnations:composedNameFailed'),
+      status: error instanceof ApiError && error.detail ? error.detail : t('incarnations:composedIdFailed'),
       statusTone: 'var(--danger)',
-      statusTestId: 'composed-name-error',
+      statusTestId: 'composed-id-error',
     };
   }
 
   if (loading || !reply) {
     return {
       ...base,
-      value: t('incarnations:composedNamePending'),
+      value: t('incarnations:composedIdPending'),
       valueTone: 'var(--text-faint)',
-      valueTestId: 'composed-name-pending',
+      valueTestId: 'composed-id-pending',
     };
   }
 
-  const { composed_name: name, length, max_length: max, valid, invalid_reason: reason } = reply;
+  const { composed_id: id, length, max_length: max, valid, invalid_reason: reason } = reply;
 
-  // Nothing composed yet — the operator has not filled the components the name is
+  // Nothing composed yet — the operator has not filled the components the id is
   // built from. Say which, in the keeper's words: an unexplained blank is exactly
   // what this preview exists to remove.
-  if (!valid && !name) {
+  if (!valid && !id) {
     return {
       ...base,
-      value: t('incarnations:composedNamePending'),
+      value: t('incarnations:composedIdPending'),
       valueTone: 'var(--text-faint)',
-      valueTestId: 'composed-name-pending',
+      valueTestId: 'composed-id-pending',
       status: reason,
-      statusTestId: 'composed-name-incomplete',
+      statusTestId: 'composed-id-incomplete',
     };
   }
 
   const nearLimit = valid && max > 0 && length > max - NEAR_LIMIT_MARGIN;
   const view = {
     ...base,
-    value: name,
+    value: id,
     valueTone: valid ? 'var(--text)' : 'var(--danger)',
     counter:
-      t('incarnations:composedNameCounter', { length, max }) +
-      (nearLimit ? ` — ${t('incarnations:composedNameNearLimit')}` : ''),
+      t('incarnations:composedIdCounter', { length, max }) +
+      (nearLimit ? ` — ${t('incarnations:composedIdNearLimit')}` : ''),
     counterTone: !valid || nearLimit ? 'var(--warning, #f59e0b)' : 'var(--text-faint)',
   };
 
   if (!valid) {
-    return { ...view, status: reason, statusTone: 'var(--danger)', statusTestId: 'composed-name-invalid' };
+    return { ...view, status: reason, statusTone: 'var(--danger)', statusTestId: 'composed-id-invalid' };
   }
   if (reply.available) {
-    return { ...view, status: t('incarnations:composedNameFree'), statusTone: 'var(--ok)', statusTestId: 'composed-name-free' };
+    return { ...view, status: t('incarnations:composedIdFree'), statusTone: 'var(--ok)', statusTestId: 'composed-id-free' };
   }
   // The occupying service is named only when the keeper sends it — it omits the
   // field for a caller who may not see that incarnation, and the form must not
@@ -230,10 +230,10 @@ function describe(
   return {
     ...view,
     status: reply.taken_by_service
-      ? t('incarnations:composedNameTakenBy', { service: reply.taken_by_service })
-      : t('incarnations:composedNameTaken'),
+      ? t('incarnations:composedIdTakenBy', { service: reply.taken_by_service })
+      : t('incarnations:composedIdTaken'),
     statusTone: 'var(--danger)',
-    statusTestId: 'composed-name-taken',
+    statusTestId: 'composed-id-taken',
   };
 }
 

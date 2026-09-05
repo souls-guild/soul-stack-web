@@ -23,13 +23,12 @@ const EVENT_TYPES_CATALOG = {
     { name: 'cadence.*' },
   ],
   point_events: [
-    { name: 'incarnation.drift_checked' },
     { name: 'incarnation.run_completed' },
   ],
 };
 
 const HERALDS_REPLY = {
-  items: [{ name: 'ops-webhook', type: 'webhook', config: { url: 'https://example.com' }, secret_ref: null, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), created_by_aid: 'archon-alice' }],
+  items: [{ id: 'ops-webhook', type: 'webhook', config: { url: 'https://example.com' }, secret_ref: null, enabled: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), created_by_aid: 'archon-alice' }],
   offset: 0, limit: 200, total: 1,
 };
 
@@ -151,7 +150,7 @@ describe('EventTypeCatalog — fetch from backend (ADR-042)', () => {
       if (url.startsWith('/v1/tidings') && method === 'GET') return json(TIDINGS_REPLY);
       if (url === '/v1/tidings' && method === 'POST') {
         calls.push(`${method} ${url} BODY:${JSON.stringify(body)}`);
-        return json({ name: 'area-t', herald: 'ops-webhook', event_types: ['scenario_run.*'], only_failures: false, only_changes: false, enabled: true, ephemeral: false, voyage_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, 201);
+        return json({ id: 'area-t', herald: 'ops-webhook', event_types: ['scenario_run.*'], only_failures: false, only_changes: false, enabled: true, ephemeral: false, voyage_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, 201);
       }
       return new Response('{}', { status: 599 });
     });
@@ -170,7 +169,7 @@ describe('EventTypeCatalog — fetch from backend (ADR-042)', () => {
       expect(chip.textContent).toBe('scenario_run.*');
     });
 
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'area-t');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'area-t');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-scenario_run.*'));
@@ -202,7 +201,7 @@ describe('EventTypeCatalog — fetch from backend (ADR-042)', () => {
       if (url.startsWith('/v1/tidings') && method === 'GET') return json(TIDINGS_REPLY);
       if (url === '/v1/tidings' && method === 'POST') {
         calls.push(`${method} ${url} BODY:${JSON.stringify(body)}`);
-        return json({ name: 'new-t', herald: 'ops-webhook', event_types: ['voyage.*'], only_failures: false, only_changes: false, enabled: true, ephemeral: false, voyage_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, 201);
+        return json({ id: 'new-t', herald: 'ops-webhook', event_types: ['voyage.*'], only_failures: false, only_changes: false, enabled: true, ephemeral: false, voyage_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, 201);
       }
       return new Response('{}', { status: 599 });
     });
@@ -214,7 +213,7 @@ describe('EventTypeCatalog — fetch from backend (ADR-042)', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'my-t');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'my-t');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
 

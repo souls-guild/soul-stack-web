@@ -10,9 +10,8 @@ const TASKS: RunTaskView[] = [
   {
     plan_index: 0,
     passage: 0,
-    name: 'Install redis package',
+    id: 'Install redis package',
     module: 'core.pkg.installed',
-    no_log: false,
     params: { name: 'redis', version: '7.2.4' },
     hosts: [
       {
@@ -27,9 +26,8 @@ const TASKS: RunTaskView[] = [
   {
     plan_index: 1,
     passage: 0,
-    name: 'Configure sentinel',
+    id: 'Configure sentinel',
     module: 'core.file.rendered',
-    no_log: false,
     params: { path: '/etc/redis/sentinel.conf' },
     hosts: [
       { sid: 'redis-1.local', status: 'TASK_STATUS_OK', output: { changed: false } },
@@ -79,43 +77,45 @@ describe('RunTasks (Schema-2 master-detail, NIM-37)', () => {
     expect(screen.getByTestId('run-task-host-redis-2.local')).toBeInTheDocument();
   });
 
-  it('no_log task: input + per-host output + error.message are hidden (no leak), code/module visible', () => {
-    const noLog: RunTaskView[] = [
+  // The masking boundary moved. `no_log:` was retired by NIM-698 in favour of a
+  // module declaring `secret: true` on an output field, and the keeper masks the
+  // observable copy before serving it (`redactSecretOutput`). So the guard here is
+  // no longer "the UI hides it" — the UI cannot, the field is gone from the wire —
+  // but "the UI shows what arrived and adds no masking of its own". A second,
+  // client-side rule would only be able to hide non-secrets, and would hide the
+  // fact that an unmasked value got through.
+  it('renders a server-masked output as it arrived, and masks nothing itself', () => {
+    const masked: RunTaskView[] = [
       {
         plan_index: 0,
         passage: 0,
-        name: 'Write secret',
+        id: 'Write secret',
         module: 'core.secret.written',
-        no_log: true,
         params: { key: 'db_password' },
         hosts: [
-          { sid: 'h1.local', status: 'TASK_STATUS_CHANGED', output: { changed: true, stdout: 'SUPERSECRET' } },
+          { sid: 'h1.local', status: 'TASK_STATUS_CHANGED', output: { changed: true, token: '***MASKED***' } },
           {
             sid: 'h2.local',
             status: 'TASK_STATUS_FAILED',
-            output: { stderr: 'LEAKED-STDERR' },
-            error: { code: 'render_failed', module: 'core.secret.written', message: 'secret=hunter2 leaked' },
+            output: { stderr: 'render failed' },
+            error: { code: 'render_failed', module: 'core.secret.written', message: 'template lookup failed' },
           },
         ],
       },
     ];
-    renderWithProviders(<RunTasks tasks={noLog} />, '/');
+    renderWithProviders(<RunTasks tasks={masked} />, '/');
 
-    // Input is hidden, secret value does not leak into the params block.
-    expect(screen.getByTestId('run-task-params')).toHaveTextContent('hidden (no_log)');
-    expect(screen.queryByText('db_password')).not.toBeInTheDocument();
+    // The keeper's placeholder reaches the operator unchanged.
+    expect(screen.getByTestId('run-task-output-h1.local')).toHaveTextContent('***MASKED***');
+    // What the keeper did not mask is shown, rather than blanked by a stale rule.
+    expect(screen.getByTestId('run-task-params')).toHaveTextContent('db_password');
+    expect(screen.getByTestId('run-task-output-h2.local')).toHaveTextContent('render failed');
 
-    // Per-host output is hidden for both hosts; register_data/stderr not in DOM.
-    expect(screen.getByTestId('run-task-output-h1.local')).toHaveTextContent('hidden (no_log)');
-    expect(screen.getByTestId('run-task-output-h2.local')).toHaveTextContent('hidden (no_log)');
-    expect(screen.queryByText(/SUPERSECRET/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/LEAKED-STDERR/)).not.toBeInTheDocument();
-
-    // Error: code + module visible, message (may carry a secret) is hidden.
+    // Error: module plus the message, which is no longer suppressed — nothing on
+    // the wire says this task was secret. The code is the fallback the cell shows
+    // when there is no message, so it does not appear alongside one.
     const err = screen.getByTestId('run-task-error-h2.local');
-    expect(err).toHaveTextContent('render_failed');
-    expect(err).toHaveTextContent('core.secret.written');
-    expect(screen.queryByText(/hunter2/)).not.toBeInTheDocument();
+    expect(err).toHaveTextContent('core.secret.written: template lookup failed');
   });
 
   it('output object: per-host output renders as key→value (exit_code visible), empty fields hidden', async () => {
@@ -135,7 +135,7 @@ describe('RunTasks (Schema-2 master-detail, NIM-37)', () => {
 
   it('task with no hosts (null) does not crash rendering', () => {
     const noHosts: RunTaskView[] = [
-      { plan_index: 0, passage: 0, name: 'No hosts task', module: 'core.noop', no_log: false, hosts: null },
+      { plan_index: 0, passage: 0, id: 'No hosts task', module: 'core.noop', hosts: null },
     ];
     renderWithProviders(<RunTasks tasks={noHosts} />, '/');
     expect(screen.getByTestId('run-task-detail')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('RunTasks (Schema-2 master-detail, NIM-37)', () => {
 
   it('task with no params → «no data»', () => {
     const noParams: RunTaskView[] = [
-      { plan_index: 0, passage: 0, name: 'Noop', module: 'core.noop', no_log: false, hosts: [{ sid: 'h1.local', status: 'TASK_STATUS_OK' }] },
+      { plan_index: 0, passage: 0, id: 'Noop', module: 'core.noop', hosts: [{ sid: 'h1.local', status: 'TASK_STATUS_OK' }] },
     ];
     renderWithProviders(<RunTasks tasks={noParams} />, '/');
     expect(screen.getByTestId('run-task-params')).toHaveTextContent('no data');

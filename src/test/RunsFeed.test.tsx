@@ -115,8 +115,8 @@ const EMPTY = { items: [], offset: 0, limit: 50, total: 0 };
 // Service catalog (NIM-42 Service filter for Scenario) — GET /v1/services.
 const SERVICES = {
   items: [
-    { name: 'redis', git: 'https://example.test/redis.git', ref: 'main', created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z' },
-    { name: 'postgres', git: 'https://example.test/postgres.git', ref: 'main', created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z' },
+    { id: 'redis', git: 'https://example.test/redis.git', ref: 'main', created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z' },
+    { id: 'postgres', git: 'https://example.test/postgres.git', ref: 'main', created_at: '2026-05-01T00:00:00Z', updated_at: '2026-05-01T00:00:00Z' },
   ],
 };
 

@@ -11,6 +11,8 @@ import {
 } from '../../api/keeper';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
+import { EntityIdCell } from '../../components/EntityIdCell';
+import { entityCaption } from '../../components/entityCaption';
 import { ApiError } from '../../api/client';
 import i18n from '../../i18n';
 import { StateFilterPanel } from './StateFilterPanel';
@@ -37,7 +39,9 @@ const INCARNATION_STATUSES = [
 
 const COVEN_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-type SortKey = 'created_at' | 'name' | 'status';
+// The keeper's sort whitelist: created_at | id | status | service | state.<field>.
+// `name` is not on it and earns a 422, which replaces the table with an error banner.
+type SortKey = 'created_at' | 'id' | 'status';
 type SortDir = 'asc' | 'desc';
 
 function formatTimeAgo(iso: string | null | undefined): string {
@@ -162,13 +166,14 @@ export function IncarnationsList() {
     setStateFieldErrors(errors);
   }, [stateFilter422, activePredicates]);
 
-  // Client-side search (by name) + coven/traits multiselect (AND). Sort is
-  // server-side; items arrive already sorted, extra filters don't change order.
+  // Client-side search (over both halves of the identity) + coven/traits
+  // multiselect (AND). Sort is server-side; items arrive already sorted, extra
+  // filters don't change order.
   const filtered = useMemo(() => {
     const items = q.data?.items ?? [];
     const term = search.trim().toLowerCase();
     return items.filter((it) => {
-      if (term && !it.name.toLowerCase().includes(term)) return false;
+      if (term && !`${it.id} ${it.label ?? ''}`.toLowerCase().includes(term)) return false;
       if (!matchesCovenTraitsFilter(it, covenTraitsFilter)) return false;
       return true;
     });
@@ -199,7 +204,7 @@ export function IncarnationsList() {
 
   function handleRunSet() {
     if (!canRunSet || !q.data) return;
-    const names = (q.data.items ?? []).map((it: IncarnationGetReply) => it.name);
+    const names = (q.data.items ?? []).map((it: IncarnationGetReply) => it.id);
     const regex = buildSnapshotRegex(names);
     // Pass to RunWizard via incarnation_regex (raw ready-made regex, no re-escaping).
     // We do NOT use incarnation (single name) — that's a different param, RunWizard would
@@ -242,7 +247,7 @@ export function IncarnationsList() {
       {/* Primary filters */}
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>{t('incarnations:filterSearchByName')}</div>
+          <div className={styles.metaKey}>{t('incarnations:filterSearchByIdOrLabel')}</div>
           <input
             type="text"
             value={search}
@@ -278,8 +283,8 @@ export function IncarnationsList() {
           >
             <option value="">{t('incarnations:filterAnyOption')}</option>
             {serviceItems.map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.name}
+              <option key={s.id} value={s.id}>
+                {entityCaption(s)}
               </option>
             ))}
           </select>
@@ -397,8 +402,13 @@ export function IncarnationsList() {
           <thead>
             <tr>
               <th>
-                <button type="button" onClick={() => toggleSort('name')} style={{ all: 'unset', cursor: 'pointer' }}>
-                  {t('incarnations:colName')}{sortArrow('name')}
+                <button
+                  type="button"
+                  onClick={() => toggleSort('id')}
+                  style={{ all: 'unset', cursor: 'pointer' }}
+                  title={t('incarnations:sortsByIdHint')}
+                >
+                  {t('common:colLabel')}{sortArrow('id')}
                 </button>
               </th>
               <th>{t('incarnations:colService')}</th>
@@ -418,9 +428,9 @@ export function IncarnationsList() {
           </thead>
           <tbody>
             {filtered.map((row) => (
-              <tr key={row.name}>
+              <tr key={row.id}>
                 <td>
-                  <Link to={`/incarnations/${encodeURIComponent(row.name)}`}>{row.name}</Link>
+                  <EntityIdCell entity={row} to={`/incarnations/${encodeURIComponent(row.id)}`} />
                 </td>
                 <td className="mono">
                   <Link

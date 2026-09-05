@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type Tiding } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Modal } from '../../components/primitives';
+import { EntityIdCell } from '../../components/EntityIdCell';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { TidingModal } from './TidingModal';
 import styles from '../common.module.css';
@@ -101,7 +102,7 @@ export function TidingsTab() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>{t('tidingColName')}</th>
+              <th>{t('common:colLabel')}</th>
               <th>{t('tidingColHerald')}</th>
               <th>{t('tidingColEventTypes')}</th>
               <th>{t('tidingColFilters')}</th>
@@ -112,19 +113,14 @@ export function TidingsTab() {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.name}>
+              <tr key={item.id}>
                 <td>
-                  <Link
-                    to={`/notifications/tidings/${encodeURIComponent(item.name)}`}
-                    data-testid={`tiding-link-${item.name}`}
-                  >
-                    {item.name}
-                  </Link>
+                  <EntityIdCell entity={item} to={`/notifications/tidings/${encodeURIComponent(item.id)}`} />
                 </td>
                 <td>
                   <Link
                     to={`/notifications/heralds/${encodeURIComponent(item.herald)}`}
-                    data-testid={`tiding-herald-link-${item.name}`}
+                    data-testid={`tiding-herald-link-${item.id}`}
                     style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
                   >
                     {item.herald}
@@ -154,7 +150,7 @@ export function TidingsTab() {
                   <Button
                     variant="ghost"
                     type="button"
-                    data-testid={`tiding-edit-btn-${item.name}`}
+                    data-testid={`tiding-edit-btn-${item.id}`}
                     disabled={!canUpdate}
                     title={!canUpdate ? 'tiding.update' : undefined}
                     onClick={() => setEditing(item)}
@@ -165,7 +161,7 @@ export function TidingsTab() {
                   <Button
                     variant="ghost"
                     type="button"
-                    data-testid={`tiding-delete-btn-${item.name}`}
+                    data-testid={`tiding-delete-btn-${item.id}`}
                     disabled={!canDelete}
                     title={!canDelete ? 'tiding.delete' : undefined}
                     onClick={() => setDeleteTarget(item)}
@@ -190,7 +186,7 @@ export function TidingsTab() {
         onClose={() => setDeleteTarget(null)}
       >
         <p style={{ margin: 0, fontSize: 13 }}>
-          {t('tidingDeleteConfirm', { name: deleteTarget?.name ?? '' })}
+          {t('tidingDeleteConfirm', { name: deleteTarget?.id ?? '' })}
         </p>
         <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
           <Button variant="ghost" type="button" onClick={() => setDeleteTarget(null)} disabled={deleteMu.isPending}>
@@ -201,7 +197,7 @@ export function TidingsTab() {
             type="button"
             disabled={deleteMu.isPending}
             data-testid="tiding-delete-confirm-btn"
-            onClick={() => deleteTarget && deleteMu.mutate(deleteTarget.name)}
+            onClick={() => deleteTarget && deleteMu.mutate(deleteTarget.id)}
           >
             {t('common:delete')}
           </Button>

@@ -18,7 +18,7 @@ describe('IncarnationsList', () => {
         body: {
           items: [
             {
-              name: 'redis-prod',
+              id: 'redis-prod',
               service: 'redis',
               service_version: 'v2.0.0',
               state_schema_version: 3,
@@ -29,7 +29,7 @@ describe('IncarnationsList', () => {
               updated_at: '2026-05-25T12:00:00Z',
             },
             {
-              name: 'postgres-stage',
+              id: 'postgres-stage',
               service: 'postgres',
               service_version: 'main',
               state_schema_version: 1,
@@ -126,7 +126,7 @@ describe('IncarnationsList', () => {
         body: {
           items: [
             {
-              name: 'redis-prod',
+              id: 'redis-prod',
               service: 'redis',
               service_version: 'v2.0.0',
               state_schema_version: 3,
@@ -137,7 +137,7 @@ describe('IncarnationsList', () => {
               updated_at: '2026-05-25T12:00:00Z',
             },
             {
-              name: 'postgres-stage',
+              id: 'postgres-stage',
               service: 'postgres',
               service_version: 'main',
               state_schema_version: 1,
@@ -174,7 +174,7 @@ describe('IncarnationsList', () => {
         body: {
           items: [
             {
-              name: 'redis-prod',
+              id: 'redis-prod',
               service: 'redis',
               service_version: 'v2.0.0',
               state_schema_version: 3,
@@ -224,7 +224,7 @@ describe('IncarnationsList', () => {
         body: {
           items: [
             {
-              name: 'redis-prod',
+              id: 'redis-prod',
               service: 'redis',
               service_version: 'v2.0.0',
               state_schema_version: 3,
@@ -236,7 +236,7 @@ describe('IncarnationsList', () => {
               updated_at: '2026-05-25T12:00:00Z',
             },
             {
-              name: 'postgres-stage',
+              id: 'postgres-stage',
               service: 'postgres',
               service_version: 'main',
               state_schema_version: 1,
@@ -274,7 +274,7 @@ describe('IncarnationsList', () => {
         body: {
           items: [
             {
-              name: 'redis-prod',
+              id: 'redis-prod',
               service: 'redis',
               service_version: 'v2.0.0',
               state_schema_version: 3,
@@ -286,7 +286,7 @@ describe('IncarnationsList', () => {
               updated_at: '2026-05-25T12:00:00Z',
             },
             {
-              name: 'redis-stage',
+              id: 'redis-stage',
               service: 'redis',
               service_version: 'v2.0.0',
               state_schema_version: 3,
@@ -298,7 +298,7 @@ describe('IncarnationsList', () => {
               updated_at: '2026-05-25T12:00:00Z',
             },
             {
-              name: 'postgres-stage',
+              id: 'postgres-stage',
               service: 'postgres',
               service_version: 'main',
               state_schema_version: 1,
@@ -365,7 +365,7 @@ describe('IncarnationsList', () => {
         body: {
           items: [
             {
-              name: 'nim445-fixture',
+              id: 'nim445-fixture',
               service: 'hello-world',
               service_version: 'main',
               state_schema_version: 1,
@@ -385,7 +385,7 @@ describe('IncarnationsList', () => {
               },
             },
             {
-              name: 'postgres-stage',
+              id: 'postgres-stage',
               service: 'postgres',
               service_version: 'main',
               state_schema_version: 1,
@@ -421,7 +421,7 @@ describe('IncarnationsList', () => {
     // A count survives both: a seventh column is a seventh column whatever it
     // renders and whatever it is called.
     const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent?.trim() ?? '');
-    expect(headers).toEqual(['Name', 'Service', 'Status', 'Covens', 'Traits', 'Created ↓']);
+    expect(headers).toEqual(['Label', 'Service', 'Status', 'Covens', 'Traits', 'Created ↓']);
     for (const row of within(table).getAllByRole('row').slice(1)) {
       expect(within(row).getAllByRole('cell')).toHaveLength(headers.length);
     }

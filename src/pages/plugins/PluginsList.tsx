@@ -9,13 +9,11 @@ import { isSigilDisabled } from './sigilUtils';
 import { Badge, Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
-// Known Sigil registry namespaces. NOT taken from the vendored /v1/plugins/sigils
-// schema description, which still says `cloud/ssh/mod`: the engine rebuilt that
-// registry and the vendored copy has not caught up (deferred, see NIM-762).
-// `mod` = SoulModule + soul_beacon, `ssh` = SshProvider. There is no `cloud`
-// namespace: the CloudDriver contract is gone (NIM-761) and a cloud driver is
-// now an ordinary SoulModule declaring `side: keeper`, so it registers as `mod`.
-const KNOWN_NAMESPACES = ['mod', 'ssh'] as const;
+// A grant covers a release, and a release publishes one artifact per platform, so
+// `kind` (how the plugin arrives) replaced the old namespace chips: namespaces are
+// gone from the record entirely, and the address level they used to occupy is now
+// the registration alias.
+const KINDS = ['git', 'artifact'] as const;
 
 type StatusFilter = '' | 'active' | 'revoked';
 
@@ -25,7 +23,7 @@ function statusOf(row: PluginSigilView): 'active' | 'revoked' {
 
 export function PluginsList() {
   const { t } = useTranslation();
-  const [namespace, setNamespace] = useState<string>('');
+  const [kind, setKind] = useState<string>('');
   const [status, setStatus] = useState<StatusFilter>('');
   const [search, setSearch] = useState('');
 
@@ -36,23 +34,17 @@ export function PluginsList() {
 
   const items = useMemo<PluginSigilView[]>(() => q.data?.items ?? [], [q.data]);
 
-  // Unique namespaces from the response + known ones (in case there's nothing yet,
-  // chips are still shown — so it's visible which ones exist).
-  const allNamespaces = useMemo<string[]>(() => {
-    const set = new Set<string>(KNOWN_NAMESPACES);
-    for (const it of items) set.add(it.namespace);
-    return [...set].sort();
-  }, [items]);
-
   const filtered = useMemo<PluginSigilView[]>(() => {
     const s = search.trim().toLowerCase();
     return items.filter((it) => {
-      if (namespace && it.namespace !== namespace) return false;
+      if (kind && it.kind !== kind) return false;
       if (status && statusOf(it) !== status) return false;
-      if (s && !it.name.toLowerCase().includes(s)) return false;
+      // Match the alias or the source: the operator may remember either the name
+      // they registered it under or the repository it comes from.
+      if (s && !`${it.alias} ${it.source}`.toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [items, namespace, status, search]);
+  }, [items, kind, status, search]);
 
   return (
     <div className={styles.page}>
@@ -75,25 +67,25 @@ export function PluginsList() {
 
       <div className={styles.filters}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span className={styles.metaKey}>{t('common:colNamespace')}</span>
+          <span className={styles.metaKey}>{t('common:colKind')}</span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => setNamespace('')}
-              aria-pressed={namespace === ''}
-              style={chipStyle(namespace === '')}
+              onClick={() => setKind('')}
+              aria-pressed={kind === ''}
+              style={chipStyle(kind === '')}
             >
               all
             </button>
-            {allNamespaces.map((ns) => (
+            {KINDS.map((k) => (
               <button
-                key={ns}
+                key={k}
                 type="button"
-                onClick={() => setNamespace(ns)}
-                aria-pressed={namespace === ns}
-                style={chipStyle(namespace === ns)}
+                onClick={() => setKind(k)}
+                aria-pressed={kind === k}
+                style={chipStyle(kind === k)}
               >
-                {ns}
+                {k}
               </button>
             ))}
           </div>
@@ -116,7 +108,7 @@ export function PluginsList() {
           </select>
         </label>
         <label>
-          <div className={styles.metaKey}>{t('admin:pluginNameContains')}</div>
+          <div className={styles.metaKey}>{t('admin:pluginFilterContains')}</div>
           <input
             type="text"
             value={search}
@@ -157,10 +149,11 @@ export function PluginsList() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>{t('common:colNamespace')}</th>
-              <th>{t('colName')}</th>
+              <th>{t('admin:pluginColAlias')}</th>
+              <th>{t('admin:pluginColSource')}</th>
               <th>{t('common:colRef')}</th>
-              <th>{t('common:colSha256')}</th>
+              <th>{t('common:colKind')}</th>
+              <th>{t('admin:pluginColArtifacts')}</th>
               <th>{t('colStatus')}</th>
               <th>{t('colAllowedAt')}</th>
               <th>{t('colAllowedBy')}</th>
@@ -169,22 +162,18 @@ export function PluginsList() {
           <tbody>
             {filtered.map((row) => {
               const st = statusOf(row);
+              const artifacts = row.artifacts ?? [];
               return (
-                <tr key={`${row.namespace}/${row.name}/${row.ref}`}>
-                  <td className="mono">
-                    <Badge tone="info">{row.namespace}</Badge>
-                  </td>
+                <tr key={row.alias}>
                   <td>
-                    <Link
-                      to={`/plugins/${encodeURIComponent(row.namespace)}/${encodeURIComponent(row.name)}/${encodeURIComponent(row.ref)}`}
-                    >
-                      {row.name}
-                    </Link>
+                    <Link to={`/plugins/${encodeURIComponent(row.alias)}`}>{row.alias}</Link>
                   </td>
+                  <td className="mono" style={{ wordBreak: 'break-all' }}>{row.source}</td>
                   <td className="mono">{row.ref}</td>
-                  <td className="mono" title={row.sha256}>
-                    {row.sha256.slice(0, 16)}…
+                  <td>
+                    <Badge tone="info">{row.kind}</Badge>
                   </td>
+                  <td className="mono">{artifacts.length}</td>
                   <td>
                     {st === 'active' ? (
                       <Badge tone="ok">active</Badge>

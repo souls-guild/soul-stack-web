@@ -64,14 +64,6 @@ export function TaskTimeline({
                 </td>
                 <td>
                   <Badge tone={taskStatusTone(r.status)}>{r.status}</Badge>
-                  {r.suppressed === 'no_log' ? (
-                    <>
-                      {' '}
-                      <Badge tone="muted" title={t('runhistory:runTasksNoLogHint')}>
-                        no_log
-                      </Badge>
-                    </>
-                  ) : null}
                 </td>
                 <td className="mono">{r.errorModule ?? r.errorCode ?? '—'}</td>
               </tr>

@@ -18,7 +18,7 @@ describe('IncarnationNewForm', () => {
   //
   // The empty field must therefore arrive as an OMITTED key. Sending `name: ""`
   // would look the same in the form and still be a request that carries `name`.
-  // A create scenario that composes its name (`composes_name`) — the mode where the
+  // A create scenario that composes its name (`composes_id`) — the mode where the
   // form shows a preview instead of a name field.
   const COMPOSING_SCENARIO = {
     name: 'create',
@@ -26,7 +26,7 @@ describe('IncarnationNewForm', () => {
     path: 'scenario/create/main.yml',
     create: true,
     runnable: true,
-    composes_name: true,
+    composes_id: true,
     input_schema: {},
   };
 
@@ -44,7 +44,7 @@ describe('IncarnationNewForm', () => {
 
   const DEFAULT_RESOLVE = {
     composes: true,
-    composed_name: 'cache-billing-redis',
+    composed_id: 'cache-billing-redis',
     length: 19,
     max_length: 63,
     valid: true,
@@ -75,14 +75,14 @@ describe('IncarnationNewForm', () => {
       }
       if (method === 'GET' && url.startsWith('/v1/services')) {
         return new Response(
-          JSON.stringify({ items: [{ name: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }] }),
+          JSON.stringify({ items: [{ id: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }] }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
       }
       // Before the create branch: the resolve lives under the same path prefix, and
       // answering it with the create's stub would make the preview look like a
       // successful create.
-      if (method === 'POST' && url.startsWith('/v1/incarnations/resolve-name')) {
+      if (method === 'POST' && url.startsWith('/v1/incarnations/resolve-id')) {
         const r = opts.resolve ?? DEFAULT_RESOLVE;
         return r instanceof Response
           ? r.clone()
@@ -121,8 +121,8 @@ describe('IncarnationNewForm', () => {
 
     // The operator does not type this name, so offering a field for it invites a
     // request the keeper refuses outright.
-    await waitFor(() => expect(screen.getByTestId('composed-name-preview')).toBeInTheDocument());
-    expect(screen.queryByTestId('incarnation-name-input')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('composed-id-preview')).toBeInTheDocument());
+    expect(screen.queryByTestId('incarnation-id-input')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
@@ -153,13 +153,13 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
 
-    expect(screen.getByTestId('incarnation-name-input')).toBeInTheDocument();
-    expect(screen.queryByTestId('composed-name-preview')).toBeNull();
+    expect(screen.getByTestId('incarnation-id-input')).toBeInTheDocument();
+    expect(screen.queryByTestId('composed-id-preview')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     await waitFor(() =>
-      expect(screen.getByTestId('incarnation-name-input')).toHaveAttribute('aria-invalid', 'true'),
+      expect(screen.getByTestId('incarnation-id-input')).toHaveAttribute('aria-invalid', 'true'),
     );
     expect(
       calls.find((c) => c.method === 'POST' && c.url === '/v1/incarnations'),
@@ -194,11 +194,11 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
 
-    await screen.findByTestId('incarnation-name-input');
-    await user.type(screen.getByTestId('incarnation-name-input'), 'typed-earlier');
+    await screen.findByTestId('incarnation-id-input');
+    await user.type(screen.getByTestId('incarnation-id-input'), 'typed-earlier');
 
     await user.selectOptions(screen.getByTestId('create-scenario-select'), 'create-composed');
-    await waitFor(() => expect(screen.getByTestId('composed-name-preview')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('composed-id-preview')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
@@ -212,7 +212,7 @@ describe('IncarnationNewForm', () => {
     });
   });
 
-  // If the keeper asks for a name while the descriptor said the scenario composes one, the two
+  // If the keeper asks for an id while the descriptor said the scenario composes one, the two
   // sides disagree — and there is no input on screen to carry the complaint. Attaching it to
   // the absent field would swallow it and leave the operator with a form that just does
   // nothing on submit.
@@ -220,7 +220,7 @@ describe('IncarnationNewForm', () => {
     stubCreate(
       () =>
         new Response(
-          JSON.stringify({ title: 'Validation failed', status: 422, detail: "field 'name' is required" }),
+          JSON.stringify({ title: 'Validation failed', status: 422, detail: "field 'id' is required" }),
           { status: 422, headers: { 'Content-Type': 'application/json' } },
         ),
       { scenarios: [COMPOSING_SCENARIO] },
@@ -230,19 +230,19 @@ describe('IncarnationNewForm', () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
-    await waitFor(() => expect(screen.getByTestId('composed-name-preview')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('composed-id-preview')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     const box = await screen.findByTestId('incarnation-create-error');
-    expect(box).toHaveTextContent(/does not compose a name/i);
-    expect(screen.queryByTestId('incarnation-name-input')).toBeNull();
+    expect(box).toHaveTextContent(/does not compose an id/i);
+    expect(screen.queryByTestId('incarnation-id-input')).toBeNull();
   });
 
-  // The name is the immutable primary key: the operator has to read it before the
+  // The id is the immutable primary key: the operator has to read it before the
   // create makes it permanent, and read how close it is to the ceiling that would
   // refuse it.
-  it('the preview shows the composed name and its length', async () => {
+  it('the preview shows the composed id and its length', async () => {
     stubCreate(() => new Response('{}', { status: 202 }), { scenarios: [COMPOSING_SCENARIO] });
 
     renderForm();
@@ -250,10 +250,10 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
 
-    await waitFor(() => expect(screen.getByTestId('composed-name-value')).toHaveTextContent('cache-billing-redis'));
-    expect(screen.getByTestId('composed-name-counter')).toHaveTextContent('19');
-    expect(screen.getByTestId('composed-name-counter')).toHaveTextContent('63');
-    expect(screen.getByTestId('composed-name-free')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('composed-id-value')).toHaveTextContent('cache-billing-redis'));
+    expect(screen.getByTestId('composed-id-counter')).toHaveTextContent('19');
+    expect(screen.getByTestId('composed-id-counter')).toHaveTextContent('63');
+    expect(screen.getByTestId('composed-id-free')).toBeInTheDocument();
   });
 
   // Seeing the collision BEFORE pressing create is the point: under a template the
@@ -269,8 +269,8 @@ describe('IncarnationNewForm', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /svc/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
 
-    await waitFor(() => expect(screen.getByTestId('composed-name-taken')).toHaveTextContent(/redis/));
-    expect(screen.queryByTestId('composed-name-free')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('composed-id-taken')).toHaveTextContent(/redis/));
+    expect(screen.queryByTestId('composed-id-free')).toBeNull();
   });
 
   // A preview that cannot be composed must SAY why. Going silently blank is the
@@ -281,7 +281,7 @@ describe('IncarnationNewForm', () => {
       scenarios: [COMPOSING_SCENARIO],
       resolve: {
         composes: true,
-        composed_name: '',
+        composed_id: '',
         length: 0,
         max_length: 63,
         valid: false,
@@ -296,7 +296,7 @@ describe('IncarnationNewForm', () => {
     await user.selectOptions(screen.getByRole('combobox'), 'svc');
 
     await waitFor(() =>
-      expect(screen.getByTestId('composed-name-incomplete')).toHaveTextContent(/project/),
+      expect(screen.getByTestId('composed-id-incomplete')).toHaveTextContent(/project/),
     );
   });
 
@@ -313,7 +313,7 @@ describe('IncarnationNewForm', () => {
     // Asserted on the field state, not on the message: the label itself reads
     // "Name (kebab-case)", so matching that text finds two elements.
     await waitFor(() =>
-      expect(screen.getByTestId('incarnation-name-input')).toHaveAttribute('aria-invalid', 'true'),
+      expect(screen.getByTestId('incarnation-id-input')).toHaveAttribute('aria-invalid', 'true'),
     );
     expect(
       calls.find((c) => c.method === 'POST'),
@@ -346,7 +346,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -397,7 +397,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -466,7 +466,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -518,7 +518,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -573,7 +573,7 @@ describe('IncarnationNewForm', () => {
       if (method === 'GET' && url.startsWith('/v1/services')) {
         return new Response(
           JSON.stringify({
-            items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }],
+            items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }],
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
@@ -611,7 +611,7 @@ describe('IncarnationNewForm', () => {
       const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
       expect(post).toBeTruthy();
       const parsed = JSON.parse(post!.body);
-      expect(parsed.name).toBe('redis-prod');
+      expect(parsed.id).toBe('redis-prod');
       expect(parsed.service).toBe('redis');
       expect(parsed.input).toEqual({});
       // create_scenario must be present in the body.
@@ -642,7 +642,7 @@ describe('IncarnationNewForm', () => {
       if (method === 'GET' && url.startsWith('/v1/services')) {
         return new Response(
           JSON.stringify({
-            items: [{ name: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }],
+            items: [{ id: 'svc', git: 'git@…', ref: 'v1.0.0', created_at: '', updated_at: '' }],
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
@@ -685,7 +685,7 @@ describe('IncarnationNewForm', () => {
       const post = calls.find((c) => c.method === 'POST' && c.url.startsWith('/v1/incarnations'));
       expect(post).toBeTruthy();
       const parsed = JSON.parse(post!.body);
-      expect(parsed.name).toBe('svc-prod');
+      expect(parsed.id).toBe('svc-prod');
       // create_scenario must not be present for a bare incarnation.
       expect(parsed.create_scenario).toBeUndefined();
     });
@@ -723,7 +723,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -788,7 +788,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -833,7 +833,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 
@@ -875,7 +875,7 @@ describe('IncarnationNewForm', () => {
       {
         method: 'GET',
         url: '/v1/services',
-        body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+        body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
       },
     ]);
 

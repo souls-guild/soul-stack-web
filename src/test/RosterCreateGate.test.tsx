@@ -60,7 +60,7 @@ function mockApi() {
     {
       method: 'GET',
       url: '/v1/services',
-      body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
     },
     {
       method: 'POST',
@@ -122,7 +122,7 @@ describe('create form — roster gate', () => {
       await user.click(input);
       await user.click(await screen.findByTestId(`sid-option-${sid}`));
     }
-    await user.type(screen.getByLabelText(/name/i), 'redis-roster');
+    await user.type(screen.getByLabelText(/^ID \(kebab-case\)/), 'redis-roster');
 
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
@@ -152,7 +152,7 @@ describe('create form — roster gate', () => {
       expect(screen.queryByTestId('roster-count-warning')).not.toBeInTheDocument(),
     );
 
-    await user.type(screen.getByLabelText(/name/i), 'redis-roster');
+    await user.type(screen.getByLabelText(/^ID \(kebab-case\)/), 'redis-roster');
     await user.click(screen.getByRole('button', { name: /Create incarnation/i }));
 
     await waitFor(() => {

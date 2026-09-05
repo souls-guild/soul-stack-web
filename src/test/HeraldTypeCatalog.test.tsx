@@ -55,7 +55,7 @@ const HERALDS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
 const TIDINGS_EMPTY = { items: [], offset: 0, limit: 200, total: 0 };
 
 const HERALD_TELEGRAM_EXISTING = {
-  name: 'ops-telegram',
+  id: 'ops-telegram',
   type: 'telegram',
   config: { chat_id: '-100555', bot_token_ref: 'vault:secret/tg-bot' },
   secret_ref: null,
@@ -284,7 +284,7 @@ describe('HeraldModal — dynamic rendering driven by the GET /v1/herald-types c
     renderNotif();
     const { dialog, user } = await openCreateModal();
 
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'my-telegram');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'my-telegram');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
 
@@ -302,7 +302,7 @@ describe('HeraldModal — dynamic rendering driven by the GET /v1/herald-types c
     renderNotif();
     const { dialog, user } = await openCreateModal();
 
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'my-telegram');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'my-telegram');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'telegram' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'telegram');
     await user.type(within(dialog).getByTestId('herald-field-bot_token_ref'), 'vault:secret/tg-token');
@@ -314,9 +314,9 @@ describe('HeraldModal — dynamic rendering driven by the GET /v1/herald-types c
       const post = calls.find((c) => c.url === '/v1/heralds' && c.method === 'POST');
       expect(post).toBeDefined();
       const parsed = JSON.parse(post!.body ?? '{}') as {
-        name: string; type: string; config: Record<string, unknown>; secret_ref?: string;
+        id: string; type: string; config: Record<string, unknown>; secret_ref?: string;
       };
-      expect(parsed.name).toBe('my-telegram');
+      expect(parsed.id).toBe('my-telegram');
       expect(parsed.type).toBe('telegram');
       expect(parsed.config).toMatchObject({ bot_token_ref: 'vault:secret/tg-token', chat_id: '98765' });
       // telegram - secret_required=false in the catalog - should not be in body.
@@ -430,5 +430,43 @@ describe('HeraldModal — editing a non-webhook type (telegram)', () => {
       expect(parsed.config).toMatchObject({ chat_id: '-100999', bot_token_ref: 'vault:secret/tg-bot' });
       expect(parsed.secret_ref).toBeUndefined();
     });
+  });
+
+  // The catalog is what tells this form which fields the channel HAS. Without it
+  // the form rebuilds `config` as {} — and PUT is a full replace, so saving an
+  // existing channel would swap its real config for nothing. Creating is safe
+  // (there is no config yet), so the block is on editing only.
+  it('editing without the catalog cannot save, so a caption-only edit cannot wipe config', async () => {
+    const calls = setupMock({ heraldTypesFail: true, heralds: HERALDS_WITH_TELEGRAM });
+    renderNotif();
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByTestId('herald-edit-btn-ops-telegram')).toBeInTheDocument());
+    await user.click(screen.getByTestId('herald-edit-btn-ops-telegram'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Edit Herald/i });
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('herald-catalog-unavailable')).toBeInTheDocument(),
+    );
+
+    const save = within(dialog).getByRole('button', { name: /^Save$/ });
+    expect(save).toBeDisabled();
+    await user.click(save);
+
+    expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(0);
+  });
+
+  // The same failure must not block a create: there is nothing to destroy, and
+  // the type select still works from the catalog's own empty state.
+  it('creating without the catalog is not blocked by the edit guard', async () => {
+    setupMock({ heraldTypesFail: true, heralds: HERALDS_EMPTY });
+    renderNotif();
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByTestId('herald-create-btn')).toBeInTheDocument());
+    await user.click(screen.getByTestId('herald-create-btn'));
+
+    const dialog = await screen.findByRole('dialog', { name: /Create Herald/i });
+    expect(within(dialog).queryByTestId('herald-catalog-unavailable')).not.toBeInTheDocument();
   });
 });

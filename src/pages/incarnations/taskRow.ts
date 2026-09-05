@@ -15,7 +15,6 @@ export interface TaskRow {
   errorModule?: string;
   // error.message intentionally NOT stored: an audit message may carry a secret - we
   // don't render it on screen (secret hygiene, NIM-37 review).
-  suppressed?: string;
 }
 
 // Dedup/row key: task_idx is local within a Passage, so on its own it's
@@ -46,7 +45,6 @@ export function normalizeAuditTaskPayload(payload: unknown): TaskRow | null {
     status: asString(p.status) ?? '',
   };
   if (typeof p.plan_index === 'number') row.planIndex = p.plan_index;
-  if (p.suppressed === 'no_log') row.suppressed = 'no_log';
   const err = p.error;
   if (err && typeof err === 'object') {
     const e = err as Record<string, unknown>;

@@ -9,6 +9,7 @@ audit.enabled
 augur.access_denied
 augur.fetch_brokered
 bootstrap.delivered
+bootstrap.issued
 cadence.created
 cadence.deleted
 cadence.skipped_forbidden
@@ -39,6 +40,7 @@ console.recording-read
 decree.circuit_tripped
 decree.created
 decree.deleted
+decree.label_changed
 errand.cancelled
 errand.completed
 errand.failed
@@ -49,12 +51,13 @@ herald.created
 herald.deleted
 herald.delivered
 herald.failed
+herald.label_changed
 herald.updated
 incarnation.created
 incarnation.destroy_completed
 incarnation.destroy_failed
 incarnation.destroy_started
-incarnation.drift_checked
+incarnation.label_changed
 incarnation.member_bound
 incarnation.member_unbound
 incarnation.rerun_last
@@ -66,6 +69,7 @@ incarnation.unlocked
 incarnation.upgrade_started
 input.vault_resolved
 omen.created
+omen.label_changed
 omen.revoked
 operator.created
 operator.login
@@ -77,12 +81,15 @@ plugin.allowed
 plugin.revoked
 profile.created
 profile.deleted
+profile.label_changed
 provider.created
 provider.deleted
+provider.label_changed
 provisioning.policy_changed
 push-provider.created
 push-provider.deleted
 push-provider.imported_from_config
+push-provider.label_changed
 push-provider.updated
 push.applied
 push.completed
@@ -106,6 +113,7 @@ scenario_run.leg_started
 scenario_run.partial_failed
 scenario_run.started
 service.deregistered
+service.label_changed
 service.registered
 service.updated
 setting.deleted
@@ -116,6 +124,7 @@ sigil.key-retired
 soul.bootstrapped
 soul.coven-changed
 soul.created
+soul.forgotten
 soul.seed-issued
 soul.seed-rotated
 soul.ssh-target.imported_from_config
@@ -133,9 +142,11 @@ synod.updated
 task.executed
 tiding.created
 tiding.deleted
+tiding.label_changed
 tiding.updated
 vault.kv-present
 vault.kv-read
 vigil.created
 vigil.deleted
+vigil.label_changed
 voyage.reclaimed

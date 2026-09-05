@@ -18,6 +18,8 @@ import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type IncarnationRerunLastReply } from '../../api/keeper';
 import { incarnationDot, incarnationTone } from '../../components/status';
+import { entityCaption, showsIdBeside } from '../../components/entityCaption';
+import { EditLabelModal } from '../../components/EditLabelModal';
 import { ApiError } from '../../api/client';
 import { UnlockModal } from './UnlockModal';
 import { RerunLastModal } from './RerunLastModal';
@@ -45,6 +47,7 @@ export function IncarnationDetail() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [destroyOpen, setDestroyOpen] = useState(false);
   const [traitsOpen, setTraitsOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
 
   const detail = useQuery({
     queryKey: ['incarnation', name],
@@ -123,11 +126,14 @@ export function IncarnationDetail() {
     <div className={styles.page}>
       <div>
         <div className={styles.crumbs}>
-          <Link to="/incarnations">incarnations</Link> / <span>{row.name}</span>
+          <Link to="/incarnations">incarnations</Link> / <span>{entityCaption(row)}</span>
         </div>
         <div className={styles.header}>
           <div>
-            <h1 className={styles.title}>{row.name}</h1>
+            <h1 className={styles.title}>{entityCaption(row)}</h1>
+            {showsIdBeside(row) ? (
+              <div className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{row.id}</div>
+            ) : null}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8 }}>
               <Dot kind={incarnationDot(row.status)} />
               <Badge tone={incarnationTone(row.status)}>{row.status}</Badge>
@@ -148,7 +154,7 @@ export function IncarnationDetail() {
                     const params = new URLSearchParams({
                       workload: 'scenario',
                       service: row.service,
-                      incarnation: row.name,
+                      incarnation: row.id,
                     });
                     navigate(`/run?${params.toString()}`);
                   }}
@@ -161,6 +167,9 @@ export function IncarnationDetail() {
                 </Button>
                 <Button variant="secondary" onClick={() => setTraitsOpen(true)} title={t('incarnations:editTraitsTitle')}>
                   <Tag size={14} /> {t('incarnations:editTraitsBtn')}
+                </Button>
+                <Button variant="secondary" onClick={() => setLabelOpen(true)}>
+                  {t('forms:editLabelBtn')}
                 </Button>
                 <Button variant="danger" onClick={() => setDestroyOpen(true)} title={t('common:destroy')} data-testid="destroy-trigger">
                   <Trash size={14} /> {t('common:destroy')}
@@ -299,7 +308,7 @@ export function IncarnationDetail() {
         <StateTab
           state={row.state ?? null}
           stateSchemaVersion={row.state_schema_version}
-          incarnationName={row.name}
+          incarnationName={row.id}
         />
       ) : null}
 
@@ -312,11 +321,11 @@ export function IncarnationDetail() {
       ) : null}
 
       {tab === 'hosts' ? (
-        <HostsTab incarnationName={row.name} state={row.state ?? null} />
+        <HostsTab incarnationName={row.id} state={row.state ?? null} />
       ) : null}
 
       {tab === 'choirs' ? (
-        <ChoirsTab incarnationName={row.name} />
+        <ChoirsTab incarnationName={row.id} />
       ) : null}
 
       {tab === 'history' ? (
@@ -400,27 +409,36 @@ export function IncarnationDetail() {
           </button>
         </div>
       ) : null}
+      <EditLabelModal
+        open={labelOpen}
+        onClose={() => setLabelOpen(false)}
+        id={row.id}
+        label={row.label}
+        setLabel={(body) => keeperApi.incarnations.setLabel(row.id, body)}
+        invalidate={[['incarnation', row.id], ['incarnations.list']]}
+        idHint={t('forms:idImmutableIncarnation')}
+      />
       <IncarnationTraitsModal
         open={traitsOpen}
-        incarnationName={row.name}
+        incarnationName={row.id}
         currentTraits={row.traits as Record<string, unknown> | null | undefined}
         onClose={() => setTraitsOpen(false)}
       />
-      <UnlockModal open={unlockOpen} incarnationName={row.name} onClose={() => setUnlockOpen(false)} />
+      <UnlockModal open={unlockOpen} incarnationName={row.id} onClose={() => setUnlockOpen(false)} />
       <RerunLastModal
         open={rerunLastOpen}
-        incarnationName={row.name}
+        incarnationName={row.id}
         onClose={() => setRerunLastOpen(false)}
         onAccepted={(reply) => setRerunAccepted(reply)}
       />
       <UpgradeModal
         open={upgradeOpen}
-        incarnationName={row.name}
+        incarnationName={row.id}
         serviceName={row.service}
         currentRef={row.service_version}
         onClose={() => setUpgradeOpen(false)}
       />
-      <DestroyModal open={destroyOpen} incarnationName={row.name} onClose={() => setDestroyOpen(false)} />
+      <DestroyModal open={destroyOpen} incarnationName={row.id} onClose={() => setDestroyOpen(false)} />
     </div>
   );
 }

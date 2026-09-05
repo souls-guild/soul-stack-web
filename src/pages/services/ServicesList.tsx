@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { keeperApi, type ServiceView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button } from '../../components/primitives';
+import { EntityIdCell } from '../../components/EntityIdCell';
 import { RegisterServiceModal } from './RegisterServiceModal';
 import styles from '../common.module.css';
 
@@ -25,7 +25,9 @@ export function ServicesList() {
     const r = refFilter.trim();
     if (!n && !r) return items;
     return items.filter((s) => {
-      if (n && !s.name.toLowerCase().includes(n)) return false;
+      // Match either half of the identity: the operator may remember the caption
+      // they gave it or the id it is addressed by.
+      if (n && !`${s.id} ${s.label ?? ''}`.toLowerCase().includes(n)) return false;
       if (r && s.ref !== r) return false;
       return true;
     });
@@ -45,7 +47,7 @@ export function ServicesList() {
 
       <div className={styles.filters}>
         <label>
-          <div className={styles.metaKey}>{t('admin:svcNameContains')}</div>
+          <div className={styles.metaKey}>{t('admin:svcFilterContains')}</div>
           <input
             type="text"
             value={nameFilter}
@@ -98,7 +100,7 @@ export function ServicesList() {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>{t('admin:svcColName')}</th>
+              <th>{t('common:colLabel')}</th>
               <th>{t('admin:svcColGit')}</th>
               <th>{t('admin:svcColRef')}</th>
               <th>{t('admin:svcColRefresh')}</th>
@@ -107,9 +109,9 @@ export function ServicesList() {
           </thead>
           <tbody>
             {filtered.map((s) => (
-              <tr key={s.name}>
+              <tr key={s.id}>
                 <td>
-                  <Link to={`/services/${encodeURIComponent(s.name)}`}>{s.name}</Link>
+                  <EntityIdCell entity={s} to={`/services/${encodeURIComponent(s.id)}`} />
                 </td>
                 <td className="mono" style={{ wordBreak: 'break-all' }}>{s.git}</td>
                 <td className="mono">{s.ref}</td>

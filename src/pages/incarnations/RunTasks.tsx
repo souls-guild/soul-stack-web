@@ -124,8 +124,8 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
                 data-testid={`run-task-item-${tk.plan_index}`}
               >
                 <span className={styles.idx}>#{tk.plan_index}</span>
-                <span className={styles.name} title={tk.name}>
-                  {tk.name}
+                <span className={styles.name} title={tk.id}>
+                  {tk.id}
                 </span>
                 <span className={styles.modchip}>{tk.module}</span>
                 <span className={styles.hbar} aria-hidden="true">
@@ -156,21 +156,16 @@ function TaskDetail({ task }: { task: RunTaskView }) {
   return (
     <div className={styles.detail} data-testid="run-task-detail">
       <div className={styles.detailHead}>
-        <h3 className={styles.detailTitle}>{task.name}</h3>
+        <h3 className={styles.detailTitle}>{task.id}</h3>
         <span className={styles.modchip}>{task.module}</span>
-        {task.no_log ? (
-          <Badge tone="muted" title={t('runhistory:runTasksNoLogHint')}>
-            no_log
-          </Badge>
-        ) : null}
       </div>
 
+      {/* No masking here any more: `no_log:` was retired in favour of a module
+          declaring `secret: true` on an output field, and the keeper masks the
+          observable copy before it is served. What arrives is already redacted,
+          so a second client-side rule could only hide non-secrets. */}
       <div className={styles.blabel}>{t('runhistory:runTasksInputTitle')}</div>
-      {task.no_log ? (
-        <div className={styles.muted} data-testid="run-task-params">
-          {t('runhistory:runTasksInputNoLog')}
-        </div>
-      ) : paramEntries.length > 0 ? (
+      {paramEntries.length > 0 ? (
         <div className={styles.kv} data-testid="run-task-params">
           {paramEntries.map(([k, v]) => (
             <div key={k} style={{ display: 'contents' }}>
@@ -205,13 +200,7 @@ function TaskDetail({ task }: { task: RunTaskView }) {
                 <Badge tone={taskStatusTone(h.status)}>{h.status}</Badge>
               </td>
               <td>
-                {task.no_log ? (
-                  <span className={styles.muted} data-testid={`run-task-output-${h.sid}`}>
-                    {t('runhistory:runTasksInputNoLog')}
-                  </span>
-                ) : (
-                  <OutputCell output={h.output} sid={h.sid} />
-                )}
+                <OutputCell output={h.output} sid={h.sid} />
               </td>
               <td>
                 {h.error ? (
@@ -221,7 +210,7 @@ function TaskDetail({ task }: { task: RunTaskView }) {
                     data-testid={`run-task-error-${h.sid}`}
                   >
                     {h.error.module ? `${h.error.module}: ` : ''}
-                    {task.no_log ? h.error.code : (h.error.message ?? h.error.code)}
+                    {h.error.message ?? h.error.code}
                   </span>
                 ) : (
                   <span className={styles.out}>—</span>

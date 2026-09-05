@@ -184,7 +184,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     // GET-stubs
     if (url.includes('/v1/services?') || url.endsWith('/v1/services')) {
       return json({
-        items: [{ name: serviceName, ref: 'main', source: { type: 'git', url: 'git@x' } }],
+        items: [{ id: serviceName, ref: 'main', source: { type: 'git', url: 'git@x' } }],
         offset: 0,
         limit: 50,
         total: 1,
@@ -214,7 +214,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     if (url.includes('/v1/incarnations?') || url.endsWith('/v1/incarnations')) {
       return json({
         items: incarnationNames.map((name) => ({
-          name,
+          id: name,
           service: serviceName,
           service_version: 'main',
           state_schema_version: 1,
@@ -2330,7 +2330,7 @@ function setupFetchStubWithHeralds(heraldNames: string[]) {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
     if (url.startsWith('/v1/heralds')) {
       const items = heraldNames.map((name) => ({
-        name,
+        id: name,
         type: 'webhook' as const,
         config: { url: `https://example.com/${name}` },
         enabled: true,

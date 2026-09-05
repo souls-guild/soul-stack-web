@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { keeperApi, type Herald } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Modal } from '../../components/primitives';
+import { EntityIdCell } from '../../components/EntityIdCell';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { HeraldModal } from './HeraldModal';
 import styles from '../common.module.css';
@@ -92,14 +92,9 @@ export function HeraldsTab() {
               const cfg = (h.config ?? {}) as Record<string, unknown>;
               const url = typeof cfg.url === 'string' ? cfg.url : '—';
               return (
-                <tr key={h.name}>
+                <tr key={h.id}>
                   <td>
-                    <Link
-                      to={`/notifications/heralds/${encodeURIComponent(h.name)}`}
-                      data-testid={`herald-link-${h.name}`}
-                    >
-                      {h.name}
-                    </Link>
+                    <EntityIdCell entity={h} to={`/notifications/heralds/${encodeURIComponent(h.id)}`} />
                   </td>
                   <td>
                     <Badge tone="muted">{h.type}</Badge>
@@ -125,7 +120,7 @@ export function HeraldsTab() {
                     <Button
                       variant="ghost"
                       type="button"
-                      data-testid={`herald-edit-btn-${h.name}`}
+                      data-testid={`herald-edit-btn-${h.id}`}
                       disabled={!canUpdate}
                       title={!canUpdate ? 'herald.update' : undefined}
                       onClick={() => setEditing(h)}
@@ -136,7 +131,7 @@ export function HeraldsTab() {
                     <Button
                       variant="ghost"
                       type="button"
-                      data-testid={`herald-delete-btn-${h.name}`}
+                      data-testid={`herald-delete-btn-${h.id}`}
                       disabled={!canDelete}
                       title={!canDelete ? 'herald.delete' : undefined}
                       onClick={() => setDeleteTarget(h)}
@@ -162,7 +157,7 @@ export function HeraldsTab() {
         onClose={() => setDeleteTarget(null)}
       >
         <p style={{ margin: 0, fontSize: 13 }}>
-          {t('heraldDeleteConfirm', { name: deleteTarget?.name ?? '' })}
+          {t('heraldDeleteConfirm', { name: deleteTarget?.id ?? '' })}
         </p>
         <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
           <Button variant="ghost" type="button" onClick={() => setDeleteTarget(null)} disabled={deleteMu.isPending}>
@@ -173,7 +168,7 @@ export function HeraldsTab() {
             type="button"
             disabled={deleteMu.isPending}
             data-testid="herald-delete-confirm-btn"
-            onClick={() => deleteTarget && deleteMu.mutate(deleteTarget.name)}
+            onClick={() => deleteTarget && deleteMu.mutate(deleteTarget.id)}
           >
             {t('common:delete')}
           </Button>

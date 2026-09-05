@@ -264,6 +264,13 @@ export interface ListVoyagesQuery {
 export type PushProvider = components['schemas']['PushProvider'];
 export type PushProviderListReply = components['schemas']['PushProviderListReply'];
 
+/**
+ * Display caption of a registry entity (ADR-0085). Carried by its own
+ * `PUT /v1/<registry>/{id}/label`, never by the entity's update request: the
+ * identifier is immutable and the caption is not, so they cannot travel together.
+ */
+export type LabelSetRequest = components['schemas']['LabelSetRequest'];
+
 // Synod — groups of Archons (ADR-049). Types from gen.
 export type SynodView = components['schemas']['SynodView'];
 export type SynodListReply = components['schemas']['SynodListReply'];
@@ -473,8 +480,8 @@ export type ScenarioInputSchema = Record<string, ScenarioInputSchemaProperty>;
 
 // ScenarioForm types: optional presentation layer for scenario input_schema (ADR-045).
 export type ScenarioForm = components['schemas']['ScenarioForm'];
-export type IncarnationResolveNameRequest = components['schemas']['IncarnationResolveNameRequest'];
-export type IncarnationResolveNameReply = components['schemas']['IncarnationResolveNameReply'];
+export type IncarnationResolveIDRequest = components['schemas']['IncarnationResolveIDRequest'];
+export type IncarnationResolveIDReply = components['schemas']['IncarnationResolveIDReply'];
 export type ScenarioFormSection = components['schemas']['ScenarioFormSection'];
 export type ScenarioFormField = components['schemas']['ScenarioFormField'];
 
@@ -500,20 +507,24 @@ export interface ServiceScenarioInfo {
   description?: string;
   input_schema?: ScenarioInputSchema;
   /**
-   * The create scenario composes the incarnation name from its `input:`
+   * The create scenario composes the incarnation id from its `input:`
    * components instead of the operator typing one, so POST /v1/incarnations must
-   * NOT carry `name` (the keeper refuses a request that does).
+   * NOT carry `id` (the keeper refuses a request that does).
    *
-   * A flag, not the template: the operator is shown the resulting name, not the
-   * formula. The name itself comes from `incarnations.resolveName` — the keeper
+   * A flag, not the template: the operator is shown the resulting id, not the
+   * formula. The id itself comes from `incarnations.resolveId` — the keeper
    * composes, the form displays. Composing here instead would mean a second CEL
    * evaluator producing a different string from the same input, and under an
    * immutable name that is a different identity, arrived at silently.
    *
    * Optional for backward compatibility: an older keeper omits the field, and the
-   * form then behaves as it did before — a name is typed.
+   * form then behaves as it did before — an id is typed.
+   *
+   * Hand-written, so nothing type-checks the spelling against the wire: a stale
+   * key reads `undefined` and the form silently reverts to a typed id instead of
+   * failing. Keep it equal to `Scenario.composes_id` in the vendored openapi.
    */
-  composes_name?: boolean;
+  composes_id?: boolean;
   /** Optional presentation layer: splits fields into sections with headings. */
   form?: ScenarioForm;
 }
@@ -599,7 +610,8 @@ export interface ListIncarnationsQuery {
   coven?: string;
   offset?: number;
   limit?: number;
-  // Server-side sorting: sort = column name (name | status | created_at | state.<field>).
+  // Server-side sorting: sort = column (id | status | service | created_at | state.<field>).
+  // A value outside that whitelist is a 422, not a silently ignored parameter.
   // sort_dir = asc | desc.
   sort?: string;
   sort_dir?: 'asc' | 'desc';
@@ -745,17 +757,21 @@ export const keeperApi = {
       ),
     create: (body: IncarnationCreateRequest) =>
       apiSend<IncarnationCreateReply>('/v1/incarnations', 'POST', { body }),
-    // POST /v1/incarnations/resolve-name — what name would a create with this input
-    // compose, is it a legal name, and is it free. Creates nothing; the create
+    // PUT /v1/incarnations/{id}/label — the caption only. The id is immutable:
+    // it is a Vault path segment and an RBAC scope, so it has no edit surface.
+    setLabel: (id: string, body: LabelSetRequest) =>
+      apiSend<IncarnationGetReply>(`/v1/incarnations/${encodeURIComponent(id)}/label`, 'PUT', { body }),
+    // POST /v1/incarnations/resolve-id — what id would a create with this input
+    // compose, is it a legal id, and is it free. Creates nothing; the create
     // re-checks everything. Called on a debounce as the operator fills the identity
-    // components of a `composes_name` scenario.
+    // components of a `composes_id` scenario.
     //
     // `covens` is not part of the composition — it is sent so the permission check
     // scopes the preview exactly as it scopes the create it previews; without it a
     // coven-scoped operator would be refused on every keystroke for a create that
     // would have succeeded.
-    resolveName: (body: IncarnationResolveNameRequest) =>
-      apiSend<IncarnationResolveNameReply>('/v1/incarnations/resolve-name', 'POST', { body }),
+    resolveId: (body: IncarnationResolveIDRequest) =>
+      apiSend<IncarnationResolveIDReply>('/v1/incarnations/resolve-id', 'POST', { body }),
     // API behavior: if `wave` is present in the request, IncarnationRunTideReply is returned,
     // otherwise — the classic IncarnationRunReply. A caller using wave must do its own
     // type-narrowing by the presence of `tide_id`. The existing /incarnations/:name -> RunScenarioForm
@@ -1233,14 +1249,18 @@ export const keeperApi = {
 
   services: {
     list: () => apiGet<ServiceListReply>('/v1/services'),
-    get: (name: string) =>
-      apiGet<ServiceView>(`/v1/services/${encodeURIComponent(name)}`),
+    get: (id: string) =>
+      apiGet<ServiceView>(`/v1/services/${encodeURIComponent(id)}`),
     register: (body: ServiceRegisterRequest) =>
       apiSend<ServiceView>('/v1/services', 'POST', { body }),
-    update: (name: string, body: ServiceUpdateRequest) =>
-      apiSend<ServiceView>(`/v1/services/${encodeURIComponent(name)}`, 'PATCH', { body }),
-    deregister: (name: string) =>
-      apiSend<void>(`/v1/services/${encodeURIComponent(name)}`, 'DELETE'),
+    update: (id: string, body: ServiceUpdateRequest) =>
+      apiSend<ServiceView>(`/v1/services/${encodeURIComponent(id)}`, 'PATCH', { body }),
+    // PUT /v1/services/{id}/label — the caption travels alone; ServiceUpdateRequest
+    // carries git/ref/refresh and no label, because the id it keys on cannot move.
+    setLabel: (id: string, body: LabelSetRequest) =>
+      apiSend<ServiceView>(`/v1/services/${encodeURIComponent(id)}/label`, 'PUT', { body }),
+    deregister: (id: string) =>
+      apiSend<void>(`/v1/services/${encodeURIComponent(id)}`, 'DELETE'),
     // GET /v1/services/{name}/refs — git tags + branches. Endpoint is optional
     // (being fixed in parallel by a backend slice); UI graceful-degraded on 404/501.
     listRefs: (name: string) =>
@@ -1280,12 +1300,14 @@ export const keeperApi = {
       apiGet<VigilListReply>('/v1/vigils', {
         query: { offset: q.offset, limit: q.limit },
       }),
-    get: (name: string) =>
-      apiGet<VigilView>(`/v1/vigils/${encodeURIComponent(name)}`),
+    get: (id: string) =>
+      apiGet<VigilView>(`/v1/vigils/${encodeURIComponent(id)}`),
     create: (body: VigilCreateRequest) =>
       apiSend<VigilView>('/v1/vigils', 'POST', { body }),
-    delete: (name: string) =>
-      apiSend<void>(`/v1/vigils/${encodeURIComponent(name)}`, 'DELETE'),
+    setLabel: (id: string, body: LabelSetRequest) =>
+      apiSend<VigilView>(`/v1/vigils/${encodeURIComponent(id)}/label`, 'PUT', { body }),
+    delete: (id: string) =>
+      apiSend<void>(`/v1/vigils/${encodeURIComponent(id)}`, 'DELETE'),
   },
 
   // Oracle: Decree registry (reactor rules). ADR-030.
@@ -1294,12 +1316,14 @@ export const keeperApi = {
       apiGet<DecreeListReply>('/v1/decrees', {
         query: { offset: q.offset, limit: q.limit },
       }),
-    get: (name: string) =>
-      apiGet<DecreeView>(`/v1/decrees/${encodeURIComponent(name)}`),
+    get: (id: string) =>
+      apiGet<DecreeView>(`/v1/decrees/${encodeURIComponent(id)}`),
     create: (body: DecreeCreateRequest) =>
       apiSend<DecreeView>('/v1/decrees', 'POST', { body }),
-    delete: (name: string) =>
-      apiSend<void>(`/v1/decrees/${encodeURIComponent(name)}`, 'DELETE'),
+    setLabel: (id: string, body: LabelSetRequest) =>
+      apiSend<DecreeView>(`/v1/decrees/${encodeURIComponent(id)}/label`, 'PUT', { body }),
+    delete: (id: string) =>
+      apiSend<void>(`/v1/decrees/${encodeURIComponent(id)}`, 'DELETE'),
   },
 
   // Multi-target Errand run. Slice W1 (2026-05-27).
@@ -1404,23 +1428,27 @@ export const keeperApi = {
 
   // Heralds — notification delivery channels (ADR-052, S5).
   heralds: {
-    // GET /v1/heralds -> HeraldListReply (sorted updated_at DESC, name ASC).
+    // GET /v1/heralds -> HeraldListReply (sorted updated_at DESC, id ASC).
     list: (q: ListPagedQuery = {}) =>
       apiGet<HeraldListReply>('/v1/heralds', {
         query: { offset: q.offset, limit: q.limit },
       }),
-    // GET /v1/heralds/{name} -> Herald.
-    get: (name: string) =>
-      apiGet<Herald>(`/v1/heralds/${encodeURIComponent(name)}`),
+    // GET /v1/heralds/{id} -> Herald.
+    get: (id: string) =>
+      apiGet<Herald>(`/v1/heralds/${encodeURIComponent(id)}`),
     // POST /v1/heralds -> 201 Herald.
     create: (body: HeraldCreateRequest) =>
       apiSend<Herald>('/v1/heralds', 'POST', { body }),
-    // PUT /v1/heralds/{name} -> 200 Herald (replace semantics).
-    update: (name: string, body: HeraldUpdateRequest) =>
-      apiSend<Herald>(`/v1/heralds/${encodeURIComponent(name)}`, 'PUT', { body }),
-    // DELETE /v1/heralds/{name} -> 204. Cascades to delete Tidings.
-    delete: (name: string) =>
-      apiSend<void>(`/v1/heralds/${encodeURIComponent(name)}`, 'DELETE'),
+    // PUT /v1/heralds/{id} -> 200 Herald (replace semantics).
+    update: (id: string, body: HeraldUpdateRequest) =>
+      apiSend<Herald>(`/v1/heralds/${encodeURIComponent(id)}`, 'PUT', { body }),
+    // PUT /v1/heralds/{id}/label -> 200 Herald. Separate from update, whose
+    // replace semantics would otherwise drop the caption on every edit.
+    setLabel: (id: string, body: LabelSetRequest) =>
+      apiSend<Herald>(`/v1/heralds/${encodeURIComponent(id)}/label`, 'PUT', { body }),
+    // DELETE /v1/heralds/{id} -> 204. Cascades to delete Tidings.
+    delete: (id: string) =>
+      apiSend<void>(`/v1/heralds/${encodeURIComponent(id)}`, 'DELETE'),
   },
 
   // HeraldTypeCatalog — catalog of Herald-channel types (ADR-052 amendment, ADR-042
@@ -1438,40 +1466,43 @@ export const keeperApi = {
 
   // Tidings — notification subscription rules (ADR-052, S5).
   tidings: {
-    // GET /v1/tidings -> TidingListReply (sorted updated_at DESC, name ASC).
+    // GET /v1/tidings -> TidingListReply (sorted updated_at DESC, id ASC).
     list: (q: ListPagedQuery = {}) =>
       apiGet<TidingListReply>('/v1/tidings', {
         query: { offset: q.offset, limit: q.limit },
       }),
-    // GET /v1/tidings/{name} -> Tiding.
-    get: (name: string) =>
-      apiGet<Tiding>(`/v1/tidings/${encodeURIComponent(name)}`),
+    // GET /v1/tidings/{id} -> Tiding.
+    get: (id: string) =>
+      apiGet<Tiding>(`/v1/tidings/${encodeURIComponent(id)}`),
     // POST /v1/tidings -> 201 Tiding.
     create: (body: TidingCreateRequest) =>
       apiSend<Tiding>('/v1/tidings', 'POST', { body }),
-    // PUT /v1/tidings/{name} -> 200 Tiding (replace semantics).
-    update: (name: string, body: TidingUpdateRequest) =>
-      apiSend<Tiding>(`/v1/tidings/${encodeURIComponent(name)}`, 'PUT', { body }),
-    // DELETE /v1/tidings/{name} -> 204.
-    delete: (name: string) =>
-      apiSend<void>(`/v1/tidings/${encodeURIComponent(name)}`, 'DELETE'),
+    // PUT /v1/tidings/{id} -> 200 Tiding (replace semantics).
+    update: (id: string, body: TidingUpdateRequest) =>
+      apiSend<Tiding>(`/v1/tidings/${encodeURIComponent(id)}`, 'PUT', { body }),
+    // PUT /v1/tidings/{id}/label -> 200 Tiding. Separate from update, whose
+    // replace semantics would otherwise drop the caption on every edit.
+    setLabel: (id: string, body: LabelSetRequest) =>
+      apiSend<Tiding>(`/v1/tidings/${encodeURIComponent(id)}/label`, 'PUT', { body }),
+    // DELETE /v1/tidings/{id} -> 204.
+    delete: (id: string) =>
+      apiSend<void>(`/v1/tidings/${encodeURIComponent(id)}`, 'DELETE'),
   },
 
-  // Sigil allow-list for plugins (ADR-026, variant C). Full record path — (namespace, name, ref).
+  // Sigil allow-list for plugins (ADR-026, variant C). A grant is keyed by its
+  // registration alias and covers a release: (source, ref) resolved to the
+  // artifact rows the release publishes, one per os/arch.
   plugins: {
     sigils: {
       // 200 -> PluginSigilListReply. Only active grants, newest first.
       list: () => apiGet<PluginSigilListReply>('/v1/plugins/sigils'),
-      // 201 -> PluginSigilAllowReply. Keeper reads the binary/manifest from the local
-      // host cache by (namespace, name); sha256 is computed by Keeper, not the client.
+      // 201 -> PluginSigilAllowReply. Keeper resolves the release at `source`/`ref`
+      // and records a sha256 per published artifact; the client computes nothing.
       allow: (body: PluginSigilAllowRequest) =>
         apiSend<PluginSigilAllowReply>('/v1/plugins/sigils', 'POST', { body }),
-      // 204 — soft revocation. ref — a single path segment (tag-ref like v1.2.3).
-      revoke: (namespace: string, name: string, ref: string) =>
-        apiSend<void>(
-          `/v1/plugins/sigils/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/${encodeURIComponent(ref)}`,
-          'DELETE',
-        ),
+      // 204 — soft revocation of the whole grant registered under `alias`.
+      revoke: (alias: string) =>
+        apiSend<void>(`/v1/plugins/sigils/${encodeURIComponent(alias)}`, 'DELETE'),
     },
   },
 };

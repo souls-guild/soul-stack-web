@@ -19,7 +19,7 @@ import { tokenStore } from '../api/tokenStore';
 // Incarnation fixture with a given status.
 function makeIncarnation(status: string) {
   return {
-    name: 'test-inc',
+    id: 'test-inc',
     service: 'my-svc',
     service_version: 'v1.0.0',
     state_schema_version: 1,

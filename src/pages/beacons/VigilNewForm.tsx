@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { applyLabelAfterCreate } from '../../api/applyLabel';
 import { keeperApi, type VigilCreateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
@@ -149,6 +150,11 @@ export function VigilNewForm() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  // The entity exists once the create returned, even if its caption write was
+  // refused. Re-submitting would 409 on the id — and for an incarnation it would
+  // dispatch a second run — so the only way forward is to leave; the caption is
+  // editable from the entity's own page.
+  const [created, setCreated] = useState(false);
   // typed-params live separately — turned into params_json on submit.
   const [typedParams, setTypedParams] = useState<Record<string, unknown>>({ recursive: false });
   // The subject is required and is one of four dimensions — it lives outside
@@ -167,7 +173,8 @@ export function VigilNewForm() {
   } = useForm<VigilFormInput>({
     resolver: zodResolver(vigilFormSchema),
     defaultValues: {
-      name: '',
+      id: '',
+      label: '',
       interval: '30s',
       check: KNOWN_BEACONS[0],
       enabled: true,
@@ -178,10 +185,21 @@ export function VigilNewForm() {
   const check = watch('check');
 
   const create = useMutation({
-    mutationFn: (body: VigilCreateRequest) => keeperApi.vigils.create(body),
-    onSuccess: (v) => {
+    // The caption travels on its own endpoint after the create: the keeper accepts
+    // `label` in the create body and drops it (see applyLabelAfterCreate).
+    mutationFn: async ({ body, label }: { body: VigilCreateRequest; label: string }) => {
+      const v = await keeperApi.vigils.create(body);
+      const labelError = await applyLabelAfterCreate((b) => keeperApi.vigils.setLabel(v.id, b), label);
+      return { v, labelError };
+    },
+    onSuccess: ({ v, labelError }) => {
       qc.invalidateQueries({ queryKey: ['vigils.list'] });
-      nav(`/vigils/${encodeURIComponent(v.name)}`);
+      if (labelError) {
+        setCreated(true);
+        setServerError(labelError);
+        return;
+      }
+      nav(`/vigils/${encodeURIComponent(v.id)}`);
     },
     onError: (err) => {
       setServerError(
@@ -252,14 +270,14 @@ export function VigilNewForm() {
     if (badSubject) return;
     const params = buildParamsForSubmit(values);
     const body: VigilCreateRequest = {
-      name: values.name,
+      id: values.id,
       subject: buildSubject(draft),
       interval: values.interval,
       check: values.check,
       params: params as VigilCreateRequest['params'],
       enabled: values.enabled,
     };
-    create.mutate(body);
+    create.mutate({ body, label: values.label });
   }
 
   // When switching check, reset typedParams to sensible defaults.
@@ -294,11 +312,19 @@ export function VigilNewForm() {
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.formFields}>
             <Input
-              label={t('beacons:nameKebabLabel')}
+              label={t('common:colId')}
               mono
-              {...register('name')}
+              {...register('id')}
               placeholder="redis-down"
-              error={errors.name?.message ? t(errors.name.message) : undefined}
+              hint={t('beacons:idKebabHint')}
+              error={errors.id?.message ? t(errors.id.message) : undefined}
+            />
+            <Input
+              label={t('common:colLabel')}
+              {...register('label')}
+              placeholder="Redis down"
+              hint={t('beacons:labelHint')}
+              error={errors.label?.message ? t(errors.label.message) : undefined}
             />
             <Input
               label={t('common:colInterval')}
@@ -388,7 +414,7 @@ export function VigilNewForm() {
         {serverError ? <div className={styles.errorBox}>{serverError}</div> : null}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button type="submit" variant="primary" disabled={isSubmitting || create.isPending}>
+          <Button type="submit" variant="primary" disabled={created || isSubmitting || create.isPending}>
             {create.isPending ? t('creating') : t('createVigil')}
           </Button>
           <Button type="button" variant="ghost" onClick={() => nav('/vigils')}>{t('cancel')}</Button>

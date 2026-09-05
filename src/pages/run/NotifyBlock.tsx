@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { entityCaption } from '../../components/entityCaption';
 import { Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { keeperApi } from '../../api/keeper';
@@ -200,7 +201,7 @@ function NotifyItem({
   value: VoyageNotify;
   onChange: (next: VoyageNotify) => void;
   onRemove: () => void;
-  heraldItems: Array<{ name: string }>;
+  heraldItems: Array<{ id: string; label?: string }>;
 }) {
   const { t } = useTranslation();
 
@@ -272,9 +273,10 @@ function NotifyItem({
             }}
           >
             <option value="">{t('run:notifyHeraldPlaceholder')}</option>
+            {/* The value is the herald id the notify rule binds to; the text is its caption. */}
             {heraldItems.map((h) => (
-              <option key={h.name} value={h.name}>
-                {h.name}
+              <option key={h.id} value={h.id}>
+                {entityCaption(h)}
               </option>
             ))}
           </select>

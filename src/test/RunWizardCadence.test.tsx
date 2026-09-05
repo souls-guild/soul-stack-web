@@ -66,7 +66,7 @@ function setupFetch(opts: { capturedPosts?: PostCapture[] } = {}) {
     }
     if (url.includes('/v1/services')) {
       return json({
-        items: [{ name: 'redis', ref: 'main', source: { type: 'git', url: 'git@x' } }],
+        items: [{ id: 'redis', ref: 'main', source: { type: 'git', url: 'git@x' } }],
         offset: 0, limit: 50, total: 1,
       });
     }
@@ -78,7 +78,7 @@ function setupFetch(opts: { capturedPosts?: PostCapture[] } = {}) {
     }
     if (url.includes('/v1/incarnations')) {
       return json({
-        items: [{ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' }],
+        items: [{ id: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' }],
         offset: 0, limit: 500, total: 1,
       });
     }

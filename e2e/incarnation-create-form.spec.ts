@@ -22,7 +22,7 @@ test.describe('incarnation create form', () => {
     await scenarioSelect.selectOption('create_from_souls');
     await expect(scenarioSelect).toHaveValue('create_from_souls');
 
-    await page.getByTestId('incarnation-name-input').fill(uniqueName('cre'));
+    await page.getByTestId('incarnation-id-input').fill(uniqueName('cre'));
 
     // version field (if the scenario requires it): first available option, no hardcoding.
     const versionSelect = page.getByTestId('field-enum-version');

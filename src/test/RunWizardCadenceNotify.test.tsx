@@ -68,16 +68,16 @@ function setupFetch() {
       return json({ areas: [{ name: 'voyage.*' }, { name: 'scenario_run.*' }], point_events: [] });
     }
     if (url.includes('/v1/heralds')) {
-      return json({ items: [{ name: 'ops-webhook', type: 'webhook', config: { url: 'https://example.com' }, secret_ref: null, enabled: true, created_at: '', updated_at: '', created_by_aid: null }], offset: 0, limit: 200, total: 1 });
+      return json({ items: [{ id: 'ops-webhook', type: 'webhook', config: { url: 'https://example.com' }, secret_ref: null, enabled: true, created_at: '', updated_at: '', created_by_aid: null }], offset: 0, limit: 200, total: 1 });
     }
     if (url.includes('/v1/services/redis/scenarios')) {
       return json({ service: 'redis', ref: 'main', scenarios: [{ name: 'restart', kind: 'operational', input_schema: {} }] });
     }
     if (url.includes('/v1/services')) {
-      return json({ items: [{ name: 'redis', ref: 'main', source: { type: 'git', url: 'git@x' } }], offset: 0, limit: 50, total: 1 });
+      return json({ items: [{ id: 'redis', ref: 'main', source: { type: 'git', url: 'git@x' } }], offset: 0, limit: 50, total: 1 });
     }
     if (url.includes('/v1/incarnations')) {
-      return json({ items: [{ name: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' }], offset: 0, limit: 500, total: 1 });
+      return json({ items: [{ id: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' }], offset: 0, limit: 500, total: 1 });
     }
     if (url.includes('/v1/souls')) {
       return json({ items: [], offset: 0, limit: 1000, total: 0 });

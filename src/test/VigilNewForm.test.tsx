@@ -20,7 +20,7 @@ describe('VigilNewForm', () => {
         url: '/v1/vigils',
         status: 201,
         body: {
-          name: 'config-changed',
+          id: 'config-changed',
           check: 'core.beacon.file_changed',
           interval: '15s',
           params: { path: '/etc/redis.conf', recursive: false },
@@ -34,7 +34,7 @@ describe('VigilNewForm', () => {
         method: 'GET',
         url: '/v1/vigils/config-changed',
         body: {
-          name: 'config-changed',
+          id: 'config-changed',
           check: 'core.beacon.file_changed',
           interval: '15s',
           params: { path: '/etc/redis.conf', recursive: false },
@@ -63,7 +63,7 @@ describe('VigilNewForm', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
+    await user.type(screen.getByLabelText(/^ID/), 'config-changed');
     await user.clear(screen.getByLabelText(/Interval/i));
     await user.type(screen.getByLabelText(/Interval/i), '15s');
     // typed mode is already selected by default -- fill in path.
@@ -79,7 +79,7 @@ describe('VigilNewForm', () => {
       expect(postSpy).toHaveBeenCalled();
     });
     const payload = postSpy.mock.calls[0][0];
-    expect(payload.name).toBe('config-changed');
+    expect(payload.id).toBe('config-changed');
     expect(payload.check).toBe('core.beacon.file_changed');
     expect(payload.interval).toBe('15s');
     expect(payload.params).toEqual({ path: '/etc/redis.conf', recursive: false });
@@ -103,7 +103,7 @@ describe('VigilNewForm', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
+    await user.type(screen.getByLabelText(/^ID/), 'config-changed');
     await user.type(screen.getByLabelText(/^path$/i), '/etc/redis.conf');
     // every other field is valid; the subject is left empty on purpose.
     await user.click(screen.getByRole('button', { name: /Create Vigil/i }));
@@ -132,7 +132,7 @@ describe('VigilNewForm', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
+    await user.type(screen.getByLabelText(/^ID/), 'config-changed');
     await user.type(screen.getByLabelText(/^path$/i), '/etc/redis.conf');
     const picker = screen.getByLabelText('dimension');
     expect([...picker.querySelectorAll('option')].map((o) => o.getAttribute('value'))).toEqual([
@@ -163,7 +163,7 @@ describe('VigilNewForm', () => {
     expect(postSpy.mock.calls[2][0].subject).toEqual({ trait: { key: 'owner', value: 'dba' } });
   });
 
-  it('validation: empty name blocks submit (no 422 sent)', async () => {
+  it('validation: empty id blocks submit (no 422 sent)', async () => {
     const postSpy = vi.fn();
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
@@ -181,11 +181,11 @@ describe('VigilNewForm', () => {
     );
 
     const user = userEvent.setup();
-    // submit without filling in name
+    // submit without filling in the id
     await user.click(screen.getByRole('button', { name: /Create Vigil/i }));
     // Inline error must appear, fetch must NOT be called
     await waitFor(() => {
-      expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+      expect(screen.getByText('id is required')).toBeInTheDocument();
     });
     expect(postSpy).not.toHaveBeenCalled();
   });

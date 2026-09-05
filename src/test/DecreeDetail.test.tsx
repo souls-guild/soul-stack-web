@@ -7,7 +7,7 @@ import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
 const SAMPLE = {
-  name: 'restart-on-config',
+  id: 'restart-on-config',
   on_beacon: 'redis-config-changed',
   where: 'portent.kind == "core.beacon.file_changed" && portent.path == "/etc/redis.conf"',
   subject: { coven: ['prod'] },

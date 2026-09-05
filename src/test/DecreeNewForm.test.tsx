@@ -28,7 +28,7 @@ describe('DecreeNewForm', () => {
 
   it('POST with minimal fields → redirect to detail', async () => {
     const created = {
-      name: 'restart-on-config',
+      id: 'restart-on-config',
       on_beacon: 'redis-config-changed',
       incarnation_name: 'redis-prod',
       action_scenario: 'restart',
@@ -80,7 +80,7 @@ describe('DecreeNewForm', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'restart-on-config');
+    await user.type(screen.getByLabelText(/^ID/), 'restart-on-config');
     await user.type(screen.getByLabelText(/on_beacon/i), 'redis-config-changed');
     await user.type(screen.getByLabelText(/^Incarnation$/i), 'redis-prod');
     await user.type(screen.getByLabelText(/action_scenario/i), 'restart');
@@ -93,7 +93,7 @@ describe('DecreeNewForm', () => {
       expect(postSpy).toHaveBeenCalled();
     });
     const payload = postSpy.mock.calls[0][0];
-    expect(payload.name).toBe('restart-on-config');
+    expect(payload.id).toBe('restart-on-config');
     expect(payload.on_beacon).toBe('redis-config-changed');
     expect(payload.incarnation_name).toBe('redis-prod');
     expect(payload.action_scenario).toBe('restart');
@@ -119,7 +119,7 @@ describe('DecreeNewForm', () => {
     renderWithProviders(<DecreeNewForm />, '/decrees/new');
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'restart-on-config');
+    await user.type(screen.getByLabelText(/^ID/), 'restart-on-config');
     await user.type(screen.getByLabelText(/on_beacon/i), 'redis-config-changed');
     await user.type(screen.getByLabelText(/^Incarnation$/i), 'redis-prod');
     await user.type(screen.getByLabelText(/action_scenario/i), 'restart');

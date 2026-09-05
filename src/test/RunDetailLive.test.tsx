@@ -56,9 +56,8 @@ describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
             {
               plan_index: 0,
               passage: 0,
-              name: 'Install redis package',
+              id: 'Install redis package',
               module: 'core.pkg.installed',
-              no_log: false,
               params: { name: 'redis' },
               hosts: [{ sid: 'h1.local', status: 'TASK_STATUS_CHANGED', output: { changed: true } }],
             },
@@ -103,9 +102,8 @@ describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
               {
                 plan_index: 0,
                 passage: 0,
-                name: 'Configure sentinel',
+                id: 'Configure sentinel',
                 module: 'core.file.rendered',
-                no_log: false,
                 params: {},
                 hosts: [{ sid: 'redis-3.local', status: st }],
               },

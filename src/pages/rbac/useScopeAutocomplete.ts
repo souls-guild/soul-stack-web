@@ -40,11 +40,14 @@ export function useAutocompleteOptions(dim: ScopeDim | '', active = false): stri
     staleTime: 60_000,
   });
 
+  // An RBAC scope is matched against the identifier, never the caption: the
+  // caption is mutable and unique to nobody, so a scope built from one would
+  // silently change meaning — or match two entities — the moment it is edited.
   if (dim === 'incarnation') {
-    return (incQ.data?.items ?? []).map((i) => i.name).filter(Boolean);
+    return (incQ.data?.items ?? []).map((i) => i.id).filter(Boolean);
   }
   if (dim === 'service') {
-    return (svcQ.data?.items ?? []).map((s) => s.name).filter(Boolean);
+    return (svcQ.data?.items ?? []).map((s) => s.id).filter(Boolean);
   }
   if (dim === 'host') {
     return (soulsQ.data?.items ?? []).map((s) => s.sid).filter(Boolean);

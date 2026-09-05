@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { applyLabelAfterCreate } from '../../api/applyLabel';
 import { keeperApi, type DecreeCreateRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
@@ -18,6 +19,11 @@ export function DecreeNewForm() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  // The entity exists once the create returned, even if its caption write was
+  // refused. Re-submitting would 409 on the id — and for an incarnation it would
+  // dispatch a second run — so the only way forward is to leave; the caption is
+  // editable from the entity's own page.
+  const [created, setCreated] = useState(false);
   // Required, one of four dimensions — see ./subject.ts. Distinct from
   // incarnation_name below: the subject says which hosts may FIRE the rule,
   // incarnation_name is the TARGET the reaction runs against.
@@ -41,7 +47,8 @@ export function DecreeNewForm() {
   } = useForm<DecreeFormInput>({
     resolver: zodResolver(decreeFormSchema),
     defaultValues: {
-      name: '',
+      id: '',
+      label: '',
       on_beacon: '',
       where: '',
       incarnation_name: '',
@@ -53,10 +60,21 @@ export function DecreeNewForm() {
   });
 
   const create = useMutation({
-    mutationFn: (body: DecreeCreateRequest) => keeperApi.decrees.create(body),
-    onSuccess: (d) => {
+    // The caption travels on its own endpoint after the create: the keeper accepts
+    // `label` in the create body and drops it (see applyLabelAfterCreate).
+    mutationFn: async ({ body, label }: { body: DecreeCreateRequest; label: string }) => {
+      const d = await keeperApi.decrees.create(body);
+      const labelError = await applyLabelAfterCreate((b) => keeperApi.decrees.setLabel(d.id, b), label);
+      return { d, labelError };
+    },
+    onSuccess: ({ d, labelError }) => {
       qc.invalidateQueries({ queryKey: ['decrees.list'] });
-      nav(`/decrees/${encodeURIComponent(d.name)}`);
+      if (labelError) {
+        setCreated(true);
+        setServerError(labelError);
+        return;
+      }
+      nav(`/decrees/${encodeURIComponent(d.id)}`);
     },
     onError: (err) => {
       setServerError(
@@ -81,7 +99,7 @@ export function DecreeNewForm() {
       actionInput = {};
     }
     const body: DecreeCreateRequest = {
-      name: values.name,
+      id: values.id,
       on_beacon: values.on_beacon,
       subject: buildSubject(draft),
       incarnation_name: values.incarnation_name,
@@ -91,7 +109,7 @@ export function DecreeNewForm() {
     };
     if (values.where) body.where = values.where;
     if (values.cooldown) body.cooldown = values.cooldown;
-    create.mutate(body);
+    create.mutate({ body, label: values.label });
   }
 
   return (
@@ -115,11 +133,19 @@ export function DecreeNewForm() {
           <h2 className={styles.sectionTitle}>{t('beacons:baseFieldsLegend')}</h2>
           <div className={styles.filters}>
             <Input
-              label={t('beacons:nameKebabLabel')}
+              label={t('common:colId')}
               mono
-              {...register('name')}
+              {...register('id')}
               placeholder="restart-on-config-change"
-              error={errors.name?.message ? t(errors.name.message) : undefined}
+              hint={t('beacons:idKebabHint')}
+              error={errors.id?.message ? t(errors.id.message) : undefined}
+            />
+            <Input
+              label={t('common:colLabel')}
+              {...register('label')}
+              placeholder="Restart on config change"
+              hint={t('beacons:labelHint')}
+              error={errors.label?.message ? t(errors.label.message) : undefined}
             />
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div className={styles.metaKey}>{t('beacons:onBeaconLabel')}</div>
@@ -137,7 +163,7 @@ export function DecreeNewForm() {
                 }}
               />
               <datalist id="known-vigils">
-                {(vigils.data?.items ?? []).map((v) => <option key={v.name} value={v.name} />)}
+                {(vigils.data?.items ?? []).map((v) => <option key={v.id} value={v.id} />)}
               </datalist>
               {errors.on_beacon ? (
                 <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.on_beacon.message ?? '')}</span>
@@ -209,7 +235,7 @@ export function DecreeNewForm() {
                 }}
               />
               <datalist id="known-incarnations">
-                {(incarnations.data?.items ?? []).map((i) => <option key={i.name} value={i.name} />)}
+                {(incarnations.data?.items ?? []).map((i) => <option key={i.id} value={i.id} />)}
               </datalist>
               {errors.incarnation_name ? (
                 <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t(errors.incarnation_name.message ?? '')}</span>
@@ -248,7 +274,7 @@ export function DecreeNewForm() {
         {serverError ? <div className={styles.errorBox}>{serverError}</div> : null}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button type="submit" variant="primary" disabled={isSubmitting || create.isPending}>
+          <Button type="submit" variant="primary" disabled={created || isSubmitting || create.isPending}>
             {create.isPending ? t('creating') : t('createDecree')}
           </Button>
           <Button type="button" variant="ghost" onClick={() => nav('/decrees')}>{t('cancel')}</Button>

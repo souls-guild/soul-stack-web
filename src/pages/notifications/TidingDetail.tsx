@@ -6,6 +6,7 @@ import { Bell } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
+import { entityCaption, showsIdBeside } from '../../components/entityCaption';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { TidingModal } from './TidingModal';
 import styles from '../common.module.css';
@@ -64,14 +65,17 @@ export function TidingDetail() {
         <div>
           <h1 className={styles.title}>
             <Bell size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
-            {td.name}
+            {entityCaption(td)}
           </h1>
+          {showsIdBeside(td) ? (
+            <div className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{td.id}</div>
+          ) : null}
           <div className={styles.crumbs}>
             <Link to="/notifications">{t('pageTitle')}</Link>
             {' / '}
             <Link to="/notifications?tab=tidings">{t('tidingTitle')}</Link>
             {' / '}
-            {td.name}
+            {entityCaption(td)}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -94,7 +98,7 @@ export function TidingDetail() {
             type="button"
             disabled={!canDelete}
             onClick={() => {
-              if (window.confirm(t('tidingDeleteConfirm', { name: td.name }))) {
+              if (window.confirm(t('tidingDeleteConfirm', { name: td.id }))) {
                 deleteMu.mutate();
               }
             }}

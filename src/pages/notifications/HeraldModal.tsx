@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { applyLabelAfterCreate } from '../../api/applyLabel';
+import { canonicalJson } from '../../api/canonicalJson';
 import { keeperApi, type Herald, type HeraldCreateRequest, type HeraldUpdateRequest, type HeraldTypeFieldSpec } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Modal, Button, Input } from '../../components/primitives';
@@ -180,7 +182,10 @@ export function HeraldModal({ open, onClose, editing }: Props) {
   const qc = useQueryClient();
   const typeCatalog = useHeraldTypeCatalog();
 
-  const [name, setName] = useState('');
+  const [id, setId] = useState('');
+  const [label, setLabel] = useState('');
+  // Set when the entity was created but its caption write was refused.
+  const [labelNotice, setLabelNotice] = useState<string | null>(null);
   const [type, setType] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
   const [secretFields, setSecretFields] = useState<Record<string, SecretFieldState>>({});
@@ -195,7 +200,8 @@ export function HeraldModal({ open, onClose, editing }: Props) {
   useEffect(() => {
     if (!open) return;
     if (editing) {
-      setName(editing.name);
+      setId(editing.id);
+      setLabel(editing.label ?? '');
       setType(editing.type);
       setSecretMode('ref');
       setSecretValue('');
@@ -208,7 +214,9 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       setFieldValues(rawValuesFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
       setSecretFields(secretFieldsFromConfig(typeFields, editing.config as Record<string, unknown> | null | undefined));
     } else {
-      setName('');
+      setId('');
+      setLabel('');
+      setLabelNotice(null);
       setType('');
       setSecretMode('ref');
       setSecretValue('');
@@ -259,18 +267,58 @@ export function HeraldModal({ open, onClose, editing }: Props) {
   }
 
   const createMu = useMutation({
-    mutationFn: (body: HeraldCreateRequest) => keeperApi.heralds.create(body),
-    onSuccess: () => {
+    // The caption travels on its own endpoint after the create: the keeper accepts
+    // `label` in the create body and drops it (see applyLabelAfterCreate).
+    mutationFn: async (body: HeraldCreateRequest) => {
+      const h = await keeperApi.heralds.create(body);
+      return applyLabelAfterCreate((b) => keeperApi.heralds.setLabel(h.id, b), label);
+    },
+    onSuccess: (labelError) => {
       qc.invalidateQueries({ queryKey: ['heralds.list'] });
+      if (labelError) {
+        setLabelNotice(labelError);
+        return;
+      }
       onClose();
     },
   });
 
+  // The update body the record as loaded would produce. Used only to tell a
+  // caption-only save from a real edit; it deliberately mirrors the shape built in
+  // handleSubmit so the two are comparable field for field.
+  function bodyFromEditing(): HeraldUpdateRequest | null {
+    if (!editing) return null;
+    return {
+      type: editing.type as HeraldUpdateRequest['type'],
+      config: editing.config as HeraldUpdateRequest['config'],
+      secret: undefined,
+      secret_ref: editing.secret_ref ?? undefined,
+      enabled: editing.enabled,
+    };
+  }
+
   const updateMu = useMutation({
-    mutationFn: (body: HeraldUpdateRequest) => keeperApi.heralds.update(editing!.name, body),
+    // Two requests when the caption moved: HeraldUpdateRequest has replace
+    // semantics over type/config/secret and carries no label at all, so the
+    // caption travels on its own endpoint.
+    mutationFn: async (body: HeraldUpdateRequest) => {
+      // Skip the replace when only the caption moved: PUT is a full replace of the
+      // channel and writes a `herald.updated` audit event, so sending it for a
+      // caption-only save reports a change to the channel that did not happen.
+      // The comparison is against the body this form would build from the record
+      // it loaded, so anything it cannot round-trip (a freshly typed secret is
+      // write-only and never returned) compares unequal and still sends.
+      if (canonicalJson(body) !== canonicalJson(bodyFromEditing())) {
+        await keeperApi.heralds.update(editing!.id, body);
+      }
+      const next = label.trim();
+      if (next !== (editing!.label ?? '')) {
+        await keeperApi.heralds.setLabel(editing!.id, { label: next ? next : null });
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['heralds.list'] });
-      qc.invalidateQueries({ queryKey: ['herald.get', editing!.name] });
+      qc.invalidateQueries({ queryKey: ['herald.get', editing!.id] });
       onClose();
     },
   });
@@ -313,7 +361,7 @@ export function HeraldModal({ open, onClose, editing }: Props) {
       updateMu.mutate(body);
     } else {
       const body: HeraldCreateRequest = {
-        name,
+        id,
         type: type as HeraldCreateRequest['type'],
         config: configOut,
         secret: topSecret,
@@ -340,25 +388,51 @@ export function HeraldModal({ open, onClose, editing }: Props) {
     if (f.kind === 'bool') return false;
     return String(v ?? '').trim() === '';
   });
-  const canSubmit = Boolean(type) && !missingRequired;
+  // Editing REQUIRES the catalog. Without it `fields` is empty, so the config this
+  // form rebuilds is `{}` — and a PUT is a full replace, so saving would wipe the
+  // channel's real config (chat_id, bot_token_ref) with nothing. Creating is safe:
+  // there is no existing config to destroy. The skip-when-unchanged guard cannot
+  // help here, because `{}` differs from the record and therefore looks like an edit.
+  const catalogUsable = !typeCatalog.isLoading && !typeCatalog.isError && fields.length > 0;
+  // `labelNotice` is only set after a create that landed, so it doubles as the
+  // "already created" flag: a resubmit would 409 on the id.
+  const canSubmit =
+    Boolean(type) && !missingRequired && (!editing || catalogUsable) && !labelNotice;
 
   return (
     <Modal open={open} title={title} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {!editing && (
+        {editing ? (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className={styles.metaKey}>{t('notifications:heraldFieldName')} *</span>
+            <span className={styles.metaKey}>{tc('colId')}</span>
+            <Input data-testid="herald-id-input" value={editing.id} readOnly mono />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('notifications:heraldFieldIdImmutableHint')}</span>
+          </label>
+        ) : (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span className={styles.metaKey}>{tc('colId')} *</span>
             <Input
-              data-testid="herald-name-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              data-testid="herald-id-input"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
               placeholder="my-webhook"
               required
               pattern="^[a-z0-9-]{1,63}$"
             />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('notifications:heraldFieldNameHint')}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('notifications:heraldFieldIdHint')}</span>
           </label>
         )}
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className={styles.metaKey}>{tc('colLabel')}</span>
+          <Input
+            data-testid="herald-label-input"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="My webhook"
+          />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t('notifications:heraldFieldLabelHint')}</span>
+        </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className={styles.metaKey}>{t('notifications:heraldFieldType')} *</span>
@@ -448,6 +522,16 @@ export function HeraldModal({ open, onClose, editing }: Props) {
           {t('notifications:heraldFieldEnabled')}
         </label>
 
+        {editing && !catalogUsable && !typeCatalog.isLoading ? (
+          <div role="alert" className={styles.errorBox} data-testid="herald-catalog-unavailable">
+            {t('notifications:heraldCatalogUnavailable')}
+          </div>
+        ) : null}
+        {labelNotice ? (
+          <div role="alert" className={styles.errorBox} data-testid="herald-label-notice">
+            {labelNotice}
+          </div>
+        ) : null}
         {error ? (
           <div role="alert" className={styles.errorBox} data-testid="herald-form-error">
             {plaintextDisabledMessage(error) ??

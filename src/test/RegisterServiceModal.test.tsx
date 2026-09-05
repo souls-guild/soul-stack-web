@@ -40,7 +40,7 @@ describe('RegisterServiceModal', () => {
   });
   it('valid form sends POST /v1/services with the correct body', async () => {
     const calls = installCapturingMock(201, {
-      name: 'redis',
+      id: 'redis',
       git: 'https://git.example.com/service-redis.git',
       ref: 'main',
       created_at: '2026-05-28T00:00:00Z',
@@ -64,11 +64,21 @@ describe('RegisterServiceModal', () => {
     await waitFor(() => {
       const post = calls.find((c) => c.method === 'POST' && c.url.includes('/v1/services'));
       expect(post).toBeTruthy();
+      // The create body carries no label: the keeper accepts the field there and
+      // drops it, so the caption goes out on PUT /v1/services/{id}/label instead.
       expect(post!.body).toEqual({
-        name: 'redis',
+        id: 'redis',
         git: 'https://git.example.com/service-redis.git',
         ref: 'main',
       });
+    });
+
+    await waitFor(() => {
+      const put = calls.find((c) => c.method === 'PUT' && c.url === '/v1/services/redis/label');
+      expect(put).toBeTruthy();
+      // The operator typed the id, so it kept what they typed; the caption was
+      // left alone and therefore followed the git path.
+      expect(put!.body).toEqual({ label: 'Service-redis' });
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -133,5 +143,41 @@ describe('RegisterServiceModal', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/already registered/i);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // NIM-731: both identity fields are proposed from the git path. This is the
+  // behaviour the ticket calls out as the one that breaks silently — a wrong
+  // proposal accepted by reflex writes an immutable id.
+  it('proposes id and label from the last segment of the git path', async () => {
+    installCapturingMock(201, {});
+    renderWithProviders(<RegisterServiceModal open onClose={vi.fn()} />, '/services');
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByPlaceholderText(/git\.example\.com\/service-redis/i),
+      'https://git.example.com/wb/service/redis.git',
+    );
+
+    await waitFor(() => expect(screen.getByPlaceholderText('redis')).toHaveValue('redis'));
+    expect(screen.getByPlaceholderText('Redis')).toHaveValue('Redis');
+  });
+
+  it('a hand-edited id stops following the git path', async () => {
+    installCapturingMock(201, {});
+    renderWithProviders(<RegisterServiceModal open onClose={vi.fn()} />, '/services');
+    const user = userEvent.setup();
+
+    await user.type(
+      screen.getByPlaceholderText(/git\.example\.com\/service-redis/i),
+      'https://git.example.com/wb/service/redis.git',
+    );
+    await waitFor(() => expect(screen.getByPlaceholderText('redis')).toHaveValue('redis'));
+
+    await user.clear(screen.getByPlaceholderText('redis'));
+    await user.type(screen.getByPlaceholderText('redis'), 'cache');
+    // Extending the path must not overwrite what the operator chose.
+    await user.type(screen.getByPlaceholderText(/git\.example\.com\/service-redis/i), 'x');
+
+    expect(screen.getByPlaceholderText('redis')).toHaveValue('cache');
   });
 });

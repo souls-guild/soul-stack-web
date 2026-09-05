@@ -8,7 +8,7 @@ import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
 const SAMPLE = {
-  name: 'redis',
+  id: 'redis',
   git: 'https://git.example.com/services/redis.git',
   ref: 'v2.0.0',
   refresh: '5m',
@@ -21,7 +21,7 @@ const SAMPLE = {
 const INCS = {
   items: [
     {
-      name: 'redis-prod',
+      id: 'redis-prod',
       service: 'redis',
       service_version: 'v2.0.0',
       state_schema_version: 3,
@@ -41,7 +41,7 @@ const INCS = {
 const INCS_WITH_STATE = {
   items: [
     {
-      name: 'redis-prod',
+      id: 'redis-prod',
       service: 'redis',
       service_version: 'v2.0.0',
       state_schema_version: 3,
@@ -57,7 +57,7 @@ const INCS_WITH_STATE = {
       },
     },
     {
-      name: 'redis-staging',
+      id: 'redis-staging',
       service: 'redis',
       service_version: 'v2.0.0',
       state_schema_version: 3,

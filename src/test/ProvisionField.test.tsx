@@ -221,7 +221,7 @@ function mockRedisScenarios(scenario: any = PROVISION_CREATE_SCENARIO) {
     {
       method: 'GET',
       url: '/v1/services',
-      body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+      body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
     },
   ]);
 }

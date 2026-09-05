@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { keeperApi, type VigilView } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Pager } from '../../components/primitives';
+import { EntityIdCell } from '../../components/EntityIdCell';
 import { KNOWN_BEACONS } from './schemas';
 import { formatSubject } from './subject';
 import styles from '../common.module.css';
@@ -120,7 +121,7 @@ export function VigilsList() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>{t('colName')}</th>
+                <th>{t('colLabel')}</th>
                 <th>{t('colBeaconKind')}</th>
                 <th>{t('colSubject')}</th>
                 <th>{t('colInterval')}</th>
@@ -131,9 +132,9 @@ export function VigilsList() {
             </thead>
             <tbody>
               {filtered.map((v) => (
-                <tr key={v.name}>
+                <tr key={v.id}>
                   <td>
-                    <Link to={`/vigils/${encodeURIComponent(v.name)}`}>{v.name}</Link>
+                    <EntityIdCell entity={v} to={`/vigils/${encodeURIComponent(v.id)}`} />
                   </td>
                   <td className="mono">{v.check}</td>
                   <td className="mono">{formatSubject(v.subject) ?? t('beacons:subjectNone')}</td>

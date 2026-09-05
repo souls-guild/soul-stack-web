@@ -7,7 +7,7 @@ import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
 const SAMPLE = {
-  name: 'redis-down',
+  id: 'redis-down',
   check: 'core.beacon.service_down',
   interval: '30s',
   params: { service: 'redis' },

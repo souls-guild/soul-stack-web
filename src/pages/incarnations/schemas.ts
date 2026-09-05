@@ -30,21 +30,24 @@ const jsonObjectFromString = z
 
 export const incarnationCreateSchema = z.object({
   // Empty is allowed HERE, and required is enforced in the form instead. A create scenario
-  // declaring `name_template` composes the name server-side and REJECTS a request that
+  // declaring `id_template` composes the id server-side and REJECTS a request that
   // carries one, so a hard `min(1)` in the schema made those services impossible to create
   // from the console at all (NIM-340).
   //
   // The rule is a property of the CHOSEN SCENARIO, not of the field, and this schema is a
   // module-level constant with no way to see the selection — so `IncarnationNewForm` gates
-  // the empty name against `composes_name` before submitting. Read that check together with
-  // this relaxation: on its own the line below looks like the name is simply optional, and it
+  // the empty id against `composes_id` before submitting. Read that check together with
+  // this relaxation: on its own the line below looks like the id is simply optional, and it
   // is not.
   //
   // The format check does stay here, and applies to whatever value IS present.
-  name: z
+  id: z
     .string()
     .trim()
     .refine((v) => v === '' || KEBAB.test(v), 'incarnations:kebabPattern'),
+  // The caption is free text and always optional — a composing scenario composes the
+  // id, never the caption, so this field is offered in both branches of the form.
+  label: z.string().trim(),
   service: z.string().trim().min(1, 'incarnations:noService'),
   covens: z
     .array(z.string().regex(KEBAB, 'incarnations:kebabEach'))

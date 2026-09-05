@@ -7,6 +7,8 @@ import { keeperApi, type ServiceScenarioInfo, type ServiceDependency, type Servi
 import { ApiError } from '../../api/client';
 import { Badge, Button, Dot } from '../../components/primitives';
 import { incarnationDot, incarnationTone } from '../../components/status';
+import { EntityIdCell } from '../../components/EntityIdCell';
+import { entityCaption } from '../../components/entityCaption';
 import { useServiceRefs } from './refs';
 import { EditServiceModal } from './EditServiceModal';
 import { DeregisterServiceModal } from './DeregisterServiceModal';
@@ -78,11 +80,11 @@ export function ServiceDetail() {
     <div className={styles.page}>
       <div>
         <div className={styles.crumbs}>
-          <Link to="/services">{t('admin:svcDetailCrumbParent')}</Link> / <span>{row.name}</span>
+          <Link to="/services">{t('admin:svcDetailCrumbParent')}</Link> / <span>{entityCaption(row)}</span>
         </div>
         <div className={styles.header}>
           <div>
-            <h1 className={styles.title}>{row.name}</h1>
+            <h1 className={styles.title}>{entityCaption(row)}</h1>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
               <GitRefInline git={row.git} gitRef={row.ref} />
               {row.refresh ? (
@@ -104,6 +106,10 @@ export function ServiceDetail() {
       </div>
 
       <div className={styles.meta}>
+        <span className={styles.metaKey}>{t('common:colId')}</span>
+        <span className={styles.metaVal} data-testid="svc-id">
+          <span className="mono">{row.id}</span>
+        </span>
         <span className={styles.metaKey}>{t('admin:svcMetaGit')}</span>
         <span className={styles.metaVal}>
           <GitUrl git={row.git} />
@@ -236,7 +242,7 @@ export function ServiceDetail() {
           {scenarioUnavailable ? (
             <div className={styles.empty}>
               {t('admin:svcScenariosUnavailable')}{' '}
-              <code className="mono">GET /v1/services/{row.name}/scenarios</code> {t('admin:svcScenariosUnavailable2')}{' '}
+              <code className="mono">GET /v1/services/{row.id}/scenarios</code> {t('admin:svcScenariosUnavailable2')}{' '}
               {(scenarios.error as ApiError).status}{t('admin:svcScenariosUnavailable3')}{' '}
               <Link to="/run?workload=scenario">Run Wizard</Link>.
             </div>
@@ -276,7 +282,7 @@ export function ServiceDetail() {
                         </span>
                       ) : (
                         <Link
-                          to={`/run?workload=scenario&service=${encodeURIComponent(row.name)}&scenario=${encodeURIComponent(s.name)}`}
+                          to={`/run?workload=scenario&service=${encodeURIComponent(row.id)}&scenario=${encodeURIComponent(s.name)}`}
                           aria-label={`${t('runScenario')} ${s.name}`}
                         >
                           <Button type="button" variant="primary">{t('admin:svcRunThisScenario')}</Button>
@@ -298,7 +304,7 @@ export function ServiceDetail() {
           {refs.unavailable ? (
             <div className={styles.empty}>
               {t('admin:svcRefsUnavailable')}{' '}
-              <code className="mono">GET /v1/services/{row.name}/refs</code> {t('admin:svcRefsUnavailable2')}{' '}
+              <code className="mono">GET /v1/services/{row.id}/refs</code> {t('admin:svcRefsUnavailable2')}{' '}
               <span className="mono">{row.ref}</span> {t('admin:svcRefsUnavailable3')}
             </div>
           ) : null}
@@ -347,7 +353,7 @@ export function ServiceDetail() {
         </section>
       ) : null}
 
-      {tab === 'schema' ? <ServiceSchemaTab name={row.name} serviceRef={row.ref} /> : null}
+      {tab === 'schema' ? <ServiceSchemaTab name={row.id} serviceRef={row.ref} /> : null}
 
       {tab === 'dependencies' ? (
         <ServiceDepsTab deps={deps} />
@@ -482,7 +488,7 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
           <table className={styles.table} data-testid="svc-inc-table">
             <thead>
               <tr>
-                <th>{t('admin:svcIncColName')}</th>
+                <th>{t('common:colLabel')}</th>
                 <th>{t('admin:svcIncColRef')}</th>
                 <th>{t('admin:svcIncColStatus')}</th>
                 <th>{t('admin:svcIncColCovens')}</th>
@@ -497,9 +503,9 @@ function IncarnationsTab({ incs, stateSchema }: IncarnationsTabProps) {
             </thead>
             <tbody>
               {(incs.data.items ?? []).map((inc) => (
-                <tr key={inc.name}>
+                <tr key={inc.id}>
                   <td>
-                    <Link to={`/incarnations/${encodeURIComponent(inc.name)}`}>{inc.name}</Link>
+                    <EntityIdCell entity={inc} to={`/incarnations/${encodeURIComponent(inc.id)}`} />
                   </td>
                   <td className="mono">{inc.service_version}</td>
                   <td>

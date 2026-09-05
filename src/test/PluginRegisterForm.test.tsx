@@ -12,7 +12,7 @@ describe('PluginRegisterForm', () => {
     tokenStore.clear();
   });
 
-  it('Zod validation rejects invalid namespace/name/ref', async () => {
+  it('Zod validation rejects an alias that is not kebab-case', async () => {
     installFetchMock([
       { method: 'POST', url: '/v1/plugins/sigils', status: 201, body: {} },
     ]);
@@ -23,30 +23,42 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    // namespace with uppercase - not kebab-case.
-    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'BAD_NS');
-    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'good-name');
+    // alias with uppercase and an underscore - not kebab-case.
+    await user.type(screen.getByPlaceholderText('acme'), 'BAD_ALIAS');
+    await user.type(screen.getByPlaceholderText(/soul-mod-acme\.git/i), 'https://git.example.com/soul-mod-acme.git');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
+    // The field error replaces its own hint, so counting "kebab-case" matches
+    // proves nothing. Assert the outcome instead: the pattern error is shown and
+    // the grant request never leaves the form.
     await waitFor(() => {
-      // "kebab-case" appears both in hint and in error-message; should become
-      // at least two (hint always + error from the Zod resolver on BAD_NS).
-      const matches = screen.getAllByText(/kebab-case/i);
-      expect(matches.length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText(/\^\[a-z\]\[a-z0-9-\]\*\$/)).toBeInTheDocument();
     });
+    const posts = (fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(
+      ([, init]) => ((init as RequestInit | undefined)?.method ?? 'GET').toUpperCase() === 'POST',
+    );
+    expect(posts).toHaveLength(0);
   });
 
-  it('successful POST shows sha256 and navigation buttons', async () => {
+  it('a successful POST shows a digest per artifact and the navigation buttons', async () => {
     installFetchMock([
       {
         method: 'POST',
         url: '/v1/plugins/sigils',
         status: 201,
         body: {
-          namespace: 'mod',
-          name: 'soul-mod-acme',
+          alias: 'acme',
+          source: 'https://git.example.com/soul-mod-acme.git',
           ref: 'v1.0.0',
-          sha256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          kind: 'git',
+          artifacts: [
+            {
+              os: 'linux',
+              arch: 'amd64',
+              path: 'soul-mod-acme_linux_amd64',
+              sha256: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+            },
+          ],
         },
       },
     ]);
@@ -57,16 +69,16 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'mod');
-    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
+    await user.type(screen.getByPlaceholderText('acme'), 'acme');
+    await user.type(screen.getByPlaceholderText(/soul-mod-acme\.git/i), 'https://git.example.com/soul-mod-acme.git');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Plugin allowed/i })).toBeInTheDocument();
     });
-    expect(
-      screen.getByText('abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('plugin-allowed-digests')).toHaveTextContent(
+      'linux/amd64 — abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+    );
     expect(screen.getByRole('button', { name: /Go to record/i })).toBeInTheDocument();
   });
 
@@ -86,8 +98,8 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'mod');
-    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
+    await user.type(screen.getByPlaceholderText('acme'), 'acme');
+    await user.type(screen.getByPlaceholderText(/soul-mod-acme\.git/i), 'https://git.example.com/soul-mod-acme.git');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
@@ -95,13 +107,13 @@ describe('PluginRegisterForm', () => {
     });
   });
 
-  it('404 explains "plugin not in cache"', async () => {
+  it('404 explains that the release could not be resolved', async () => {
     installFetchMock([
       {
         method: 'POST',
         url: '/v1/plugins/sigils',
         status: 404,
-        body: { title: 'plugin-not-in-cache', detail: 'no cached binary' },
+        body: { title: 'release-not-found', detail: 'no release at that ref' },
       },
     ]);
     renderWithProviders(
@@ -111,12 +123,12 @@ describe('PluginRegisterForm', () => {
       '/plugins/register',
     );
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/mod \/ ssh/i), 'mod');
-    await user.type(screen.getByPlaceholderText(/soul-mod-acme/i), 'soul-mod-acme');
+    await user.type(screen.getByPlaceholderText('acme'), 'acme');
+    await user.type(screen.getByPlaceholderText(/soul-mod-acme\.git/i), 'https://git.example.com/soul-mod-acme.git');
     await user.type(screen.getByPlaceholderText(/v1\.2\.3/i), 'v1.0.0');
     await user.click(screen.getByRole('button', { name: /Allow/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Plugin not found in the host's cache/i)).toBeInTheDocument();
+      expect(screen.getByText(/could not resolve a release/i)).toBeInTheDocument();
     });
   });
 });

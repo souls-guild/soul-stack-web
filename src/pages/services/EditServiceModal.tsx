@@ -15,8 +15,10 @@ interface Props {
   service: ServiceView;
 }
 
-// PATCH /v1/services/{name} — replace semantics for mutable fields (git/ref/refresh);
-// name is the record key and does not change.
+// PATCH /v1/services/{id} — replace semantics for the mutable fields
+// (git/ref/refresh). The caption is mutable too but travels on its own
+// PUT /v1/services/{id}/label, so a save that changes both is two requests; the
+// id is the record key and has no edit surface at all.
 export function EditServiceModal({ open, onClose, service }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -30,18 +32,42 @@ export function EditServiceModal({ open, onClose, service }: Props) {
   } = useForm<ServiceEditFormValues>({
     resolver: zodResolver(serviceEditSchema),
     mode: 'onChange',
-    defaultValues: { git: service.git, ref: service.ref, refresh: service.refresh ?? '' },
+    defaultValues: {
+      label: service.label ?? '',
+      git: service.git,
+      ref: service.ref,
+      refresh: service.refresh ?? '',
+    },
   });
 
   const mu = useMutation({
-    mutationFn: (values: ServiceEditFormValues) =>
-      keeperApi.services.update(service.name, {
-        git: values.git.trim(),
-        ref: values.ref.trim(),
-        ...(values.refresh.trim() ? { refresh: values.refresh.trim() } : {}),
-      }),
+    mutationFn: async (values: ServiceEditFormValues) => {
+      const git = values.git.trim();
+      const ref = values.ref.trim();
+      const refresh = values.refresh.trim();
+      // PATCH only when a field it owns actually moved. It is not idempotent from
+      // the outside: the keeper invalidates every artifact cache for the service
+      // and writes a `service.updated` audit event unconditionally, so firing it
+      // for a caption-only save reports a change that did not happen — and it
+      // needs `service.update`, which an operator who may only set a caption
+      // does not have.
+      const sourceChanged =
+        git !== service.git || ref !== service.ref || refresh !== (service.refresh ?? '');
+      if (sourceChanged) {
+        await keeperApi.services.update(service.id, {
+          git,
+          ref,
+          ...(refresh ? { refresh } : {}),
+        });
+      }
+      const label = values.label.trim();
+      if (label !== (service.label ?? '')) {
+        // null clears the caption; consumers then fall back to the id.
+        await keeperApi.services.setLabel(service.id, { label: label ? label : null });
+      }
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['service', service.name] });
+      qc.invalidateQueries({ queryKey: ['service', service.id] });
       qc.invalidateQueries({ queryKey: ['services.list'] });
       onClose();
     },
@@ -58,7 +84,7 @@ export function EditServiceModal({ open, onClose, service }: Props) {
   return (
     <Modal
       open={open}
-      title={t('forms:editServiceTitle', { name: service.name })}
+      title={t('forms:editServiceTitle', { name: service.id })}
       onClose={close}
       footer={
         <>
@@ -80,6 +106,22 @@ export function EditServiceModal({ open, onClose, service }: Props) {
       }
     >
       <form noValidate>
+        <Input
+          label={t('common:colId')}
+          mono
+          readOnly
+          value={service.id}
+          hint={t('admin:svcIdImmutableHint')}
+        />
+        <div style={{ height: 12 }} />
+        <Input
+          label={t('common:colLabel')}
+          placeholder={t('admin:svcLabelPlaceholderRedis')}
+          hint={t('admin:svcLabelHint')}
+          error={errors.label?.message ? t(errors.label.message) : undefined}
+          {...register('label')}
+        />
+        <div style={{ height: 12 }} />
         <Input
           label={t('admin:svcMetaGit')}
           mono

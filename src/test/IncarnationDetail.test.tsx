@@ -31,7 +31,7 @@ describe('IncarnationDetail', () => {
         method: 'GET',
         url: '/v1/incarnations/redis-prod',
         body: {
-          name: 'redis-prod',
+          id: 'redis-prod',
           service: 'redis',
           service_version: 'v2.0.0',
           state_schema_version: 3,
@@ -117,7 +117,7 @@ describe('IncarnationDetail', () => {
           method: 'GET',
           url: '/v1/incarnations/redis-prod',
           body: {
-            name: 'redis-prod',
+            id: 'redis-prod',
             service: 'redis',
             service_version: 'v2.0.0',
             state_schema_version: 3,
@@ -159,7 +159,7 @@ describe('IncarnationDetail', () => {
         method: 'GET',
         url: '/v1/incarnations/svc-1',
         body: {
-          name: 'svc-1',
+          id: 'svc-1',
           service: 'svc',
           service_version: 'main',
           state_schema_version: 1,
@@ -236,7 +236,7 @@ describe('IncarnationDetail', () => {
           covens: [],
           created_at: '2026-07-30T10:52:04.094288Z',
           created_by_aid: null,
-          name: 'nim330-fixture',
+          id: 'nim330-fixture',
           service: 'hello-world',
           service_version: 'main',
           state: { greeting_file: '/tmp/soul-stack-hello' },
@@ -322,7 +322,7 @@ describe('IncarnationDetail', () => {
             scanned_at: '0001-01-01T00:00:00Z',
             total_hosts: 0,
           },
-          name: 'nim445-fixture',
+          id: 'nim445-fixture',
           service: 'hello-world',
           service_version: 'main',
           state: {},
@@ -379,7 +379,7 @@ describe('IncarnationDetail', () => {
         method: 'GET',
         url: '/v1/incarnations/r-1',
         body: {
-          name: 'r-1',
+          id: 'r-1',
           service: 'r',
           service_version: 'main',
           state_schema_version: 1,
@@ -451,7 +451,7 @@ describe('IncarnationDetail', () => {
         method: 'GET',
         url: '/v1/incarnations/inc-h',
         body: {
-          name: 'inc-h',
+          id: 'inc-h',
           service: 'svc',
           service_version: 'main',
           state_schema_version: 1,
@@ -504,7 +504,7 @@ describe('IncarnationDetail', () => {
         method: 'GET',
         url: '/v1/incarnations/redis-traits',
         body: {
-          name: 'redis-traits',
+          id: 'redis-traits',
           service: 'redis',
           service_version: 'main',
           state_schema_version: 1,
@@ -543,7 +543,7 @@ describe('IncarnationDetail', () => {
         method: 'GET',
         url: '/v1/incarnations/no-traits',
         body: {
-          name: 'no-traits',
+          id: 'no-traits',
           service: 'redis',
           service_version: 'main',
           state_schema_version: 1,

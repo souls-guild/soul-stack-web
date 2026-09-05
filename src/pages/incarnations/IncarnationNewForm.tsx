@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Box } from 'lucide-react';
 import { Button, Input } from '../../components/primitives';
+import { applyLabelAfterCreate } from '../../api/applyLabel';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { ChipsInput } from './ChipsInput';
@@ -13,7 +14,8 @@ import { TraitsEditor, type TraitsMap } from './TraitsEditor';
 import { useServiceScenarios } from './useServiceScenarios';
 import { useServiceDirectives } from './useServiceDirectives';
 import { ScenarioInputFields } from './ScenarioInputFields';
-import { ComposedNamePreview } from './ComposedNamePreview';
+import { ComposedIdPreview } from './ComposedIdPreview';
+import { entityCaption } from '../../components/entityCaption';
 import {
   computeVisibleFields,
   computeRequiredHostCount,
@@ -43,6 +45,11 @@ export function IncarnationNewForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
+  // The entity exists once the create returned, even if its caption write was
+  // refused. Re-submitting would 409 on the id — and for an incarnation it would
+  // dispatch a second run — so the only way forward is to leave; the caption is
+  // editable from the entity's own page.
+  const [created, setCreated] = useState(false);
   const [createdApplyId, setCreatedApplyId] = useState<string | null>(null);
 
   // Pre-fill from ?service=... (comes from ServiceDetail -> "Use in incarnation").
@@ -70,7 +77,7 @@ export function IncarnationNewForm() {
       unknown,
       IncarnationCreateFormOutput
     >,
-    defaultValues: { name: '', service: prefilledService, covens: [], inputJson: '', traits: {} },
+    defaultValues: { id: '', label: '', service: prefilledService, covens: [], inputJson: '', traits: {} },
   });
 
   const selectedService = watch('service');
@@ -97,12 +104,12 @@ export function IncarnationNewForm() {
   const createSchema = selectedCreateScenario?.input_schema;
   const usePerField = isSupportedInputSchema(createSchema);
 
-  // The chosen create scenario composes the name from its input components
+  // The chosen create scenario composes the id from its input components
   // (ADR-0079), so the operator does not type one and the keeper REFUSES a request
-  // that carries one. The name field gives way to a live preview of what the create
+  // that carries one. The id field gives way to a live preview of what the create
   // would compose. An older keeper omits the flag → false → the form behaves as
-  // before, with a typed name.
-  const composesName = selectedCreateScenario?.composes_name === true;
+  // before, with a typed id. The caption is unaffected either way: nothing composes it.
+  const composesId = selectedCreateScenario?.composes_id === true;
 
   const [fields, setFields] = useState<ScenarioFieldsState>({});
   const [showInputErrors, setShowInputErrors] = useState(false);
@@ -201,23 +208,46 @@ export function IncarnationNewForm() {
   );
 
   const createMu = useMutation({
-    mutationFn: (body: { name?: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap }) =>
-      keeperApi.incarnations.create(body),
-    onSuccess: (reply) => {
+    // `label` is deliberately absent from the create body: the keeper accepts it
+    // there and drops it, so the caption is written afterwards against the id the
+    // reply names — which under a composing scenario is the only place the
+    // operator's incarnation id exists (see applyLabelAfterCreate).
+    mutationFn: async ({
+      body,
+      label,
+    }: {
+      body: { id?: string; service: string; covens: string[]; input: Record<string, unknown>; create_scenario?: string; traits?: TraitsMap };
+      label: string;
+    }) => {
+      const reply = await keeperApi.incarnations.create(body);
+      const labelError = await applyLabelAfterCreate(
+        (b) => keeperApi.incarnations.setLabel(reply.incarnation, b),
+        label,
+      );
+      return { reply, labelError };
+    },
+    onSuccess: ({ reply, labelError }) => {
       setCreatedApplyId(reply.apply_id ?? null);
+      // The incarnation exists and its run is already dispatched; a lost caption
+      // must not read as a failed create.
+      if (labelError) {
+        setCreated(true);
+        setServerError(labelError);
+        return;
+      }
       setTimeout(() => navigate(`/incarnations/${encodeURIComponent(reply.incarnation)}`), 600);
     },
     onError: (err) => {
-      // "field 'name' is required" belongs on the name input — a failure of one field reads
-      // wrong in the generic banner. But when the scenario composes the name there IS no
+      // "field 'id' is required" belongs on the id input — a failure of one field reads
+      // wrong in the generic banner. But when the scenario composes the id there IS no
       // input: the two sides disagree (the descriptor said composing, the keeper then asked
-      // for a name), and attaching the error to a field that is not rendered would drop the
+      // for an id), and attaching the error to a field that is not rendered would drop the
       // message entirely. Then, and only then, it goes to the form-level box.
-      if (err instanceof ApiError && err.status === 422 && /field 'name' is required/i.test(err.detail ?? '')) {
-        if (composesName) {
-          setServerError(t('incarnations:nameRequiredByScenario'));
+      if (err instanceof ApiError && err.status === 422 && /field 'id' is required/i.test(err.detail ?? '')) {
+        if (composesId) {
+          setServerError(t('incarnations:idRequiredByScenario'));
         } else {
-          setError('name', { type: 'server', message: 'incarnations:nameRequiredByScenario' });
+          setError('id', { type: 'server', message: 'incarnations:idRequiredByScenario' });
         }
         return;
       }
@@ -233,13 +263,13 @@ export function IncarnationNewForm() {
   function onSubmit(values: IncarnationCreateFormOutput) {
     setServerError(null);
     setCreatedApplyId(null);
-    // Conditional, which the zod schema cannot be: whether a name is required is a
+    // Conditional, which the zod schema cannot be: whether an id is required is a
     // property of the CHOSEN scenario, not of the field. NIM-340 had to drop the
     // requirement outright because the scenario list carried no such flag, which
-    // lost the check wherever a name IS still typed; `composes_name` restores it
+    // lost the check wherever an id IS still typed; `composes_id` restores it
     // without re-breaking the templated path.
-    if (!composesName && !values.name) {
-      setError('name', { type: 'required', message: 'incarnations:nameRequired' });
+    if (!composesId && !values.id) {
+      setError('id', { type: 'required', message: 'incarnations:nameRequired' });
       return;
     }
     // Scenario selection validation — if create scenarios exist, selection is required.
@@ -270,18 +300,21 @@ export function IncarnationNewForm() {
       usePerField && createSchema ? serializeFields(createSchema, fields) : {};
     const traits = Object.keys(values.traits).length > 0 ? values.traits : undefined;
     createMu.mutate({
-      // Decided by the flag, not by emptiness. Hiding the input does not clear it, so a name
-      // typed for a previously selected scenario is still in form state when the operator
-      // switches to one that composes — and a composing scenario rejects a request carrying
-      // `name` at all. Testing `values.name` here would send that leftover and earn the very
-      // 422 this path exists to avoid.
-      ...(composesName || !values.name ? {} : { name: values.name }),
-      service: values.service,
-      covens: values.covens,
-      input,
-      // For a bare incarnation (no create scenarios) — don't pass create_scenario.
-      ...(selectedCreateScenario ? { create_scenario: selectedCreateScenario.name } : {}),
-      traits,
+      label: values.label,
+      body: {
+        // Decided by the flag, not by emptiness. Hiding the input does not clear it, so an id
+        // typed for a previously selected scenario is still in form state when the operator
+        // switches to one that composes — and a composing scenario rejects a request carrying
+        // `id` at all. Testing `values.id` here would send that leftover and earn the very
+        // 422 this path exists to avoid.
+        ...(composesId || !values.id ? {} : { id: values.id }),
+        service: values.service,
+        covens: values.covens,
+        input,
+        // For a bare incarnation (no create scenarios) — don't pass create_scenario.
+        ...(selectedCreateScenario ? { create_scenario: selectedCreateScenario.name } : {}),
+        traits,
+      },
     });
   }
 
@@ -303,30 +336,39 @@ export function IncarnationNewForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
-        {composesName ? (
-          <ComposedNamePreview
+        {composesId ? (
+          <ComposedIdPreview
             service={selectedService}
             scenario={selectedCreateScenario!.name}
             input={previewInput}
             covens={watch('covens') ?? []}
           />
         ) : (
-          // No "leave it empty if the scenario composes the name" note here. This branch IS
-          // the one where nothing composes it and the name is required, so that instruction
+          // No "leave it empty if the scenario composes the id" note here. This branch IS
+          // the one where nothing composes it and the id is required, so that instruction
           // told the operator to do the one thing the form then rejects — it sat directly
           // above "required field". It was written when the form could not tell the two kinds
-          // of scenario apart and had to ask the operator to guess; `composes_name` decides
+          // of scenario apart and had to ask the operator to guess; `composes_id` decides
           // now, and the composing branch above explains itself.
           <Input
-            label={t('incarnations:newNameLabel')}
+            label={t('incarnations:newIdLabel')}
             placeholder="redis-prod"
             mono
-            data-testid="incarnation-name-input"
-            aria-invalid={errors.name ? 'true' : undefined}
-            error={errors.name ? t(errors.name.message ?? '') : undefined}
-            {...register('name')}
+            data-testid="incarnation-id-input"
+            aria-invalid={errors.id ? 'true' : undefined}
+            error={errors.id ? t(errors.id.message ?? '') : undefined}
+            {...register('id')}
           />
         )}
+
+        <Input
+          label={t('incarnations:newLabelLabel')}
+          placeholder="Redis prod"
+          hint={t('incarnations:newLabelHint')}
+          data-testid="incarnation-label-input"
+          error={errors.label ? t(errors.label.message ?? '') : undefined}
+          {...register('label')}
+        />
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Service</span>
@@ -346,8 +388,8 @@ export function IncarnationNewForm() {
           >
             <option value="">{t('incarnations:selectService')}</option>
             {serviceItems.map((s) => (
-              <option key={s.name} value={s.name}>
-                {s.name} ({s.ref})
+              <option key={s.id} value={s.id}>
+                {entityCaption(s)} ({s.ref})
               </option>
             ))}
           </select>
@@ -495,7 +537,7 @@ export function IncarnationNewForm() {
               onChange={setFields}
               showErrors={showInputErrors}
               form={selectedCreateScenario?.form}
-              incarnationName={watch('name') || undefined}
+              incarnationName={watch('id') || undefined}
               onInvalidMapChange={setInvalidMaps}
               directiveCatalog={directiveCatalog}
               directiveVersion={directiveVersion}
@@ -534,7 +576,7 @@ export function IncarnationNewForm() {
             <span>
               {t('incarnations:provisionHostWarningBody', {
                 n: provisionWarning,
-                name: watch('name') || '…',
+                name: watch('id') || '…',
               })}
             </span>
           </div>
@@ -579,7 +621,7 @@ export function IncarnationNewForm() {
           <Button
             type="submit"
             variant="primary"
-            disabled={isSubmitting || createMu.isPending || missingRequired.length > 0 || missingScenarioSelection || invalidMaps.length > 0}
+            disabled={created || isSubmitting || createMu.isPending || missingRequired.length > 0 || missingScenarioSelection || invalidMaps.length > 0}
             data-testid="incarnation-submit"
           >
             {createMu.isPending ? t('creating') : t('createIncarnation')}

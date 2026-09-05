@@ -174,7 +174,7 @@ describe('Vigil / Decree request contract', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
+    await user.type(screen.getByLabelText(/^ID/), 'config-changed');
     await user.type(screen.getByLabelText(/^path$/i), '/etc/redis.conf');
     await typeChips('subject-sid', 'host01.example.com');
     await user.click(screen.getByRole('button', { name: /Create Vigil/i }));
@@ -191,7 +191,7 @@ describe('Vigil / Decree request contract', () => {
     renderWithProviders(<DecreeNewForm />, '/decrees/new');
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'restart-on-config');
+    await user.type(screen.getByLabelText(/^ID/), 'restart-on-config');
     await user.type(screen.getByLabelText(/on_beacon/i), 'redis-config-changed');
     await user.type(screen.getByLabelText(/^Incarnation$/i), 'redis-prod');
     await user.type(screen.getByLabelText(/action_scenario/i), 'restart');
@@ -216,7 +216,7 @@ describe('Vigil / Decree request contract', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
+    await user.type(screen.getByLabelText(/^ID/), 'config-changed');
     await user.type(screen.getByLabelText(/^path$/i), '/etc/redis.conf');
     const picker = screen.getByLabelText('dimension');
     const offered = [...picker.querySelectorAll('option')].map((o) => o.getAttribute('value'));
@@ -290,7 +290,7 @@ describe('Vigil / Decree request contract', () => {
     );
 
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText(/Name \(kebab-case\)/i), 'config-changed');
+    await user.type(screen.getByLabelText(/^ID/), 'config-changed');
     await user.type(screen.getByLabelText(/^path$/i), '/etc/redis.conf');
     await user.selectOptions(screen.getByLabelText('dimension'), 'incarnation');
     // Upper case: legal in the field, rejected by SubjectIncarnation.service.

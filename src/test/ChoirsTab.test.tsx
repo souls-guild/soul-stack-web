@@ -10,7 +10,7 @@ import { tokenStore } from '../api/tokenStore';
 
 // Base incarnation fixture.
 const INCARNATION = {
-  name: 'redis-prod',
+  id: 'redis-prod',
   service: 'redis',
   service_version: 'v2.0.0',
   state_schema_version: 3,

@@ -18,6 +18,7 @@ import {
 import { ApiError } from '../../api/client';
 import { Badge, Pager } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
+import { entityCaption } from '../../components/entityCaption';
 import { EMPTY_DATE_RANGE, inDateRange, hasDateRange, toServerRange, type DateRange } from './dateRange';
 import { DateRangeFilter } from './DateRangeFilter';
 import styles from '../common.module.css';
@@ -554,9 +555,10 @@ export function RunsFeed() {
                 style={selectStyle}
               >
                 <option value="">{t('runhistory:filterServiceAllOption')}</option>
+                {/* value is the id the filter is sent as; the text is what the operator reads. */}
                 {(servicesQ.data?.items ?? []).map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.name}
+                  <option key={s.id} value={s.id}>
+                    {entityCaption(s)}
                   </option>
                 ))}
               </select>

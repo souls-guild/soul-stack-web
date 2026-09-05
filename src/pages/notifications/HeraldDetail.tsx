@@ -6,6 +6,8 @@ import { Bell } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
+import { EntityIdCell } from '../../components/EntityIdCell';
+import { entityCaption, showsIdBeside } from '../../components/entityCaption';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import { HeraldModal } from './HeraldModal';
 import { useHeraldTypeCatalog } from './heraldTypes';
@@ -109,14 +111,17 @@ export function HeraldDetail() {
         <div>
           <h1 className={styles.title}>
             <Bell size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />
-            {h.name}
+            {entityCaption(h)}
           </h1>
+          {showsIdBeside(h) ? (
+            <div className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{h.id}</div>
+          ) : null}
           <div className={styles.crumbs}>
             <Link to="/notifications">{t('pageTitle')}</Link>
             {' / '}
             <Link to="/notifications">{t('heraldTitle')}</Link>
             {' / '}
-            {h.name}
+            {entityCaption(h)}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -139,7 +144,7 @@ export function HeraldDetail() {
             type="button"
             disabled={!canDelete}
             onClick={() => {
-              if (window.confirm(t('heraldDeleteConfirm', { name: h.name }))) {
+              if (window.confirm(t('heraldDeleteConfirm', { name: h.id }))) {
                 deleteMu.mutate();
               }
             }}
@@ -203,18 +208,16 @@ export function HeraldDetail() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>{t('tidingColName')}</th>
+                <th>{t('common:colLabel')}</th>
                 <th>{t('tidingColEventTypes')}</th>
                 <th>{t('tidingColEnabled')}</th>
               </tr>
             </thead>
             <tbody>
               {heraldTidings.map((td) => (
-                <tr key={td.name}>
+                <tr key={td.id}>
                   <td>
-                    <Link to={`/notifications/tidings/${encodeURIComponent(td.name)}`}>
-                      {td.name}
-                    </Link>
+                    <EntityIdCell entity={td} to={`/notifications/tidings/${encodeURIComponent(td.id)}`} />
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
                     {(td.event_types ?? []).slice(0, 2).join(', ')}

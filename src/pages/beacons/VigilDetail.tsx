@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +7,8 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
+import { entityCaption, showsIdBeside } from '../../components/entityCaption';
+import { EditLabelModal } from '../../components/EditLabelModal';
 import { formatSubject } from './subject';
 import styles from '../common.module.css';
 
@@ -13,6 +16,7 @@ export function VigilDetail() {
   const { t } = useTranslation();
   const { name = '' } = useParams<{ name: string }>();
   const qc = useQueryClient();
+  const [labelOpen, setLabelOpen] = useState(false);
   const nav = useNavigate();
 
   const detail = useQuery({
@@ -51,13 +55,16 @@ export function VigilDetail() {
     <div className={styles.page}>
       <div>
         <div className={styles.crumbs}>
-          <Link to="/vigils">vigils</Link> / <span>{v.name}</span>
+          <Link to="/vigils">vigils</Link> / <span>{entityCaption(v)}</span>
         </div>
         <div className={styles.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Eye size={20} aria-hidden="true" />
             <div>
-              <h1 className={styles.title}>{v.name}</h1>
+              <h1 className={styles.title}>{entityCaption(v)}</h1>
+              {showsIdBeside(v) ? (
+                <div className="mono" style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{v.id}</div>
+              ) : null}
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 8 }}>
                 <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 12 }}>{v.check}</span>
                 {v.enabled ? <Badge tone="ok">enabled</Badge> : <Badge tone="muted">disabled</Badge>}
@@ -75,9 +82,14 @@ export function VigilDetail() {
               </div>
             </div>
           </div>
-          <Button variant="ghost" onClick={handleDelete} disabled={deleteMut.isPending}>
-            {deleteMut.isPending ? t('deleting') : t('delete')}
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="secondary" onClick={() => setLabelOpen(true)}>
+              {t('forms:editLabelBtn')}
+            </Button>
+            <Button variant="ghost" onClick={handleDelete} disabled={deleteMut.isPending}>
+              {deleteMut.isPending ? t('deleting') : t('delete')}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -126,6 +138,15 @@ export function VigilDetail() {
           <Trans i18nKey="beacons:portentHistoryTodo" components={{ code: <code className="mono" /> }} />
         </div>
       </section>
+      <EditLabelModal
+        open={labelOpen}
+        onClose={() => setLabelOpen(false)}
+        id={v.id}
+        label={v.label}
+        setLabel={(body) => keeperApi.vigils.setLabel(v.id, body)}
+        invalidate={[['vigil', v.id], ['vigils.list']]}
+        idHint={t('forms:idImmutableVigil')}
+      />
     </div>
   );
 }

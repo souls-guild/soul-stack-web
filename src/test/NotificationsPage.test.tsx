@@ -12,7 +12,7 @@ import type { Tiding } from '../api/keeper';
 // --- Sample data ---
 
 const HERALD_WEBHOOK = {
-  name: 'ops-webhook',
+  id: 'ops-webhook',
   type: 'webhook',
   config: { url: 'https://hooks.example.com/notify', headers: { 'Authorization': 'Bearer tok' } },
   secret_ref: 'vault:secret/my-token',
@@ -23,7 +23,7 @@ const HERALD_WEBHOOK = {
 };
 
 const HERALD_DISABLED = {
-  name: 'dev-webhook',
+  id: 'dev-webhook',
   type: 'webhook',
   config: { url: 'http://dev.internal/notify', http_allowed: true },
   secret_ref: null,
@@ -34,7 +34,7 @@ const HERALD_DISABLED = {
 };
 
 const TIDING_SCENARIOS: Tiding = {
-  name: 'run-failures',
+  id: 'run-failures',
   herald: 'ops-webhook',
   event_types: ['scenario_run.*', 'voyage.*'],
   only_failures: true,
@@ -52,7 +52,7 @@ const TIDING_SCENARIOS: Tiding = {
 };
 
 const TIDING_CADENCE: Tiding = {
-  name: 'cadence-alerts',
+  id: 'cadence-alerts',
   herald: 'ops-webhook',
   event_types: ['cadence.*'],
   only_failures: false,
@@ -71,7 +71,7 @@ const TIDING_CADENCE: Tiding = {
 
 // Ephemeral rule (one-off, bound to a Voyage).
 const TIDING_EPHEMERAL: Tiding = {
-  name: 'ephemeral-01hz',
+  id: 'ephemeral-01hz',
   herald: 'ops-webhook',
   event_types: ['voyage.*'],
   only_failures: false,
@@ -214,7 +214,7 @@ function setupMock(opts: MockOpts = {}): Call[] {
     }
     if (/^\/v1\/heralds\/[^/]+$/.test(url) && method === 'GET') {
       const name = url.split('/').pop();
-      const h = [HERALD_WEBHOOK, HERALD_DISABLED].find((x) => x.name === name) ?? opts.heraldDetail ?? HERALD_WEBHOOK;
+      const h = [HERALD_WEBHOOK, HERALD_DISABLED].find((x) => x.id === name) ?? opts.heraldDetail ?? HERALD_WEBHOOK;
       return new Response(JSON.stringify(h), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.startsWith('/v1/event-types') && method === 'GET') {
@@ -224,7 +224,6 @@ function setupMock(opts: MockOpts = {}): Call[] {
           { name: 'command_run.*' },
           { name: 'voyage.*' },
           { name: 'cadence.*' },
-          { name: 'incarnation.drift_checked' },
         ],
         point_events: [{ name: 'incarnation.run_completed' }],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -238,10 +237,10 @@ function setupMock(opts: MockOpts = {}): Call[] {
     if (/^\/v1\/tidings\/[^/]+$/.test(url) && method === 'GET') {
       const name = url.split('/').pop();
       // opts.tidingDetail takes priority - allows overriding data for a specific test.
-      if (opts.tidingDetail && opts.tidingDetail.name === name) {
+      if (opts.tidingDetail && opts.tidingDetail.id === name) {
         return new Response(JSON.stringify(opts.tidingDetail), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-      const td = [TIDING_SCENARIOS, TIDING_CADENCE, TIDING_EPHEMERAL].find((x) => x.name === name) ?? opts.tidingDetail ?? TIDING_SCENARIOS;
+      const td = [TIDING_SCENARIOS, TIDING_CADENCE, TIDING_EPHEMERAL].find((x) => x.id === name) ?? opts.tidingDetail ?? TIDING_SCENARIOS;
       return new Response(JSON.stringify(td), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.startsWith('/v1/tidings') && method === 'GET') {
@@ -326,7 +325,7 @@ describe('NotificationsPage — Heralds tab', () => {
     expect(btn).toHaveAttribute('title', 'herald.update');
   });
 
-  it('Create Herald — POST /v1/heralds with name+type+config', async () => {
+  it('Create Herald — POST /v1/heralds with id+type+config', async () => {
     const calls = setupMock();
     renderNotificationsPage();
     const user = userEvent.setup();
@@ -335,7 +334,7 @@ describe('NotificationsPage — Heralds tab', () => {
     await user.click(screen.getByTestId('herald-create-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Create Herald/i });
-    await user.type(within(dialog).getByTestId('herald-name-input'), 'new-webhook');
+    await user.type(within(dialog).getByTestId('herald-id-input'), 'new-webhook');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('herald-type-select'), 'webhook');
     await user.type(within(dialog).getByTestId('herald-field-url'), 'https://example.com/hook');
@@ -345,7 +344,7 @@ describe('NotificationsPage — Heralds tab', () => {
       const post = calls.find((c) => c.url === '/v1/heralds' && c.method === 'POST');
       expect(post).toBeDefined();
       const parsed = JSON.parse(post!.body ?? '{}');
-      expect(parsed).toMatchObject({ name: 'new-webhook', type: 'webhook' });
+      expect(parsed).toMatchObject({ id: 'new-webhook', type: 'webhook' });
       expect(parsed.config).toMatchObject({ url: 'https://example.com/hook' });
     });
 
@@ -365,11 +364,11 @@ describe('NotificationsPage — Heralds tab', () => {
 
     const dialog = await screen.findByRole('dialog', { name: /Create Herald/i });
     // name empty -> Create button should not submit (required on input).
-    const nameInput = within(dialog).getByTestId('herald-name-input');
+    const nameInput = within(dialog).getByTestId('herald-id-input');
     expect(nameInput).toBeRequired();
   });
 
-  it('Delete Herald — opens confirm modal → DELETE /v1/heralds/{name}', async () => {
+  it('Delete Herald — opens confirm modal → DELETE /v1/heralds/{id}', async () => {
     const calls = setupMock();
     renderNotificationsPage();
     const user = userEvent.setup();
@@ -519,7 +518,7 @@ describe('NotificationsPage — Tidings tab', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'my-tiding');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'my-tiding');
 
     // Herald select.
     await waitFor(() => {
@@ -537,7 +536,7 @@ describe('NotificationsPage — Tidings tab', () => {
       const post = calls.find((c) => c.url === '/v1/tidings' && c.method === 'POST');
       expect(post).toBeDefined();
       const parsed = JSON.parse(post!.body ?? '{}');
-      expect(parsed.name).toBe('my-tiding');
+      expect(parsed.id).toBe('my-tiding');
       expect(parsed.herald).toBe('ops-webhook');
       expect(parsed.event_types).toContain('scenario_run.*');
     });
@@ -553,7 +552,7 @@ describe('NotificationsPage — Tidings tab', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'my-tiding');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'my-tiding');
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     // event_types empty -> Submit disabled.
     const submitBtn = within(dialog).getByRole('button', { name: /Create/i });
@@ -570,7 +569,7 @@ describe('NotificationsPage — Tidings tab', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
 
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'custom-tiding');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'custom-tiding');
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
 
     // Add a custom type.
@@ -755,7 +754,7 @@ describe('NotificationsPage — deep-link ?tab=tidings', () => {
 
 // Tiding with annotations+projection for edit tests.
 const TIDING_WITH_ANNOT: Tiding = {
-  name: 'run-failures',
+  id: 'run-failures',
   herald: 'ops-webhook',
   event_types: ['scenario_run.*', 'voyage.*'],
   only_failures: true,
@@ -830,7 +829,7 @@ describe('TidingModal — annotations and projection', () => {
     await user.click(screen.getByTestId('tiding-create-btn'));
     const dialog = await screen.findByRole('dialog', { name: /Create Tiding/i });
 
-    await user.type(within(dialog).getByTestId('tiding-name-input'), 'annot-tiding');
+    await user.type(within(dialog).getByTestId('tiding-id-input'), 'annot-tiding');
     await waitFor(() => expect(within(dialog).getByRole('option', { name: 'ops-webhook' })).toBeInTheDocument());
     await user.selectOptions(within(dialog).getByTestId('tiding-herald-select'), 'ops-webhook');
     await user.click(within(dialog).getByTestId('event-type-chip-voyage.*'));
@@ -860,7 +859,13 @@ describe('TidingModal — annotations and projection', () => {
 
   it('Edit Tiding — PUT carries annotations+projection', async () => {
     // Use TIDING_WITH_ANNOT (a persistent rule with annotations and projection).
-    const calls = setupMock({ tidings: TIDINGS_REPLY, tidingDetail: TIDING_WITH_ANNOT });
+    const calls = setupMock({
+      // The edit modal is opened from the LIST, so the annotated rule has to be IN
+      // the list: seeding it only as tidingDetail leaves the form editing a rule
+      // with no projection, and 'remove every path' then removes nothing.
+      tidings: { items: [TIDING_WITH_ANNOT, TIDING_CADENCE], offset: 0, limit: 200, total: 2 },
+      tidingDetail: TIDING_WITH_ANNOT,
+    });
     renderNotificationsPage('/notifications?tab=tidings');
     const user = userEvent.setup();
 
@@ -898,7 +903,13 @@ describe('TidingModal — annotations and projection', () => {
 
   it('Edit Tiding — cleared all paths → PUT without projection (omit == clear)', async () => {
     // Open editing TIDING_WITH_ANNOT which has projection=['summary.succeeded','voyage_id'].
-    const calls = setupMock({ tidings: TIDINGS_REPLY, tidingDetail: TIDING_WITH_ANNOT });
+    const calls = setupMock({
+      // The edit modal is opened from the LIST, so the annotated rule has to be IN
+      // the list: seeding it only as tidingDetail leaves the form editing a rule
+      // with no projection, and 'remove every path' then removes nothing.
+      tidings: { items: [TIDING_WITH_ANNOT, TIDING_CADENCE], offset: 0, limit: 200, total: 2 },
+      tidingDetail: TIDING_WITH_ANNOT,
+    });
     renderNotificationsPage('/notifications?tab=tidings');
     const user = userEvent.setup();
 

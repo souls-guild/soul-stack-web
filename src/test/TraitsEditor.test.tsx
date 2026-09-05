@@ -12,7 +12,7 @@ import { tokenStore } from '../api/tokenStore';
 const SERVICES_MOCK = {
   method: 'GET' as const,
   url: '/v1/services',
-  body: { items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
+  body: { items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] },
 };
 
 function renderForm() {
@@ -87,7 +87,7 @@ describe('TraitsEditor in the incarnation create form', () => {
       calls.push({ url, method, body });
       if (method === 'GET' && url.startsWith('/v1/services')) {
         return new Response(
-          JSON.stringify({ items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] }),
+          JSON.stringify({ items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
       }
@@ -135,7 +135,7 @@ describe('TraitsEditor in the incarnation create form', () => {
       calls.push({ url, method, body });
       if (method === 'GET' && url.startsWith('/v1/services')) {
         return new Response(
-          JSON.stringify({ items: [{ name: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] }),
+          JSON.stringify({ items: [{ id: 'redis', git: 'git@…', ref: 'v2.0.0', created_at: '', updated_at: '' }] }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
       }
