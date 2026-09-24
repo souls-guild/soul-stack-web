@@ -300,10 +300,15 @@ export function SidPicker({
             style={{ ...baseStyle, border: `1px solid ${missing && multiValues.length === 0 ? 'var(--danger)' : 'var(--border)'}` }}
             data-testid="sid-picker-multi-input"
           />
+          {/* Already-picked SIDs are dropped from the list rather than tinted. They are
+              on screen twice otherwise — as a chip above and as a row here — and the
+              rows are not actionable: clicking one re-selects a SID the list already
+              holds. On a roster of any size they push the pickable hosts out of a
+              200px scroll box. Removal stays where it reads: the chip's own button. */}
           <SuggestionDropdown
             open={open && !atCapacity}
             loading={loading}
-            suggestions={suggestions}
+            suggestions={suggestions.filter((s) => !multiValues.includes(s))}
             truncated={truncated}
             selected={multiValues}
             onSelect={selectSid}
