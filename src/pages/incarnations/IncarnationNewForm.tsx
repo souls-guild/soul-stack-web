@@ -321,7 +321,7 @@ export function IncarnationNewForm() {
   const serviceItems = services.data?.items ?? [];
 
   return (
-    <div className={styles.page}>
+    <div className={styles.formPage}>
       <div>
         <div className={styles.crumbs}>
           <Link to="/incarnations">incarnations</Link> / <span>new</span>
@@ -335,7 +335,9 @@ export function IncarnationNewForm() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
+      {/* The measure lives on the page column (`.formPage`), not here: with it on the
+          <form> alone the heading above ran full-width and the fields hugged the left. */}
+      <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {composesId ? (
           <ComposedIdPreview
             service={selectedService}

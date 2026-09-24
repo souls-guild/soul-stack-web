@@ -296,3 +296,24 @@
   color: var(--text);
   min-width: 280px;
 }
+
+/* A single-column form page: centred, with breathing room at the edges.
+ *
+ * Separate from `.page` on purpose. `.page` is what every list and detail screen
+ * uses, and those are meant to run the full width of the viewport — putting a
+ * max-width there would narrow the whole product to fix one form. This class is
+ * opt-in and composes `.page`, so a form centres without the tables moving.
+ *
+ * The padding is horizontal only: vertical rhythm is `.page`'s `gap`, and adding
+ * padding-block here would double the space under the header on every form. */
+.formPage {
+  composes: page;
+  width: 100%;
+  /* 720px is the form's own readable measure, which used to sit as an inline
+   * maxWidth on the <form> alone — so the heading and breadcrumb above it ran the
+   * full viewport while the fields hugged the left edge. Putting the measure on the
+   * page column instead lines all three up and centres them together. */
+  max-width: 720px;
+  margin-inline: auto;
+  padding-inline: var(--s-5);
+}
