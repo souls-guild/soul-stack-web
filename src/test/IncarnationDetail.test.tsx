@@ -426,25 +426,38 @@ describe('IncarnationDetail', () => {
     expect(screen.getByText('host-a')).toBeInTheDocument();
   });
 
-  it('History tab: apply_id renders as a link to /incarnations/:name/runs/:apply_id (NOT /voyages/)', async () => {
+  // The tab lists RUNS, one row each. It used to list state VERSIONS — one row per
+  // state write — so a create that writes sixteen fields read as sixteen runs
+  // (NIM-897). The fixture answers with what the runs fold returns, and the mock for
+  // the state-history endpoint is deliberately absent: a request to it would now be
+  // a regression, and installFetchMock fails an unmocked URL.
+  it('History tab lists one row per run, with its status and a link to the run view', async () => {
     // More specific paths come FIRST (fetchMock matches the first match).
     installFetchMock([
       {
         method: 'GET',
-        url: '/v1/incarnations/inc-h/history',
+        url: '/v1/incarnations/inc-h/runs',
         body: {
           items: [
             {
-              history_id: 'hid-1',
-              scenario: 'deploy',
               apply_id: '01VOYAGE000000000000001',
-              changed_by_aid: 'archon-x',
-              created_at: '2026-05-25T12:00:00Z',
+              scenario: 'deploy',
+              status: 'success',
+              started_by_aid: 'archon-x',
+              started_at: '2026-05-25T12:00:00Z',
+              finished_at: '2026-05-25T12:04:10Z',
+            },
+            {
+              apply_id: '01VOYAGE000000000000002',
+              scenario: 'create',
+              status: 'failed',
+              started_by_aid: 'archon-x',
+              started_at: '2026-05-24T09:00:00Z',
             },
           ],
           offset: 0,
           limit: 50,
-          total: 1,
+          total: 2,
         },
       },
       {
@@ -488,14 +501,22 @@ describe('IncarnationDetail', () => {
     expect(historyTab).toBeDefined();
     await user.click(historyTab);
 
+    // Two runs in, two rows out — the row count is the run count and nothing else.
+    await waitFor(() => {
+      expect(screen.getByTestId('incarnation-runs-table')).toBeInTheDocument();
+    }, { timeout: 3000 });
+    const rows = screen.getAllByTestId(/^history-run-row-/);
+    expect(rows).toHaveLength(2);
+
+    // The run's own status is on the row; state-version rows never carried one.
+    expect(screen.getByTestId('history-run-row-01VOYAGE000000000000001')).toHaveTextContent('success');
+    expect(screen.getByTestId('history-run-row-01VOYAGE000000000000002')).toHaveTextContent('failed');
+
     // apply_id - apply_run (create/rerun-last/operational scenario), NOT Voyage:
     // link leads to run-view of the incarnation, not to /voyages/:id.
-    await waitFor(() => {
-      const link = screen.getByTestId('history-apply-link-hid-1');
-      expect(link).toBeInTheDocument();
-      expect((link as HTMLAnchorElement).href).toContain('/incarnations/inc-h/runs/01VOYAGE000000000000001');
-      expect((link as HTMLAnchorElement).href).not.toContain('/voyages/');
-    }, { timeout: 3000 });
+    const link = screen.getByTestId('history-apply-link-01VOYAGE000000000000001');
+    expect((link as HTMLAnchorElement).href).toContain('/incarnations/inc-h/runs/01VOYAGE000000000000001');
+    expect((link as HTMLAnchorElement).href).not.toContain('/voyages/');
   });
 
   it('Overview shows incarnation traits (scalar + list) in the meta block', async () => {

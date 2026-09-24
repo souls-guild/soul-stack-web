@@ -17,7 +17,7 @@ import {
 import { Badge, Button, Dot } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { keeperApi, type IncarnationRerunLastReply } from '../../api/keeper';
-import { incarnationDot, incarnationTone } from '../../components/status';
+import { incarnationDot, incarnationTone, runStatusTone } from '../../components/status';
 import { entityCaption, showsIdBeside } from '../../components/entityCaption';
 import { EditLabelModal } from '../../components/EditLabelModal';
 import { ApiError } from '../../api/client';
@@ -55,9 +55,15 @@ export function IncarnationDetail() {
     enabled: Boolean(name),
   });
 
+  // The History tab lists RUNS, one row each — not state versions. The
+  // state-history endpoint answers with one entry per state WRITE, so a single
+  // create of the redis service produced sixteen of them and the tab read as
+  // sixteen runs (NIM-897). `/runs` is the server's own fold by apply_id, which is
+  // the unit an operator thinks in, and it carries the run's status, which the
+  // state-version rows never did.
   const history = useQuery({
-    queryKey: ['incarnation-history', name],
-    queryFn: () => keeperApi.incarnations.history(name, { limit: 50 }),
+    queryKey: ['incarnation-runs', name],
+    queryFn: () => keeperApi.incarnations.runs(name, { limit: 50 }),
     enabled: Boolean(name) && tab === 'history',
   });
 
@@ -330,7 +336,7 @@ export function IncarnationDetail() {
 
       {tab === 'history' ? (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>state_history</h2>
+          <h2 className={styles.sectionTitle}>{t('incarnations:tabHistory')}</h2>
           {history.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
           {history.error ? (
             <div className={styles.errorBox}>
@@ -341,43 +347,47 @@ export function IncarnationDetail() {
             <div className={styles.empty}>{t('incarnations:historyEmpty')}</div>
           ) : null}
           {history.data && (history.data.items ?? []).length > 0 ? (
-            <table className={styles.table}>
+            <table className={styles.table} data-testid="incarnation-runs-table">
               <thead>
                 <tr>
                   <th>{t('colScenario')}</th>
+                  <th>{t('colStatus')}</th>
                   <th>{t('common:colApplyId')}</th>
-                  <th>{t('colChangedBy')}</th>
-                  <th>{t('colCreatedAt')}</th>
+                  <th>{t('common:colStartedBy')}</th>
+                  <th>{t('common:colStartedAt')}</th>
+                  <th>{t('common:colFinishedAt')}</th>
                 </tr>
               </thead>
               <tbody>
-                {(history.data.items ?? []).map((entry) => (
-                  <tr key={entry.history_id}>
-                    <td className="mono">{entry.scenario}</td>
+                {(history.data.items ?? []).map((run) => (
+                  <tr key={run.apply_id} data-testid={`history-run-row-${run.apply_id}`}>
+                    <td className="mono">{run.scenario}</td>
+                    <td>
+                      <Badge tone={runStatusTone(run.status)}>{run.status}</Badge>
+                    </td>
                     <td className="mono">
-                      {entry.apply_id ? (
-                        // apply_id is the apply_run (create/rerun-last/operational scenario),
-                        // NOT a Voyage (batch run across many incarnations). Reference the
-                        // run view of this incarnation.
-                        <Link
-                          to={`/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(entry.apply_id)}`}
-                          title={t('incarnations:historyApplyIdLink')}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                          data-testid={`history-apply-link-${entry.history_id}`}
-                        >
-                          {entry.apply_id}
-                          <ExternalLink size={11} style={{ opacity: 0.6, flexShrink: 0 }} />
+                      {/* apply_id is the apply_run (create/rerun-last/operational scenario),
+                          NOT a Voyage (batch run across many incarnations). Reference the
+                          run view of this incarnation. */}
+                      <Link
+                        to={`/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(run.apply_id)}`}
+                        title={t('incarnations:historyApplyIdLink')}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        data-testid={`history-apply-link-${run.apply_id}`}
+                      >
+                        {run.apply_id}
+                        <ExternalLink size={11} style={{ opacity: 0.6, flexShrink: 0 }} />
+                      </Link>
+                    </td>
+                    <td className="mono">
+                      {run.started_by_aid ? (
+                        <Link to={`/archons/${encodeURIComponent(run.started_by_aid)}`}>
+                          {run.started_by_aid}
                         </Link>
                       ) : '—'}
                     </td>
-                    <td className="mono">
-                      {entry.changed_by_aid ? (
-                        <Link to={`/archons/${encodeURIComponent(entry.changed_by_aid)}`}>
-                          {entry.changed_by_aid}
-                        </Link>
-                      ) : '—'}
-                    </td>
-                    <td className="mono">{entry.created_at}</td>
+                    <td className="mono">{run.started_at}</td>
+                    <td className="mono">{run.finished_at ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

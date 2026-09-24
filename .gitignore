@@ -1,4 +1,8 @@
 node_modules/
+# …and as a SYMLINK: a worktree that links the deps of a sibling checkout gets
+# `node_modules` (no slash) as a symlink, which `node_modules/` does not match —
+# `git add -A` then commits the link.
+node_modules
 dist/
 .vite/
 coverage/
