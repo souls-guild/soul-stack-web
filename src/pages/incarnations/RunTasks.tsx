@@ -128,7 +128,11 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
                   {tk.id}
                 </span>
                 <span className={styles.modchip}>{tk.module}</span>
-                <span className={styles.hbar} aria-hidden="true">
+                <span
+                  className={styles.hbar}
+                  aria-hidden="true"
+                  data-testid={`run-task-hostbar-${tk.plan_index}`}
+                >
                   {(tk.hosts ?? []).map((h, i) => (
                     <i
                       key={`${h.sid}-${i}`}

@@ -71,17 +71,22 @@
   flex-shrink: 0;
 }
 
+/* One bar per host of the task, laid out as a GRID of six columns rather than one
+   row: the row also holds the task's index, its name and the module chip, and a
+   single row of bars grows with the host count — nine hosts took 160px and a
+   23-entry batch over 400px, pushing the name out (NIM-896). Six columns cap the
+   width at 106px and spend height instead, which the row has to give. */
 .hbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, 16px);
   gap: 2px;
   flex-shrink: 0;
+  justify-content: end;
 }
 
 .hbar i {
-  width: 16px;
   height: 6px;
   border-radius: 2px;
-  display: inline-block;
 }
 
 .detail {
