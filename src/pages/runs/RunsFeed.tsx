@@ -21,6 +21,7 @@ import { runStatusTone } from '../../components/status';
 import { entityCaption } from '../../components/entityCaption';
 import { EMPTY_DATE_RANGE, inDateRange, hasDateRange, toServerRange, type DateRange } from './dateRange';
 import { DateRangeFilter } from './DateRangeFilter';
+import { scenStatusesServed } from './scenStatuses';
 import styles from '../common.module.css';
 
 // Unified /runs page (ADR-069 part B2): segment filter by run type + column
@@ -178,9 +179,6 @@ function sortGlyph(active: boolean, dir: SortDir): string {
   return dir === 'asc' ? ' ▲' : ' ▼';
 }
 
-// Aggregate run statuses (Scenario stats); satisfies catches drift when the enum expands.
-const SCEN_STATUSES = ['applying', 'success', 'failed', 'cancelled'] as const satisfies readonly RunStatus[];
-
 // Client-side text search over already-loaded union rows (case-insensitive substring
 // over id/target/status). Client-only — union is already "first N of each type" anyway.
 function matchesUnionSearch(row: FeedRow, query: string): boolean {
@@ -287,6 +285,24 @@ export function RunsFeed() {
     retry: false,
   });
 
+  const statsQ = useQuery({
+    queryKey: ['runs.stats'],
+    queryFn: () => keeperApi.runs.stats(),
+    enabled: isScenario,
+    retry: false,
+  });
+  // A picked status this keeper does not serve (partial_failed, then stats from an
+  // older keeper) is cleared with its page as soon as a stats reply shows it gone:
+  // left in place, every fetch would 422 under a select that reads "All", and it
+  // would re-apply by itself once the key came back. The list refetched together
+  // with those stats (re-entering the segment) still carries it once - that one
+  // 422 is superseded by the unfiltered fetch the reset triggers.
+  const scenStatuses = scenStatusesServed(statsQ.data);
+  if (scenarioStatus !== '' && !scenStatuses.includes(scenarioStatus)) {
+    setScenarioStatus('');
+    setOffset(0);
+  }
+
   // Scenario mode: server-side sort + SERVER-SIDE filter (status/incarnation) + pagination.
   // Everything (sort/sort_dir/status/incarnation/offset) is in the query AND queryKey.
   const scenServerRange = toServerRange(scenDateRange);
@@ -322,12 +338,6 @@ export function RunsFeed() {
     retry: false,
     refetchInterval: (query) =>
       (query.state.data?.items ?? []).some((r) => r.status === 'applying') ? 5000 : false,
-  });
-  const statsQ = useQuery({
-    queryKey: ['runs.stats'],
-    queryFn: () => keeperApi.runs.stats(),
-    enabled: isScenario,
-    retry: false,
   });
   // Service catalog for the Service filter (ADR-042 — no hardcode). No catalog/error
   // -> just an empty options list (graceful degradation), no filter-bar crash.
@@ -536,7 +546,7 @@ export function RunsFeed() {
                 style={selectStyle}
               >
                 <option value="">{t('all')}</option>
-                {SCEN_STATUSES.map((s) => (
+                {scenStatuses.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -817,7 +827,7 @@ function ScenarioSegment({
       {statsQ.isError ? null : (
         <section className={styles.summaryGrid} aria-label={t('runhistory:statsSectionAria')} data-testid="runs-stats">
           <StatBox label={t('runhistory:statsTotalLabel')} bucketKey="total" all={statsQ.data?.all} last24h={statsQ.data?.last_24h} loading={statsQ.isLoading} />
-          {SCEN_STATUSES.map((s) => (
+          {scenStatusesServed(statsQ.data).map((s) => (
             <StatBox key={s} label={s} bucketKey={s} all={statsQ.data?.all} last24h={statsQ.data?.last_24h} loading={statsQ.isLoading} />
           ))}
         </section>

@@ -13,6 +13,7 @@ import { subscribeRunEvents } from '../../api/runEvents';
 import { RunTasks } from './RunTasks';
 import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
+import { noticesByHost } from './runNotices';
 import styles from '../common.module.css';
 
 // Run view: details of a single incarnation apply_run (create/rerun-last/operational
@@ -149,7 +150,7 @@ export function RunDetail() {
   // a deprecated parameter is still honored until the version it names. Kept
   // per host on purpose: a park mid-upgrade legitimately answers differently
   // from host to host, and that spread is the useful part.
-  const noticeHosts = hosts.filter((h) => (h.notices ?? []).length > 0);
+  const noticeHosts = noticesByHost(hosts);
 
   return (
     <div className={styles.page}>
@@ -237,7 +238,7 @@ export function RunDetail() {
           </p>
           {noticeHosts.map((h) => (
             <div
-              key={`${h.sid}-${h.passage}`}
+              key={h.sid}
               className={styles.deprecationBanner}
               role="note"
               data-testid={`run-notice-host-${h.sid}`}
@@ -246,7 +247,7 @@ export function RunDetail() {
               <div className="mono" style={{ fontWeight: 600, marginBottom: 4 }}>
                 <KeeperSidCell sid={h.sid} />
               </div>
-              {(h.notices ?? []).map((n, i) => (
+              {h.notices.map((n, i) => (
                 <div key={`${n.code}-${n.module}-${n.param ?? ''}-${i}`} style={{ marginTop: 4 }}>
                   <span className="mono" style={{ color: 'var(--text-muted)' }}>
                     {n.param ? `${n.module}.${n.param}` : n.module}

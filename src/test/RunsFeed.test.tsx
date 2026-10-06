@@ -369,6 +369,72 @@ describe('RunsFeed (unified /runs)', () => {
     expect(within(row).getByRole('link', { name: 'archon-alice' })).toHaveAttribute('href', '/archons/archon-alice');
   });
 
+  // partial_failed (a run that finished without some hosts) is offered only by a
+  // keeper whose stats carry its bucket: this bundle can also be served by a keeper
+  // that answers ?status=partial_failed with 422 and has no such counter. A pick
+  // made against one keeper is dropped, not sent, once the stats stop carrying it.
+  it('[scenario] filters by partial_failed on a keeper that reports it, and drops the pick when it stops', async () => {
+    const withPartial = {
+      all: { ...STATS.all, total: 15, partial_failed: 3 },
+      last_24h: { ...STATS.last_24h, total: 4, partial_failed: 1 },
+    };
+    let stats: unknown = withPartial;
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      urls.push(url);
+      let body: unknown = EMPTY;
+      if (url.includes('/v1/runs/stats')) body = stats;
+      else if (url.startsWith('/v1/runs')) body = { ...RUNS, total: 120 };
+      else if (url.startsWith('/v1/services')) body = SERVICES;
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    const lastRunsUrl = () => [...urls].reverse().find((u) => u.startsWith('/v1/runs?'));
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+
+    const box = await screen.findByTestId('runs-stat-partial_failed');
+    await waitFor(() => expect(within(box).getByText('3')).toBeInTheDocument());
+    await user.selectOptions(screen.getByTestId('runs-scenario-status-filter'), 'partial_failed');
+    await waitFor(() => expect(lastRunsUrl()).toContain('status=partial_failed'));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(lastRunsUrl()).toContain('offset=50'));
+
+    // Same UI, older keeper (a rollback): its stats have no such bucket. The pick
+    // goes with its page - offset 50 belonged to the filtered set.
+    stats = STATS;
+    await user.click(screen.getByTestId('runs-segment-all'));
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await waitFor(() => expect(screen.queryByTestId('runs-stat-partial_failed')).not.toBeInTheDocument());
+    const filter = screen.getByTestId('runs-scenario-status-filter') as HTMLSelectElement;
+    expect(filter.value).toBe('');
+    await waitFor(() => expect(lastRunsUrl()).toContain('offset=0'));
+    expect(lastRunsUrl()).not.toContain('status=partial_failed');
+
+    // The key comes back (roll forward): the cleared pick must not re-apply by itself.
+    stats = withPartial;
+    await user.click(screen.getByTestId('runs-segment-all'));
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+    await screen.findByTestId('runs-stat-partial_failed');
+    expect((screen.getByTestId('runs-scenario-status-filter') as HTMLSelectElement).value).toBe('');
+    expect(lastRunsUrl()).not.toContain('status=partial_failed');
+  });
+
+  it('[scenario] does not offer partial_failed to a keeper whose stats have no such bucket', async () => {
+    installFetchMock(baseRoutes());
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('runs-segment-scenario'));
+
+    const total = await screen.findByTestId('runs-stat-total');
+    await waitFor(() => expect(within(total).getByText('12')).toBeInTheDocument());
+    expect(screen.queryByTestId('runs-stat-partial_failed')).not.toBeInTheDocument();
+    const filter = screen.getByTestId('runs-scenario-status-filter');
+    expect(within(filter).queryByRole('option', { name: 'partial_failed' })).not.toBeInTheDocument();
+    expect(within(filter).getByRole('option', { name: 'failed' })).toBeInTheDocument();
+  });
+
   // -- Guard #2: Scenario sends sort/sort_dir + RESETS offset on sort change ---
 
   it('[scenario] column sort goes into query as sort/sort_dir and RESETS offset', async () => {

@@ -707,7 +707,7 @@ export interface paths {
         put?: never;
         /**
          * Resolve the id a create would compose
-         * @description Live preview for the create form: composes the incarnation id from the chosen create scenario's id_template over the input so far, reports its length against the ceiling, and whether the id is free. Composition runs server-side — the same code the create runs — so the previewed id cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed id is measured against the caller's scope, and the occupying service is named only to a caller who may see it.
+         * @description Live preview for the create form: composes the incarnation id from the chosen create scenario's id.template over the input so far, reports its length against the ceiling, and whether the id is free. Composition runs server-side — the same code the create runs — so the previewed id cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed id is measured against the caller's scope, and the occupying service is named only to a caller who may see it.
          */
         post: operations["resolveIncarnationID"];
         delete?: never;
@@ -941,7 +941,7 @@ export interface paths {
         };
         /**
          * List incarnation runs (paged)
-         * @description Fold apply_runs by apply_id: run status (applying/success/failed/cancelled), time bounds, initiator. Run (apply_run) - NOT Voyage. Outside RBAC scope -> 404. Permission incarnation.history. Read-only.
+         * @description Fold apply_runs by apply_id: run status (applying/success/failed/partial_failed/cancelled), time bounds, initiator. Run (apply_run) - NOT Voyage. Outside RBAC scope -> 404. Permission incarnation.history. Read-only.
          */
         get: operations["listIncarnationRuns"];
         put?: never;
@@ -1689,7 +1689,7 @@ export interface paths {
         };
         /**
          * Global run list (paged)
-         * @description Folds apply_runs by apply_id ACROSS ALL incarnations: run status (applying/success/failed/cancelled), owner incarnation, time bounds, initiator. A run (apply_run) is NOT a Voyage. Sorting by column - sort/sort_dir (stable tie-break on apply_id). Visibility scoped by RBAC (ADR-047, fail-closed: empty scope -> empty list). Permission incarnation.history. Read-only.
+         * @description Folds apply_runs by apply_id ACROSS ALL incarnations: run status (applying/success/failed/partial_failed/cancelled), owner incarnation, time bounds, initiator. A run (apply_run) is NOT a Voyage. Sorting by column - sort/sort_dir (stable tie-break on apply_id). Visibility scoped by RBAC (ADR-047, fail-closed: empty scope -> empty list). Permission incarnation.history. Read-only.
          */
         get: operations["listRuns"];
         put?: never;
@@ -1709,7 +1709,7 @@ export interface paths {
         };
         /**
          * Run summary counters
-         * @description Run counters by aggregate status (total/applying/success/failed/cancelled) for all time and for the last 24 hours, within the RBAC scope (fail-closed: empty scope -> zero aggregate). Permission incarnation.history. Read-only.
+         * @description Run counters by aggregate status (total/applying/success/failed/partial_failed/cancelled) for all time and for the last 24 hours, within the RBAC scope (fail-closed: empty scope -> zero aggregate). Permission incarnation.history. Read-only.
          */
         get: operations["getRunsStats"];
         put?: never;
@@ -2642,7 +2642,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -3132,7 +3132,7 @@ export interface components {
             started_at: string;
             started_by_aid?: string;
             /** @enum {string} */
-            status: "applying" | "success" | "failed" | "cancelled";
+            status: "applying" | "success" | "failed" | "partial_failed" | "cancelled";
         };
         GrantOperatorRequest: {
             /** @description AID of the archon being assigned to a role/group (naming-rules.md) */
@@ -3240,7 +3240,7 @@ export interface components {
             covens?: string[] | null;
             /** @description name of start scenario (mechanism for multiple creates, scenario with create:true). Empty: service offers create scenarios → 422 create_scenario_required; service without them → bare incarnation (ready without run) */
             create_scenario?: string;
-            /** @description new instance id (kebab-case, immutable); omit when the create scenario declares id_template (ADR-0079) — then it is composed server-side from input components. */
+            /** @description new instance id (kebab-case, immutable); omit when the create scenario declares id.template (ADR-0079) — then it is composed server-side from input components. */
             id?: string;
             /** @description input for selected create scenario */
             input?: {
@@ -3372,7 +3372,7 @@ export interface components {
             available: boolean;
             /** @description the id a create with this input would produce; carries the offending value when invalid */
             composed_id: string;
-            /** @description the chosen create scenario composes the id from id_template (ADR-0079); false → the operator names the incarnation */
+            /** @description the chosen create scenario composes the id from id.template (ADR-0079); false → the operator names the incarnation */
             composes: boolean;
             /** @description why the id could not be composed or was rejected, in operator terms */
             invalid_reason?: string;
@@ -3394,7 +3394,7 @@ export interface components {
         IncarnationResolveIDRequest: {
             /** @description declared environment tags of the intended create — scope parity with POST /v1/incarnations, not part of the composition */
             covens?: string[] | null;
-            /** @description chosen create scenario, whose id_template composes the id */
+            /** @description chosen create scenario, whose id.template composes the id */
             create_scenario?: string;
             /** @description the create input so far — partial is expected, this is a live preview */
             input?: {
@@ -3766,6 +3766,8 @@ export interface components {
             inventory: string[] | null;
             /** @description SshProvider name; defaults to the first registered one */
             ssh_provider?: string;
+            /** @description transport for the run: the scalar "ssh", or {"ssh": {ssh_provider, user, port}}. Beats souls.ssh_target and the keeper.yml push defaults. */
+            transport?: unknown;
         };
         PushApplyView: {
             apply_id: string;
@@ -3960,19 +3962,25 @@ export interface components {
             started_at: string;
             started_by_aid?: string;
             /** @enum {string} */
-            status: "applying" | "success" | "failed" | "cancelled";
+            status: "applying" | "success" | "failed" | "partial_failed" | "cancelled";
         };
         RunHostStatusEntry: {
             /** Format: int32 */
             attempt: number;
             cancel_requested: boolean;
             error_summary?: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description plan_index of the first task that failed on this row (a later failure on the same row does not overwrite it); correlates with tasks[].plan_index
+             */
             failed_plan_index?: number;
             /** Format: int64 */
             failed_task_idx?: number;
             notices?: components["schemas"]["RunNoticeEntry"][] | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description index of the unit this row was dispatched for: the Passage today; once linear dispatch is on, the 0-based step index, a host then having one row per step it was sent. Values can have holes - nothing about them is contiguous
+             */
             passage: number;
             /** @description host FQDN OR synthetic run sid (keeper=on:keeper, __run__=run-sentinel abort to dispatch), not addressing a Soul (NIM-36) */
             sid: string;
@@ -3993,7 +4001,7 @@ export interface components {
             started_at: string;
             started_by_aid?: string;
             /** @enum {string} */
-            status: "applying" | "success" | "failed" | "cancelled";
+            status: "applying" | "success" | "failed" | "partial_failed" | "cancelled";
         };
         RunTaskEntry: {
             hosts: components["schemas"]["RunTaskHostEntry"][] | null;
@@ -4002,7 +4010,10 @@ export interface components {
             params?: {
                 [key: string]: unknown;
             };
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description index of the unit this task was dispatched in, the passage of the run-detail rows it ran on: the Passage today, the 0-based step index once linear dispatch is on
+             */
             passage: number;
             /** Format: int64 */
             plan_index: number;
@@ -4062,6 +4073,11 @@ export interface components {
             failed: number;
             /**
              * Format: int64
+             * @description runs that finished without some of their hosts
+             */
+            partial_failed: number;
+            /**
+             * Format: int64
              * @description successful runs
              */
             success: number;
@@ -4091,6 +4107,7 @@ export interface components {
             path: string;
             runnable: boolean;
             tags?: string[] | null;
+            validate?: components["schemas"]["ScenarioValidateRule"][] | null;
         };
         ScenarioForm: {
             sections?: components["schemas"]["ScenarioFormSection"][] | null;
@@ -4109,6 +4126,10 @@ export interface components {
             key: string;
             show_when?: string;
             title?: string;
+        };
+        ScenarioValidateRule: {
+            message: string;
+            that: string;
         };
         ServiceCompatReply: {
             detail?: string;
@@ -4424,7 +4445,7 @@ export interface components {
             total_approximate?: boolean;
         };
         SoulSshTarget: {
-            /** @description absolute install path of the soul binary (starts with /) */
+            /** @description absolute path the applier is exec'd from; send /var/lib/soul-stack/bin/soul, which is where push delivery writes the binary (an override opts out of delivery) */
             soul_path: string;
             /**
              * Format: int64
@@ -11531,7 +11552,7 @@ export interface operations {
     listRuns: {
         parameters: {
             query?: {
-                /** @description filter by aggregate run status (applying/success/failed/cancelled); invalid -> 422 */
+                /** @description filter by aggregate run status (applying/success/failed/partial_failed/cancelled); invalid -> 422 */
                 status?: string;
                 /** @description filter by incarnation name; invalid name -> 422 */
                 incarnation?: string;

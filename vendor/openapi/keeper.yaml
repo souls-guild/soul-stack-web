@@ -153,6 +153,7 @@ components:
             - soul.token-issued
             - soul.traits-changed
             - soulprint.received
+            - ssh.run
             - synod.created
             - synod.deleted
             - synod.operator-added
@@ -1198,6 +1199,7 @@ components:
             - applying
             - success
             - failed
+            - partial_failed
             - cancelled
           type: string
       required:
@@ -1465,7 +1467,7 @@ components:
           pattern: ^[a-z][a-z0-9_]*$
           type: string
         id:
-          description: new instance id (kebab-case, immutable); omit when the create scenario declares id_template (ADR-0079) — then it is composed server-side from input components.
+          description: new instance id (kebab-case, immutable); omit when the create scenario declares id.template (ADR-0079) — then it is composed server-side from input components.
           pattern: ^[a-z0-9][a-z0-9-]{0,62}$
           type: string
         input:
@@ -1746,7 +1748,7 @@ components:
           description: the id a create with this input would produce; carries the offending value when invalid
           type: string
         composes:
-          description: the chosen create scenario composes the id from id_template (ADR-0079); false → the operator names the incarnation
+          description: the chosen create scenario composes the id from id.template (ADR-0079); false → the operator names the incarnation
           type: boolean
         invalid_reason:
           description: why the id could not be composed or was rejected, in operator terms
@@ -1786,7 +1788,7 @@ components:
             - array
             - "null"
         create_scenario:
-          description: chosen create scenario, whose id_template composes the id
+          description: chosen create scenario, whose id.template composes the id
           pattern: ^[a-z][a-z0-9_]*$
           type: string
         input:
@@ -2691,6 +2693,8 @@ components:
         ssh_provider:
           description: SshProvider name; defaults to the first registered one
           type: string
+        transport:
+          description: "transport for the run: the scalar \"ssh\", or {\"ssh\": {ssh_provider, user, port}}. Beats souls.ssh_target and the keeper.yml push defaults."
       required:
         - inventory
         - destiny
@@ -3135,6 +3139,7 @@ components:
             - applying
             - success
             - failed
+            - partial_failed
             - cancelled
           type: string
       required:
@@ -3155,6 +3160,7 @@ components:
         error_summary:
           type: string
         failed_plan_index:
+          description: plan_index of the first task that failed on this row (a later failure on the same row does not overwrite it); correlates with tasks[].plan_index
           format: int64
           type: integer
         failed_task_idx:
@@ -3167,6 +3173,7 @@ components:
             - array
             - "null"
         passage:
+          description: "index of the unit this row was dispatched for: the Passage today; once linear dispatch is on, the 0-based step index, a host then having one row per step it was sent. Values can have holes - nothing about them is contiguous"
           format: int64
           type: integer
         sid:
@@ -3220,6 +3227,7 @@ components:
             - applying
             - success
             - failed
+            - partial_failed
             - cancelled
           type: string
       required:
@@ -3245,6 +3253,7 @@ components:
           additionalProperties: {}
           type: object
         passage:
+          description: "index of the unit this task was dispatched in, the passage of the run-detail rows it ran on: the Passage today, the 0-based step index once linear dispatch is on"
           format: int64
           type: integer
         plan_index:
@@ -3351,6 +3360,10 @@ components:
           description: failed runs (including orphaned hosts)
           format: int64
           type: integer
+        partial_failed:
+          description: runs that finished without some of their hosts
+          format: int64
+          type: integer
         success:
           description: successful runs
           format: int64
@@ -3364,6 +3377,7 @@ components:
         - applying
         - success
         - failed
+        - partial_failed
         - cancelled
       type: object
     RunsStatsReply:
@@ -3410,6 +3424,12 @@ components:
         tags:
           items:
             type: string
+          type:
+            - array
+            - "null"
+        validate:
+          items:
+            $ref: "#/components/schemas/ScenarioValidateRule"
           type:
             - array
             - "null"
@@ -3466,6 +3486,17 @@ components:
           type: string
       required:
         - key
+      type: object
+    ScenarioValidateRule:
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+        that:
+          type: string
+      required:
+        - that
+        - message
       type: object
     ServiceCompatReply:
       additionalProperties: false
@@ -4250,7 +4281,7 @@ components:
       additionalProperties: false
       properties:
         soul_path:
-          description: absolute install path of the soul binary (starts with /)
+          description: absolute path the applier is exec'd from; send /var/lib/soul-stack/bin/soul, which is where push delivery writes the binary (an override opts out of delivery)
           pattern: ^/
           type: string
         ssh_port:
@@ -8006,7 +8037,7 @@ paths:
         - incarnation
   /v1/incarnations/resolve-id:
     post:
-      description: "Live preview for the create form: composes the incarnation id from the chosen create scenario's id_template over the input so far, reports its length against the ceiling, and whether the id is free. Composition runs server-side — the same code the create runs — so the previewed id cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed id is measured against the caller's scope, and the occupying service is named only to a caller who may see it."
+      description: "Live preview for the create form: composes the incarnation id from the chosen create scenario's id.template over the input so far, reports its length against the ceiling, and whether the id is free. Composition runs server-side — the same code the create runs — so the previewed id cannot differ from the created one. Creates nothing. Permission incarnation.create; the composed id is measured against the caller's scope, and the occupying service is named only to a caller who may see it."
       operationId: resolveIncarnationID
       requestBody:
         content:
@@ -8844,7 +8875,7 @@ paths:
         - incarnation
   /v1/incarnations/{id}/runs:
     get:
-      description: "Fold apply_runs by apply_id: run status (applying/success/failed/cancelled), time bounds, initiator. Run (apply_run) - NOT Voyage. Outside RBAC scope -> 404. Permission incarnation.history. Read-only."
+      description: "Fold apply_runs by apply_id: run status (applying/success/failed/partial_failed/cancelled), time bounds, initiator. Run (apply_run) - NOT Voyage. Outside RBAC scope -> 404. Permission incarnation.history. Read-only."
       operationId: listIncarnationRuns
       parameters:
         - description: incarnation id
@@ -11055,15 +11086,15 @@ paths:
         - role
   /v1/runs:
     get:
-      description: "Folds apply_runs by apply_id ACROSS ALL incarnations: run status (applying/success/failed/cancelled), owner incarnation, time bounds, initiator. A run (apply_run) is NOT a Voyage. Sorting by column - sort/sort_dir (stable tie-break on apply_id). Visibility scoped by RBAC (ADR-047, fail-closed: empty scope -> empty list). Permission incarnation.history. Read-only."
+      description: "Folds apply_runs by apply_id ACROSS ALL incarnations: run status (applying/success/failed/partial_failed/cancelled), owner incarnation, time bounds, initiator. A run (apply_run) is NOT a Voyage. Sorting by column - sort/sort_dir (stable tie-break on apply_id). Visibility scoped by RBAC (ADR-047, fail-closed: empty scope -> empty list). Permission incarnation.history. Read-only."
       operationId: listRuns
       parameters:
-        - description: filter by aggregate run status (applying/success/failed/cancelled); invalid -> 422
+        - description: filter by aggregate run status (applying/success/failed/partial_failed/cancelled); invalid -> 422
           explode: false
           in: query
           name: status
           schema:
-            description: filter by aggregate run status (applying/success/failed/cancelled); invalid -> 422
+            description: filter by aggregate run status (applying/success/failed/partial_failed/cancelled); invalid -> 422
             type: string
         - description: filter by incarnation name; invalid name -> 422
           explode: false
@@ -11168,7 +11199,7 @@ paths:
         - runs
   /v1/runs/stats:
     get:
-      description: "Run counters by aggregate status (total/applying/success/failed/cancelled) for all time and for the last 24 hours, within the RBAC scope (fail-closed: empty scope -> zero aggregate). Permission incarnation.history. Read-only."
+      description: "Run counters by aggregate status (total/applying/success/failed/partial_failed/cancelled) for all time and for the last 24 hours, within the RBAC scope (fail-closed: empty scope -> zero aggregate). Permission incarnation.history. Read-only."
       operationId: getRunsStats
       responses:
         "200":

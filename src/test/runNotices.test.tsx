@@ -105,6 +105,39 @@ describe('deprecation notices on the run page', () => {
     expect(screen.getByTestId('run-host-row-new-1.local')).not.toHaveTextContent('deprecated params');
   });
 
+  // A host has several rows (one per Passage, one per step under linear dispatch)
+  // and keeper dedupes within a row only, so three rows passing the same parameter
+  // arrive three times. The operator has one thing to migrate on that host, not
+  // three, and one block per host to read — in keeper's per-row order (sorted by
+  // key), so the same set reads the same on every host. Each row below is in the
+  // order keeper sends it; web-1 meets onlyif first, yet must list creates first.
+  it('merges the notices of a host across its rows into one block, sorted by key', async () => {
+    const onlyif = { code: 'param_deprecated', module: 'core.cmd', param: 'onlyif', message: 'onlyif goes in 0.6.0' };
+    const creates = { code: 'param_deprecated', module: 'core.cmd', param: 'creates', message: 'creates goes in 0.6.0' };
+    installFetchMock([
+      {
+        method: 'GET',
+        url: URL,
+        body: runBody([
+          host('web-1.local', { passage: 0, notices: [onlyif] }),
+          host('web-1.local', { passage: 1 }),
+          host('web-1.local', { passage: 2, notices: [creates, onlyif] }),
+          host('web-1.local', { passage: 3, notices: [onlyif] }),
+          host('web-2.local', { passage: 0, notices: [creates, onlyif] }),
+        ]),
+      },
+    ]);
+
+    render();
+
+    await screen.findByTestId('run-notices-section');
+    const blocks = screen.getAllByTestId('run-notice-host-web-1.local');
+    expect(blocks, 'one block per host, not one per row').toHaveLength(1);
+    const order = (el: HTMLElement) => el.textContent?.match(/(creates|onlyif) goes in 0\.6\.0/g);
+    expect(order(blocks[0])).toEqual(['creates goes in 0.6.0', 'onlyif goes in 0.6.0']);
+    expect(order(screen.getByTestId('run-notice-host-web-2.local'))).toEqual(order(blocks[0]));
+  });
+
   // `notices` is declared `array | null`, so null is a value the server may
   // actually send — reading .length off it would take the page down.
   it('survives notices: null and shows no empty frame when nothing is deprecated', async () => {

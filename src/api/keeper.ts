@@ -794,7 +794,7 @@ export const keeperApi = {
         query: { offset: q.offset, limit: q.limit },
       }),
     // GET /v1/incarnations/{name}/runs — list of runs (apply_run, NOT Voyage):
-    // rollup of apply_runs by apply_id, status applying/success/failed/cancelled.
+    // rollup of apply_runs by apply_id, status applying/success/failed/partial_failed/cancelled.
     runs: (name: string, q: { offset?: number; limit?: number } = {}) =>
       apiGet<IncarnationRunsReply>(`/v1/incarnations/${encodeURIComponent(name)}/runs`, {
         query: { offset: q.offset, limit: q.limit },
