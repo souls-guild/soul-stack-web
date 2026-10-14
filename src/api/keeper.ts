@@ -328,6 +328,8 @@ export type ServiceView = components['schemas']['ServiceView'];
 export type ServiceListReply = components['schemas']['ServiceListReply'];
 export type ServiceRegisterRequest = components['schemas']['ServiceRegisterRequest'];
 export type ServiceUpdateRequest = components['schemas']['ServiceUpdateRequest'];
+export type ServiceStatsReply = components['schemas']['ServiceStatsReply'];
+export type ServiceStatsEntry = components['schemas']['ServiceStatsEntry'];
 
 // Service state_schema metadata (UI Schema explorer). GET /v1/services/{name}/state-schema.
 export type ServiceStateSchemaReply = components['schemas']['ServiceStateSchemaReply'];
@@ -1248,6 +1250,12 @@ export const keeperApi = {
           'DELETE',
         ),
     },
+  },
+
+  // Aggregates have their own prefix, so they never collide with an object id.
+  stats: {
+    // Incarnations (incarnation.list scope) and distinct member hosts (soul.list scope) per service.
+    services: () => apiGet<ServiceStatsReply>('/v1/stats/services'),
   },
 
   services: {

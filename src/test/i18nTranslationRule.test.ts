@@ -35,7 +35,7 @@ const ENTITY_NAMES = [
   'incarnations:tabChoirs', 'incarnations:voices', 'incarnations:colCovens',
   'incarnations:colTraits', 'incarnations:pageTitle',
   'notifications:heraldTitle', 'notifications:tidingTitle', 'notifications:heraldLinkLabel',
-  'pages:overviewCovensCount', 'pages:overviewIncarnations',
+  'pages:overviewIncarnations', 'pages:overviewServicesCount',
   'run:stepIncarnations',
   'runhistory:filterServiceLabel', 'runhistory:runColPassage',
   'runhistory:segErrand', 'runhistory:segPush', 'runhistory:segVoyage',

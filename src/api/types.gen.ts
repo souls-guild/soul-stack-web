@@ -2268,6 +2268,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/stats/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Incarnations and hosts per service (Overview)
+         * @description Per service: how many incarnations the caller can list (scoped like GET /v1/incarnations) and how many distinct hosts are members of them, counting only hosts inside the caller's soul.list visibility (the soul half of GET /v1/incarnations/{id}/members; incarnation.get, which gates that roster read, is not asked for here). A host bound to two incarnations of one service counts once. Services without an incarnation in scope are omitted. Fail-closed: an empty incarnation scope -> empty by_service; an empty soul scope -> hosts 0. Permission incarnation.list. Read-only, no audit.
+         */
+        get: operations["getServiceStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/synods": {
         parameters: {
             query?: never;
@@ -4245,6 +4265,24 @@ export interface components {
             service: string;
             /** Format: int64 */
             state_schema_version: number;
+        };
+        ServiceStatsEntry: {
+            /**
+             * Format: int64
+             * @description distinct member hosts of those incarnations that the caller may see as Souls
+             */
+            hosts: number;
+            /**
+             * Format: int64
+             * @description incarnations of this service within the caller's scope
+             */
+            incarnations: number;
+            /** @description service id */
+            service: string;
+        };
+        ServiceStatsReply: {
+            /** @description one entry per service with at least one incarnation in scope, sorted by service */
+            by_service: components["schemas"]["ServiceStatsEntry"][] | null;
         };
         ServiceTelemetryReply: {
             collectors: string[] | null;
@@ -13859,6 +13897,44 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    getServiceStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceStatsReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Boxes, Radio, Tags } from 'lucide-react';
-import { keeperApi, type SoulStatus, type Voyage } from '../../api/keeper';
+import { Boxes, Package, Radio } from 'lucide-react';
+import { keeperApi, type ServiceStatsEntry, type SoulStatus, type Voyage } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Donut, type DonutSlice, type DonutTone } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
@@ -80,9 +80,11 @@ function statusDonutTone(status: string): DonutTone {
   }
 }
 
-// The coven donut has no status semantics — a cyclic neutral palette
-// by index, so neighboring segments are visually distinct.
-const COVEN_PALETTE: DonutTone[] = ['accent', 'info', 'warn', 'ok', 'danger', 'muted'];
+// One tone per slice: past five services the tail folds into one muted "other"
+// slice, because a cycled palette would give two services one colour. `ok` is left
+// out on purpose — in every theme it is a green next to the teal `accent`.
+const SERVICE_PALETTE: DonutTone[] = ['accent', 'info', 'warn', 'danger', 'muted'];
+const OTHER_SLICE_KEY = '__other__';
 
 function statusMapToSlices(byStatus: Record<string, number>): DonutSlice[] {
   return Object.entries(byStatus)
@@ -90,21 +92,63 @@ function statusMapToSlices(byStatus: Record<string, number>): DonutSlice[] {
     .map(([status, count]) => ({ key: status, label: status, value: count, tone: statusDonutTone(status) }));
 }
 
-function covenMapToSlices(byCoven: Record<string, number>): DonutSlice[] {
-  return Object.entries(byCoven)
-    .sort((a, b) => b[1] - a[1])
-    .map(([coven, count], i) => ({
-      key: coven,
-      label: coven,
-      value: count,
-      tone: COVEN_PALETTE[i % COVEN_PALETTE.length],
-    }));
+function serviceIncarnationSlices(entries: ServiceStatsEntry[], otherLabel: string): DonutSlice[] {
+  const sorted = entries
+    .filter((e) => e.incarnations > 0)
+    .sort((a, b) => b.incarnations - a.incarnations || a.service.localeCompare(b.service));
+  const shown = sorted.length > SERVICE_PALETTE.length ? sorted.slice(0, SERVICE_PALETTE.length - 1) : sorted;
+  const slices: DonutSlice[] = shown.map((e, i) => ({
+    key: e.service,
+    label: e.service,
+    value: e.incarnations,
+    tone: SERVICE_PALETTE[i],
+  }));
+  const rest = sorted.slice(shown.length);
+  if (rest.length > 0) {
+    slices.push({
+      key: OTHER_SLICE_KEY,
+      label: otherLabel,
+      value: rest.reduce((sum, e) => sum + e.incarnations, 0),
+      tone: 'muted',
+    });
+  }
+  return slices;
+}
+
+function ServiceHostsBars({ entries }: { entries: ServiceStatsEntry[] }) {
+  const sorted = [...entries].sort((a, b) => b.hosts - a.hosts || a.service.localeCompare(b.service));
+  const max = Math.max(1, ...sorted.map((e) => e.hosts));
+  return (
+    <ul className={donutStyles.bars}>
+      {sorted.map((e) => (
+        <li key={e.service} className={donutStyles.barRow} data-testid={`hosts-bar-${e.service}`}>
+          <Link to={`/services/${encodeURIComponent(e.service)}`} className={`${donutStyles.barLabel} mono`}>
+            {e.service}
+          </Link>
+          <span className={donutStyles.barTrack}>
+            <span className={donutStyles.barFill} style={{ width: `${(e.hosts / max) * 100}%` }} />
+          </span>
+          <span className={donutStyles.barValue}>{e.hosts}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function QueryError({ error }: { error: unknown }) {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.errorBox}>
+      {error instanceof ApiError
+        ? t('errors:generic', { status: error.status, detail: error.message })
+        : String(error)}
+    </div>
+  );
 }
 
 export function OverviewPage() {
   const { t } = useTranslation();
 
-  // Souls — summary by status/transport/coven in one request (ADR-047 scoped).
   const soulsStatsQ = useQuery({
     queryKey: ['overview.souls.stats'],
     queryFn: () => keeperApi.souls.stats(),
@@ -130,6 +174,17 @@ export function OverviewPage() {
     staleTime: 15_000,
   });
 
+  const servicesQ = useQuery({
+    queryKey: ['overview.services'],
+    queryFn: () => keeperApi.services.list(),
+    staleTime: 30_000,
+  });
+  const serviceStatsQ = useQuery({
+    queryKey: ['overview.stats.services'],
+    queryFn: () => keeperApi.stats.services(),
+    staleTime: 15_000,
+  });
+
   // Voyages — last 5 (for the "recent runs" section).
   const voyagesRecent = useQuery({
     queryKey: ['overview.voyages.recent'],
@@ -142,16 +197,15 @@ export function OverviewPage() {
 
   const byStatus = soulsStatsQ.data?.by_status ?? {};
   const byTransport = soulsStatsQ.data?.by_transport ?? {};
-  const byCoven = soulsStatsQ.data?.by_coven ?? {};
   const soulsTotal = soulsStatsQ.data?.total ?? 0;
-  const staleCount = soulsStatsQ.data?.stale_count ?? 0;
-  const covensCount = Object.keys(byCoven).length;
   // agent->pull, ssh->push (backend transport vocabulary, UI labels see /v1/souls/stats description).
   const pullCount = byTransport['agent'] ?? 0;
   const pushCount = byTransport['ssh'] ?? 0;
+  const servicesCount = servicesQ.data?.items?.length ?? 0;
+  const byService = serviceStatsQ.data?.by_service ?? [];
 
   const statusSlices = statusMapToSlices(byStatus);
-  const covenSlices = covenMapToSlices(byCoven);
+  const serviceSlices = serviceIncarnationSlices(byService, t('pages:overviewOtherServices'));
 
   const recentRuns: RecentRun[] = ((voyagesRecent.data?.items ?? []) as Voyage[]).map((v) => {
     // Show a short target: for scenario — the first incarnation from target.incarnations,
@@ -172,7 +226,8 @@ export function OverviewPage() {
   });
 
   // Whether there are errors — show degradation, not a crash.
-  const hasError = soulsStatsQ.isError || clusterQ.isError || incarnationsQ.isError;
+  const hasError =
+    soulsStatsQ.isError || clusterQ.isError || incarnationsQ.isError || servicesQ.isError || serviceStatsQ.isError;
 
   return (
     <div className={styles.page}>
@@ -201,11 +256,12 @@ export function OverviewPage() {
             icon={Radio}
           />
           <StatCard
-            label={t('pages:overviewCovensCount')}
-            value={covensCount}
-            to="/souls"
-            loading={soulsStatsQ.isLoading}
-            icon={Tags}
+            label={t('pages:overviewServicesCount')}
+            value={servicesCount}
+            hint={t('pages:overviewServicesHint')}
+            to="/services"
+            loading={servicesQ.isLoading}
+            icon={Package}
           />
           <StatCard
             label={t('pages:overviewIncarnations')}
@@ -219,50 +275,50 @@ export function OverviewPage() {
             loading={incarnationsQ.isLoading}
             icon={Boxes}
           />
-          <StatCard
-            label={t('pages:overviewStaleCount')}
-            value={staleCount}
-            hint={t('pages:overviewStaleHint')}
-            to="/souls"
-            loading={soulsStatsQ.isLoading}
-            icon={Activity}
-          />
         </div>
       </section>
 
-      {/* Souls: 2 donuts (status + coven) */}
-      <section className={styles.section} aria-label={t('pages:overviewSoulsCharts')}>
+      <section className={styles.section} aria-label={t('pages:overviewCharts')}>
         <div className={donutStyles.donutGrid}>
           <div className={donutStyles.donutCard}>
             <h2 className={styles.sectionTitle}>{t('pages:overviewStatusDonutTitle')}</h2>
             {soulsStatsQ.isLoading ? (
               <div className={styles.loading}>{t('loading')}</div>
             ) : soulsStatsQ.error ? (
-              <div className={styles.errorBox}>
-                {soulsStatsQ.error instanceof ApiError
-                  ? t('errors:generic', { status: soulsStatsQ.error.status, detail: soulsStatsQ.error.message })
-                  : String(soulsStatsQ.error)}
-              </div>
+              <QueryError error={soulsStatsQ.error} />
             ) : statusSlices.length === 0 ? (
               <div className={styles.empty}>{t('pages:overviewNoSouls')}</div>
             ) : (
               <Donut slices={statusSlices} centerValue={soulsTotal} centerLabel={t('pages:overviewSoulsTotal')} />
             )}
           </div>
-          <div className={donutStyles.donutCard}>
-            <h2 className={styles.sectionTitle}>{t('pages:overviewCovenDonutTitle')}</h2>
-            {soulsStatsQ.isLoading ? (
+          <div className={donutStyles.donutCard} data-testid="overview-incarnations-by-service">
+            <h2 className={styles.sectionTitle}>{t('pages:overviewIncByServiceTitle')}</h2>
+            {serviceStatsQ.isLoading ? (
               <div className={styles.loading}>{t('loading')}</div>
-            ) : soulsStatsQ.error ? (
-              <div className={styles.errorBox}>
-                {soulsStatsQ.error instanceof ApiError
-                  ? t('errors:generic', { status: soulsStatsQ.error.status, detail: soulsStatsQ.error.message })
-                  : String(soulsStatsQ.error)}
-              </div>
-            ) : covenSlices.length === 0 ? (
-              <div className={styles.empty}>{t('pages:overviewNoCovens')}</div>
+            ) : serviceStatsQ.error ? (
+              <QueryError error={serviceStatsQ.error} />
+            ) : serviceSlices.length === 0 ? (
+              <div className={styles.empty}>{t('pages:overviewNoIncarnations')}</div>
             ) : (
-              <Donut slices={covenSlices} centerValue={soulsTotal} centerLabel={t('pages:overviewSoulsTotal')} />
+              <Donut
+                slices={serviceSlices}
+                centerLabel={t('pages:overviewSoulsTotal')}
+                legendBelow
+                totalLabel={t('pages:overviewIncTotal')}
+              />
+            )}
+          </div>
+          <div className={donutStyles.donutCard} data-testid="overview-hosts-by-service">
+            <h2 className={styles.sectionTitle}>{t('pages:overviewHostsByServiceTitle')}</h2>
+            {serviceStatsQ.isLoading ? (
+              <div className={styles.loading}>{t('loading')}</div>
+            ) : serviceStatsQ.error ? (
+              <QueryError error={serviceStatsQ.error} />
+            ) : byService.length === 0 ? (
+              <div className={styles.empty}>{t('pages:overviewNoIncarnations')}</div>
+            ) : (
+              <ServiceHostsBars entries={byService} />
             )}
           </div>
         </div>

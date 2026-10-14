@@ -16,6 +16,9 @@ interface Props {
   centerLabel?: string;
   centerValue?: string | number;
   emptyLabel?: string;
+  legendBelow?: boolean;
+  // When set, the legend ends with a row carrying this label and the sum of the slices.
+  totalLabel?: string;
 }
 
 const toneClass: Record<DonutTone, string> = {
@@ -38,6 +41,8 @@ export function Donut({
   centerLabel,
   centerValue,
   emptyLabel,
+  legendBelow = false,
+  totalLabel,
 }: Props) {
   const total = slices.reduce((sum, s) => sum + s.value, 0);
   const radius = (size - strokeWidth) / 2;
@@ -47,7 +52,7 @@ export function Donut({
   let accumulated = 0;
 
   return (
-    <div className={styles.wrap}>
+    <div className={legendBelow ? `${styles.wrap} ${styles.stacked}` : styles.wrap}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={styles.svg}>
         <circle
           cx={center}
@@ -101,6 +106,13 @@ export function Donut({
             <span className={styles.legendValue}>{s.value}</span>
           </li>
         ))}
+        {totalLabel ? (
+          <li className={`${styles.legendItem} ${styles.legendTotal}`} data-testid="donut-legend-total">
+            <span className={styles.legendDot} aria-hidden="true" />
+            <span className={styles.legendLabel}>{totalLabel}</span>
+            <span className={styles.legendValue}>{total}</span>
+          </li>
+        ) : null}
       </ul>
     </div>
   );

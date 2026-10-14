@@ -5,8 +5,18 @@
   flex-wrap: wrap;
 }
 
+.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-4);
+}
+
 .svg {
   flex-shrink: 0;
+}
+
+.stacked .svg {
+  align-self: center;
 }
 
 .svg circle {
@@ -58,6 +68,16 @@
   font-family: var(--font-mono);
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.legendTotal {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  font-weight: 600;
+}
+
+.legendTotal .legendLabel {
+  color: var(--text);
 }
 
 /* Tone colors: circle uses stroke (SVG), legend-dot uses background. */
