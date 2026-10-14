@@ -342,6 +342,36 @@ describe('RunsFeed (unified /runs)', () => {
 
   // -- Segment: Scenario (collapsed IncarnationRunsList) ------------------------
 
+  it('[scenario] a failed run shows why under its status, the full reason on hover (NIM-1000)', async () => {
+    const summary = 'render: task "reads a missing register key" (host h): render: cell "args[0]": CEL eval "register.probe.no_such_key": no such key: no_such_key';
+    const runs = {
+      ...RUNS,
+      items: [
+        RUNS.items[0],
+        {
+          ...RUNS.items[1],
+          failure: {
+            summary,
+            code: 'render_failed',
+            step: 1,
+            tasks: [{ index: 1, name: 'reads a missing register key' }],
+            cause: 'no such key: no_such_key',
+          },
+        },
+      ],
+    };
+    installFetchMock(baseRoutes({ runs }));
+    renderWithProviders(<RunsFeed />, '/runs');
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId('runs-segment-scenario'));
+
+    const cause = await screen.findByTestId('runs-scenario-failure-01RUNBBBBBBBBBBBBBBBBBBBB2');
+    expect(cause).toHaveTextContent('step 1 · reads a missing register key · no such key: no_such_key');
+    expect(cause).toHaveAttribute('title', summary);
+    expect(cause).toHaveStyle({ color: 'var(--danger)' });
+    expect(screen.queryByTestId('runs-scenario-failure-01RUNAAAAAAAAAAAAAAAAAAAA1')).not.toBeInTheDocument();
+  });
+
   it('[scenario] renders apply_run from /v1/runs + stats + RunDetail/incarnation/archon links', async () => {
     installFetchMock(baseRoutes());
     renderWithProviders(<RunsFeed />, '/runs');

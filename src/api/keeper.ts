@@ -32,6 +32,8 @@ export type RunDetailReply = components['schemas']['RunDetailReply'] & {
   input?: Record<string, unknown>;
 };
 export type RunHostStatusEntry = components['schemas']['RunHostStatusEntry'];
+// Why and where a failed run stopped (NIM-1000): on the run detail and on both run lists.
+export type RunFailure = components['schemas']['RunFailureEntry'];
 
 // GET /runs/{apply_id}/tasks (NIM-37 Schema-2). Server joins the plan (name/module/
 // params/no_log/passage) with per-host outcomes from audit (task.executed) by plan_index:

@@ -55,6 +55,16 @@
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+.rowFailed {
+  cursor: default;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+}
+
+.rowFailed:hover {
+  background: color-mix(in srgb, var(--danger) 4%, var(--surface));
+}
+
 .idx {
   font-family: var(--font-mono);
   font-size: 11px;

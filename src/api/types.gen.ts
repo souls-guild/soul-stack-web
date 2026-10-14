@@ -3143,6 +3143,7 @@ export interface components {
         };
         GlobalRunEntry: {
             apply_id: string;
+            failure?: components["schemas"]["RunFailureEntry"];
             /** Format: date-time */
             finished_at?: string;
             incarnation: string;
@@ -3971,6 +3972,7 @@ export interface components {
         };
         RunDetailReply: {
             apply_id: string;
+            failure?: components["schemas"]["RunFailureEntry"];
             /** Format: date-time */
             finished_at?: string;
             hosts: components["schemas"]["RunHostStatusEntry"][] | null;
@@ -3983,6 +3985,54 @@ export interface components {
             started_by_aid?: string;
             /** @enum {string} */
             status: "applying" | "success" | "failed" | "partial_failed" | "cancelled";
+        };
+        RunFailureEntry: {
+            /** @description innermost reason; a fixed sentence when cause_withheld */
+            cause?: string;
+            /** @description the failing expression reads a secret, so the evaluator's own message - which can quote a value - was not recorded */
+            cause_withheld?: boolean;
+            /** @description params cell path that failed to render, e.g. args[0] */
+            cell?: string;
+            /** @description the run's abort reason, e.g. render_failed, dispatch_failed, no_hosts */
+            code?: string;
+            /** @description the CEL expression as the author wrote it */
+            expression?: string;
+            /** @description SID the failing evaluation ran for */
+            host?: string;
+            /**
+             * Format: int64
+             * @description 0-based step the run stopped at (hosts[].passage); absent when it stopped outside a step - before its first or after its last
+             */
+            step?: number;
+            /** @description the reason as one masked line - the error chain of the failure */
+            summary?: string;
+            /** @description task chain of a render failure, outermost first: a block and its child, an applier and the destiny task it expanded into */
+            tasks?: components["schemas"]["RunFailureTaskEntry"][] | null;
+        };
+        RunFailureSourceEntry: {
+            file: string;
+            /** Format: int64 */
+            line: number;
+        };
+        RunFailureTaskEntry: {
+            /** @description the destiny an applier task applies */
+            destiny?: string;
+            /** @description file the task is written in, relative to its artifact: the service for a scenario task (scenario/<name>/main.yml), the destiny the applier above it names for a destiny task */
+            file?: string;
+            /** @description the include: tasks that spliced this task in, outermost first */
+            included_from?: components["schemas"]["RunFailureSourceEntry"][] | null;
+            /**
+             * Format: int64
+             * @description plan_index of the task (tasks[].plan_index of GET .../runs/{apply_id}/tasks), a loop iteration's own; absent for a task that expands (a block, an applier), for an assert, which renders into no task, and for a loop whose failing iteration is not known
+             */
+            index?: number;
+            /**
+             * Format: int64
+             * @description 1-based line of the task in file
+             */
+            line?: number;
+            module?: string;
+            name?: string;
         };
         RunHostStatusEntry: {
             /**
@@ -4019,6 +4069,7 @@ export interface components {
         };
         RunSummaryEntry: {
             apply_id: string;
+            failure?: components["schemas"]["RunFailureEntry"];
             /** Format: date-time */
             finished_at?: string;
             scenario: string;

@@ -7,6 +7,7 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
+import { RUN_SENTINEL_SID } from '../../components/keeperSid';
 import { JsonViewer } from '../../components/JsonViewer';
 import { runStatusTone } from '../../components/status';
 import { subscribeRunEvents } from '../../api/runEvents';
@@ -14,6 +15,8 @@ import { RunHostOutcomes, RunTasks } from './RunTasks';
 import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
 import { noticesByHost } from './runNotices';
+import { RunFailureRow } from './RunFailureRow';
+import { failedTask } from './runFailure';
 import styles from '../common.module.css';
 
 // Run view: details of a single incarnation apply_run (create/rerun-last/operational
@@ -147,7 +150,13 @@ export function RunDetail() {
   if (!run) return <div className={styles.empty}>{t('runhistory:runNotFound')}</div>;
 
   const hosts = run.hosts ?? [];
-  const failedHosts = hosts.filter((h) => h.error_summary || h.failed_task_idx != null || h.failed_plan_index != null);
+  const failure = run.failure;
+  // With the run's failure at hand the sentinel row's bare abort code adds nothing.
+  const failedHosts = hosts.filter(
+    (h) =>
+      (h.error_summary || h.failed_task_idx != null || h.failed_plan_index != null) &&
+      !(failure && h.sid === RUN_SENTINEL_SID),
+  );
   const cancelRequested = hosts.some((h) => h.cancel_requested);
   // A failure is named by its task and, in a `serial:` step, its wave once /tasks has
   // answered; until then (or on an older keeper) by the indexes the row carries.
@@ -215,9 +224,10 @@ export function RunDetail() {
         </section>
       ) : null}
 
-      {failedHosts.length > 0 ? (
+      {failure || failedHosts.length > 0 ? (
         <section className={styles.section} aria-label={t('incarnations:runFailedTaskAria')} data-testid="run-failed-section">
           <h2 className={styles.sectionTitle}>{t('runhistory:runFailedTaskTitle')}</h2>
+          {failure ? <RunFailureRow failure={failure} foldSummary={failedHosts.length > 0} /> : null}
           {failedHosts.map((h) => {
             const task = h.failed_plan_index != null ? taskByPlan.get(h.failed_plan_index) : undefined;
             const waves = task?.waves ?? [];
@@ -299,7 +309,8 @@ export function RunDetail() {
       ) : null}
 
       {tasksReady ? (
-        <RunTasks tasks={tasksQ.data!.tasks ?? []} live={isApplying} hosts={hosts} />
+        <RunTasks tasks={tasksQ.data!.tasks ?? []} live={isApplying} hosts={hosts} renderFailed={failedTask(failure)} />
+
       ) : tasksUnavailable ? (
         <>
           <RunHostOutcomes hosts={hosts} />

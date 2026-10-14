@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 import { Badge } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { taskStatusTone } from '../../components/status';
-import type { RunHostStatusEntry, RunTaskView } from '../../api/keeper';
+import type { RunFailure, RunHostStatusEntry, RunTaskView } from '../../api/keeper';
 import { ParamsByHostPanel, type HostFilter } from './RunTaskParamsByHost';
 import { paramValue } from './runTaskParams';
 import {
@@ -157,20 +157,28 @@ function waveHostsText(t: TFunction, sids: string[]): string {
   return t('runhistory:runWaveHosts', { count: sids.length, first: sids[0], last: sids[sids.length - 1] });
 }
 
+type FailedTask = NonNullable<RunFailure['tasks']>[number];
+
+// renderFailed — the task a render failure stopped the run at (NIM-1000). Its step's
+// plan is never stored, so the list does not have it; it is shown in its place, marked.
 export function RunTasks({
   tasks,
   live = false,
   hosts = [],
+  renderFailed,
 }: {
   tasks: RunTaskView[];
   live?: boolean;
   // The run's detail rows: what the host filter reads a host's outcome from.
   hosts?: RunHostStatusEntry[];
+  renderFailed?: FailedTask;
 }) {
   const { t } = useTranslation();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [hostSid, setHostSid] = useState<string | null>(null);
   const [unfolded, setUnfolded] = useState<ReadonlySet<number>>(new Set());
+  const placeholder =
+    renderFailed?.index != null && !tasks.some((tk) => tk.plan_index === renderFailed.index) ? renderFailed : undefined;
 
   const items = useMemo(() => groupRunTasks(tasks, live, hosts), [tasks, live, hosts]);
   const summaries = useMemo(() => summarizeHosts(hosts, tasks, items), [hosts, tasks, items]);
@@ -222,7 +230,7 @@ export function RunTasks({
     (plainSelected ? { key: taskKey(plainSelected), task: plainSelected } : undefined) ??
     defaultEntry;
 
-  if (tasks.length === 0) {
+  if (tasks.length === 0 && !placeholder) {
     return (
       <>
         <RunHostOutcomes hosts={hosts} />
@@ -290,6 +298,17 @@ export function RunTasks({
               />
             );
           })}
+          {/* Last: every task the list has ran at an earlier step. */}
+          {placeholder ? (
+            <div className={`${styles.row} ${styles.rowFailed}`} data-testid={`run-task-render-failed-${placeholder.index}`}>
+              <span className={styles.idx}>#{placeholder.index}</span>
+              <span className={styles.name} title={placeholder.name}>
+                {placeholder.name}
+              </span>
+              {placeholder.module ? <span className={styles.modchip}>{placeholder.module}</span> : null}
+              <Badge tone="danger">{t('runhistory:runTaskRenderFailed')}</Badge>
+            </div>
+          ) : null}
         </div>
 
         {current ? (

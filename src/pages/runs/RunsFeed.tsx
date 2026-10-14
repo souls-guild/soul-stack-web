@@ -14,6 +14,7 @@ import {
   type RunsListReply,
   type RunsStatsReply,
   type GlobalRunEntry,
+  type RunFailure,
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Pager } from '../../components/primitives';
@@ -22,6 +23,7 @@ import { entityCaption } from '../../components/entityCaption';
 import { EMPTY_DATE_RANGE, inDateRange, hasDateRange, toServerRange, type DateRange } from './dateRange';
 import { DateRangeFilter } from './DateRangeFilter';
 import { scenStatusesServed } from './scenStatuses';
+import { failureLine } from '../incarnations/runFailure';
 import styles from '../common.module.css';
 
 // Unified /runs page (ADR-069 part B2): segment filter by run type + column
@@ -778,6 +780,33 @@ function UnionSegment({
   );
 }
 
+// Why a failed run stopped, one line under its status (NIM-1000); the run detail has
+// the rest. Truncated to the cell, the whole line on hover.
+function FailureCause({ failure, applyId, cancelled }: { failure: RunFailure; applyId: string; cancelled: boolean }) {
+  const { t } = useTranslation();
+  const line = failureLine(failure, t);
+  if (!line) return null;
+  return (
+    <span
+      className="mono"
+      title={failure.summary ?? line}
+      data-testid={`runs-scenario-failure-${applyId}`}
+      style={{
+        display: 'block',
+        marginTop: 3,
+        maxWidth: 420,
+        fontSize: 11,
+        color: cancelled ? 'var(--text-muted)' : 'var(--danger)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}
+    >
+      {line}
+    </span>
+  );
+}
+
 // --- scenario mode (apply_run, server-side sort+pagination+stats) ---
 function ScenarioSegment({
   statsQ,
@@ -891,6 +920,9 @@ function ScenarioSegment({
                   <td className="mono">{r.scenario}</td>
                   <td>
                     <Badge tone={runStatusTone(r.status)}>{r.status}</Badge>
+                    {r.failure ? (
+                      <FailureCause failure={r.failure} applyId={r.apply_id} cancelled={r.status === 'cancelled'} />
+                    ) : null}
                   </td>
                   <td className="mono">
                     {r.started_by_aid ? (
