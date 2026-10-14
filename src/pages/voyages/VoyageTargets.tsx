@@ -65,7 +65,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
           <th style={thStyle}>{t('voyageTargetsColTarget')}</th>
           <th style={thStyle}>{t('voyageTargetsColStatus')}</th>
           <th style={thStyle}>{t('voyageTargetsColFinishedAt')}</th>
-          <th style={thStyle}>{t('voyageTargetsColApplyId')}</th>
+          <th style={thStyle}>{t('voyageTargetsColRun')}</th>
         </tr>
       </thead>
       <tbody>
@@ -83,7 +83,6 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
             {(grouped.get(batchIdx) ?? []).map((entry) => (
               <tr key={`${entry.target_kind}:${entry.target_id}`}>
                 <td style={tdStyle}>
-                  {/* incarnation-target -> link to detail; soul-target -> link to soul */}
                   {entry.target_kind === 'incarnation' ? (
                     <Link
                       to={`/incarnations/${encodeURIComponent(entry.target_id)}`}
@@ -92,7 +91,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
                     >
                       {entry.target_id}
                     </Link>
-                  ) : entry.target_kind === 'soul' ? (
+                  ) : entry.target_kind === 'sid' ? (
                     <KeeperSidCell
                       sid={entry.target_id}
                       className="mono"
@@ -111,20 +110,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
                   {entry.finished_at ?? '—'}
                 </td>
                 <td style={tdStyle}>
-                  {/* apply_id = voyage_id of this step. Links to /voyages/:id */}
-                  {entry.apply_id ? (
-                    <Link
-                      to={`/voyages/${encodeURIComponent(entry.apply_id)}`}
-                      className="mono"
-                      style={{ fontSize: 12 }}
-                      title={t('voyageTargetsApplyIdLink')}
-                      data-testid={`target-apply-link-${entry.target_id}`}
-                    >
-                      {entry.apply_id.slice(0, 12)}…
-                    </Link>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
-                  )}
+                  <TargetRunLink entry={entry} title={t('voyageTargetsRunLink')} />
                 </td>
               </tr>
             ))}
@@ -132,6 +118,39 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
         ))}
       </tbody>
     </table>
+  );
+}
+
+// A target back-links the run it spawned, never a Voyage: a scenario run
+// (apply_id) for an incarnation target, an Errand (errand_id) for a host target.
+function targetRunPath(entry: VoyageTargetEntry): { id: string; to: string } | null {
+  if (entry.target_kind === 'incarnation' && entry.apply_id) {
+    return {
+      id: entry.apply_id,
+      to: `/incarnations/${encodeURIComponent(entry.target_id)}/runs/${encodeURIComponent(entry.apply_id)}`,
+    };
+  }
+  if (entry.target_kind === 'sid' && entry.errand_id) {
+    return { id: entry.errand_id, to: `/errands/${encodeURIComponent(entry.errand_id)}` };
+  }
+  return null;
+}
+
+function TargetRunLink({ entry, title }: { entry: VoyageTargetEntry; title: string }) {
+  const run = targetRunPath(entry);
+  if (!run) {
+    return <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>;
+  }
+  return (
+    <Link
+      to={run.to}
+      className="mono"
+      style={{ fontSize: 12 }}
+      title={title}
+      data-testid={`target-run-link-${entry.target_id}`}
+    >
+      {run.id.slice(0, 12)}…
+    </Link>
   );
 }
 

@@ -72,7 +72,7 @@ const TECHNICAL = [
   'runhistory:dryRunLabel', 'runhistory:filterSshProviderLabel', 'runhistory:pushDestinyHint',
   'runhistory:pushDestinyRefLabel',
   'runhistory:runFailedPlanIndex', 'runhistory:runFailedTaskIdx', 'runhistory:runKeeperSideBadge',
-  'runhistory:runLiveBadge', 'runhistory:countNoMatch', 'runhistory:voyageTargetsColApplyId',
+  'runhistory:runLiveBadge', 'runhistory:countNoMatch',
   'runhistory:voyageChangedRunStatusUnknown', 'runhistory:sidLabel',
   'souls:traitRemovePair',
 ];

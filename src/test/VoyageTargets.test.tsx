@@ -1,6 +1,9 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
-import { Routes, Route } from 'react-router-dom';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { Routes, Route, matchRoutes, useLocation } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
 import { VoyageDetail } from '../pages/voyages/VoyageDetail';
 import { VoyageTargets } from '../pages/voyages/VoyageTargets';
@@ -8,6 +11,52 @@ import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
 const VOYAGE_ID = '01VTGT0000000000000000001';
+const APPLY_ID = '01M4XF9CC5JYMKBFP388SE0VZV';
+const ERRAND_ID = '01M4XF9ERRANDKBFP388SE0VZV';
+
+// Read from App.tsx rather than mirrored here: a mirrored table keeps a link
+// green after the route it points at is renamed or removed.
+const APP_ROUTES = [
+  ...readFileSync(path.resolve('src/App.tsx'), 'utf8').matchAll(/<Route\s+path=["']([^"']+)["']/g),
+].map((m) => ({ path: m[1] }));
+
+const TARGETS_ALL_KINDS = {
+  voyage_id: VOYAGE_ID,
+  targets: [
+    { target_kind: 'incarnation', target_id: 'redis-prod', batch_index: 0, status: 'succeeded', apply_id: APPLY_ID },
+    { target_kind: 'incarnation', target_id: 'redis-stage', batch_index: 0, status: 'failed' },
+    { target_kind: 'sid', target_id: 'db-1', batch_index: 0, status: 'succeeded', errand_id: ERRAND_ID },
+    { target_kind: 'sid', target_id: 'db-2', batch_index: 0, status: 'awaiting' },
+  ],
+};
+
+function RouterLocation() {
+  return <output data-testid="router-location">{useLocation().pathname}</output>;
+}
+
+// Mounted where the app mounts it, so a relative `to` resolves under the Voyage
+// page here exactly as it does in production.
+function renderTargetsOnVoyagePage() {
+  installFetchMock([{ method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_ALL_KINDS }]);
+  return renderWithProviders(
+    <>
+      <Routes>
+        <Route path="/voyages/:id" element={<VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} />} />
+      </Routes>
+      <RouterLocation />
+    </>,
+    `/voyages/${VOYAGE_ID}`,
+  );
+}
+
+// Where a click takes the ROUTER, not what the href says: a bare <a> leaves the
+// router where it was (jsdom does not navigate), so it lands back on /voyages/:id.
+function landingOf(link: HTMLElement) {
+  fireEvent.click(link);
+  const hit = matchRoutes(APP_ROUTES, screen.getByTestId('router-location').textContent ?? '');
+  const leaf = hit?.[hit.length - 1];
+  return leaf ? { pattern: leaf.route.path, params: leaf.params } : null;
+}
 
 const VOYAGE_BASE = {
   voyage_id: VOYAGE_ID,
@@ -208,43 +257,36 @@ describe('VoyageTargets (via VoyageDetail)', () => {
     expect(screen.queryByText('pg-prod-3')).toBeNull();
   });
 
-  it('[guard] apply_id renders as a link to /voyages/:apply_id when present', async () => {
-    const targetsWithApplyId = {
-      voyage_id: VOYAGE_ID,
-      targets: [
-        {
-          target_kind: 'incarnation',
-          target_id: 'redis-prod',
-          status: 'succeeded',
-          batch_index: 0,
-          finished_at: '2026-06-30T10:05:00Z',
-          apply_id: '01APPLYID00000000000001',
-        },
-        {
-          target_kind: 'incarnation',
-          target_id: 'redis-stage',
-          status: 'failed',
-          batch_index: 0,
-          finished_at: '2026-06-30T10:06:00Z',
-          // No apply_id -> should show "-"
-        },
-      ],
-    };
-    installFetchMock([
-      { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: targetsWithApplyId },
-    ]);
+  // /voyages/:id exists, so a run link landing on SOME route proves nothing: an
+  // apply_id is a scenario run, not a Voyage, and /voyages/<apply_id> is a 404.
+  it.each([
+    ['an incarnation target', 'redis-prod', APPLY_ID, { pattern: '/incarnations/:name/runs/:applyId', params: { name: 'redis-prod', applyId: APPLY_ID } }],
+    ['a host target', 'db-1', ERRAND_ID, { pattern: '/errands/:id', params: { id: ERRAND_ID } }],
+  ])('[guard] %s links the run it spawned, on the route that serves that run', async (_, targetId, runId, route) => {
+    renderTargetsOnVoyagePage();
 
-    renderWithProviders(
-      <VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} />,
-    );
+    const link = await screen.findByTestId(`target-run-link-${targetId}`);
+    expect(link).toHaveTextContent(`${runId.slice(0, 12)}…`);
+    expect(landingOf(link)).toEqual(route);
+  });
 
-    await waitFor(() => expect(screen.getByText('redis-prod')).toBeInTheDocument());
-    // Link to the voyage by apply_id
-    const link = screen.getByTestId('target-apply-link-redis-prod');
-    expect(link).toBeInTheDocument();
-    expect((link as HTMLAnchorElement).href).toContain('/voyages/01APPLYID00000000000001');
-    // No apply_id - "-"
-    expect(screen.queryByTestId('target-apply-link-redis-stage')).not.toBeInTheDocument();
+  it('[guard] a target without a back-linked run has no link in its run cell', async () => {
+    renderTargetsOnVoyagePage();
+
+    await screen.findByText('redis-stage');
+    for (const targetId of ['redis-stage', 'db-2']) {
+      const row = screen.getByText(targetId).closest('tr') as HTMLTableRowElement;
+      expect(within(row.cells[3]).queryByRole('link')).toBeNull();
+    }
+  });
+
+  it.each([
+    ['an incarnation target names its incarnation', 'redis-prod', { pattern: '/incarnations/:name', params: { name: 'redis-prod' } }],
+    ['a host target names its Soul', 'db-1', { pattern: '/souls/:sid', params: { sid: 'db-1' } }],
+  ])('[guard] %s', async (_, targetId, route) => {
+    renderTargetsOnVoyagePage();
+
+    expect(landingOf(await screen.findByRole('link', { name: targetId }))).toEqual(route);
   });
 
   it('statusFilter with 0 matches → "no targets with this status" message', async () => {
