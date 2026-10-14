@@ -4,6 +4,7 @@
 # not carry it yet (NIM-346). Guarded by src/test/auditEventLabels.test.ts.
 apply.cancelled
 apply.dispatched
+apply.host_dropped
 audit.disabled
 audit.enabled
 augur.access_denied

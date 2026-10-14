@@ -21,6 +21,7 @@
   "auditEmpty": "No audit events match the filter.",
   "auditEventLabel_apply_cancelled": "Apply run cancelled",
   "auditEventLabel_apply_dispatched": "Apply dispatched to a Soul",
+  "auditEventLabel_apply_host_dropped": "Host dropped from run",
   "auditEventLabel_audit_disabled": "Audit logging disabled",
   "auditEventLabel_audit_enabled": "Audit logging enabled",
   "auditEventLabel_augur_access_denied": "Augur request denied",

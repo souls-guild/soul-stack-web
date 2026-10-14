@@ -4,6 +4,8 @@ import { Badge } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { taskStatusTone } from '../../components/status';
 import type { RunTaskView } from '../../api/keeper';
+import { ParamsByHostPanel, type HostFilter } from './RunTaskParamsByHost';
+import { paramValue } from './runTaskParams';
 import styles from './RunTasks.module.css';
 import common from '../common.module.css';
 
@@ -21,17 +23,6 @@ const TONE_COLOR: Record<string, string> = {
 
 function taskKey(t: RunTaskView): string {
   return `${t.passage}:${t.plan_index}`;
-}
-
-// Params value for a kv-line: scalar as-is, object/array — compact JSON.
-function paramValue(v: unknown): string {
-  if (v === null) return 'null';
-  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
 }
 
 // output = register_data (a structure, NOT a string): compact key->value of non-empty
@@ -146,16 +137,41 @@ export function RunTasks({ tasks, live = false }: { tasks: RunTaskView[]; live?:
           })}
         </div>
 
-        {current ? <TaskDetail task={current} /> : null}
+        {current ? <TaskDetail key={taskKey(current)} task={current} /> : null}
       </div>
     </section>
   );
 }
 
+function ParamsPanel({ entries }: { entries: [string, unknown][] }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className={styles.blabel}>{t('runhistory:runTasksInputTitle')}</div>
+      {entries.length > 0 ? (
+        <div className={styles.kv} data-testid="run-task-params">
+          {entries.map(([k, v]) => (
+            <div key={k} style={{ display: 'contents' }}>
+              <span className={styles.kvKey}>{k}</span>
+              <span className={styles.kvVal}>{paramValue(v)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={styles.muted} data-testid="run-task-params">
+          {t('runhistory:runTasksInputEmpty')}
+        </div>
+      )}
+    </>
+  );
+}
+
 function TaskDetail({ task }: { task: RunTaskView }) {
   const { t } = useTranslation();
+  const [filter, setFilter] = useState<HostFilter | null>(null);
   const paramEntries = task.params ? Object.entries(task.params) : [];
-  const hosts = task.hosts ?? [];
+  const allHosts = task.hosts ?? [];
+  const hosts = filter ? allHosts.filter((h) => filter.sids.includes(h.sid)) : allHosts;
 
   return (
     <div className={styles.detail} data-testid="run-task-detail">
@@ -168,23 +184,29 @@ function TaskDetail({ task }: { task: RunTaskView }) {
           declaring `secret: true` on an output field, and the keeper masks the
           observable copy before it is served. What arrives is already redacted,
           so a second client-side rule could only hide non-secrets. */}
-      <div className={styles.blabel}>{t('runhistory:runTasksInputTitle')}</div>
-      {paramEntries.length > 0 ? (
-        <div className={styles.kv} data-testid="run-task-params">
-          {paramEntries.map(([k, v]) => (
-            <div key={k} style={{ display: 'contents' }}>
-              <span className={styles.kvKey}>{k}</span>
-              <span className={styles.kvVal}>{paramValue(v)}</span>
-            </div>
-          ))}
-        </div>
+      {task.params_by_host ? (
+        <ParamsByHostPanel data={task.params_by_host} onFilter={setFilter} />
       ) : (
-        <div className={styles.muted} data-testid="run-task-params">
-          {t('runhistory:runTasksInputEmpty')}
-        </div>
+        <ParamsPanel entries={paramEntries} />
       )}
 
       <div className={styles.blabel}>{t('runhistory:runTasksByHostLabel')}</div>
+      {filter ? (
+        <div className={styles.filterBar}>
+          <button
+            type="button"
+            className={styles.filterChip}
+            onClick={() => setFilter(null)}
+            aria-label={t('runhistory:runTasksClearFilter')}
+            data-testid="run-task-host-filter"
+          >
+            {t('runhistory:runTasksFilter', { label: filter.label })} ✕
+          </button>
+          <span className={styles.muted}>
+            {t('runhistory:runTasksFilterCount', { shown: hosts.length, total: allHosts.length })}
+          </span>
+        </div>
+      ) : null}
       <table className={styles.hostsTable}>
         <thead>
           <tr>

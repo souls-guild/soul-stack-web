@@ -2642,7 +2642,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -3965,7 +3965,10 @@ export interface components {
             status: "applying" | "success" | "failed" | "partial_failed" | "cancelled";
         };
         RunHostStatusEntry: {
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description fencing epoch of the last work-queue claim of this row; 0 if the row was never claimed (sent inline, keeper-side, or still planned). It grows across a host's rows of one run, so a later step of a host can start above 1 without ever having been re-claimed
+             */
             attempt: number;
             cancel_requested: boolean;
             error_summary?: string;
@@ -3979,7 +3982,7 @@ export interface components {
             notices?: components["schemas"]["RunNoticeEntry"][] | null;
             /**
              * Format: int64
-             * @description index of the unit this row was dispatched for: the Passage today; once linear dispatch is on, the 0-based step index, a host then having one row per step it was sent. Values can have holes - nothing about them is contiguous
+             * @description 0-based index of the step this row was dispatched for, a host having one row per step that reached it, sent or settled by the Keeper without a send (the Passage index for a run under the deprecated staged model). Values can have holes - nothing about them is contiguous
              */
             passage: number;
             /** @description host FQDN OR synthetic run sid (keeper=on:keeper, __run__=run-sentinel abort to dispatch), not addressing a Soul (NIM-36) */
@@ -4007,12 +4010,15 @@ export interface components {
             hosts: components["schemas"]["RunTaskHostEntry"][] | null;
             id: string;
             module: string;
+            /** @description masked input of the task; a top-level key whose value differs between hosts reads <per-host>, and params_by_host carries its values */
             params?: {
                 [key: string]: unknown;
             };
+            /** @description present only when the task's masked input differs between hosts: every leaf of the input with the values it took and the hosts that took each */
+            params_by_host?: components["schemas"]["RunTaskParamsByHost"];
             /**
              * Format: int64
-             * @description index of the unit this task was dispatched in, the passage of the run-detail rows it ran on: the Passage today, the 0-based step index once linear dispatch is on
+             * @description 0-based index of the step this task was dispatched in, the passage of the run-detail rows it ran on (the Passage index for a run under the deprecated staged model)
              */
             passage: number;
             /** Format: int64 */
@@ -4032,6 +4038,47 @@ export interface components {
             sid: string;
             /** @enum {string} */
             status: "TASK_STATUS_UNSPECIFIED" | "TASK_STATUS_OK" | "TASK_STATUS_CHANGED" | "TASK_STATUS_SKIPPED" | "TASK_STATUS_FAILED" | "TASK_STATUS_TIMED_OUT" | "TASK_STATUS_CANCELLED";
+        };
+        RunTaskParamCell: {
+            /**
+             * Format: int64
+             * @description 1-based base-text line a hunk starts at; absent for a cell that is not a hunk
+             */
+            line?: number;
+            /**
+             * Format: int64
+             * @description base-text lines the hunk replaces; absent or 0 on a hunk is an insertion before line
+             */
+            line_count?: number;
+            /** @description leaf chain, e.g. config.replication.role or acl.users[0].name; a key holding a dot, a bracket or a quote reads ["a.b"]; past 32 segments (keys and list indices) the rest of a value is one cell whose value is that subtree */
+            path: string;
+            /** @description the leaf is equal on every host; values then holds one entry without sids */
+            same: boolean;
+            /** @description ordered by host count, largest first, then by first SID */
+            values: components["schemas"]["RunTaskParamVariant"][] | null;
+        };
+        RunTaskParamText: {
+            lines: string[] | null;
+            path: string;
+        };
+        RunTaskParamVariant: {
+            /** @description the hosts have no such key, or no lines at this hunk */
+            absent?: boolean;
+            /** @description a hunk variant's lines */
+            lines?: string[] | null;
+            sids?: string[] | null;
+            value?: unknown;
+        };
+        RunTaskParamsByHost: {
+            /** @description leaves in path order; the hunks of one multi-line value follow each other in line order under its path */
+            cells: components["schemas"]["RunTaskParamCell"][] | null;
+            /**
+             * Format: int64
+             * @description number of hosts the task was rendered for
+             */
+            hosts: number;
+            /** @description base text of every leaf split into hunks (a string on every host, multi-line on at least one, within the diff bounds); replacing each hunk's line range by a host's variant gives that host's text */
+            texts?: components["schemas"]["RunTaskParamText"][] | null;
         };
         RunTasksReply: {
             tasks: components["schemas"]["RunTaskEntry"][] | null;

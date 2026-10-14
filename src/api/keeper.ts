@@ -42,6 +42,9 @@ export type RunTaskHost = components['schemas']['RunTaskHostEntry'];
 export type RunTaskError = components['schemas']['RunTaskErrorEntry'];
 export type RunTaskView = components['schemas']['RunTaskEntry'];
 export type RunTasksReply = components['schemas']['RunTasksReply'];
+export type RunTaskParamsByHost = components['schemas']['RunTaskParamsByHost'];
+export type RunTaskParamCell = components['schemas']['RunTaskParamCell'];
+export type RunTaskParamVariant = components['schemas']['RunTaskParamVariant'];
 export type RunStatus = NonNullable<RunSummaryEntry['status']>;
 // Global run-view (GET /v1/runs + /v1/runs/stats) — the same apply_runs, but across ALL incarnations.
 export type GlobalRunEntry = components['schemas']['GlobalRunEntry'];

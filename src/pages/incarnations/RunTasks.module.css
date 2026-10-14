@@ -218,3 +218,194 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* "Input by host" (NIM-985): one line per leaf, its values as chips with the hosts
+   that took each. Shared values are faint and frameless — nothing to inspect. */
+.pbh {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 5px 14px;
+  align-items: start;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.pbh .kvKey {
+  padding-top: 2px;
+}
+
+.differs {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
+}
+
+.hostCount {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.vals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  max-width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 1px 7px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chip b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipN {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.chipSame {
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+  cursor: default;
+}
+
+.chipSame b {
+  font-weight: 400;
+}
+
+.chipSame .chipN {
+  color: var(--text-faint);
+}
+
+.chipRare {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+}
+
+.chipRare b {
+  color: var(--warning);
+}
+
+.chipAbsent b {
+  font-family: var(--font-sans);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.uniq {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.linkBtn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.find {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  padding: 1px 6px;
+  background: var(--surface);
+  color: var(--text);
+  width: 160px;
+}
+
+.sameNote {
+  grid-column: 1 / -1;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  padding-top: 2px;
+}
+
+.lineKey {
+  padding-left: 14px;
+  color: var(--text-faint);
+}
+
+.textHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+
+.textPick select {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.hostTextPre {
+  grid-column: 1 / -1;
+  margin: 2px 0 4px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  white-space: pre;
+}
+
+.filterBar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 6px;
+}
+
+.filterChip {
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
