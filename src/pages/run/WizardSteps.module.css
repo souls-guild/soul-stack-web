@@ -56,11 +56,20 @@
   cursor: not-allowed;
 }
 
+/* Applied next to the shared `.page` rather than via `composes`: the two set
+ * disjoint properties, so their load order cannot matter. The measure is on the
+ * page column so the heading and stepper centre with the steps, as `.formPage`
+ * does for the create form. */
+.page {
+  width: 100%;
+  max-width: 820px;
+  margin-inline: auto;
+}
+
 .body {
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
-  max-width: 820px;
 }
 
 .radioRow {

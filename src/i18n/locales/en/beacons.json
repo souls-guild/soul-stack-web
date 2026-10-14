@@ -63,7 +63,7 @@
   "subjectDecreeHint": "Pick ONE dimension — it decides which hosts may fire the rule. Required, and separate from the Incarnation the reaction runs against.",
   "subjectDimensionLabel": "dimension",
   "subjectHintCoven": "labels — reaches a host carrying one, and every member of an incarnation carrying one",
-  "subjectHintIncarnation": "service + name — reaches every host on that incarnation's roster",
+  "subjectHintIncarnation": "service + name — reaches every host bound to that incarnation",
   "subjectHintSid": "exact SIDs — reaches those hosts and nothing else",
   "subjectHintTrait": "key/value — the same two-level reach as coven, on the traits map",
   "subjectLegend": "Subject (exactly one dimension)",

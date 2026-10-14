@@ -1099,7 +1099,7 @@ export function RunWizard() {
   }, [canAdvanceFromStep2, canAdvanceFromStep3]);
 
   return (
-    <div className={pageStyles.page}>
+    <div className={`${pageStyles.page} ${styles.page}`}>
       <div className={pageStyles.header}>
         <div>
           <h1 className={pageStyles.title}>

@@ -71,7 +71,7 @@ describe('IncarnationDetail', () => {
     // one. (Nor is it what a run acts on — that set is resolved with no caller
     // scope and then cut to hosts holding a live lease.)
     await waitFor(() => {
-      expect(screen.getByText(/2 in the roster/i)).toBeInTheDocument();
+      expect(screen.getByText('hosts: 2')).toBeInTheDocument();
     });
 
     // Action-bar for status=ready.

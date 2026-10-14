@@ -170,7 +170,7 @@ describe('incarnation Overview — the Hosts card counts the roster', () => {
     await waitFor(() => screen.getByRole('heading', { name: INCARNATION_NAME }));
     // 2 — the roster. The label answer holds 1, so this number alone tells the
     // two sources apart.
-    await waitFor(() => expect(screen.getByText(/2 in the roster/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('hosts: 2')).toBeInTheDocument());
 
     expect(seen.some((u) => u.includes(`/v1/incarnations/${INCARNATION_NAME}/members`))).toBe(true);
     expect(seen.some((u) => u.startsWith('/v1/souls') && u.includes('coven='))).toBe(false);

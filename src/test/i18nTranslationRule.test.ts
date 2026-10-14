@@ -357,6 +357,8 @@ describe('i18n translation rule', () => {
     [/\bgrains?\b/i, 'borrowed config-management jargon'],
     [/\bpillars?\b/i, 'borrowed config-management jargon'],
     [/state\.apply/i, 'borrowed config-management jargon'],
+    [/roster/i, 'not a dictionary term — say the hosts bound to the incarnation'],
+    [/ростер/i, 'not a dictionary term — say the hosts bound to the incarnation'],
   ];
 
   it('locale values avoid vocabulary the dictionary rules out', () => {

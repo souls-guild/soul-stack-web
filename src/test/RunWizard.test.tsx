@@ -462,9 +462,9 @@ describe('RunWizard', () => {
     // 2 — the roster. The souls stub holds no host at all, so this number can only
     // have come from `/members`; a count read off the label column would be 0.
     const list = screen.getByLabelText('Matched incarnations');
-    await waitFor(() => expect(within(list).getByText(/2 in the roster/)).toBeInTheDocument());
+    await waitFor(() => expect(within(list).getByText('hosts: 2')).toBeInTheDocument());
     // And the badge the operator actually reads before pressing Run.
-    expect(screen.getByText('2 in the rosters')).toBeInTheDocument();
+    expect(screen.getByText('hosts in total: 2')).toBeInTheDocument();
     // Which is a roster size, not what the run will reach: the server resolves
     // the run's hosts with no caller scope and then drops the ones without a live
     // lease. The badge sits on the last screen before Run, so it has to say so.
@@ -494,7 +494,7 @@ describe('RunWizard', () => {
     await user.type(screen.getByLabelText('Incarnation regex'), '*');
 
     const list = screen.getByLabelText('Matched incarnations');
-    await waitFor(() => expect(within(list).getByText(/1 in the roster/)).toBeInTheDocument());
+    await waitFor(() => expect(within(list).getByText('hosts: 1')).toBeInTheDocument());
 
     // The dash on the forbidden row is the whole point: without the notice it is
     // the same dash the over-cap case gets, and the operator cannot tell "not

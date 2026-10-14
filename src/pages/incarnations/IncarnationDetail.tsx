@@ -103,7 +103,7 @@ export function IncarnationDetail() {
     // What the number means: the roster AS THIS OPERATOR MAY SEE IT. The server
     // narrows the reply to the hosts inside the caller's soul scope, so a narrow
     // scope legitimately shows fewer hosts than are bound. That is the contract,
-    // not a miscount — hence "in the roster" and not "the roster has".
+    // not a miscount — hence a bare "hosts: N" and not "N hosts are bound".
     const memberHosts = roster.data?.total ?? null;
     return { stateKeys, memberHosts };
   }, [detail.data, roster.data]);

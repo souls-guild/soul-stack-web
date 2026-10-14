@@ -5,9 +5,9 @@ import styles from '../common.module.css';
 
 // Confirmation for DELETE .../members/{sid} — the destructive half of membership.
 //
-// Unbinding is not "remove a row from a list": the host leaves the roster that
-// EVERY future run resolves, so a scenario that used to reach it silently stops
-// doing so. Warning box + explicit checkbox + danger button. The mutation lives
+// Unbinding is not "remove a row from a list": the host leaves the membership
+// that EVERY future run of this incarnation resolves, so a scenario that used to
+// reach it silently stops doing so. Warning box + explicit checkbox + danger button. The mutation lives
 // in MembersPanel; this is confirmation UI only.
 
 interface Props {
