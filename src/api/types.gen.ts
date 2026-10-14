@@ -2571,7 +2571,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Voyage
-         * @description Unified batch run (ADR-043). RBAC-by-kind: scenario->incarnation.run, command->errand.run (fail-closed, in the handler). Tempo per-AID rate-limit. 400 - kind=command with dry_run on a verb-shell module: refused at creation, before a scope is resolved and a row written, since it could only fan out one identical failure per host.
+         * @description Unified batch run (ADR-043). RBAC-by-kind: scenario->incarnation.run, command->errand.run (fail-closed, in the handler). Tempo per-AID rate-limit. 400 - kind=command with dry_run on a verb-shell module: refused at creation, before a scope is resolved and a row written, since it could only fan out one identical failure per host. 409 incarnation-locked - kind=scenario whose resolved target holds an error_locked incarnation: refused before the Voyage exists, detail names the run that locked it and the unlock / rerun-last routes.
          */
         post: operations["createVoyage"];
         delete?: never;
@@ -2591,7 +2591,7 @@ export interface paths {
         put?: never;
         /**
          * Dry-resolve scope Voyage
-         * @description Preview of the number of units/batches WITHOUT creating a Voyage (ADR-043 amendment 4). Same validation/resolve/RBAC as Create, so the same 400 for kind=command with dry_run on a verb-shell module. Without revealing the SID list. Read-like - no audit.
+         * @description Preview of the number of units/batches WITHOUT creating a Voyage (ADR-043 amendment 4). Same validation/resolve/RBAC as Create, so the same 400 for kind=command with dry_run on a verb-shell module and the same 409 for a scenario target holding an error_locked incarnation. Without revealing the SID list. Read-like - no audit.
          */
         post: operations["previewVoyage"];
         delete?: never;
@@ -5174,6 +5174,10 @@ export interface components {
             /** Format: int64 */
             batch_index: number;
             errand_id?: string;
+            /** @description why the target did not succeed, one of the documented snake_case codes (docs/keeper/operator-api/voyages.md); omitted for a target that succeeded, one the run itself stopped, and a scenario target whose run exists and failed (follow apply_id) */
+            error_code?: string;
+            /** @description the same reason as a sentence the Keeper composed (e.g. the run that left the incarnation error_locked); omitted when there is none */
+            error_message?: string;
             /** Format: date-time */
             finished_at?: string;
             status: string;
@@ -15308,6 +15312,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
             /** @description Unprocessable Entity */
             422: {
                 headers: {
@@ -15379,6 +15392,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

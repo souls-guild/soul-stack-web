@@ -3,7 +3,7 @@
  * Tests runMode switching, submit -> POST /v1/cadences.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Routes, Route, MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -41,8 +41,11 @@ interface PostCapture {
   body: unknown;
 }
 
-function setupFetch(opts: { capturedPosts?: PostCapture[] } = {}) {
+function setupFetch(opts: { capturedPosts?: PostCapture[]; incarnations?: Array<Record<string, unknown>> } = {}) {
   const posts: PostCapture[] = opts.capturedPosts ?? [];
+  const incarnations = opts.incarnations ?? [
+    { id: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' },
+  ];
 
   vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -77,10 +80,7 @@ function setupFetch(opts: { capturedPosts?: PostCapture[] } = {}) {
       return json({ items: [{ name: 'core.cmd', kind: 'core', states: ['shell'], errand_safe: true, params: [{ name: 'cmd', type: 'string', required: true }] }] });
     }
     if (url.includes('/v1/incarnations')) {
-      return json({
-        items: [{ id: 'redis-prod', service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'], status: 'ready', created_by_aid: 'archon-x', created_at: '', updated_at: '' }],
-        offset: 0, limit: 500, total: 1,
-      });
+      return json({ items: incarnations, offset: 0, limit: 500, total: incarnations.length });
     }
     return new Response('{}', { status: 404 });
   }) as typeof fetch);
@@ -116,6 +116,52 @@ describe('RunWizard — Cadence mode (recurrence)', () => {
     renderWizard('/run?recurrence=true');
 
     expect(screen.getByLabelText('Recurring')).toBeChecked();
+  });
+
+  // NIM-989: "exclude locked" belongs to a run started now. Ticked in one-time mode
+  // and carried into Recurring, it must not narrow the schedule — its names are fixed
+  // for every future run, so the locked incarnation would be dropped for good.
+  it('[GUARD] exclude ticked one-time does not narrow a Cadence', async () => {
+    const inc = (id: string, status: string) => ({
+      id, service: 'redis', service_version: 'main', state_schema_version: 1, covens: ['prod'],
+      status, status_details: status === 'error_locked' ? { apply_id: '01HLOCKER' } : {},
+      created_by_aid: 'archon-x', created_at: '', updated_at: '',
+    });
+    const posts = setupFetch({ incarnations: [inc('redis-prod', 'error_locked'), inc('redis-stage', 'ready')] });
+    renderWizard();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await user.click(await screen.findByTestId('exclude-error_locked'));
+
+    await user.click(screen.getByRole('button', { name: /Back/ }));
+    await user.click(screen.getByRole('button', { name: /Back/ }));
+    await user.click(screen.getByLabelText('Recurring'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+
+    expect(await screen.findByTestId('problems-cadence-note')).toBeInTheDocument();
+    expect(screen.queryByTestId('exclude-error_locked')).toBeNull();
+    // An id short enough to show whole is not marked as cut.
+    expect(within(screen.getByTestId('problem-redis-prod')).getByRole('link', { name: 'locked by run 01HLOCKER' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByTestId('cadence-name')).toBeInTheDocument());
+    await user.clear(screen.getByTestId('cadence-name'));
+    await user.type(screen.getByTestId('cadence-name'), 'redis-hourly');
+    await user.click(screen.getByRole('button', { name: /Create schedule/ }));
+    await waitFor(() => expect(screen.getByTestId('cadence-detail')).toBeInTheDocument());
+
+    const cadencePosts = posts.filter((p) => (p.url as string).includes('/v1/cadences'));
+    expect(cadencePosts).toHaveLength(1);
+    const target = (cadencePosts[0].body as { target: { incarnations: string[] } }).target;
+    expect([...target.incarnations].sort()).toEqual(['redis-prod', 'redis-stage']);
   });
 
   it('Scenario + Cadence (interval): submit → POST /v1/cadences with schedule_kind=interval', async () => {

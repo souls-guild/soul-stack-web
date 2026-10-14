@@ -92,6 +92,11 @@ interface FetchStubOpts {
   // flight. A resolved-but-empty stub cannot show that state: it is gone by the
   // time the first assertion runs.
   deferMembers?: boolean;
+  // Incarnations not in `ready`: name -> status and the run it points at (the locking
+  // run for error_locked, the applying run for applying; '' leaves it out).
+  problemIncarnations?: Record<string, { status: string; run?: string }>;
+  // More services offered on step 2 besides serviceName (no scenarios of their own).
+  extraServices?: string[];
 }
 
 const DEFAULT_MODULES: ModuleStub[] = [
@@ -132,6 +137,7 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
   const modules = opts.modules ?? DEFAULT_MODULES;
   const members = opts.members ?? {};
   const memberErrors = opts.memberErrors ?? {};
+  const problems = opts.problemIncarnations ?? {};
   const ref: { posted: CapturedPost | null; posts: CapturedPost[] } = { posted: null, posts: [] };
 
   vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -184,10 +190,14 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
     // GET-stubs
     if (url.includes('/v1/services?') || url.endsWith('/v1/services')) {
       return json({
-        items: [{ id: serviceName, ref: 'main', source: { type: 'git', url: 'git@x' } }],
+        items: [serviceName, ...(opts.extraServices ?? [])].map((id) => ({
+          id,
+          ref: 'main',
+          source: { type: 'git', url: 'git@x' },
+        })),
         offset: 0,
         limit: 50,
-        total: 1,
+        total: 1 + (opts.extraServices?.length ?? 0),
       });
     }
     if (url.includes(`/v1/services/${serviceName}/scenarios`)) {
@@ -219,7 +229,12 @@ function setupFetchStub(opts: FetchStubOpts = {}): { posted: CapturedPost | null
           service_version: 'main',
           state_schema_version: 1,
           covens: ['prod'],
-          status: 'ready',
+          status: name in problems ? problems[name].status : 'ready',
+          status_details:
+            problems[name]?.status === 'error_locked' && problems[name].run
+              ? { apply_id: problems[name].run, reason: 'apply_failed' }
+              : {},
+          ...(problems[name]?.status === 'applying' && problems[name].run ? { applying_apply_id: problems[name].run } : {}),
           created_by_aid: 'archon-x',
           created_at: '',
           updated_at: '',
@@ -398,6 +413,166 @@ describe('RunWizard', () => {
     expect(vBody.kind).toBe('scenario');
     expect(vBody.scenario_name).toBe('restart');
     expect(vBody.target.incarnations.sort()).toEqual(['redis-prod', 'redis-staging']);
+  });
+
+  // NIM-989: Keeper refuses a Voyage holding an error_locked incarnation (409). The step
+  // that picks the target counts them, badges each row with the run that locked it, and
+  // does not let a run start on them unless the operator excludes them.
+  it('[GUARD] Scenario: an error_locked incarnation is badged on step 3 and blocks the run until excluded', async () => {
+    const stub = setupFetchStub({
+      incarnationNames: ['redis-prod', 'redis-staging'],
+      problemIncarnations: { 'redis-prod': { status: 'error_locked', run: '01M4XGESGDY0CGG7THJCJA15R7' } },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    const badge = await screen.findByTestId('problem-redis-prod');
+    expect(badge.textContent).toContain('error_locked');
+    // The warning counts; it does not enumerate — a fleet run carries a hundred of them.
+    const row = screen.getByTestId('problem-row-error_locked');
+    expect(row).toHaveTextContent('1 in error_locked');
+    expect(row).not.toHaveTextContent('redis-prod');
+    // A full ULID is shortened on screen; the link and its title keep the whole id.
+    const runLink = within(badge).getByRole('link', { name: /01M4XGESGDY0…/ });
+    expect(runLink).toHaveAttribute('href', '/incarnations/redis-prod/runs/01M4XGESGDY0CGG7THJCJA15R7');
+    expect(runLink).toHaveAttribute('title', '01M4XGESGDY0CGG7THJCJA15R7');
+    expect(screen.queryByTestId('problem-redis-staging')).toBeNull();
+    expect(screen.getByTestId('locked-blocks-run')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
+
+    await user.click(screen.getByTestId('exclude-error_locked'));
+    expect(screen.queryByTestId('locked-blocks-run')).toBeNull();
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+    const voyagePosts = stub.posts.filter((p) => p.url.includes('/v1/voyages'));
+    expect(voyagePosts).toHaveLength(1);
+    expect((voyagePosts[0].body as { target: { incarnations: string[] } }).target.incarnations).toEqual(['redis-staging']);
+  });
+
+  // A Cadence keeps its names for every future run, so excluding a locked one today
+  // would drop it for good: the step warns and offers no exclusion.
+  it('Scenario + Cadence: an error_locked incarnation is warned about, not excluded', async () => {
+    setupFetchStub({
+      incarnationNames: ['redis-prod', 'redis-staging'],
+      problemIncarnations: { 'redis-prod': { status: 'error_locked' } },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText('Recurring'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    expect(await screen.findByTestId('problems-cadence-note')).toBeInTheDocument();
+    // No checkbox per row in a Cadence: one column, or two statuses share a line.
+    expect(screen.getByTestId('problem-incarnations').style.gridTemplateColumns).toBe('max-content');
+    expect(screen.getByTestId('problem-row-error_locked')).toHaveTextContent('1 in error_locked');
+    expect(screen.queryByTestId('exclude-error_locked')).toBeNull();
+    expect(within(screen.getByTestId('problem-redis-prod')).queryByRole('link', { name: /locked by run/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
+  });
+
+  // Statuses that only fail their own targets (applying, migration_failed, ...) are
+  // counted and badged too, each with its own exclusion, and never block the run.
+  // The list puts every problem first, ahead of the ready ones.
+  it('[GUARD] Scenario: applying / migration_failed are counted, excludable one kind at a time, and do not block', async () => {
+    const stub = setupFetchStub({
+      incarnationNames: ['redis-a', 'redis-b', 'redis-c'],
+      problemIncarnations: {
+        'redis-b': { status: 'applying', run: '01M4XAPPLYING0000000000000' },
+        'redis-c': { status: 'migration_failed' },
+      },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    expect(await screen.findByTestId('problem-row-applying')).toHaveTextContent('1 in applying');
+    expect(screen.getByTestId('problem-row-migration_failed')).toHaveTextContent('1 in migration_failed');
+    expect(within(screen.getByTestId('problem-redis-b')).getByRole('link', { name: /applying run 01M4XAPPLYIN…/ })).toHaveAttribute(
+      'href',
+      '/incarnations/redis-b/runs/01M4XAPPLYING0000000000000',
+    );
+    expect(screen.queryByTestId('locked-blocks-run')).toBeNull();
+    expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
+    const order = within(screen.getByLabelText('Matched incarnations')).getAllByRole('listitem').map((li) => li.textContent ?? '');
+    expect(order[0]).toContain('redis-b');
+    expect(order[1]).toContain('redis-c');
+    expect(order[2]).toContain('redis-a');
+
+    await user.click(screen.getByTestId('exclude-applying'));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Run/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+    const voyagePosts = stub.posts.filter((p) => p.url.includes('/v1/voyages'));
+    expect((voyagePosts[0].body as { target: { incarnations: string[] } }).target.incarnations.sort()).toEqual(['redis-a', 'redis-c']);
+  });
+
+  // Several kinds at once, as on a fleet: counts above one, error_locked ahead of
+  // applying, drift left alone (it runs, like ready), and the run count follows
+  // every exclusion.
+  it('[GUARD] Scenario: mixed problems are counted per kind, ordered, and every exclusion reaches the run count', async () => {
+    setupFetchStub({
+      // applying comes first in name order, so error_locked leading the warning is
+      // the sort's doing, not the fixture's.
+      incarnationNames: ['redis-a', 'redis-b', 'redis-c', 'redis-d', 'redis-e'],
+      problemIncarnations: {
+        'redis-a': { status: 'applying' },
+        'redis-b': { status: 'error_locked' },
+        'redis-d': { status: 'error_locked' },
+        'redis-e': { status: 'drift' },
+      },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    const warning = await screen.findByTestId('problem-incarnations');
+    expect(screen.getByTestId('problem-row-error_locked')).toHaveTextContent('2 in error_locked');
+    expect(screen.getByTestId('problem-row-applying')).toHaveTextContent('1 in applying');
+    const text = warning.textContent ?? '';
+    expect(text.indexOf('error_locked')).toBeLessThan(text.indexOf('applying'));
+    expect(screen.queryByTestId('problem-row-drift')).toBeNull();
+    expect(screen.queryByTestId('problem-redis-e')).toBeNull();
+    const order = within(screen.getByLabelText('Matched incarnations')).getAllByRole('listitem').map((li) => (li.textContent ?? '').slice(0, 7));
+    expect(order).toEqual(['redis-b', 'redis-d', 'redis-a', 'redis-c', 'redis-e']);
+    expect(warning.style.gridTemplateColumns).toBe('max-content max-content');
+    expect(screen.getByText('Run on 5 incarnations')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('exclude-error_locked'));
+    expect(screen.getByText('Run on 3 incarnations')).toBeInTheDocument();
+    await user.click(screen.getByTestId('exclude-applying'));
+    expect(screen.getByText('Run on 2 incarnations')).toBeInTheDocument();
   });
 
   it('Scenario regex filter: matched subset → fan-out over matched', async () => {
@@ -1492,12 +1667,12 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Valid fresh draft (v=10, incarnationRegex) → state is restored', async () => {
+  it('Valid fresh draft (v=12, incarnationRegex) → state is restored', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 10,
+        v: 12,
         step: 3,
         workload: 'scenario',
         runMode: 'voyage',
@@ -1507,6 +1682,8 @@ describe('RunWizard', () => {
           scenario: 'restart',
           incarnationRegex: '^redis-prod$',
           incarnations: ['redis-prod'],
+          // An empty status must not exclude a ready incarnation.
+          excludeStatuses: [''],
           fields: {},
           inputObj: {},
         },
@@ -1546,6 +1723,61 @@ describe('RunWizard', () => {
       expect(list).toContain('redis-prod');
       expect(list).not.toContain('redis-staging');
     });
+    expect(screen.getByText('Run on 1 incarnations')).toBeInTheDocument();
+  });
+
+  // A row whose status came back empty is a problem of its own kind; excluding it
+  // must not take the ready incarnations with it.
+  it('[GUARD] Scenario: excluding an empty status leaves the ready incarnations in the run', async () => {
+    setupFetchStub({
+      incarnationNames: ['redis-a', 'redis-b'],
+      problemIncarnations: { 'redis-b': { status: '' } },
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    await user.click(await screen.findByTestId('exclude-'));
+    expect(screen.getByText('Run on 1 incarnations')).toBeInTheDocument();
+  });
+
+  // Exclusions belong to the service they were ticked for: picking another service
+  // starts with every box off again.
+  it('[GUARD] Scenario: changing the service clears the excluded statuses', async () => {
+    setupFetchStub({
+      incarnationNames: ['redis-a', 'redis-b'],
+      problemIncarnations: { 'redis-b': { status: 'applying' } },
+      extraServices: ['pg'],
+    });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await user.click(await screen.findByTestId('exclude-applying'));
+    expect(screen.getByTestId('exclude-applying')).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: /Back/ }));
+    await user.selectOptions(screen.getByLabelText(/Service/), 'pg');
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+
+    expect(await screen.findByTestId('exclude-applying')).not.toBeChecked();
   });
 
   it('Batch size: invalid value → inline error visible, submit disabled', async () => {

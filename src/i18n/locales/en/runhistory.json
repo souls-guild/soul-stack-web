@@ -213,6 +213,7 @@
   "voyageTargetsAria": "Voyage targets",
   "voyageTargetsBatchHeading": "Batch {{index}}",
   "voyageTargetsColFinishedAt": "Finished at",
+  "voyageTargetsColReason": "Reason",
   "voyageTargetsColRun": "Run",
   "voyageTargetsColStatus": "Status",
   "voyageTargetsColTarget": "Target",

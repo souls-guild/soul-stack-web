@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Play, ArrowLeft, ArrowRight, Send, Box, Terminal, SquareTerminal, CalendarClock, Info } from 'lucide-react';
 import { keeperApi } from '../../api/keeper';
@@ -70,6 +70,7 @@ import { ModulePicker } from './ModulePicker';
 import { hasParams, paramsToInputSchema } from './moduleParams.helpers';
 import { ChipsInput } from '../incarnations/ChipsInput';
 import { NotifyBlock } from './NotifyBlock';
+import { problemIncarnations, problemStatusRank, type ProblemIncarnation } from './problemIncarnations';
 import { serializeNotify } from './notifyHelpers';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
@@ -115,6 +116,12 @@ interface ScenarioStateValues {
   // incarnations list is loaded). Stored in state so submit and validation
   // don't depend on the step being mounted.
   incarnations: string[];
+  // Statuses whose incarnations are left out of a run started now — one checkbox per
+  // kind of problem, all off by default. An error_locked one still in the target
+  // blocks the run (Keeper refuses it with 409); the others only fail their own
+  // targets. Not applied to a Cadence — its names are fixed in the schedule, so
+  // dropping one today would drop it from every future run.
+  excludeStatuses: string[];
   fields: ScenarioFieldsState;
   // Used only when the scenario has no typed input_schema — DynamicInputBuilder.
   inputObj: Record<string, unknown>;
@@ -193,7 +200,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (new field, type change). loadDraft() discards drafts with a different/missing
 // version — old persisted state from a previous wizard form shape is ignored, the wizard
 // starts from defaults instead of crashing on a missing field.
-const DRAFT_VERSION = 10;
+const DRAFT_VERSION = 12;
 
 interface WizardDraft {
   v: number;
@@ -217,8 +224,24 @@ const DEFAULT_SCENARIO_STATE: ScenarioStateValues = {
   scenario: '',
   incarnationRegex: '',
   incarnations: [],
+  excludeStatuses: [],
   fields: {},
   inputObj: {},
+};
+
+const NO_STATUSES: string[] = [];
+
+// A ready incarnation has no problem entry, so it is never excluded — not even by
+// an empty status that slipped into the list.
+function isExcludedBy(problem: ProblemIncarnation | undefined, excludedStatuses: readonly string[]): boolean {
+  return problem !== undefined && excludedStatuses.includes(problem.status);
+}
+
+// The sentence for each kind of problem on step 3; any other status a run cannot
+// start from reads as "not runnable".
+const PROBLEM_KEY: Record<string, string> = {
+  error_locked: 'run:problemErrorLocked',
+  applying: 'run:problemApplying',
 };
 
 const DEFAULT_COMMAND_STATE: CommandStateValues = {
@@ -364,6 +387,9 @@ export function RunWizard() {
         ...DEFAULT_SCENARIO_STATE,
         ...d,
         incarnations: asArray(d.incarnations, DEFAULT_SCENARIO_STATE.incarnations),
+        excludeStatuses: asArray(d.excludeStatuses, DEFAULT_SCENARIO_STATE.excludeStatuses).filter(
+          (v): v is string => typeof v === 'string' && v !== '',
+        ),
       };
     }
     // Priority: incarnation_regex (snapshot-OR, already a ready regex) > incarnation (single incarnation).
@@ -463,6 +489,32 @@ export function RunWizard() {
   const inputSchema: ScenarioInputSchema | undefined = selectedScenarioMeta?.input_schema;
   const usePerField = isSupportedInputSchema(inputSchema);
 
+  // --- Incarnation resolution for Scenario (preview + multi-select). ---
+  const incarnationsListQ = useQuery({
+    queryKey: ['run.scenario.incarnations.list', scenarioState.service],
+    queryFn: () => keeperApi.incarnations.list({ service: scenarioState.service, limit: 500 }),
+    enabled: workload === 'scenario' && Boolean(scenarioState.service),
+  });
+
+  const incarnationNames = useMemo(
+    () => (incarnationsListQ.data?.items ?? []).map((i) => i.id),
+    [incarnationsListQ.data],
+  );
+
+  // Incarnations of the service a run cannot start on, by name. Keeper refuses a
+  // Voyage holding an error_locked one (409) and fails the target of any other, so
+  // the wizard says so on the step that picks them instead of at submit.
+  const problemsByName = useMemo(() => problemIncarnations(incarnationsListQ.data?.items ?? []), [incarnationsListQ.data]);
+  const excludedStatuses = runMode === 'voyage' ? scenarioState.excludeStatuses : NO_STATUSES;
+  const targetIncarnations = useMemo(
+    () =>
+      excludedStatuses.length === 0
+        ? scenarioState.incarnations
+        : scenarioState.incarnations.filter((n) => !isExcludedBy(problemsByName[n], excludedStatuses)),
+    [excludedStatuses, scenarioState.incarnations, problemsByName],
+  );
+  const lockedBlocksRun = runMode === 'voyage' && targetIncarnations.some((n) => problemsByName[n]?.status === 'error_locked');
+
   // NIM-76: operational update_config — Redis version isn't set in the form, we take it from
   // the incarnation's state.redis_version (the first of the resolved set). Gated on the presence
   // of an x-directives field in the schema (don't fetch incarnation/catalog for non-redis scenarios).
@@ -470,8 +522,8 @@ export function RunWizard() {
   // Directive validation (hard-block, 3A) applies ONLY to a single target: with
   // fan-out onto >1 incarnation their redis_version can differ -> one version would
   // hard-block ones valid on others. >1 -> graceful (no validation; backend 422 is final).
-  const dayTwoSingle = workload === 'scenario' && scenarioState.incarnations.length === 1;
-  const dayTwoIncarnation = dayTwoSingle ? scenarioState.incarnations[0] : '';
+  const dayTwoSingle = workload === 'scenario' && targetIncarnations.length === 1;
+  const dayTwoIncarnation = dayTwoSingle ? targetIncarnations[0] : '';
   const incarnationDetailQ = useQuery({
     queryKey: ['incarnation', dayTwoIncarnation],
     queryFn: () => keeperApi.incarnations.get(dayTwoIncarnation),
@@ -637,17 +689,6 @@ export function RunWizard() {
     setHostCriteria((prev) => (prev.excluded.includes(sid) ? prev : { ...prev, excluded: [...prev.excluded, sid] }));
   }, []);
 
-  // --- Incarnation resolution for Scenario (preview + multi-select). ---
-  const incarnationsListQ = useQuery({
-    queryKey: ['run.scenario.incarnations.list', scenarioState.service],
-    queryFn: () => keeperApi.incarnations.list({ service: scenarioState.service, limit: 500 }),
-    enabled: workload === 'scenario' && Boolean(scenarioState.service),
-  });
-
-  const incarnationNames = useMemo(
-    () => (incarnationsListQ.data?.items ?? []).map((i) => i.id),
-    [incarnationsListQ.data],
-  );
 
   // Host count per incarnation, read from each ROSTER — the relation a scenario
   // run fans out over.
@@ -710,7 +751,8 @@ export function RunWizard() {
   const canAdvanceFromStep3 = useMemo(() => {
     if (workload === 'scenario') {
       return (
-        scenarioState.incarnations.length > 0 &&
+        targetIncarnations.length > 0 &&
+        !lockedBlocksRun &&
         scenarioMissingRequired.length === 0 &&
         scenarioInvalidComposite.length === 0 &&
         scenarioInvalidMaps.length === 0 &&
@@ -732,7 +774,8 @@ export function RunWizard() {
     return true;
   }, [
     workload,
-    scenarioState.incarnations,
+    targetIncarnations,
+    lockedBlocksRun,
     scenarioMissingRequired,
     scenarioInvalidComposite,
     scenarioInvalidMaps,
@@ -833,7 +876,7 @@ export function RunWizard() {
         kind: 'scenario',
         scenario_name: scenarioState.scenario,
         input: Object.keys(inputObj).length > 0 ? inputObj : undefined,
-        target: { incarnations: scenarioState.incarnations },
+        target: { incarnations: targetIncarnations },
       };
     } else {
       // Full module address — `<name>.<state>` (state is omitted if empty —
@@ -966,7 +1009,7 @@ export function RunWizard() {
   const isLateBinding = workload === 'command' && hostCriteria.covens.length > 0 && hostCriteria.sidRegex.trim().length === 0 && hostCriteria.soulprint.trim().length === 0 && excludedSids.length === 0;
 
   // Scope for snapshot-count: for scenario = number of incarnations; for command = target size.
-  const snapshotScope = workload === 'scenario' ? scenarioState.incarnations.length : targetSids.length;
+  const snapshotScope = workload === 'scenario' ? targetIncarnations.length : targetSids.length;
 
   // Local computation of the batch count for a snapshot target.
   // batch = '' | 'N' | 'N%'. For window — always 1 (batch isn't used in window semantics).
@@ -1158,6 +1201,8 @@ export function RunWizard() {
             onChange={setScenarioState}
             incarnationsLoading={incarnationsListQ.isLoading}
             incarnationNames={incarnationNames}
+            problemsByName={problemsByName}
+            runMode={runMode}
             hostCountByIncarnation={hostCountByIncarnation}
             hostCountOverCap={rosterSizes.overCap}
             hostCountLoading={rosterSizes.loading}
@@ -1436,7 +1481,7 @@ function Step2ScenarioSelect({
           className={styles.field}
           value={value.service}
           onChange={(e) =>
-            onChange({ ...value, service: e.target.value, scenario: '', incarnationRegex: '', incarnations: [] })
+            onChange({ ...value, service: e.target.value, scenario: '', incarnationRegex: '', incarnations: [], excludeStatuses: [] })
           }
         >
           <option value="">{t('run:selectServicePlaceholder')}</option>
@@ -1485,6 +1530,8 @@ function Step3ScenarioIncarnations({
   onChange,
   incarnationsLoading,
   incarnationNames,
+  problemsByName,
+  runMode,
   hostCountByIncarnation,
   hostCountOverCap,
   hostCountLoading,
@@ -1506,6 +1553,8 @@ function Step3ScenarioIncarnations({
   onChange: Dispatch<SetStateAction<ScenarioStateValues>>;
   incarnationsLoading: boolean;
   incarnationNames: string[];
+  problemsByName: Record<string, ProblemIncarnation>;
+  runMode: RunMode;
   hostCountByIncarnation: Record<string, number> | undefined;
   hostCountOverCap: boolean;
   hostCountLoading: boolean;
@@ -1565,9 +1614,43 @@ function Step3ScenarioIncarnations({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchedKey]);
 
+  // Problem kinds present in the match, by status, in screen order — counts, not
+  // names: a fleet run can carry a hundred of them.
+  const problemGroups = useMemo(() => {
+    const byStatus = new Map<string, number>();
+    for (const n of matched) {
+      const p = problemsByName[n];
+      if (p) byStatus.set(p.status, (byStatus.get(p.status) ?? 0) + 1);
+    }
+    return [...byStatus.entries()].sort(([a], [b]) => problemStatusRank(a).localeCompare(problemStatusRank(b)));
+  }, [matched, problemsByName]);
+  const excludedStatuses = runMode === 'voyage' ? value.excludeStatuses : NO_STATUSES;
+  const isExcluded = (name: string) => isExcludedBy(problemsByName[name], excludedStatuses);
+  const runOn = useMemo(
+    () => matched.filter((n) => !isExcludedBy(problemsByName[n], excludedStatuses)),
+    [excludedStatuses, matched, problemsByName],
+  );
+  const lockedBlocksHere =
+    runMode === 'voyage' &&
+    problemGroups.some(([status]) => status === 'error_locked') &&
+    !value.excludeStatuses.includes('error_locked');
+  // Problems first so they are on screen without scrolling a fleet-sized list; the
+  // run itself keeps the matched order.
+  const displayOrder = useMemo(() => {
+    const rank = (n: string) => (problemsByName[n] ? problemStatusRank(problemsByName[n].status) : '9');
+    return matched.map((n, i) => ({ n, i })).sort((a, b) => rank(a.n).localeCompare(rank(b.n)) || a.i - b.i).map((x) => x.n);
+  }, [matched, problemsByName]);
+  const toggleExclude = (status: string, on: boolean) =>
+    onChange((prev) => ({
+      ...prev,
+      excludeStatuses: on
+        ? [...prev.excludeStatuses.filter((s) => s !== status), status]
+        : prev.excludeStatuses.filter((s) => s !== status),
+    }));
+
   const totalHosts = useMemo(
-    () => totalRosterSize(matched, hostCountByIncarnation),
-    [hostCountByIncarnation, matched],
+    () => totalRosterSize(runOn, hostCountByIncarnation),
+    [hostCountByIncarnation, runOn],
   );
 
   return (
@@ -1622,6 +1705,47 @@ function Step3ScenarioIncarnations({
             </div>
           );
         })}
+        {problemGroups.length > 0 ? (
+          <div
+            className={styles.warn}
+            style={{
+              marginBottom: 6,
+              display: 'grid',
+              // A Cadence row has no checkbox: two columns would pair two statuses on a line.
+              gridTemplateColumns: runMode === 'voyage' ? 'max-content max-content' : 'max-content',
+              columnGap: 16,
+              rowGap: 2,
+            }}
+            data-testid="problem-incarnations"
+          >
+            {problemGroups.map(([status, count]) => (
+              <div key={status} style={{ display: 'contents' }} data-testid={`problem-row-${status}`}>
+                <span>{t(PROBLEM_KEY[status] ?? 'run:problemNotRunnable', { count, status })}</span>
+                {runMode === 'voyage' ? (
+                  <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={value.excludeStatuses.includes(status)}
+                      onChange={(e) => toggleExclude(status, e.target.checked)}
+                      data-testid={`exclude-${status}`}
+                    />
+                    {t('run:excludeFromRun')}
+                  </label>
+                ) : null}
+              </div>
+            ))}
+            {runMode === 'cadence' ? (
+              <div style={{ gridColumn: '1 / -1' }} data-testid="problems-cadence-note">
+                {t('run:problemsCadenceNote')}
+              </div>
+            ) : null}
+            {lockedBlocksHere ? (
+              <div style={{ gridColumn: '1 / -1' }} data-testid="locked-blocks-run">
+                {t('run:lockedBlocksRun')}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div
           style={{
             maxHeight: 240,
@@ -1640,8 +1764,9 @@ function Step3ScenarioIncarnations({
               {t('run:incarnationNoMatch')}
             </div>
           ) : null}
-          {matched.map((name) => {
+          {displayOrder.map((name) => {
             const count = hostCountByIncarnation?.[name];
+            const problem = problemsByName[name];
             return (
               <div
                 key={name}
@@ -1653,6 +1778,7 @@ function Step3ScenarioIncarnations({
                   padding: '4px 2px',
                   fontFamily: 'var(--font-mono)',
                   fontSize: 12.5,
+                  opacity: isExcluded(name) ? 0.5 : undefined,
                 }}
               >
                 {name}
@@ -1666,6 +1792,28 @@ function Step3ScenarioIncarnations({
                       ? t('run:hostCountLoading')
                       : t('run:hostCountUnknown')}
                 </span>
+                {problem ? (
+                  <span
+                    style={{ display: 'inline-flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap' }}
+                    data-testid={`problem-${name}`}
+                  >
+                    <Badge tone={problem.status === 'error_locked' ? 'danger' : 'warn'}>{problem.status}</Badge>
+                    {problem.runId ? (
+                      <Link
+                        to={`/incarnations/${encodeURIComponent(name)}/runs/${encodeURIComponent(problem.runId)}`}
+                        title={problem.runId}
+                      >
+                        {t(problem.status === 'error_locked' ? 'run:lockedByRun' : 'run:applyingRun', {
+                          applyId: problem.runId.length > 12 ? `${problem.runId.slice(0, 12)}…` : problem.runId,
+                        })}
+                      </Link>
+                    ) : null}
+                    <Link to={`/incarnations/${encodeURIComponent(name)}`}>
+                      {t(problem.status === 'error_locked' ? 'run:lockedResolve' : 'run:problemOpen')}
+                    </Link>
+                    {isExcluded(name) ? <span style={{ color: 'var(--text-faint)' }}>{t('run:lockedExcluded')}</span> : null}
+                  </span>
+                ) : null}
               </div>
             );
           })}
@@ -1674,8 +1822,8 @@ function Step3ScenarioIncarnations({
 
       <div className={styles.preview} aria-label={t('run:incarnationPreviewAria')}>
         <div>
-          <Badge tone={matched.length > 0 ? 'info' : 'muted'}>
-            {t('run:incarnationRunOnN', { count: matched.length })}
+          <Badge tone={runOn.length > 0 ? 'info' : 'muted'}>
+            {t('run:incarnationRunOnN', { count: runOn.length })}
           </Badge>
           {totalHosts !== undefined ? (
             <>

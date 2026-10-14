@@ -289,6 +289,38 @@ describe('VoyageTargets (via VoyageDetail)', () => {
     expect(landingOf(await screen.findByRole('link', { name: targetId }))).toEqual(route);
   });
 
+  // NIM-989 / NIM-617: a target refused before its child run existed has no back-link,
+  // and its row's reason is the only place the operator learns why it failed.
+  it('[GUARD] a target that did not run shows its error_code and error_message', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: `/v1/voyages/${VOYAGE_ID}/targets`,
+        body: {
+          voyage_id: VOYAGE_ID,
+          targets: [
+            {
+              target_kind: 'incarnation',
+              target_id: 'demo',
+              status: 'failed',
+              batch_index: 0,
+              error_code: 'incarnation_error_locked',
+              error_message: 'incarnation demo is error_locked by run 01HLOCKER',
+            },
+            { target_kind: 'incarnation', target_id: 'fine', status: 'succeeded', batch_index: 0, apply_id: 'apply-1' },
+          ],
+        },
+      },
+    ]);
+
+    renderWithProviders(<VoyageTargets voyageId={VOYAGE_ID} refetchInterval={false} />);
+
+    const reason = await screen.findByTestId('target-reason-demo');
+    expect(reason).toHaveTextContent('incarnation_error_locked');
+    expect(reason).toHaveTextContent('incarnation demo is error_locked by run 01HLOCKER');
+    expect(screen.getByTestId('target-reason-fine')).toHaveTextContent('—');
+  });
+
   it('statusFilter with 0 matches → "no targets with this status" message', async () => {
     installFetchMock([
       { method: 'GET', url: `/v1/voyages/${VOYAGE_ID}/targets`, body: TARGETS_BARRIER },

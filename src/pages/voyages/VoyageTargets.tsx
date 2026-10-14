@@ -66,6 +66,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
           <th style={thStyle}>{t('voyageTargetsColStatus')}</th>
           <th style={thStyle}>{t('voyageTargetsColFinishedAt')}</th>
           <th style={thStyle}>{t('voyageTargetsColRun')}</th>
+          <th style={{ ...thStyle, width: '35%' }}>{t('voyageTargetsColReason')}</th>
         </tr>
       </thead>
       <tbody>
@@ -73,7 +74,7 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
           <React.Fragment key={batchIdx}>
             <tr>
               <td
-                colSpan={4}
+                colSpan={5}
                 data-testid={`batch-heading-${batchIdx}`}
                 style={batchSepStyle}
               >
@@ -111,6 +112,21 @@ export function VoyageTargets({ voyageId, refetchInterval, statusFilter }: Props
                 </td>
                 <td style={tdStyle}>
                   <TargetRunLink entry={entry} title={t('voyageTargetsRunLink')} />
+                </td>
+                <td style={reasonTdStyle} data-testid={`target-reason-${entry.target_id}`}>
+                  {/* Why the target did not succeed. A target refused before its child
+                      run existed has no back-link, and this is the only place the
+                      reason appears. */}
+                  {entry.error_code ? (
+                    <>
+                      <span className="mono" style={{ fontSize: 12 }}>{entry.error_code}</span>
+                      {entry.error_message ? (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{entry.error_message}</div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -189,6 +205,12 @@ const tdStyle: React.CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+};
+
+const reasonTdStyle: React.CSSProperties = {
+  ...tdStyle,
+  whiteSpace: 'normal',
+  overflowWrap: 'anywhere',
 };
 
 const batchSepStyle: React.CSSProperties = {
