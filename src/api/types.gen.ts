@@ -3991,6 +3991,8 @@ export interface components {
              */
             attempt: number;
             cancel_requested: boolean;
+            /** @description true on the failed or orphaned row of a host the run dropped under on_failure: host and finished without; absent on every other row, a failed row of a run that ended early included */
+            dropped?: boolean;
             error_summary?: string;
             /**
              * Format: int64
@@ -4043,6 +4045,8 @@ export interface components {
             passage: number;
             /** Format: int64 */
             plan_index: number;
+            /** @description present only for a host task of a serial: step sent in more than one wave: the step's hosts per wave in dispatch order, the same on every host task of the step. It lists the hosts of a wave the run ended before; a host the Keeper settled before the first wave without sending it anything is in no wave */
+            waves?: (string[] | null)[] | null;
         };
         RunTaskErrorEntry: {
             code: string;

@@ -10,7 +10,7 @@ import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { JsonViewer } from '../../components/JsonViewer';
 import { runStatusTone } from '../../components/status';
 import { subscribeRunEvents } from '../../api/runEvents';
-import { RunTasks } from './RunTasks';
+import { RunHostOutcomes, RunTasks } from './RunTasks';
 import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
 import { noticesByHost } from './runNotices';
@@ -24,7 +24,9 @@ import styles from '../common.module.css';
 // (server joins the plan with per-host outcomes, live AND history in one response). SSE
 // task.executed is a nudge: invalidates ['run-tasks'] for an instant refetch.
 // Graceful fallback: while backend /tasks isn't deployed (404/501) — degrade to
-// the per-host summary + audit timeline (previous view).
+// the audit timeline (previous view). There is no per-host table (NIM-988): a host's
+// outcome is in the host filter of the task list or, with no plan to list, in the
+// host outcomes block; its failure is in the failed block.
 const NON_TERMINAL = new Set(['applying']);
 
 export function RunDetail() {
@@ -53,13 +55,13 @@ export function RunDetail() {
   });
   // Primary is ready only if the response has that shape (tasks[] present). Fallback if
   // /tasks is unavailable: network error / 404 / 501 OR the body doesn't match the contract —
-  // we degrade to per-host + audit instead of crashing.
+  // we degrade to host outcomes + audit instead of crashing.
   const tasksReady = Array.isArray(tasksQ.data?.tasks);
   const tasksUnavailable = tasksQ.isError || (tasksQ.data != null && !tasksReady);
 
   // Fallback path: audit = task history (task.executed by correlation_id=applyId).
   // Loaded ONLY when /tasks is unavailable — otherwise an extra request. 403 → soft
-  // degradation (banner), the per-host summary remains.
+  // degradation (banner), the host outcomes remain.
   const auditQ = useQuery({
     queryKey: ['run-audit-tasks', name, applyId],
     queryFn: () =>
@@ -146,6 +148,10 @@ export function RunDetail() {
 
   const hosts = run.hosts ?? [];
   const failedHosts = hosts.filter((h) => h.error_summary || h.failed_task_idx != null || h.failed_plan_index != null);
+  const cancelRequested = hosts.some((h) => h.cancel_requested);
+  // A failure is named by its task and, in a `serial:` step, its wave once /tasks has
+  // answered; until then (or on an older keeper) by the indexes the row carries.
+  const taskByPlan = new Map((tasksReady ? tasksQ.data!.tasks ?? [] : []).map((tk) => [tk.plan_index, tk]));
   // notices is `array | null` on the wire, and it arrives on SUCCESSFUL runs —
   // a deprecated parameter is still honored until the version it names. Kept
   // per host on purpose: a park mid-upgrade legitimately answers differently
@@ -168,7 +174,10 @@ export function RunDetail() {
             </h1>
           </div>
           <div data-testid="run-status">
-            <Badge tone={runStatusTone(run.status)}>{run.status}</Badge>
+            <Badge tone={runStatusTone(run.status)}>
+              {run.status}
+              {cancelRequested ? ` · ${t('runhistory:runCancelRequested')}` : ''}
+            </Badge>
           </div>
         </div>
       </div>
@@ -209,20 +218,49 @@ export function RunDetail() {
       {failedHosts.length > 0 ? (
         <section className={styles.section} aria-label={t('incarnations:runFailedTaskAria')} data-testid="run-failed-section">
           <h2 className={styles.sectionTitle}>{t('runhistory:runFailedTaskTitle')}</h2>
-          {failedHosts.map((h) => (
-            <div key={`${h.sid}-${h.passage}`} className={styles.errorBox} style={{ marginBottom: 8 }}>
-              <div className="mono" style={{ fontWeight: 600, marginBottom: 4 }}>
-                <KeeperSidCell sid={h.sid} />
+          {failedHosts.map((h) => {
+            const task = h.failed_plan_index != null ? taskByPlan.get(h.failed_plan_index) : undefined;
+            const waves = task?.waves ?? [];
+            const wave = waves.findIndex((w) => (w ?? []).includes(h.sid));
+            return (
+              <div
+                key={`${h.sid}-${h.passage}`}
+                className={styles.errorBox}
+                style={{ marginBottom: 8 }}
+                data-testid={`run-failed-host-${h.sid}`}
+              >
+                <div className="mono" style={{ fontWeight: 600, marginBottom: 4 }}>
+                  <KeeperSidCell sid={h.sid} />
+                  {h.dropped ? (
+                    <>
+                      {' '}
+                      <Badge tone="warn" title={t('runhistory:runHostDroppedHint')}>
+                        {t('runhistory:runHostDropped')}
+                      </Badge>
+                    </>
+                  ) : null}
+                </div>
+                {task ? (
+                  <div data-testid={`run-failed-task-${h.sid}`}>
+                    {t('runhistory:runFailedTask', { idx: task.plan_index, name: task.id })}
+                    {wave >= 0 && waves.length > 1
+                      ? ` · ${t('runhistory:runWaveOf', { n: wave + 1, total: waves.length })}`
+                      : ''}
+                  </div>
+                ) : (
+                  <>
+                    {h.failed_task_idx != null ? (
+                      <div>{t('runhistory:runFailedTaskIdx', { idx: h.failed_task_idx })}</div>
+                    ) : null}
+                    {h.failed_plan_index != null ? (
+                      <div>{t('runhistory:runFailedPlanIndex', { idx: h.failed_plan_index })}</div>
+                    ) : null}
+                  </>
+                )}
+                {h.error_summary ? <div className="mono">{h.error_summary}</div> : null}
               </div>
-              {h.failed_task_idx != null ? (
-                <div>{t('runhistory:runFailedTaskIdx', { idx: h.failed_task_idx })}</div>
-              ) : null}
-              {h.failed_plan_index != null ? (
-                <div>{t('runhistory:runFailedPlanIndex', { idx: h.failed_plan_index })}</div>
-              ) : null}
-              {h.error_summary ? <div className="mono">{h.error_summary}</div> : null}
-            </div>
-          ))}
+            );
+          })}
         </section>
       ) : null}
 
@@ -260,51 +298,13 @@ export function RunDetail() {
         </section>
       ) : null}
 
-      <section className={styles.section} aria-label={t('common:secPerHost')}>
-        <h2 className={styles.sectionTitle}>{t('runhistory:runHostsTitle')}</h2>
-        {hosts.length > 0 ? (
-          <table className={styles.table} data-testid="run-hosts-table">
-            <thead>
-              <tr>
-                <th>{t('common:colSid')}</th>
-                <th>{t('colStatus')}</th>
-                <th>{t('runhistory:runColPassage')}</th>
-                <th>{t('runhistory:runColAttempt')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hosts.map((h) => (
-                <tr key={`${h.sid}-${h.passage}`} data-testid={`run-host-row-${h.sid}`}>
-                  <td className="mono">
-                    <KeeperSidCell sid={h.sid} />
-                    {(h.notices ?? []).length > 0 ? (
-                      <>
-                        {' '}
-                        <Badge tone="warn">{t('runhistory:runNoticeMark')}</Badge>
-                      </>
-                    ) : null}
-                  </td>
-                  <td>
-                    <Badge tone={runStatusTone(h.status)}>
-                      {h.status}
-                      {h.cancel_requested ? ` · ${t('runhistory:runCancelRequested')}` : ''}
-                    </Badge>
-                  </td>
-                  <td className="mono">{h.passage}</td>
-                  <td className="mono">{h.attempt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className={styles.empty}>{t('runhistory:runHostsEmpty')}</div>
-        )}
-      </section>
-
       {tasksReady ? (
-        <RunTasks tasks={tasksQ.data!.tasks ?? []} live={isApplying} />
+        <RunTasks tasks={tasksQ.data!.tasks ?? []} live={isApplying} hosts={hosts} />
       ) : tasksUnavailable ? (
-        <TaskTimeline rows={auditRows} degraded={auditForbidden} live={isApplying} />
+        <>
+          <RunHostOutcomes hosts={hosts} />
+          <TaskTimeline rows={auditRows} degraded={auditForbidden} live={isApplying} />
+        </>
       ) : (
         <section className={styles.section} aria-label={t('incarnations:taskTimelineAria')} data-testid="run-task-timeline">
           <h2 className={styles.sectionTitle}>{t('runhistory:runTasksTitle')}</h2>

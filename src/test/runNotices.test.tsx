@@ -82,6 +82,24 @@ describe('deprecation notices on the run page', () => {
     installFetchMock([
       {
         method: 'GET',
+        url: `${URL}/tasks`,
+        body: {
+          tasks: [
+            {
+              plan_index: 0,
+              passage: 0,
+              id: 'run',
+              module: 'core.cmd.run',
+              hosts: [
+                { sid: 'new-1.local', status: 'TASK_STATUS_OK' },
+                { sid: 'old-1.local', status: 'TASK_STATUS_OK' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        method: 'GET',
         url: URL,
         body: runBody([
           host('old-1.local', {
@@ -99,10 +117,14 @@ describe('deprecation notices on the run page', () => {
       screen.queryByTestId('run-notice-host-new-1.local'),
       'a host that reported nothing must not be listed',
     ).not.toBeInTheDocument();
-    // The table flags the same host, so the spread is visible without scrolling
-    // down to read the messages.
-    expect(screen.getByTestId('run-host-row-old-1.local')).toHaveTextContent('deprecated params');
-    expect(screen.getByTestId('run-host-row-new-1.local')).not.toHaveTextContent('deprecated params');
+    // The host filter flags the same host, so the spread is visible without
+    // scrolling down to read the messages (the per-host table that did it is gone,
+    // NIM-988).
+    const filter = await screen.findByTestId('run-host-filter');
+    const option = (sid: string) =>
+      [...filter.querySelectorAll('option')].find((o) => o.value === sid)?.textContent ?? '';
+    expect(option('old-1.local')).toContain('notices');
+    expect(option('new-1.local')).not.toContain('notices');
   });
 
   // A host has several rows (one per Passage, one per step under linear dispatch)
@@ -147,7 +169,7 @@ describe('deprecation notices on the run page', () => {
 
     render();
 
-    await screen.findByTestId('run-hosts-table');
+    await screen.findByTestId('run-status');
     await waitFor(() =>
       expect(
         screen.queryByTestId('run-notices-section'),

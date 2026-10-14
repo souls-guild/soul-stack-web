@@ -136,7 +136,7 @@ describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
     expect(tasksCall).toBeGreaterThanOrEqual(2);
   });
 
-  it('fallback: /tasks 404 → degrades to audit timeline (per-host summary remains)', async () => {
+  it('fallback: /tasks 404 → degrades to audit timeline', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -178,14 +178,13 @@ describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
     ]);
     renderRun();
 
-    // master-detail does not render, but the audit table (fallback) and per-host summary are in place.
+    // master-detail does not render; the audit table (fallback) carries the host's rows.
     await waitFor(() => expect(screen.getByTestId('run-task-row-h1.local|0|0')).toBeInTheDocument());
     expect(screen.getByText('TASK_STATUS_OK')).toBeInTheDocument();
-    expect(screen.getByTestId('run-hosts-table')).toBeInTheDocument();
     expect(screen.queryByTestId('run-tasks-md')).not.toBeInTheDocument();
   });
 
-  it('fallback + audit 403 → soft degradation (notice), per-host summary remains', async () => {
+  it('fallback + audit 403 → soft degradation (notice), the failed block remains', async () => {
     installFetchMock([
       {
         method: 'GET',
@@ -202,7 +201,18 @@ describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
           status: 'success',
           started_at: '2026-06-30T10:00:00Z',
           finished_at: '2026-06-30T10:05:00Z',
-          hosts: [{ sid: 'h1.local', status: 'success', passage: 0, attempt: 1, cancel_requested: false }],
+          hosts: [
+            {
+              sid: 'h1.local',
+              status: 'failed',
+              passage: 0,
+              attempt: 1,
+              cancel_requested: false,
+              failed_task_idx: 0,
+              failed_plan_index: 0,
+              error_summary: 'task 0 core.exec: exit 1',
+            },
+          ],
         },
       },
       { method: 'GET', url: '/v1/audit', status: 403, body: { title: 'forbidden', detail: 'audit.read required' } },
@@ -210,6 +220,10 @@ describe('RunDetail Schema-2 master-detail (NIM-37)', () => {
     renderRun();
 
     await waitFor(() => expect(screen.getByTestId('run-tasks-degraded')).toBeInTheDocument());
-    expect(screen.getByTestId('run-hosts-table')).toBeInTheDocument();
+    // Without /tasks the failure is still named, by the indexes its row carries, and
+    // every host keeps its outcome (the per-host table is gone, NIM-988).
+    expect(screen.getByTestId('run-failed-host-h1.local')).toHaveTextContent('task 0 core.exec: exit 1');
+    expect(screen.getByText('plan_index: 0')).toBeInTheDocument();
+    expect(screen.getByTestId('run-host-outcome-h1.local')).toHaveTextContent('failed');
   });
 });
