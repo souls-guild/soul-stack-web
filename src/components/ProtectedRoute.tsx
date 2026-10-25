@@ -7,9 +7,11 @@ interface Props {
 }
 
 export function ProtectedRoute({ children }: Props) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isVerifying } = useAuth();
   const location = useLocation();
   if (!isAuthenticated) {
+    // A session being restored (one cookie exchange) is not a logout yet.
+    if (isVerifying) return null;
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return <>{children}</>;

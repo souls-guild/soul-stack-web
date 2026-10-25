@@ -29,7 +29,7 @@ reader-facing content and stays in Russian (see the i18n section below).
   `npm run gen:api` (openapi-typescript → `src/api/types.gen.ts`, then
   `scripts/gen-constraints.mjs`). That yaml is a vendored copy of the core repo's
   `docs/keeper/openapi.yaml`, synced manually on backend changes.
-- Vite proxies `/v1`, `/healthz`, `/readyz`, `/openapi.yaml` to
+- Vite proxies `/v1`, `/auth`, `/healthz`, `/readyz`, `/openapi.yaml` to
   `VITE_KEEPER_API` (default `http://localhost:8080`) via `vite.config.ts`.
 
 ## Default persona: Soul Stack UI developer

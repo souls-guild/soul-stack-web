@@ -9,6 +9,7 @@ import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { RevokeArchonModal } from './RevokeArchonModal';
 import { ArchonTokensTab } from './ArchonTokensTab';
+import { ArchonPasswordSection } from './ArchonPasswordSection';
 import { AssignRoleModal } from '../rbac/AssignRoleModal';
 import { prettyRbacError } from '../rbac/errors';
 import styles from '../common.module.css';
@@ -301,6 +302,7 @@ export function ArchonDetail() {
               </div>
             )}
           </section>
+          {op.auth_method === 'local' && !revoked ? <ArchonPasswordSection aid={op.aid} /> : null}
           <section className={styles.section} aria-label={t('common:metadataAria')}>
             <h2 className={styles.sectionTitle}>{t('secMetadata')}</h2>
             {hasMetadata ? (

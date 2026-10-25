@@ -1,6 +1,6 @@
 // Screen for managing the operator provisioning policy (ADR-058 Part B).
 // GET /v1/provisioning-policy — read; PUT /v1/provisioning-policy — save.
-// Allowed methods (user/ldap/oidc) — fixed by the ProvisioningPolicyUpdateRequest
+// Allowed methods (user/ldap/oidc/local) — fixed by the ProvisioningPolicyUpdateRequest
 // OpenAPI schema; not a dynamic runtime catalog.
 
 import { useEffect, useState } from 'react';
@@ -15,7 +15,7 @@ import { Button } from '../../components/primitives';
 import styles from '../common.module.css';
 
 // Full set of allowed methods (fixed by the ProvisioningPolicyUpdateRequest.allowed_methods
-// enum in the OpenAPI schema as {"user"|"ldap"|"oidc"}).
+// enum in the OpenAPI schema as {"user"|"ldap"|"oidc"|"local"}).
 // Compile-time exhaustiveness guard: Record<ProvisioningMethod, true> requires
 // EVERY union member as a key — adding a new method to the OpenAPI schema
 // will update ProvisioningMethod and break the build until ALL_METHODS is updated.
@@ -23,6 +23,7 @@ const _ALL_METHODS_EXHAUSTIVE: Record<ProvisioningMethod, true> = {
   user: true,
   ldap: true,
   oidc: true,
+  local: true,
 };
 const ALL_METHODS = Object.keys(_ALL_METHODS_EXHAUSTIVE) as ProvisioningMethod[];
 
@@ -31,6 +32,7 @@ function methodLabelKey(m: ProvisioningMethod): string {
     case 'user': return 'admin:provMethodUser';
     case 'ldap': return 'admin:provMethodLdap';
     case 'oidc': return 'admin:provMethodOidc';
+    case 'local': return 'admin:provMethodLocal';
   }
 }
 

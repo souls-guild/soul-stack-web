@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Operator login with a local password
+         * @description NIM-1051: checks the AID's local password (argon2id) and puts an internal JWT into the HttpOnly+Secure soul_session cookie; exchange it at POST /auth/token. Only operators with auth_method=local log in here. Every credential refusal is the same 401, including a password reset that landed between the check and the session. 413 - body over 4 KiB (while the login rate limit runs). Mounted only when auth.local is configured. Response body is empty.
+         */
+        post: operations["localLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/methods": {
         parameters: {
             query?: never;
@@ -33,7 +53,7 @@ export interface paths {
         };
         /**
          * Available login methods
-         * @description Public list of login methods for the UI login form (password always true; ldap/oidc — depending on keeper config). Booleans only, no IdP URLs/domains.
+         * @description Public list of login methods for the UI login form (password - pasting an operator JWT - always true; ldap/oidc/local - depending on keeper config). Booleans only, no IdP URLs/domains.
          */
         get: operations["authMethods"];
         put?: never;
@@ -1192,6 +1212,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ldap-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * LDAP group sync settings and status
+         * @description Settings of the background LDAP group sync (ldap_sync in keeper_settings, ADR-058 amendment NIM-1053) and where it stands: when it last ran, when it last accepted an answer from the directory, and the active LDAP operators by the outcome of their last attempt. settings_set=false -> the key is absent and the defaults apply. status.enabled=false -> this Keeper takes no part in the sync (no auth.ldap or no Redis). Permission setting.read. Read-only, no audit.
+         */
+        get: operations["getLDAPSync"];
+        /**
+         * Change the LDAP group sync settings
+         * @description Replaces the settings of the background LDAP group sync (ADR-058 amendment NIM-1053). The leader re-reads them on its next tick, within 30 seconds, and the next pass is due once the last one is an interval old; no restart. Permission setting.update. 422 - interval unparsable or outside [1m, 24h]; nothing is written.
+         */
+        put: operations["updateLDAPSync"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/jwts": {
         parameters: {
             query?: never;
@@ -1207,7 +1251,7 @@ export interface paths {
         put?: never;
         /**
          * Issue a personal token to yourself
-         * @description Mints a token of kind personal for the caller (ADR-014 amendment NIM-1052). No permission: the token's rights are the caller's at each request, read from the RBAC data like every token's. Optional body: ttl and label. The ttl ceiling is auth.jwt.ttl_max, or the OIDC sign-in lifetime for an OIDC operator, whose token made from a sign-in also expires with that sign-in at the latest (GET /v1/me/jwts answers both as personal_ttl_max_seconds / personal_expires_by). At most 10 active personal tokens and 20 issued in 24 hours (409 personal-jwt-limit). A request made with a personal token is refused (403 personal-jwt-from-personal). Returns the JWT once.
+         * @description Mints a token of kind personal for the caller (ADR-014 amendment NIM-1052). No permission: the token's rights are the caller's at each request, read from the RBAC data like every token's. Optional body: ttl and label. The ttl ceiling is auth.jwt.ttl_max, or the OIDC sign-in lifetime for an OIDC operator, whose token made from a sign-in also expires with that sign-in at the latest (GET /v1/me/jwts answers both as personal_ttl_max_seconds / personal_expires_by). At most 10 active personal tokens and 20 issued in 24 hours (409 personal-jwt-limit). A request made with a personal token is refused (403 personal-jwt-from-personal), and so is one made with a token already revoked in the database, such as a session a password reset ended (401 jwt-revoked). Returns the JWT once.
          */
         post: operations["issueMyJWT"];
         delete?: never;
@@ -1230,6 +1274,26 @@ export interface paths {
          * @description Revokes one of the caller's tokens of any kind (ADR-014 amendment NIM-1052): refused (401 jwt-revoked) on its next request on every Keeper node. No permission. 404 - not a token of the caller (also for another operator's token). 409 - already revoked. Revoking the token the request is made with succeeds and signs the caller out of it.
          */
         post: operations["revokeMyJWT"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change my local password
+         * @description The calling Archon (auth_method local) replaces its own password, proving the current one; its other web sessions are revoked, the one this request came with stays (NIM-1051). No permission required. A reset committed since the current password was checked refuses the change (403). 403 - current password is incorrect (counts towards the login lockout). 401 operator-revoked-token - revoked before the check. 413 - body over 4 KiB (while the login rate limit runs). 422 - not a local Archon, password policy not met, or auth.local not configured. 429 - locked out.
+         */
+        put: operations["changeMyPassword"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1331,7 +1395,7 @@ export interface paths {
         put?: never;
         /**
          * Create an Archon
-         * @description Creates an operator (Archon) + opt. atomic-grant of roles (ADR-013/014). Permission operator.create. 409 - AID taken. Returns JWT once.
+         * @description Creates an operator (Archon) + opt. atomic-grant of roles (ADR-013/014). Permission operator.create. 409 - AID taken. Returns JWT once; an Archon with auth_method local gets a password instead and no JWT (NIM-1051).
          */
         post: operations["createOperator"];
         delete?: never;
@@ -1414,6 +1478,26 @@ export interface paths {
          * @description Sets operator_jwts.revoked_at: the token is refused (401 jwt-revoked) on its next request on every Keeper node; the operator and its other tokens keep working (ADR-014 amendment NIM-1045). Permission operator.jwt-revoke. 404 - not a token of this operator. 409 - already revoked.
          */
         post: operations["revokeOperatorJWT"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set an Archon's local password
+         * @description Replaces the local password of an Archon with auth_method local and revokes all of its web sessions and personal tokens (NIM-1051). Not restricted by target: whoever holds operator.set-password can log in as any local Archon. The caller's own AID is refused: that goes through PUT /v1/me/password, which asks for the current password. 404 - no such AID. 409 - operator revoked. 422 - the caller's own AID, not a local Archon, password policy not met, or auth.local not configured.
+         */
+        put: operations["setOperatorPassword"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1518,7 +1602,7 @@ export interface paths {
         get: operations["getProvisioningPolicy"];
         /**
          * Change the operator creation methods policy
-         * @description Replace semantics for the list of allowed operator CREATION methods (provisioning_allowed_methods, ADR-058 Part B). Permission provisioning.update. 422 - empty list (anti-lockout) or method outside {user,ldap,oidc}. Gates ONLY operator creation; existing operators log in independent of the policy.
+         * @description Replace semantics for the list of allowed operator CREATION methods (provisioning_allowed_methods, ADR-058 Part B). Permission provisioning.update. 422 - empty list (anti-lockout) or method outside {user,ldap,oidc,local}. Gates ONLY operator creation; existing operators log in independent of the policy.
          */
         put: operations["updateProvisioningPolicy"];
         post?: never;
@@ -2746,7 +2830,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -2760,9 +2844,11 @@ export interface components {
         AuthMethodsReply: {
             /** @description federated LDAP login is configured */
             ldap: boolean;
+            /** @description login with an AID and a local password is configured (auth.local) */
+            local: boolean;
             /** @description federated OIDC login is configured */
             oidc: boolean;
-            /** @description local login (always available) */
+            /** @description pasting an operator JWT (always available) */
             password: boolean;
         };
         AuthTokenReply: {
@@ -3632,9 +3718,86 @@ export interface components {
             /** @description username for LDAP search-bind */
             username: string;
         };
+        LDAPSyncOperatorCounts: {
+            /**
+             * Format: int64
+             * @description the pass would have stripped every operator holding group roles, read as a broken lookup; nothing changed
+             */
+            guarded: number;
+            /**
+             * Format: int64
+             * @description dropping its roles would have emptied the cluster admin set; nothing changed
+             */
+            lockout_refused: number;
+            /**
+             * Format: int64
+             * @description no directory entry: group roles dropped, operator not revoked
+             */
+            not_found: number;
+            /**
+             * Format: int64
+             * @description not attempted yet
+             */
+            pending: number;
+            /**
+             * Format: int64
+             * @description the directory answered but the roles could not be written; retried on the next pass
+             */
+            reconcile_failed: number;
+            /**
+             * Format: int64
+             * @description groups read, roles reconciled to them
+             */
+            synced: number;
+            /**
+             * Format: int64
+             * @description groups could not be read; the second attempt in a row drops the group roles
+             */
+            unreachable: number;
+        };
+        LDAPSyncReply: {
+            settings: components["schemas"]["LDAPSyncSettings"];
+            /** @description the stored ldap_sync value could not be read; settings shows the default the sync runs on */
+            settings_error?: string;
+            /** @description false: the ldap_sync key is absent and these are the defaults */
+            settings_set: boolean;
+            status: components["schemas"]["LDAPSyncStatus"];
+        };
+        LDAPSyncSettings: {
+            /** @description how often each LDAP operator's groups are re-read */
+            interval: string;
+        };
+        LDAPSyncStatus: {
+            /** @description this Keeper takes part in the sync (auth.ldap configured, Redis there for the leader lease); one such Keeper leads */
+            enabled: boolean;
+            /**
+             * Format: date-time
+             * @description latest attempt for any LDAP operator
+             */
+            last_run_at?: string;
+            /**
+             * Format: date-time
+             * @description latest answer from the directory the sync accepted, for any LDAP operator
+             */
+            last_success_at?: string;
+            operators: components["schemas"]["LDAPSyncOperatorCounts"];
+        };
+        LDAPSyncUpdateRequest: {
+            /** @description how often each LDAP operator's groups are re-read, keeper.yml duration grammar ("15m", "1h"), within [1m, 24h]; LDAP being unreachable keeps the roles for one more interval */
+            interval: string;
+        };
         LabelSetRequest: {
             /** @description Display caption: free text, may carry capitals and spaces. null - or an omitted field, or an empty body - clears it, after which consumers show the identifier instead. Never used to derive a Vault path, an RBAC scope, a snapshot directory or a CEL root: changing it moves nothing */
             label?: string | null;
+        };
+        LocalLoginRequest: {
+            /** @description the operator's AID */
+            aid: string;
+            /**
+             * Format: password
+             * @description local password (never logged, never returned)
+             */
+            password: string;
         };
         ModuleCatalogItem: {
             description?: string;
@@ -3745,6 +3908,18 @@ export interface components {
              */
             total: number;
         };
+        MyPasswordChangeRequest: {
+            /**
+             * Format: password
+             * @description the caller's current local password
+             */
+            current_password: string;
+            /**
+             * Format: password
+             * @description the new local password
+             */
+            new_password: string;
+        };
         MyPermission: {
             action?: string;
             resource?: string;
@@ -3810,23 +3985,34 @@ export interface components {
         };
         OperatorCreateReply: {
             aid: string;
+            auth_method: string;
             /** Format: date-time */
             created_at: string;
             created_by_aid: string;
             display_name: string;
             /** Format: date-time */
-            expires_at: string;
-            jwt: string;
-            jwt_id: string;
+            expires_at?: string;
+            jwt?: string;
+            jwt_id?: string;
             roles?: string[];
         };
         OperatorCreateRequest: {
             /** @description AID of the new Archon (naming-rules.md) */
             aid: string;
+            /**
+             * @description how the Archon logs in: jwt (default) - the reply carries its token; local - it logs in with password at POST /auth/local/login, the reply carries no token (needs auth.local)
+             * @enum {string}
+             */
+            auth_method?: "jwt" | "local";
             /** @description human-readable name for UI/audit */
             display_name?: string;
             /** @description free text shown in the operator's token list ("Service Desk prod") */
             label?: string;
+            /**
+             * Format: password
+             * @description initial local password, required with auth_method local (never logged, never returned)
+             */
+            password?: string;
             /** @description opt. list of roles for atomic create+grant (onboarding in one call); role error -> rollback */
             roles?: string[] | null;
             /** @description lifetime of the returned JWT ("2160h" or "90d"); omitted -> auth.jwt.ttl_default; between 1m and auth.jwt.ttl_max, else 422 */
@@ -3897,6 +4083,13 @@ export interface components {
              */
             total: number;
         };
+        OperatorPasswordRequest: {
+            /**
+             * Format: password
+             * @description the new local password (never logged, never returned)
+             */
+            password: string;
+        };
         OperatorRevokeRequest: {
             /** @description free-text reason for audit-trail (optional) */
             reason?: string;
@@ -3955,8 +4148,8 @@ export interface components {
             policy_set: boolean;
         };
         ProvisioningPolicyUpdateRequest: {
-            /** @description allowed operator creation methods (anti-lockout: non-empty list from {user,ldap,oidc}) */
-            allowed_methods: ("user" | "ldap" | "oidc")[] | null;
+            /** @description allowed operator creation methods (anti-lockout: non-empty list from {user,ldap,oidc,local}) */
+            allowed_methods: ("user" | "ldap" | "oidc" | "local")[] | null;
         };
         PushApplyReply: {
             apply_id: string;
@@ -5467,6 +5660,83 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    localLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10064,6 +10334,113 @@ export interface operations {
             };
         };
     };
+    getLDAPSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LDAPSyncReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateLDAPSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LDAPSyncUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LDAPSyncReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listMyJWTs: {
         parameters: {
             query?: {
@@ -10153,6 +10530,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
             /** @description Forbidden */
             403: {
                 headers: {
@@ -10230,6 +10616,91 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    changeMyPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyPasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Request Entity Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10453,7 +10924,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description filter by credential form; value outside enum -> 422 */
-                auth_method?: "jwt" | "mtls" | "combined" | "ldap" | "oidc";
+                auth_method?: "jwt" | "mtls" | "combined" | "ldap" | "oidc" | "local";
                 /** @description include revoked (false - active only); bad-value -> 400 */
                 revoked?: boolean;
                 /** @description free search over display_name/aid (substring, case-insensitive); empty -> no filter */
@@ -10833,6 +11304,85 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setOperatorPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID of the local Archon */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
             };
             /** @description Forbidden */
             403: {

@@ -13,7 +13,7 @@ describe('Login', () => {
     installFetchMock([]);
   });
 
-  it('renders without errors and shows the JWT form', () => {
+  it('renders without errors and shows the JWT form', async () => {
     renderWithProviders(
       <AuthProvider>
         <Login />
@@ -22,7 +22,8 @@ describe('Login', () => {
     );
     expect(screen.getByRole('heading', { name: /Soul Stack/i })).toBeInTheDocument();
     expect(screen.getByText(/Keeper UI · Archon login/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sign in/i })).toBeInTheDocument();
+    // The form appears once /auth/methods has answered (here: failed).
+    expect(await screen.findByRole('button', { name: /Sign in/i })).toBeInTheDocument();
   });
 
   it('validates empty input via zod', async () => {
@@ -33,7 +34,7 @@ describe('Login', () => {
       </AuthProvider>,
       '/login',
     );
-    await user.click(screen.getByRole('button', { name: /Sign in/i }));
+    await user.click(await screen.findByRole('button', { name: /Sign in/i }));
     expect(await screen.findByText(/paste the Archon JWT token/i)).toBeInTheDocument();
   });
 
@@ -45,7 +46,7 @@ describe('Login', () => {
       </AuthProvider>,
       '/login',
     );
-    const ta = screen.getByPlaceholderText(/eyJhbGciOi/);
+    const ta = await screen.findByPlaceholderText(/eyJhbGciOi/);
     await user.type(ta, 'not-a-jwt');
     await user.click(screen.getByRole('button', { name: /Sign in/i }));
     expect(await screen.findByText(/does not look like a JWT/i)).toBeInTheDocument();

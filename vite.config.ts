@@ -34,7 +34,7 @@ import react from '@vitejs/plugin-react';
 const cores = os.availableParallelism?.() ?? os.cpus().length;
 const testMaxWorkers = Math.max(1, Math.min(cores - 1, 8));
 
-// Dev mode: proxy /v1 and health endpoints to the Keeper Operator API
+// Dev mode: proxy /v1, /auth and health endpoints to the Keeper Operator API
 // (default http://localhost:8080, listen.openapi.addr from keeper.yml).
 // Override via the VITE_KEEPER_API environment variable.
 const keeperTarget = process.env.VITE_KEEPER_API ?? 'http://localhost:8080';
@@ -57,6 +57,9 @@ export default defineConfig({
       // ws:true is required for the multi-console upgrade (/v1/console); without
       // it the dev server answers the Upgrade request with plain HTTP.
       '/v1': { target: keeperTarget, changeOrigin: true, ws: true },
+      // Login, the login-method catalog and the cookie → Bearer exchange live
+      // outside /v1; the session cookie is Path=/auth, so it rides this prefix.
+      '/auth': { target: keeperTarget, changeOrigin: true },
       '/healthz': { target: keeperTarget, changeOrigin: true },
       '/readyz': { target: keeperTarget, changeOrigin: true },
       '/openapi.yaml': { target: keeperTarget, changeOrigin: true },

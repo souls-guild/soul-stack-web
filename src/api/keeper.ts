@@ -4,8 +4,7 @@
 // Manual fallback interfaces (SoulprintFacts, ErrandAccepted) were removed after
 // the final regen on the full huma OpenAPI spec (all schemas now live in components).
 
-import { apiGet, apiSend, ApiError } from './client';
-import { tokenStore } from './tokenStore';
+import { apiGet, apiSend, apiSendWithStatus } from './client';
 import type { components } from './types.gen';
 
 // --- Re-export from generated openapi (source of truth) ---
@@ -115,6 +114,9 @@ export type OperatorCreateRequest = components['schemas']['OperatorCreateRequest
   roles?: string[];
 };
 export type OperatorCreateReply = components['schemas']['OperatorCreateReply'];
+// Login methods and the cookie → Bearer exchange (ADR-058, NIM-77, NIM-1051).
+export type AuthMethodsReply = components['schemas']['AuthMethodsReply'];
+export type AuthTokenReply = components['schemas']['AuthTokenReply'];
 export type OperatorRevokeRequest = components['schemas']['OperatorRevokeRequest'];
 export type IssueTokenReply = components['schemas']['IssueTokenReply'];
 export type Operator = components['schemas']['Operator'];
@@ -746,6 +748,20 @@ async function listAllSouls(
 }
 
 export const keeperApi = {
+  // Public login endpoints outside /v1. The session cookie (Path=/auth) is set
+  // by a login and read only by POST /auth/token; same-origin fetch carries it.
+  auth: {
+    // GET /auth/methods -> which login methods this Keeper offers.
+    methods: () => apiGet<AuthMethodsReply>('/auth/methods', { anonymous: true }),
+    // POST /auth/local/login -> 204 + the soul_session cookie. 401 for every
+    // credential refusal, 429 when locked out.
+    localLogin: (aid: string, password: string) =>
+      apiSend<void>('/auth/local/login', 'POST', { body: { aid, password }, anonymous: true }),
+    // POST /auth/token -> a short Bearer for the session cookie; 401 when the
+    // session is gone (expired, revoked, or ended by a password reset).
+    exchange: (signal?: AbortSignal) => apiSend<AuthTokenReply>('/auth/token', 'POST', { anonymous: true, signal }),
+  },
+
   // health-probe, handy as a "is the token valid?" check (via /v1/incarnations).
   ping: () => apiGet<IncarnationListReply>('/v1/incarnations', { query: { limit: 1 } }),
 
@@ -1096,19 +1112,14 @@ export const keeperApi = {
       sid: string,
       body: ErrandRunRequest,
     ): Promise<{ kind: 'sync'; result: ErrandResult } | { kind: 'async'; accepted: ErrandAccepted }> => {
-      const res = await fetch(`/v1/souls/${encodeURIComponent(sid)}/exec`, {
-        method: 'POST',
-        headers: buildAuthHeaders(),
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        let problem: { type?: string; title?: string; detail?: string } = {};
-        try { problem = await res.json(); } catch { /* empty */ }
-        if (res.status === 401) tokenStoreClear();
-        throw new ApiError(res.status, problem.type ?? 'about:blank', problem.title ?? res.statusText, problem.detail ?? '');
-      }
-      const payload = (await res.json()) as ErrandResult | ErrandAccepted;
-      if (res.status === 202) {
+      // Through the shared send, so a session Bearer refused with 401 is
+      // exchanged and retried there instead of clearing the session.
+      const { status, body: payload } = await apiSendWithStatus<ErrandResult | ErrandAccepted>(
+        `/v1/souls/${encodeURIComponent(sid)}/exec`,
+        'POST',
+        { body },
+      );
+      if (status === 202) {
         return { kind: 'async', accepted: payload as ErrandAccepted };
       }
       return { kind: 'sync', result: payload as ErrandResult };
@@ -1201,7 +1212,8 @@ export const keeperApi = {
       }),
     // 200 -> Operator (detail).
     get: (aid: string) => apiGet<Operator>(`/v1/operators/${encodeURIComponent(aid)}`),
-    // 201 -> OperatorCreateReply (including jwt — returned once).
+    // 201 -> OperatorCreateReply (including jwt — returned once; an Archon with
+    // auth_method local gets a password instead and no jwt).
     create: (body: OperatorCreateRequest) =>
       apiSend<OperatorCreateReply>('/v1/operators', 'POST', { body }),
     // 204 — no body returned.
@@ -1210,6 +1222,10 @@ export const keeperApi = {
     // 200 -> IssueTokenReply (jwt returned once).
     issueToken: (aid: string) =>
       apiSend<IssueTokenReply>(`/v1/operators/${encodeURIComponent(aid)}/issue-token`, 'POST'),
+    // PUT /v1/operators/{aid}/password -> 204 (operator.set-password). Ends every
+    // web session of the target. 422 — not a local Archon / policy; 409 — revoked.
+    setPassword: (aid: string, password: string) =>
+      apiSend<void>(`/v1/operators/${encodeURIComponent(aid)}/password`, 'PUT', { body: { password } }),
     jwts: {
       // GET /v1/operators/{aid}/jwts (operator.list) — every kind, newest first.
       list: (aid: string, query: JWTListQuery = {}) =>
@@ -1231,6 +1247,13 @@ export const keeperApi = {
       issue: (body: OperatorIssueTokenRequest) => apiSend<IssueTokenReply>('/v1/me/jwts', 'POST', { body }),
       revoke: (jwtId: string) => apiSend<void>(`/v1/me/jwts/${encodeURIComponent(jwtId)}/revoke`, 'POST'),
     },
+    // PUT /v1/me/password -> 204 (NIM-1051). 403 — the current password is wrong
+    // (the caller's token is fine: NOT a logout); 422 — not a local Archon /
+    // policy; 429 — locked out.
+    changePassword: (currentPassword: string, newPassword: string) =>
+      apiSend<void>('/v1/me/password', 'PUT', {
+        body: { current_password: currentPassword, new_password: newPassword },
+      }),
   },
 
   roles: {
@@ -1564,22 +1587,6 @@ export const keeperApi = {
 export interface ListPagedQuery {
   offset?: number;
   limit?: number;
-}
-
-// --- helpers for the discriminated union 200/202 on /v1/souls/{sid}/exec ---
-
-function buildAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  };
-  const token = tokenStore.get();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
-
-function tokenStoreClear(): void {
-  tokenStore.clear();
 }
 
 export interface ListSoulHistoryQuery {

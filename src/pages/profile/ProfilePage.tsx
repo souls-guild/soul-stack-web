@@ -1,13 +1,15 @@
 // "Profile" — the signed-in Archon's own account, reached from the AID menu in the
-// Topbar. Sub-nav is built from the SECTIONS array, as on Settings: a sibling
-// ticket adds its section as one entry here (password — NIM-1051, sign-ins —
-// NIM-1050) and its route comes with it.
+// Topbar. Sub-nav and routes are built from the sections this Archon has, as on
+// Settings: a sibling ticket adds its Section constant and puts it in the list
+// (password — NIM-1051, only for a local Archon; sign-ins — NIM-1050).
 
 import type { ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { MyTokens } from './MyTokens';
+import { MyPassword } from './MyPassword';
+import { useIsLocalArchon } from './useIsLocalArchon';
 import commonStyles from '../common.module.css';
 import styles from '../settings/SettingsPage.module.css';
 
@@ -19,15 +21,17 @@ interface Section {
   element: ReactNode;
 }
 
-const SECTIONS: Section[] = [
-  { path: 'tokens', labelKey: 'profile:tabTokens', element: <MyTokens /> },
-];
+const TOKENS: Section = { path: 'tokens', labelKey: 'profile:tabTokens', element: <MyTokens /> };
+// Only a local Archon has a password here to change (NIM-1051).
+const PASSWORD: Section = { path: 'password', labelKey: 'profile:tabPassword', element: <MyPassword /> };
 
 export function ProfilePage() {
   const { t } = useTranslation();
   const { identity } = useAuth();
   const location = useLocation();
   const activePath = location.pathname.replace(/^\/profile\/?/, '').split('/')[0];
+  const local = useIsLocalArchon();
+  const SECTIONS: Section[] = local ? [TOKENS, PASSWORD] : [TOKENS];
 
   return (
     <div className={commonStyles.page}>
@@ -55,7 +59,17 @@ export function ProfilePage() {
           {SECTIONS.map((s) => (
             <Route key={s.path} path={s.path} element={s.element} />
           ))}
-          <Route path="*" element={<Navigate to={`/profile/${SECTIONS[0].path}`} replace />} />
+          {/* A link straight to Password waits for the operator record rather than bouncing to Tokens. */}
+          <Route
+            path="*"
+            element={
+              local === undefined && activePath === PASSWORD.path ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }} data-testid="profile-section-loading">{t('loading')}</div>
+              ) : (
+                <Navigate to={`/profile/${SECTIONS[0].path}`} replace />
+              )
+            }
+          />
         </Routes>
       </div>
     </div>

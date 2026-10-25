@@ -17,7 +17,7 @@ describe('ALL_METHODS exhaustiveness guard', () => {
     // All possible ProvisioningMethod members from the gen schema at time of writing.
     // When adding a new method in OpenAPI: (1) the compile-time guard in
     // ProvisioningPolicy.tsx breaks the build, (2) this array also needs updating.
-    const KNOWN_METHODS: ProvisioningMethod[] = ['user', 'ldap', 'oidc'];
+    const KNOWN_METHODS: ProvisioningMethod[] = ['user', 'ldap', 'oidc', 'local'];
     // ALL_METHODS is not exported — check indirectly via DOM:
     // the component renders a checkbox (data-testid=method-checkbox-<m>) for each
     // member of ALL_METHODS. Test fails if a method is in KNOWN_METHODS but not in DOM.

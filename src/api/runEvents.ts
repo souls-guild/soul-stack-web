@@ -1,13 +1,13 @@
 // Fetch-streaming SSE transport for run apply-events (NIM-37, ADR-069 A0).
 //
 // EventSource is NOT used: it cannot send an Authorization header, and
-// the events route authenticates via Bearer (tokenStore). Hence a manual
+// the events route authenticates via Bearer (freshBearer). Hence a manual
 // fetch + ReadableStream.getReader() + TextDecoder + custom SSE parser.
 //
 // Graceful: any fetch failure / non-200 / missing body → onError, and the
 // calling component degrades to polling (GET runDetail remains the status authority).
 
-import { tokenStore } from './tokenStore';
+import { freshBearer, rawChannelRefused } from './client';
 
 export interface SseFrame {
   event: string;
@@ -61,7 +61,9 @@ export async function subscribeRunEvents(
   opts: SubscribeRunEventsOptions,
 ): Promise<void> {
   const doFetch = opts.fetchImpl ?? fetch;
-  const token = tokenStore.get();
+  // A stream has no 401 retry: a cookie session's Bearer comes from
+  // freshBearer, and a 401 is reported back.
+  const token = await freshBearer();
   const headers: Record<string, string> = { Accept: 'text/event-stream' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -76,6 +78,7 @@ export async function subscribeRunEvents(
   }
 
   if (!res.ok || !res.body) {
+    if (res.status === 401) rawChannelRefused();
     opts.onError?.(new Error(`sse status ${res.status}`));
     return;
   }

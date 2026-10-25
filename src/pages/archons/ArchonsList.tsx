@@ -18,7 +18,7 @@ import { RevokeArchonModal } from './RevokeArchonModal';
 import { AID_PATTERN } from './schemas';
 import styles from '../common.module.css';
 
-const AUTH_METHODS: OperatorAuthMethod[] = ['jwt', 'mtls', 'combined'];
+const AUTH_METHODS: OperatorAuthMethod[] = ['jwt', 'mtls', 'combined', 'ldap', 'oidc', 'local'];
 
 function authMethodTone(m: OperatorAuthMethod | string | undefined):
   'ok' | 'warn' | 'info' | 'muted' {
@@ -318,6 +318,20 @@ export function ArchonsList() {
   // Hint: backend rejected roles[] (404/501) — the Archon was still created without roles.
   const [rolesUnsupported, setRolesUnsupported] = useState(false);
   const [revealed, setRevealed] = useState<{ jwt: string; expiresAt?: string } | null>(null);
+  // How the new Archon logs in. `local` is offered only when this Keeper has
+  // auth.local (GET /auth/methods): it gets a password and no token.
+  const [newMethod, setNewMethod] = useState<'jwt' | 'local'>('jwt');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordRepeat, setNewPasswordRepeat] = useState('');
+  const [createdLocal, setCreatedLocal] = useState<string | null>(null);
+  const methodsQ = useQuery({
+    queryKey: ['auth.methods'],
+    queryFn: () => keeperApi.auth.methods(),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const localOffered = Boolean(methodsQ.data?.local);
+  const creatingLocal = localOffered && newMethod === 'local';
 
   // Cluster role catalog — for the multi-select. If the endpoint is unavailable,
   // we show a hint that role selection is currently not working.
@@ -357,7 +371,9 @@ export function ArchonsList() {
 
   const createMut = useMutation({
     mutationFn: async (): Promise<OperatorCreateReply> => {
-      const base = { aid: aidNew, display_name: displayName };
+      const base = creatingLocal
+        ? { aid: aidNew, display_name: displayName, auth_method: 'local' as const, password: newPassword }
+        : { aid: aidNew, display_name: displayName };
       // If the operator selected roles — try with an extended payload. A backend
       // without create-with-roles support may respond 404/501 to the extended form:
       // in that case we create without roles and set the unsupported flag.
@@ -376,7 +392,15 @@ export function ArchonsList() {
       return keeperApi.operators.create(base);
     },
     onSuccess: (reply: OperatorCreateReply) => {
-      setRevealed({ jwt: reply.jwt });
+      if (reply.jwt) {
+        setRevealed({ jwt: reply.jwt });
+        setCreatedLocal(null);
+      } else {
+        setRevealed(null);
+        setCreatedLocal(reply.aid);
+      }
+      setNewPassword('');
+      setNewPasswordRepeat('');
       setAidNew('');
       setDisplayName('');
       setSelectedRoles([]);
@@ -394,6 +418,10 @@ export function ArchonsList() {
   const aidNewValid = AID_PATTERN.test(aidNew);
   const displayNameTrimmed = displayName.trim();
   const displayNameValid = displayNameTrimmed.length >= 1 && displayNameTrimmed.length <= 128;
+  // Only that the two match and are not empty: the Keeper owns the policy and
+  // its 422 says what it wants.
+  const passwordMismatch = creatingLocal && newPasswordRepeat !== '' && newPassword !== newPasswordRepeat;
+  const passwordValid = !creatingLocal || (newPassword !== '' && newPassword === newPasswordRepeat);
 
   const rawItems = list.data?.items ?? [];
   // Belt-and-suspenders: even if the backend returns revoked in the response, we
@@ -424,6 +452,14 @@ export function ArchonsList() {
       {revealed ? (
         <JwtReveal jwt={revealed.jwt} expiresAt={revealed.expiresAt} onClose={() => setRevealed(null)} />
       ) : null}
+      {createdLocal ? (
+        <div className={styles.section} role="status" data-testid="archon-created-local">
+          <span>{t('pages:archonCreatedLocal', { aid: createdLocal })}</span>
+          <div>
+            <Button variant="ghost" onClick={() => setCreatedLocal(null)}>{t('close')}</Button>
+          </div>
+        </div>
+      ) : null}
 
       <section className={styles.section} aria-label={t('pages:archonCreateSection')}>
         <h2 className={styles.sectionTitle}>{t('pages:archonCreateSection')}</h2>
@@ -450,11 +486,52 @@ export function ArchonsList() {
             disabled={rolesQ.isLoading || Boolean(rolesQ.error)}
             error={rolesQ.error ? t('pages:archonRolesLoadError') : undefined}
           />
+          {localOffered ? (
+            <div>
+              <div className={styles.metaKey}>{t('pages:archonLoginWith')}</div>
+              <div className={styles.tabs} role="tablist" aria-label={t('pages:archonLoginWith')}>
+                {(['jwt', 'local'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={newMethod === m}
+                    className={`${styles.tab} ${newMethod === m ? styles.tabActive : ''}`}
+                    data-testid={`archon-create-method-${m}`}
+                    onClick={() => setNewMethod(m)}
+                  >
+                    {t(m === 'jwt' ? 'pages:archonLoginToken' : 'pages:archonLoginPassword')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {creatingLocal ? (
+            <>
+              <Input
+                label={t('pages:archonInitialPassword')}
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                data-testid="archon-create-password"
+              />
+              <Input
+                label={t('pages:archonPasswordRepeat')}
+                type="password"
+                autoComplete="new-password"
+                value={newPasswordRepeat}
+                onChange={(e) => setNewPasswordRepeat(e.target.value)}
+                error={passwordMismatch ? t('pages:archonPasswordMismatch') : undefined}
+                data-testid="archon-create-password-repeat"
+              />
+            </>
+          ) : null}
           <div style={{ alignSelf: 'flex-end' }}>
             <Button
               variant="primary"
-              disabled={!aidNewValid || !displayNameValid || createMut.isPending}
-              onClick={() => { setRolesUnsupported(false); createMut.mutate(); }}
+              disabled={!aidNewValid || !displayNameValid || !passwordValid || createMut.isPending}
+              onClick={() => { setRolesUnsupported(false); setCreatedLocal(null); createMut.mutate(); }}
             >
               {createMut.isPending ? t('creating') : t('create')}
             </Button>

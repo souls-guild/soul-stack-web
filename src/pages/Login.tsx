@@ -1,26 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useQuery } from '@tanstack/react-query';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '../components/primitives';
 import { useAuth } from '../hooks/useAuth';
-import { ApiError, NetworkError } from '../api/client';
+import { keeperApi, type AuthMethodsReply } from '../api/keeper';
+import { PasswordLoginForm } from './login/PasswordLoginForm';
+import { TokenLoginForm } from './login/TokenLoginForm';
 import styles from './Login.module.css';
-
-// JWT — 3 base64url segments separated by dots. We don't validate content —
-// authoritative check happens on the Keeper side.
-// Messages — i18n keys in the `admin` namespace; rendered via t(fieldError.message).
-const schema = z.object({
-  token: z
-    .string()
-    .trim()
-    .min(1, 'admin:loginErrTokenRequired')
-    .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'admin:loginErrTokenFormat'),
-});
-
-type Values = z.infer<typeof schema>;
+import common from './common.module.css';
 
 interface LocationState {
   from?: { pathname?: string; search?: string; hash?: string };
@@ -41,49 +28,63 @@ function returnTo(state: unknown): string {
   return `${from.pathname}${from.search ?? ''}${from.hash ?? ''}`;
 }
 
+// A way to log in. The form shows the ones GET /auth/methods offers, in this
+// order; the first is the default. `token` (pasting a JWT) always exists.
+type LoginMethod = 'local' | 'token';
+
+const METHOD_LABEL: Record<LoginMethod, string> = {
+  local: 'admin:loginMethodLocal',
+  token: 'admin:loginMethodToken',
+};
+
+function offeredMethods(methods: AuthMethodsReply | undefined): LoginMethod[] {
+  const out: LoginMethod[] = [];
+  if (methods?.local) out.push('local');
+  out.push('token');
+  return out;
+}
+
+// How long the page waits for /auth/methods before showing the token form
+// anyway: a Keeper that hangs must not leave the page with no form at all.
+const METHODS_WAIT_MS = 3_000;
+
 export function Login() {
   const { t } = useTranslation();
-  const { loginWithToken, isAuthenticated } = useAuth();
+  const { loginWithPassword, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [serverError, setServerError] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<LoginMethod | null>(null);
+  const [waitedOut, setWaitedOut] = useState(false);
+  const [tokenTyped, setTokenTyped] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<Values>({
-    resolver: zodResolver(schema),
-    defaultValues: { token: '' },
+  // Failing → only the token form, the page as it always was. A short wait
+  // first, so a form that would be replaced at once is not shown; a hang past
+  // it gets the token form, and a later answer does not take it away from a
+  // token being pasted.
+  const methodsQ = useQuery({
+    queryKey: ['auth.methods'],
+    queryFn: () => keeperApi.auth.methods(),
+    staleTime: 60_000,
+    retry: false,
   });
+  useEffect(() => {
+    const timer = setTimeout(() => setWaitedOut(true), METHODS_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  const waiting = methodsQ.isPending && !waitedOut;
+  const offered = offeredMethods(methodsQ.data);
+  const fallback: LoginMethod = tokenTyped ? 'token' : offered[0];
+  const method = chosen && offered.includes(chosen) ? chosen : fallback;
 
   if (isAuthenticated) {
     return <Navigate to={returnTo(location.state)} replace />;
   }
 
-  async function onSubmit(values: Values) {
-    setServerError(null);
-    try {
-      await loginWithToken(values.token);
-      navigate(returnTo(location.state), { replace: true });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setServerError(
-          err.status === 401
-            ? t('admin:loginErrRejected')
-            : `${t('admin:loginErrKeeperPrefix')} ${err.message}`,
-        );
-      } else if (err instanceof NetworkError) {
-        setServerError(t('admin:loginErrNetwork'));
-      } else {
-        setServerError(err instanceof Error ? err.message : t('admin:loginErrUnknown'));
-      }
-    }
-  }
+  const done = () => navigate(returnTo(location.state), { replace: true });
 
   return (
     <div className={styles.page}>
-      <form className={styles.card} onSubmit={handleSubmit(onSubmit)} noValidate>
+      <div className={styles.card}>
         <div className={styles.brand}>
           <div className={styles.mark}>SS</div>
           <div>
@@ -91,30 +92,39 @@ export function Login() {
             <p className={styles.subtitle}>{t('admin:loginSubtitle')}</p>
           </div>
         </div>
-        <label className={styles.field}>
-          {t('admin:loginTokenLabel')}
-          <textarea
-            className={styles.tokenArea}
-            placeholder={t('admin:loginTokenPlaceholder')}
-            spellCheck={false}
-            autoComplete="off"
-            data-testid="login-token-input"
-            aria-invalid={errors.token ? 'true' : undefined}
-            {...register('token')}
+        {waiting ? (
+          <p className={styles.hint} data-testid="login-methods-loading">{t('admin:loginMethodsLoading')}</p>
+        ) : null}
+        {!waiting && offered.length > 1 ? (
+          <div className={common.tabs} role="tablist" aria-label={t('admin:loginMethodAria')}>
+            {offered.map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={method === m}
+                className={`${common.tab} ${method === m ? common.tabActive : ''}`}
+                data-testid={`login-method-${m}`}
+                onClick={() => setChosen(m)}
+              >
+                {t(METHOD_LABEL[m])}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {waiting ? null : method === 'local' ? (
+          <PasswordLoginForm
+            submit={loginWithPassword}
+            onSuccess={done}
+            loginLabel={t('common:colAid')}
+            hint={t('admin:loginLocalHint')}
+            rejectedKey="admin:loginErrBadCredentials"
+            testId="login-local"
           />
-          {errors.token ? (
-            <span className={styles.error}>{errors.token.message ? t(errors.token.message) : null}</span>
-          ) : (
-            <span className={styles.hint}>{t('admin:loginHint')}</span>
-          )}
-        </label>
-        {serverError ? <div className={styles.error} data-testid="login-error">{serverError}</div> : null}
-        <div className={styles.actions}>
-          <Button type="submit" variant="primary" disabled={isSubmitting} data-testid="login-submit">
-            {isSubmitting ? t('loggingIn') : t('login')}
-          </Button>
-        </div>
-      </form>
+        ) : (
+          <TokenLoginForm onSuccess={done} onTyped={setTokenTyped} />
+        )}
+      </div>
     </div>
   );
 }

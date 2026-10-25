@@ -11,6 +11,7 @@
 // page surfaces the drop and re-attaches explicitly.
 
 import { tokenStore } from './tokenStore';
+import { freshBearer, rawChannelRefused } from './client';
 import {
   CONSOLE_BEARER_PREFIX,
   CONSOLE_SUBPROTOCOL,
@@ -54,35 +55,52 @@ export function createWebSocketTransport(
   opts: WebSocketTransportOptions = {},
 ): ConsoleTransport {
   const Impl = opts.socketImpl ?? WebSocket;
-  const token = opts.token === undefined ? tokenStore.get() : opts.token;
-  const protocols = token ? [CONSOLE_SUBPROTOCOL, `${CONSOLE_BEARER_PREFIX}${token}`] : [CONSOLE_SUBPROTOCOL];
-
-  const ws = new Impl(opts.url ?? consoleSocketUrl(), protocols);
-  // Chunks arrive as text frames today; a binary frame would otherwise surface
-  // as a Blob and need an async read before parsing.
-  ws.binaryType = 'arraybuffer';
-
+  let ws: WebSocket | null = null;
+  let closed = false;
   // Frames produced before the socket finished opening (the wall attaches as
   // soon as the operator picks souls) would throw on send — hold them here.
   let pending: ConsoleClientMessage[] | null = [];
 
-  ws.onopen = () => {
-    const queued = pending ?? [];
-    pending = null;
-    hooks.onOpen();
-    for (const msg of queued) ws.send(JSON.stringify(msg));
+  const open = (token: string | null) => {
+    if (closed) return;
+    const protocols = token ? [CONSOLE_SUBPROTOCOL, `${CONSOLE_BEARER_PREFIX}${token}`] : [CONSOLE_SUBPROTOCOL];
+    const socket = new Impl(opts.url ?? consoleSocketUrl(), protocols);
+    ws = socket;
+    // Chunks arrive as text frames today; a binary frame would otherwise surface
+    // as a Blob and need an async read before parsing.
+    socket.binaryType = 'arraybuffer';
+    let opened = false;
+    socket.onopen = () => {
+      opened = true;
+      const queued = pending ?? [];
+      pending = null;
+      hooks.onOpen();
+      for (const msg of queued) socket.send(JSON.stringify(msg));
+    };
+    socket.onmessage = (ev: MessageEvent) => {
+      const parsed = parseServerMessage(
+        typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data as ArrayBuffer),
+      );
+      if (parsed) hooks.onMessage(parsed);
+    };
+    socket.onerror = () => hooks.onError();
+    socket.onclose = (ev: CloseEvent) => {
+      pending = null;
+      // A handshake that never opened is how the browser reports Keeper
+      // refusing the Bearer — it shows no status, so any other failure to open
+      // reads the same and costs one exchange (on top of the one freshBearer
+      // made for a stale Bearer). Nothing reopens a socket without a click, so
+      // the cost stays per attempt.
+      if (!opened && !closed && opts.token === undefined) rawChannelRefused();
+      hooks.onClose({ code: ev.code, reason: ev.reason });
+    };
   };
-  ws.onmessage = (ev: MessageEvent) => {
-    const parsed = parseServerMessage(
-      typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data as ArrayBuffer),
-    );
-    if (parsed) hooks.onMessage(parsed);
-  };
-  ws.onerror = () => hooks.onError();
-  ws.onclose = (ev: CloseEvent) => {
-    pending = null;
-    hooks.onClose({ code: ev.code, reason: ev.reason });
-  };
+
+  // The handshake has no 401 retry: a cookie session's Bearer comes from
+  // freshBearer, and a refusal is reported back. An explicit token (tests) is
+  // used as given.
+  if (opts.token !== undefined) open(opts.token);
+  else void freshBearer().then(open, () => open(tokenStore.get()));
 
   return {
     send(msg) {
@@ -90,12 +108,13 @@ export function createWebSocketTransport(
         pending.push(msg);
         return;
       }
-      if (ws.readyState === Impl.OPEN) ws.send(JSON.stringify(msg));
+      if (ws && ws.readyState === Impl.OPEN) ws.send(JSON.stringify(msg));
     },
     close() {
+      closed = true;
       pending = null;
       // 1000 = normal closure; Keeper reaps every PTY bound to this socket.
-      if (ws.readyState === Impl.OPEN || ws.readyState === Impl.CONNECTING) ws.close(1000, 'client closed');
+      if (ws && (ws.readyState === Impl.OPEN || ws.readyState === Impl.CONNECTING)) ws.close(1000, 'client closed');
     },
   };
 }
