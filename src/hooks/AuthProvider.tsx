@@ -14,6 +14,9 @@ const RESTORE_WAIT_MS = 10_000;
 // An exchange that has not answered by then is abandoned: every request it
 // holds gets its original 401 back instead of waiting on a hung Keeper.
 const EXCHANGE_TIMEOUT_MS = 10_000;
+// How long a log-out waits for Keeper to end the session — an exchange and
+// the revoke — before forgetting it here regardless.
+const LOGOUT_TIMEOUT_MS = 10_000;
 
 function exchangeWithTimeout() {
   const ctrl = new AbortController();
@@ -21,7 +24,7 @@ function exchangeWithTimeout() {
   return keeperApi.auth.exchange(ctrl.signal).finally(() => clearTimeout(timer));
 }
 
-// A cookie session (a password login) has no refresh timer: its Bearer is
+// A cookie session (a password, LDAP or SSO login) has no refresh timer: its Bearer is
 // exchanged again when Keeper refuses it (client.ts → refresh below), and
 // before a raw channel opens once half its lifetime has passed on this
 // browser's clock — elapsed time only, never compared with Keeper's clock
@@ -160,31 +163,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIdentity(next);
   }, []);
 
-  // Password login: the cookie it sets is exchanged for the Bearer at once. If
-  // the session of this browser changed while it was in flight (another tab
-  // logged out or in, a token was pasted), or the cookie was replaced by
-  // another tab's login before the exchange read it (the Bearer names another
-  // AID than the one typed), the result is dropped and the caller told so.
-  const loginWithPassword = useCallback(async (aid: string, password: string) => {
-    const before = tokenStore.sessionId();
-    await keeperApi.auth.localLogin(aid, password);
-    let token: string;
-    try {
-      token = (await exchangeWithTimeout()).token;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) throw new SessionNotKeptError();
-      throw err;
-    }
-    if (tokenStore.sessionId() !== before || tokenStore.subjectOf(token) !== normalizeLoginAID(aid)) {
-      throw new LoginSupersededError();
-    }
-    tokenStore.startSession(token, 'local');
-    setIdentity(tokenStore.identity());
-  }, []);
+  // A login that sets the session cookie, then the exchange that makes it this
+  // browser's session. If the session of this browser changed while it was in
+  // flight (another tab logged out or in, a token was pasted), or — when the
+  // login names the AID (expectAID) — the cookie was replaced by another tab's
+  // login before the exchange read it, the result is dropped and the caller
+  // told so.
+  const startCookieSession = useCallback(
+    async (method: string, login: () => Promise<void>, expectAID: string | null) => {
+      const before = tokenStore.sessionId();
+      await login();
+      let token: string;
+      try {
+        token = (await exchangeWithTimeout()).token;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) throw new SessionNotKeptError();
+        throw err;
+      }
+      if (tokenStore.sessionId() !== before || (expectAID !== null && tokenStore.subjectOf(token) !== expectAID)) {
+        throw new LoginSupersededError();
+      }
+      tokenStore.startSession(token, method);
+      setIdentity(tokenStore.identity());
+    },
+    [],
+  );
 
+  const loginWithPassword = useCallback(
+    (aid: string, password: string) =>
+      startCookieSession('local', () => keeperApi.auth.localLogin(aid, password), normalizeLoginAID(aid)),
+    [startCookieSession],
+  );
+
+  const loginWithLDAP = useCallback(
+    (username: string, password: string) =>
+      startCookieSession('ldap', () => keeperApi.auth.ldapLogin(username, password), null),
+    [startCookieSession],
+  );
+
+  const completeSSO = useCallback(() => startCookieSession('oidc', async () => {}, null), [startCookieSession]);
+
+  // A session's cookie is a credential for its whole lifetime: forgetting the
+  // Bearer here would leave it working. A stale Bearer is exchanged first, so
+  // the revoke does not lean on the client's retry — a sign-out that gives up
+  // ends the session here, and the retry would no longer be sent. Keeper
+  // unreachable or slow — the session is forgotten here all the same.
   const logout = useCallback(async () => {
+    const sid = tokenStore.sessionId();
+    const jwtId = sid ? (tokenStore.identity()?.jwtId ?? null) : null;
+    if (sid && jwtId) {
+      const revoke = (async () => {
+        if (!tokenStore.sessionBearerFresh()) await exchangeFor(sid);
+        await keeperApi.me.jwts.revoke(jwtId);
+      })().catch(() => undefined);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([revoke, new Promise<void>((resolve) => (timer = setTimeout(resolve, LOGOUT_TIMEOUT_MS)))]);
+      clearTimeout(timer);
+    }
     endSession();
-  }, [endSession]);
+  }, [endSession, exchangeFor]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -193,9 +230,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isVerifying,
       loginWithToken,
       loginWithPassword,
+      loginWithLDAP,
+      completeSSO,
       logout,
+      forgetSession: endSession,
     }),
-    [identity, isVerifying, loginWithToken, loginWithPassword, logout],
+    [identity, isVerifying, loginWithToken, loginWithPassword, loginWithLDAP, completeSSO, logout, endSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

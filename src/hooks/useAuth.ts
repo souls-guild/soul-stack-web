@@ -33,7 +33,19 @@ export interface AuthContextValue {
   // refused, LoginSupersededError when another tab changed the login meanwhile,
   // or the error of the exchange. Never resolves without logging in.
   loginWithPassword: (aid: string, password: string) => Promise<void>;
+  // An LDAP login: the same session, signed in with a directory user name and
+  // password. The user name is not the AID, so a cookie another tab's login
+  // replaced in between is not told apart from this one.
+  loginWithLDAP: (username: string, password: string) => Promise<void>;
+  // Back from the IdP: the OIDC callback has set the session cookie; exchange
+  // it and start the session. Rejects like the logins above.
+  completeSSO: () => Promise<void>;
+  // Signs out. A cookie session is also ended on Keeper, so its cookie stops
+  // being a credential at once; a pasted token is only forgotten here.
   logout: () => Promise<void>;
+  // Forgets the session in this browser without asking Keeper — for when
+  // Keeper has already ended it (the caller just revoked it).
+  forgetSession: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

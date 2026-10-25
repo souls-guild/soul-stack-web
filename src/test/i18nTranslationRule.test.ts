@@ -52,7 +52,7 @@ const TECHNICAL = [
   'admin:rbacErrRoleNamePattern',
   'admin:rbacScopeKey_incarnation', 'admin:rbacScopeKey_service', 'admin:rbacScopeKey_coven',
   'admin:rbacScopeKey_host', 'admin:auditExpand', 'admin:auditArchonPrefix', 'admin:helpMcpTitle',
-  'admin:auditCorrelationId', 'admin:svcRefreshLabel',
+  'admin:auditCorrelationId', 'admin:svcRefreshLabel', 'admin:loginMethodLdap',
   'beacons:errActionScenarioSnake', 'beacons:celWhereAria',
   'common:pushApply',
   'common:colAid', 'common:colApplyId', 'common:colErrandId', 'common:colId',

@@ -20,7 +20,7 @@ const TERMS_KEY = ['me.jwts.terms'] as const;
 
 export function MyTokens() {
   const { t } = useTranslation();
-  const { identity, logout } = useAuth();
+  const { identity, forgetSession } = useAuth();
   const navigate = useNavigate();
   const [issueOpen, setIssueOpen] = useState(false);
 
@@ -78,7 +78,8 @@ export function MyTokens() {
         invalidateKeys={[TERMS_KEY]}
         onRevoked={(row) => {
           if (identity?.jwtId && row.jwt_id === identity.jwtId) {
-            void logout().then(() => navigate('/login', { replace: true }));
+            forgetSession();
+            navigate('/login', { replace: true });
           }
         }}
       />

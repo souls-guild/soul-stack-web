@@ -27,13 +27,26 @@ export interface PasswordLoginFormProps {
   hint: string;
   // The i18n key a 401 shows ("wrong AID or password").
   rejectedKey: string;
+  // The i18n key a 403 shows; without it a 403 shows Keeper's own message.
+  forbiddenKey?: string;
+  // The i18n key an empty login field shows; the default asks for the AID.
+  loginRequiredKey?: string;
   // data-testid prefix, one per method ("login-local").
   testId: string;
 }
 
 // A login + password form. One component for every method that takes a login
 // and a password; the method is the `submit` it is given.
-export function PasswordLoginForm({ submit, onSuccess, loginLabel, hint, rejectedKey, testId }: PasswordLoginFormProps) {
+export function PasswordLoginForm({
+  submit,
+  onSuccess,
+  loginLabel,
+  hint,
+  rejectedKey,
+  forbiddenKey,
+  loginRequiredKey,
+  testId,
+}: PasswordLoginFormProps) {
   const { t } = useTranslation();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
@@ -48,7 +61,7 @@ export function PasswordLoginForm({ submit, onSuccess, loginLabel, hint, rejecte
       await submit(values.login.trim(), values.password);
       onSuccess();
     } catch (err) {
-      setServerError(loginErrorMessage(err, rejectedKey));
+      setServerError(loginErrorMessage(err, rejectedKey, forbiddenKey));
     }
   }
 
@@ -66,7 +79,7 @@ export function PasswordLoginForm({ submit, onSuccess, loginLabel, hint, rejecte
           aria-invalid={errors.login ? 'true' : undefined}
           {...register('login')}
         />
-        {errors.login?.message ? <span className={styles.error}>{t(errors.login.message)}</span> : null}
+        {errors.login?.message ? <span className={styles.error}>{t(loginRequiredKey ?? errors.login.message)}</span> : null}
       </label>
       <label className={styles.field}>
         {t('admin:loginPasswordLabel')}

@@ -129,6 +129,7 @@ export type OperatorJWTKind = OperatorJWT['kind'];
 export type OperatorJWTListReply = components['schemas']['OperatorJWTListReply'];
 // GET /v1/me/jwts — the caller's tokens plus what POST /v1/me/jwts would accept now.
 export type MyJWTListReply = components['schemas']['MyJWTListReply'];
+export type MySessionsRevokeReply = components['schemas']['MySessionsRevokeReply'];
 export type JWTState = 'active' | 'revoked' | 'expired';
 // Filters shared by GET /v1/operators/{aid}/jwts and GET /v1/me/jwts.
 export interface JWTListQuery {
@@ -757,6 +758,14 @@ export const keeperApi = {
     // credential refusal, 429 when locked out.
     localLogin: (aid: string, password: string) =>
       apiSend<void>('/auth/local/login', 'POST', { body: { aid, password }, anonymous: true }),
+    // POST /auth/ldap/login -> 204 + the soul_session cookie. 401 for every
+    // credential refusal, 403 when no group of the user maps to a role, 429
+    // when locked out.
+    ldapLogin: (username: string, password: string) =>
+      apiSend<void>('/auth/ldap/login', 'POST', { body: { username, password }, anonymous: true }),
+    // GET /auth/oidc/login is a browser navigation, not a fetch: a 302 to the
+    // IdP, which comes back through the callback to /ui/login?sso=done.
+    oidcLoginPath: '/auth/oidc/login',
     // POST /auth/token -> a short Bearer for the session cookie; 401 when the
     // session is gone (expired, revoked, or ended by a password reset).
     exchange: (signal?: AbortSignal) => apiSend<AuthTokenReply>('/auth/token', 'POST', { anonymous: true, signal }),
@@ -1246,6 +1255,13 @@ export const keeperApi = {
       // 201 -> IssueTokenReply (the personal token, returned once).
       issue: (body: OperatorIssueTokenRequest) => apiSend<IssueTokenReply>('/v1/me/jwts', 'POST', { body }),
       revoke: (jwtId: string) => apiSend<void>(`/v1/me/jwts/${encodeURIComponent(jwtId)}/revoke`, 'POST'),
+    },
+    // The caller's web sessions (tokens of kind session): listed and ended one
+    // at a time through jwts above; this ends them all at once — with
+    // keepCurrent, all but the one this browser is signed in with.
+    sessions: {
+      revokeAll: (keepCurrent: boolean) =>
+        apiSend<MySessionsRevokeReply>('/v1/me/sessions/revoke', 'POST', { body: { keep_current: keepCurrent } }),
     },
     // PUT /v1/me/password -> 204 (NIM-1051). 403 — the current password is wrong
     // (the caller's token is fine: NOT a logout); 422 — not a local Archon /

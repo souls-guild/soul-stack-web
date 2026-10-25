@@ -1,7 +1,7 @@
 // "Profile" — the signed-in Archon's own account, reached from the AID menu in the
 // Topbar. Sub-nav and routes are built from the sections this Archon has, as on
-// Settings: a sibling ticket adds its Section constant and puts it in the list
-// (password — NIM-1051, only for a local Archon; sign-ins — NIM-1050).
+// Settings: each section is a Section constant in the list (password only for
+// a local Archon).
 
 import type { ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { MyTokens } from './MyTokens';
 import { MyPassword } from './MyPassword';
+import { MySessions } from './MySessions';
 import { useIsLocalArchon } from './useIsLocalArchon';
 import commonStyles from '../common.module.css';
 import styles from '../settings/SettingsPage.module.css';
@@ -22,6 +23,7 @@ interface Section {
 }
 
 const TOKENS: Section = { path: 'tokens', labelKey: 'profile:tabTokens', element: <MyTokens /> };
+const SESSIONS: Section = { path: 'sessions', labelKey: 'profile:tabSessions', element: <MySessions /> };
 // Only a local Archon has a password here to change (NIM-1051).
 const PASSWORD: Section = { path: 'password', labelKey: 'profile:tabPassword', element: <MyPassword /> };
 
@@ -31,7 +33,7 @@ export function ProfilePage() {
   const location = useLocation();
   const activePath = location.pathname.replace(/^\/profile\/?/, '').split('/')[0];
   const local = useIsLocalArchon();
-  const SECTIONS: Section[] = local ? [TOKENS, PASSWORD] : [TOKENS];
+  const SECTIONS: Section[] = local ? [TOKENS, SESSIONS, PASSWORD] : [TOKENS, SESSIONS];
 
   return (
     <div className={commonStyles.page}>

@@ -73,7 +73,7 @@ export interface paths {
         };
         /**
          * OIDC callback for the operator
-         * @description Validates id_token (JWKS signature/iss/aud/exp/nonce), maps to operators(aid)+roles, issues the internal JWT in an HttpOnly+Secure cookie and redirects (302) to the UI. Validation/mapping error -> 401/403.
+         * @description Validates id_token (JWKS signature/iss/aud/exp/nonce), maps to operators(aid)+roles, issues the internal JWT in an HttpOnly+Secure cookie and redirects (302) to the UI login page (/ui/login?sso=done), which exchanges it. A state that does not match the __Host-soul_oidc_state cookie set by /auth/oidc/login in the same browser is refused (401) before it is used. Validation/mapping error -> 401/403.
          */
         get: operations["oidcCallback"];
         put?: never;
@@ -93,7 +93,7 @@ export interface paths {
         };
         /**
          * Start OIDC login for the operator
-         * @description Federated authentication (ADR-058): generates state+nonce+PKCE and redirects (302) to the external IdP's authorization_endpoint.
+         * @description Federated authentication (ADR-058): generates state+nonce+PKCE, binds the state to this browser with the HttpOnly cookie __Host-soul_oidc_state, and redirects (302) to the external IdP's authorization_endpoint.
          */
         get: operations["oidcLogin"];
         put?: never;
@@ -1314,6 +1314,26 @@ export interface paths {
         get: operations["listMyPermissions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/sessions/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End your web sessions
+         * @description Ends the caller's web sessions (tokens of kind session): every one, or with keep_current every one but the session this request is made with. Each ended session, and every Bearer exchanged from it, is refused (401 jwt-revoked) on its next request on every Keeper node. Personal and issued tokens are untouched. No permission. List sessions with GET /v1/me/jwts?kind=session; end one with POST /v1/me/jwts/{jwt_id}/revoke.
+         */
+        post: operations["revokeMySessions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2830,7 +2850,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.sessions-revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -3932,6 +3952,17 @@ export interface components {
         };
         MyPermissionsReply: {
             permissions: components["schemas"]["MyPermission"][] | null;
+        };
+        MySessionsRevokeReply: {
+            /**
+             * Format: int64
+             * @description the number of web sessions ended
+             */
+            revoked: number;
+        };
+        MySessionsRevokeRequest: {
+            /** @description true - end every session but the one this request is made with; omitted or false - every session, this one included */
+            keep_current?: boolean;
         };
         OmenCreateRequest: {
             /** @description vault-ref on master-credential (vault:<mount>/<path>); the secret itself is not stored */
@@ -5814,7 +5845,9 @@ export interface operations {
             };
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                "__Host-soul_oidc_state"?: string;
+            };
         };
         requestBody?: never;
         responses: {
@@ -5887,6 +5920,7 @@ export interface operations {
             302: {
                 headers: {
                     Location?: string;
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -10735,6 +10769,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyPermissionsReply"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeMySessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MySessionsRevokeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySessionsRevokeReply"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
             };
             /** @description Internal Server Error */
