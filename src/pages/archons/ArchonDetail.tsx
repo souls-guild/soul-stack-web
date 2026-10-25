@@ -8,11 +8,12 @@ import { ApiError } from '../../api/client';
 import { Badge, Button } from '../../components/primitives';
 import { JsonViewer } from '../../components/JsonViewer';
 import { RevokeArchonModal } from './RevokeArchonModal';
+import { ArchonTokensTab } from './ArchonTokensTab';
 import { AssignRoleModal } from '../rbac/AssignRoleModal';
 import { prettyRbacError } from '../rbac/errors';
 import styles from '../common.module.css';
 
-type Tab = 'info' | 'activity';
+type Tab = 'info' | 'tokens' | 'activity';
 
 function authMethodTone(m: OperatorAuthMethod | string | undefined):
   'ok' | 'warn' | 'info' | 'muted' {
@@ -140,6 +141,16 @@ export function ArchonDetail() {
           onClick={() => setTab('info')}
         >
           {t('pages:archonTabInfo')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'tokens'}
+          data-testid="archon-tab-tokens"
+          className={`${styles.tab} ${tab === 'tokens' ? styles.tabActive : ''}`}
+          onClick={() => setTab('tokens')}
+        >
+          {t('pages:archonTabTokens')}
         </button>
         <button
           type="button"
@@ -313,6 +324,12 @@ export function ArchonDetail() {
         roles={rolesQ.data?.items ?? []}
         onClose={() => setAssignOpen(false)}
       />
+
+      {tab === 'tokens' ? (
+        <section className={styles.section} aria-label={t('pages:archonTabTokens')}>
+          <ArchonTokensTab aid={op.aid} />
+        </section>
+      ) : null}
 
       {tab === 'activity' ? (
         <section className={styles.section} aria-label={t('common:activityAria')}>

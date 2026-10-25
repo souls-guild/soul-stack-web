@@ -16,6 +16,7 @@ import { AuditLog } from './pages/audit/AuditLog';
 import { ArchonsList } from './pages/archons/ArchonsList';
 import { ArchonDetail } from './pages/archons/ArchonDetail';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { ProfilePage } from './pages/profile/ProfilePage';
 import { PushApply } from './pages/push/PushApply';
 import { ErrandsList } from './pages/errands/ErrandsList';
 import { ErrandNewForm } from './pages/errands/ErrandNewForm';
@@ -105,6 +106,7 @@ export function App() {
             {/* Redirect for backward-compat with old links */}
             <Route path="/provisioning-policy" element={<Navigate to="/settings/provisioning-policy" replace />} />
             <Route path="/settings/*" element={<Protected><SettingsPage /></Protected>} />
+            <Route path="/profile/*" element={<Protected><ProfilePage /></Protected>} />
             <Route path="/push" element={<Protected><PushApply /></Protected>} />
             <Route path="/errands" element={<Protected><ErrandsList /></Protected>} />
             <Route path="/errands/new" element={<Protected><ErrandNewForm /></Protected>} />

@@ -121,6 +121,26 @@ export type Operator = components['schemas']['Operator'];
 export type OperatorListReply = components['schemas']['OperatorListReply'];
 export type OperatorAuthMethod = NonNullable<Operator['auth_method']>;
 export type OperatorCreatedVia = NonNullable<Operator['created_via']>;
+// One accounted token (operator_jwts row) — never the token itself.
+export type OperatorJWT = components['schemas']['OperatorJWT'];
+export type OperatorJWTKind = OperatorJWT['kind'];
+export type OperatorJWTListReply = components['schemas']['OperatorJWTListReply'];
+// GET /v1/me/jwts — the caller's tokens plus what POST /v1/me/jwts would accept now.
+export type MyJWTListReply = components['schemas']['MyJWTListReply'];
+export type JWTState = 'active' | 'revoked' | 'expired';
+// Filters shared by GET /v1/operators/{aid}/jwts and GET /v1/me/jwts.
+export interface JWTListQuery {
+  kind?: OperatorJWTKind[];
+  state?: JWTState;
+  q?: string;
+  offset?: number;
+  limit?: number;
+}
+export type OperatorIssueTokenRequest = components['schemas']['OperatorIssueTokenRequest'];
+
+function jwtListQuery(q: JWTListQuery) {
+  return { kind: q.kind, state: q.state, q: q.q, offset: q.offset, limit: q.limit };
+}
 
 // Provisioning-policy — allowed operator-creation methods (ADR-058 Part B).
 // GET/PUT /v1/provisioning-policy. Type from the schema; method enum — from the contract.
@@ -1190,6 +1210,27 @@ export const keeperApi = {
     // 200 -> IssueTokenReply (jwt returned once).
     issueToken: (aid: string) =>
       apiSend<IssueTokenReply>(`/v1/operators/${encodeURIComponent(aid)}/issue-token`, 'POST'),
+    jwts: {
+      // GET /v1/operators/{aid}/jwts (operator.list) — every kind, newest first.
+      list: (aid: string, query: JWTListQuery = {}) =>
+        apiGet<OperatorJWTListReply>(`/v1/operators/${encodeURIComponent(aid)}/jwts`, { query: jwtListQuery(query) }),
+      // POST .../jwts/{jwt_id}/revoke (operator.jwt-revoke) -> 204.
+      revoke: (aid: string, jwtId: string) =>
+        apiSend<void>(
+          `/v1/operators/${encodeURIComponent(aid)}/jwts/${encodeURIComponent(jwtId)}/revoke`,
+          'POST',
+        ),
+    },
+  },
+
+  // The caller's own tokens — auth-only, no permission (NIM-1052).
+  me: {
+    jwts: {
+      list: (query: JWTListQuery = {}) => apiGet<MyJWTListReply>('/v1/me/jwts', { query: jwtListQuery(query) }),
+      // 201 -> IssueTokenReply (the personal token, returned once).
+      issue: (body: OperatorIssueTokenRequest) => apiSend<IssueTokenReply>('/v1/me/jwts', 'POST', { body }),
+      revoke: (jwtId: string) => apiSend<void>(`/v1/me/jwts/${encodeURIComponent(jwtId)}/revoke`, 'POST'),
+    },
   },
 
   roles: {

@@ -26,6 +26,7 @@
   "archonSynods": "Synods",
   "archonTabActivity": "Activity",
   "archonTabInfo": "Info",
+  "archonTabTokens": "Tokens",
   "archonsCrumbs": "cluster operators",
   "backendUnsupported": "backend does not support this feature",
   "builtinDeleteDenied": "builtin role — deletion is denied by the server",

@@ -101,6 +101,17 @@ export function Topbar() {
                     </>
                   ) : null}
                 </div>
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  data-testid="topbar-profile-link"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/profile');
+                  }}
+                >
+                  {t('profile:title')}
+                </button>
                 <button type="button" className={styles.menuItem} onClick={onLogout}>
                   {t('logout')}
                 </button>

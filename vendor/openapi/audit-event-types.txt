@@ -73,6 +73,7 @@ omen.created
 omen.label_changed
 omen.revoked
 operator.created
+operator.jwt-revoked
 operator.login
 operator.provisioned
 operator.revoked
@@ -146,6 +147,7 @@ tiding.created
 tiding.deleted
 tiding.label_changed
 tiding.updated
+vault.kv-absent
 vault.kv-present
 vault.kv-read
 vigil.created

@@ -1192,6 +1192,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/jwts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your own tokens
+         * @description Every token of the caller, of every kind, newest first, with where it was minted and last used; never the token itself. Filters kind/state/q as on GET /v1/operators/{aid}/jwts. Also answers what POST /v1/me/jwts would accept from the caller now: the ttl ceiling, the OIDC sign-in cut-off, and the personal-token counts against both limits. No permission (ADR-014 amendment NIM-1052). Read-only, no audit.
+         */
+        get: operations["listMyJWTs"];
+        put?: never;
+        /**
+         * Issue a personal token to yourself
+         * @description Mints a token of kind personal for the caller (ADR-014 amendment NIM-1052). No permission: the token's rights are the caller's at each request, read from the RBAC data like every token's. Optional body: ttl and label. The ttl ceiling is auth.jwt.ttl_max, or the OIDC sign-in lifetime for an OIDC operator, whose token made from a sign-in also expires with that sign-in at the latest (GET /v1/me/jwts answers both as personal_ttl_max_seconds / personal_expires_by). At most 10 active personal tokens and 20 issued in 24 hours (409 personal-jwt-limit). A request made with a personal token is refused (403 personal-jwt-from-personal). Returns the JWT once.
+         */
+        post: operations["issueMyJWT"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/jwts/{jwt_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke one of your own tokens
+         * @description Revokes one of the caller's tokens of any kind (ADR-014 amendment NIM-1052): refused (401 jwt-revoked) on its next request on every Keeper node. No permission. 404 - not a token of the caller (also for another operator's token). 409 - already revoked. Revoking the token the request is made with succeeds and signs the caller out of it.
+         */
+        post: operations["revokeMyJWT"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/permissions": {
         parameters: {
             query?: never;
@@ -1327,9 +1371,49 @@ export interface paths {
         put?: never;
         /**
          * Issue a new JWT to an Archon
-         * @description Issues a fresh JWT to an existing operator (ADR-014). Permission operator.issue-token. 409 - operator revoked. Returns JWT once.
+         * @description Issues a fresh JWT to an existing operator (ADR-014). Optional body: ttl (up to auth.jwt.ttl_max) and label. The token is accounted under jwt_id and can be revoked on its own (POST /v1/operators/{aid}/jwts/{jwt_id}/revoke). Permission operator.issue-token. 409 - operator revoked. Returns JWT once.
          */
         post: operations["issueOperatorToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}/jwts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tokens of an Archon
+         * @description Every JWT Keeper minted for the operator, newest first, with where it was minted from and where it was last used (ADR-014 amendment NIM-1045). Never returns a token. Expired tokens stay listed until the Reaper rule purge_operator_jwts removes them. Filters: kind (repeatable), state (active/revoked/expired), q (label substring) - ADR-014 amendment NIM-1052. Permission operator.list. Read-only, no audit.
+         */
+        get: operations["listOperatorJWTs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}/jwts/{jwt_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke one token of an Archon
+         * @description Sets operator_jwts.revoked_at: the token is refused (401 jwt-revoked) on its next request on every Keeper node; the operator and its other tokens keep working (ADR-014 amendment NIM-1045). Permission operator.jwt-revoke. 404 - not a token of this operator. 409 - already revoked.
+         */
+        post: operations["revokeOperatorJWT"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2662,7 +2746,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.provisioned" | "operator.revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -3537,6 +3621,7 @@ export interface components {
             /** Format: date-time */
             expires_at: string;
             jwt: string;
+            jwt_id: string;
         };
         LDAPLoginRequest: {
             /**
@@ -3611,6 +3696,55 @@ export interface components {
             source?: components["schemas"]["ModuleInputSource"];
             type?: string;
         };
+        MyJWTListReply: {
+            /** @description page of the caller's tokens, newest first */
+            items: components["schemas"]["OperatorJWT"][] | null;
+            /**
+             * Format: int32
+             * @description page size
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description offset from start of set
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description the caller's personal tokens that are neither revoked nor expired
+             */
+            personal_active: number;
+            /**
+             * Format: int32
+             * @description the most personal tokens an operator may issue in 24 hours
+             */
+            personal_daily_limit: number;
+            /**
+             * Format: date-time
+             * @description set when the request is made with an OIDC sign-in: a personal token issued now expires at this time at the latest
+             */
+            personal_expires_by?: string;
+            /**
+             * Format: int32
+             * @description the caller's personal tokens issued in the last 24 hours, revoked ones included
+             */
+            personal_last_day: number;
+            /**
+             * Format: int32
+             * @description the most active personal tokens an operator may hold
+             */
+            personal_limit: number;
+            /**
+             * Format: int64
+             * @description the longest ttl POST /v1/me/jwts accepts from the caller, in seconds
+             */
+            personal_ttl_max_seconds: number;
+            /**
+             * Format: int32
+             * @description total number of entries under the filters
+             */
+            total: number;
+        };
         MyPermission: {
             action?: string;
             resource?: string;
@@ -3680,7 +3814,10 @@ export interface components {
             created_at: string;
             created_by_aid: string;
             display_name: string;
+            /** Format: date-time */
+            expires_at: string;
             jwt: string;
+            jwt_id: string;
             roles?: string[];
         };
         OperatorCreateRequest: {
@@ -3688,8 +3825,58 @@ export interface components {
             aid: string;
             /** @description human-readable name for UI/audit */
             display_name?: string;
+            /** @description free text shown in the operator's token list ("Service Desk prod") */
+            label?: string;
             /** @description opt. list of roles for atomic create+grant (onboarding in one call); role error -> rollback */
             roles?: string[] | null;
+            /** @description lifetime of the returned JWT ("2160h" or "90d"); omitted -> auth.jwt.ttl_default; between 1m and auth.jwt.ttl_max, else 422 */
+            ttl?: string;
+        };
+        OperatorIssueTokenRequest: {
+            /** @description free text shown in the operator's token list ("Service Desk prod") */
+            label?: string;
+            /** @description lifetime ("2160h" or "90d"); omitted -> auth.jwt.ttl_default; between 1m and auth.jwt.ttl_max (on POST /v1/me/jwts: the caller's own ceiling, the OIDC sign-in lifetime for an OIDC operator), else 422 */
+            ttl?: string;
+        };
+        OperatorJWT: {
+            aid: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by_aid?: string;
+            created_ip?: string;
+            created_user_agent?: string;
+            /** Format: date-time */
+            expires_at: string;
+            jwt_id: string;
+            /** @enum {string} */
+            kind: "bootstrap" | "issued" | "session" | "personal";
+            label?: string;
+            /** Format: date-time */
+            last_used_at?: string;
+            last_used_ip?: string;
+            last_used_user_agent?: string;
+            /** Format: date-time */
+            revoked_at?: string;
+            revoked_by_aid?: string;
+        };
+        OperatorJWTListReply: {
+            /** @description page of tokens, newest first */
+            items: components["schemas"]["OperatorJWT"][] | null;
+            /**
+             * Format: int32
+             * @description page size
+             */
+            limit: number;
+            /**
+             * Format: int32
+             * @description offset from start of set
+             */
+            offset: number;
+            /**
+             * Format: int32
+             * @description total number of entries in set
+             */
+            total: number;
         };
         OperatorListReply: {
             /** @description page of operators */
@@ -3991,7 +4178,7 @@ export interface components {
             cause?: string;
             /** @description the failing expression reads a secret, so the evaluator's own message - which can quote a value - was not recorded */
             cause_withheld?: boolean;
-            /** @description params cell path that failed to render, e.g. args[0] */
+            /** @description where the failing evaluation was: the params cell path that failed to render, e.g. args[0], or vars.<name> when the error was raised inside the definition of var <name> - the innermost failing definition, whichever cell or predicate read it; absent when neither */
             cell?: string;
             /** @description the run's abort reason, e.g. render_failed, dispatch_failed, no_hosts */
             code?: string;
@@ -9877,6 +10064,190 @@ export interface operations {
             };
         };
     };
+    listMyJWTs: {
+        parameters: {
+            query?: {
+                /** @description multi-value ?kind=personal&kind=issued - exact-match OR; value outside enum -> 422 */
+                kind?: ("bootstrap" | "issued" | "session" | "personal")[] | null;
+                /** @description active - neither revoked nor expired; revoked - revoked (expired since or not); expired - expired without being revoked; omitted -> every state */
+                state?: "active" | "revoked" | "expired";
+                /** @description case-insensitive substring of the label; empty -> no filter */
+                q?: string;
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description page size 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyJWTListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    issueMyJWT: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OperatorIssueTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueTokenReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeMyJWT: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description jwt_id of one of the caller's tokens */
+                jwt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     listMyPermissions: {
         parameters: {
             query?: never;
@@ -10292,7 +10663,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OperatorIssueTokenRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -10302,6 +10677,162 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IssueTokenReply"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listOperatorJWTs: {
+        parameters: {
+            query?: {
+                /** @description multi-value ?kind=personal&kind=issued - exact-match OR; value outside enum -> 422 */
+                kind?: ("bootstrap" | "issued" | "session" | "personal")[] | null;
+                /** @description active - neither revoked nor expired; revoked - revoked (expired since or not); expired - expired without being revoked; omitted -> every state */
+                state?: "active" | "revoked" | "expired";
+                /** @description case-insensitive substring of the label; empty -> no filter */
+                q?: string;
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description page size 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description AID of the Archon */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorJWTListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeOperatorJWT: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID of the Archon the token belongs to */
+                aid: string;
+                /** @description jwt_id of the token (its jti) */
+                jwt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Forbidden */
             403: {

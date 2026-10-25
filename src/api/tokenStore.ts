@@ -17,6 +17,7 @@ interface JwtPayload {
   exp?: number;
   sub?: string;
   iss?: string;
+  jti?: string;
 }
 
 function decodePayload(token: string): JwtPayload | null {
@@ -40,6 +41,9 @@ function isExpired(token: string): boolean {
 export interface OperatorIdentity {
   aid: string;
   expiresAt: Date | null;
+  // The token's jti = its operator_jwts row; null for a token minted before
+  // per-token accounting (or outside Keeper, like `make dev-jwt`).
+  jwtId: string | null;
 }
 
 export const tokenStore = {
@@ -70,6 +74,7 @@ export const tokenStore = {
     return {
       aid: payload.sub,
       expiresAt: payload.exp ? new Date(payload.exp * 1000) : null,
+      jwtId: payload.jti ?? null,
     };
   },
 };
