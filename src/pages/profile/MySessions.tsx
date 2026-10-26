@@ -17,6 +17,7 @@ import { Badge, Button, Modal, Pager } from '../../components/primitives';
 import { summarizeUserAgent } from './userAgent';
 import styles from '../common.module.css';
 import own from './MySessions.module.css';
+import profile from './ProfilePage.module.css';
 
 const PAGE = 50;
 const LIST_KEY = ['me.sessions'] as const;
@@ -108,32 +109,32 @@ export function MySessions() {
   const now = Date.now();
 
   return (
-    <section className={styles.section} aria-label={t('profile:tabSessions')}>
-      <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span>{t('profile:sessionsTitle')}</span>
-        {active.data ? <Badge tone="muted">{t('profile:sessionsActiveCount', { n: activeCount })}</Badge> : null}
-        <span style={{ flex: 1 }} />
-        <Button
-          type="button"
-          data-testid="sessions-end-others"
-          disabled={!active.data || othersCount === 0 || endMany.isPending}
-          onClick={() => setConfirm('others')}
-        >
-          {t('profile:sessionsEndOthers')}
-        </Button>
-        <Button
-          type="button"
-          variant="danger"
-          data-testid="sessions-end-all"
-          disabled={!active.data || activeCount === 0 || endMany.isPending}
-          onClick={() => setConfirm('all')}
-        >
-          {t('profile:sessionsEndAll')}
-        </Button>
-      </h2>
-      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        {t('profile:sessionsHint')}
-      </p>
+    <section className={profile.section} aria-label={t('profile:tabSessions')}>
+      <div className={profile.head}>
+        <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-2)' }}>
+          <span>{t('profile:sessionsTitle')}</span>
+          {active.data ? <Badge tone="muted">{t('profile:sessionsActiveCount', { n: activeCount })}</Badge> : null}
+          <span style={{ flex: 1 }} />
+          <Button
+            type="button"
+            data-testid="sessions-end-others"
+            disabled={!active.data || othersCount === 0 || endMany.isPending}
+            onClick={() => setConfirm('others')}
+          >
+            {t('profile:sessionsEndOthers')}
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            data-testid="sessions-end-all"
+            disabled={!active.data || activeCount === 0 || endMany.isPending}
+            onClick={() => setConfirm('all')}
+          >
+            {t('profile:sessionsEndAll')}
+          </Button>
+        </h2>
+        <p className={profile.hint}>{t('profile:sessionsHint')}</p>
+      </div>
       <label className={own.toggle}>
         <input
           type="checkbox"
@@ -226,9 +227,7 @@ export function MySessions() {
         </ul>
       )}
       {list.data && list.data.total > PAGE ? (
-        <div style={{ marginTop: 10 }}>
-          <Pager offset={offset} limit={PAGE} total={list.data.total} shown={items.length} onChange={setOffset} />
-        </div>
+        <Pager offset={offset} limit={PAGE} total={list.data.total} shown={items.length} onChange={setOffset} />
       ) : null}
 
       <Modal

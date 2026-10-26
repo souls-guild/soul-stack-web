@@ -125,7 +125,7 @@ export function JwtList({
   ];
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-3)' }}>
       <div className={styles.filters}>
         <Segmented
           ariaLabel={t('profile:filterStateAria')}
@@ -268,15 +268,13 @@ export function JwtList({
       )}
 
       {list.data && list.data.total > 0 ? (
-        <div style={{ marginTop: 10 }}>
-          <Pager
-            offset={list.data.offset}
-            limit={list.data.limit}
-            total={list.data.total}
-            shown={items.length}
-            onChange={setOffset}
-          />
-        </div>
+        <Pager
+          offset={list.data.offset}
+          limit={list.data.limit}
+          total={list.data.total}
+          shown={items.length}
+          onChange={setOffset}
+        />
       ) : null}
 
       <Modal

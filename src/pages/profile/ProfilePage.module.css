@@ -1,0 +1,35 @@
+/* Shared by every Profile tab: a title binds to its hint at --s-2, the blocks
+   of a tab sit --s-4 apart. */
+
+/* The sub-nav is Settings' and carries --s-4 under it; here tabs to content is
+   the page gap plus --s-1. The child selector outranks `.subNav` whatever order
+   the two modules land in the bundle. */
+.profile > nav {
+  margin-bottom: var(--s-1);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.passwordForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-width: 360px;
+}

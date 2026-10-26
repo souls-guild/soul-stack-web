@@ -13,6 +13,7 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input } from '../../components/primitives';
 import styles from '../common.module.css';
+import own from './ProfilePage.module.css';
 
 function changeError(err: unknown, t: (k: string, o?: Record<string, unknown>) => string): string {
   if (err instanceof ApiError) {
@@ -49,11 +50,13 @@ export function MyPassword() {
   };
 
   return (
-    <section className={styles.section} aria-label={t('profile:tabPassword')} data-testid="my-password">
-      <h2 className={styles.sectionTitle}>{t('profile:passwordTitle')}</h2>
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>{t('profile:passwordHint')}</p>
+    <section className={own.section} aria-label={t('profile:tabPassword')} data-testid="my-password">
+      <div className={own.head}>
+        <h2 className={styles.sectionTitle}>{t('profile:passwordTitle')}</h2>
+        <p className={own.hint}>{t('profile:passwordHint')}</p>
+      </div>
       <form
-        className={styles.filters}
+        className={own.passwordForm}
         onSubmit={(e) => {
           e.preventDefault();
           if (!ready || change.isPending) return;
@@ -86,7 +89,7 @@ export function MyPassword() {
           error={mismatch ? t('profile:passwordMismatch') : undefined}
           data-testid="my-password-repeat"
         />
-        <div style={{ alignSelf: 'flex-end' }}>
+        <div>
           <Button type="submit" variant="primary" disabled={!ready || change.isPending} data-testid="my-password-submit">
             {change.isPending ? t('saving') : t('profile:passwordSubmit')}
           </Button>

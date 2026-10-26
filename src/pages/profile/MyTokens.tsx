@@ -13,6 +13,7 @@ import { Button } from '../../components/primitives';
 import { JwtList } from '../../components/JwtList';
 import { IssueJwtModal } from './IssueJwtModal';
 import styles from '../common.module.css';
+import own from './ProfilePage.module.css';
 
 const KINDS: OperatorJWTKind[] = ['personal', 'issued', 'bootstrap'];
 const LIST_KEY = ['me.jwts'] as const;
@@ -39,31 +40,31 @@ export function MyTokens() {
   const blocked = atDailyLimit ? t('profile:atDailyLimit', { limit: dailyLimit }) : atLimit ? t('profile:atLimit', { limit }) : null;
 
   return (
-    <section className={styles.section} aria-label={t('profile:tabTokens')}>
-      <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span>{t('profile:myTokens')}</span>
-        <span style={{ flex: 1 }} />
-        {terms.data ? (
-          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }} data-testid="personal-count">
-            {t('profile:personalCount', { active, limit })}
-          </span>
-        ) : null}
-        <Button
-          type="button"
-          variant="primary"
-          data-testid="issue-jwt-btn"
-          disabled={!terms.data || blocked !== null}
-          title={blocked ?? undefined}
-          onClick={() => setIssueOpen(true)}
-        >
-          {t('profile:issueToken')}
-        </Button>
-      </h2>
-      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        {t('profile:tokensHint')}
-      </p>
+    <section className={own.section} aria-label={t('profile:tabTokens')}>
+      <div className={own.head}>
+        <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s-2)' }}>
+          <span>{t('profile:myTokens')}</span>
+          <span style={{ flex: 1 }} />
+          {terms.data ? (
+            <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }} data-testid="personal-count">
+              {t('profile:personalCount', { active, limit })}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            variant="primary"
+            data-testid="issue-jwt-btn"
+            disabled={!terms.data || blocked !== null}
+            title={blocked ?? undefined}
+            onClick={() => setIssueOpen(true)}
+          >
+            {t('profile:issueToken')}
+          </Button>
+        </h2>
+        <p className={own.hint}>{t('profile:tokensHint')}</p>
+      </div>
       {blocked ? (
-        <div className={styles.errorBox} role="status" data-testid="personal-at-limit" style={{ marginBottom: 10 }}>
+        <div className={styles.errorBox} role="status" data-testid="personal-at-limit">
           {blocked}
         </div>
       ) : null}

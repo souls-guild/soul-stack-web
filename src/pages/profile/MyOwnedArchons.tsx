@@ -14,6 +14,7 @@ import { JwtList } from '../../components/JwtList';
 import { IssueJwtModal } from './IssueJwtModal';
 import { prettyOwnedError } from './ownedErrors';
 import styles from '../common.module.css';
+import own from './ProfilePage.module.css';
 
 const PAGE = 50;
 const KINDS: OperatorJWTKind[] = ['personal', 'issued', 'session', 'bootstrap'];
@@ -35,11 +36,11 @@ export function MyOwnedArchons() {
   const isOpen = (aid: string) => toggled[aid] ?? items.length === 1;
 
   return (
-    <section className={styles.section} aria-label={t('profile:tabOwned')} data-testid="owned-archons">
-      <h2 className={styles.sectionTitle}>{t('profile:tabOwned')}</h2>
-      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        {t('profile:ownedHint')}
-      </p>
+    <section className={own.section} aria-label={t('profile:tabOwned')} data-testid="owned-archons">
+      <div className={own.head}>
+        <h2 className={styles.sectionTitle}>{t('profile:tabOwned')}</h2>
+        <p className={own.hint}>{t('profile:ownedHint')}</p>
+      </div>
 
       {q.isLoading ? (
         <div className={styles.loading}>{t('loading')}</div>
@@ -52,14 +53,14 @@ export function MyOwnedArchons() {
       ) : items.length === 0 ? (
         <div className={styles.empty} data-testid="owned-empty">{t('profile:ownedEmpty')}</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-3)' }}>
           {items.map((op) => {
             const open = isOpen(op.aid);
             return (
               <div
                 key={op.aid}
                 data-testid={`owned-${op.aid}`}
-                style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--s-3)' }}
+                style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 'var(--s-4)' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <button
@@ -89,7 +90,7 @@ export function MyOwnedArchons() {
                   </Button>
                 </div>
                 {open ? (
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 'var(--s-4)' }}>
                     <JwtList
                       queryKey={jwtsKey(op.aid)}
                       fetchPage={(page) => keeperApi.me.operators.jwts(op.aid, page)}
@@ -108,9 +109,7 @@ export function MyOwnedArchons() {
       )}
 
       {q.data && q.data.total > PAGE ? (
-        <div style={{ marginTop: 10 }}>
-          <Pager offset={q.data.offset} limit={q.data.limit} total={q.data.total} shown={items.length} onChange={setOffset} />
-        </div>
+        <Pager offset={q.data.offset} limit={q.data.limit} total={q.data.total} shown={items.length} onChange={setOffset} />
       ) : null}
 
       {issueFor ? (

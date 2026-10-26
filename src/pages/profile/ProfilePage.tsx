@@ -14,6 +14,7 @@ import { MyOwnedArchons } from './MyOwnedArchons';
 import { useIsLocalArchon } from './useIsLocalArchon';
 import commonStyles from '../common.module.css';
 import styles from '../settings/SettingsPage.module.css';
+import own from './ProfilePage.module.css';
 
 interface Section {
   /** slug path relative to /profile/ */
@@ -38,7 +39,7 @@ export function ProfilePage() {
   const SECTIONS: Section[] = local ? [TOKENS, SESSIONS, OWNED, PASSWORD] : [TOKENS, SESSIONS, OWNED];
 
   return (
-    <div className={commonStyles.page}>
+    <div className={`${commonStyles.page} ${own.profile}`}>
       <div className={commonStyles.header}>
         <div>
           <h1 className={commonStyles.title}>{t('profile:title')}</h1>
