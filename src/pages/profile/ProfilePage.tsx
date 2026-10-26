@@ -10,6 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { MyTokens } from './MyTokens';
 import { MyPassword } from './MyPassword';
 import { MySessions } from './MySessions';
+import { MyOwnedArchons } from './MyOwnedArchons';
 import { useIsLocalArchon } from './useIsLocalArchon';
 import commonStyles from '../common.module.css';
 import styles from '../settings/SettingsPage.module.css';
@@ -24,6 +25,7 @@ interface Section {
 
 const TOKENS: Section = { path: 'tokens', labelKey: 'profile:tabTokens', element: <MyTokens /> };
 const SESSIONS: Section = { path: 'sessions', labelKey: 'profile:tabSessions', element: <MySessions /> };
+const OWNED: Section = { path: 'owned', labelKey: 'profile:tabOwned', element: <MyOwnedArchons /> };
 // Only a local Archon has a password here to change (NIM-1051).
 const PASSWORD: Section = { path: 'password', labelKey: 'profile:tabPassword', element: <MyPassword /> };
 
@@ -33,7 +35,7 @@ export function ProfilePage() {
   const location = useLocation();
   const activePath = location.pathname.replace(/^\/profile\/?/, '').split('/')[0];
   const local = useIsLocalArchon();
-  const SECTIONS: Section[] = local ? [TOKENS, SESSIONS, PASSWORD] : [TOKENS, SESSIONS];
+  const SECTIONS: Section[] = local ? [TOKENS, SESSIONS, OWNED, PASSWORD] : [TOKENS, SESSIONS, OWNED];
 
   return (
     <div className={commonStyles.page}>

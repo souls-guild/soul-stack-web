@@ -1,7 +1,12 @@
-// Issue a personal token to yourself: POST /v1/me/jwts -> 201 IssueTokenReply.
-// The token is shown once. Lifetimes above the caller's ceiling
-// (personal_ttl_max_seconds — ttl_max, or the OIDC sign-in lifetime) are not
-// offered; the server refuses them anyway (422).
+// Issue a token with a lifetime and a label, shown once. The caller passes the
+// request: a personal token to oneself (POST /v1/me/jwts), an administrator's
+// issue-token for any Archon, or an owner's token for a machine operator it
+// owns (POST /v1/me/operators/{aid}/jwts).
+//
+// Lifetimes above a known ceiling (personal_ttl_max_seconds — ttl_max, or the
+// OIDC sign-in lifetime) are not offered. For another Archon the ceiling is
+// auth.jwt.ttl_max, which the UI cannot see: every preset is offered and the
+// server's 422 says what it refused.
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,33 +14,57 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Copy } from 'lucide-react';
-import { keeperApi, type IssueTokenReply } from '../../api/keeper';
+import type { IssueTokenReply, OperatorIssueTokenRequest } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Button, Input, Modal } from '../../components/primitives';
 import { durationSeconds, issueJwtSchema, PRESETS, type IssueJwtInput } from './schemas';
 import styles from '../common.module.css';
 
+type Preset = IssueJwtInput['preset'];
+
 interface Props {
   open: boolean;
-  ttlMaxSeconds: number;
+  issue: (body: OperatorIssueTokenRequest) => Promise<IssueTokenReply>;
+  // Unset when the ceiling is not known to the UI.
+  ttlMaxSeconds?: number;
   // Set for an OIDC sign-in: a token issued now expires then at the latest.
   expiresBy?: string;
+  // The Archon the token is for, when it is not the caller.
+  aid?: string;
+  defaultPreset?: Preset;
+  formatError?: (err: unknown) => string;
   onClose: () => void;
   invalidateKeys: readonly (readonly unknown[])[];
 }
 
-function defaultPreset(ttlMaxSeconds: number): IssueJwtInput['preset'] {
-  const fits = PRESETS.filter((p) => durationSeconds(p) <= ttlMaxSeconds);
-  if (fits.includes('30d')) return '30d';
-  return fits.length > 0 ? fits[fits.length - 1] : 'custom';
+function fits(p: Preset, ttlMaxSeconds: number | undefined): boolean {
+  return ttlMaxSeconds === undefined || p === 'custom' || durationSeconds(p) <= ttlMaxSeconds;
 }
 
-export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalidateKeys }: Props) {
+function pickPreset(ttlMaxSeconds: number | undefined, wanted: Preset | undefined): Preset {
+  if (wanted && fits(wanted, ttlMaxSeconds)) return wanted;
+  const fitting = PRESETS.filter((p) => fits(p, ttlMaxSeconds));
+  if (fitting.includes('30d')) return '30d';
+  return fitting.length > 0 ? fitting[fitting.length - 1] : 'custom';
+}
+
+export function IssueJwtModal({
+  open,
+  issue,
+  ttlMaxSeconds,
+  expiresBy,
+  aid,
+  defaultPreset,
+  formatError,
+  onClose,
+  invalidateKeys,
+}: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [issued, setIssued] = useState<IssueTokenReply | null>(null);
   const [copied, setCopied] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const ceiling = ttlMaxSeconds === undefined ? '' : humanSeconds(ttlMaxSeconds);
 
   const {
     register,
@@ -46,20 +75,20 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
     formState: { errors },
   } = useForm<IssueJwtInput>({
     resolver: zodResolver(issueJwtSchema),
-    values: { label: '', preset: defaultPreset(ttlMaxSeconds), custom: '' },
+    values: { label: '', preset: pickPreset(ttlMaxSeconds, defaultPreset), custom: '' },
   });
   const preset = watch('preset');
 
   const mu = useMutation({
-    mutationFn: (v: IssueJwtInput) =>
-      keeperApi.me.jwts.issue({ label: v.label || undefined, ttl: v.preset === 'custom' ? v.custom : v.preset }),
+    mutationFn: (v: IssueJwtInput) => issue({ label: v.label || undefined, ttl: v.preset === 'custom' ? v.custom : v.preset }),
     onSuccess: (reply) => {
       setIssued(reply);
       setServerError(null);
       for (const k of invalidateKeys) qc.invalidateQueries({ queryKey: [...k] });
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
+      if (formatError) setServerError(formatError(err));
+      else setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -73,7 +102,7 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
 
   function onSubmit(v: IssueJwtInput) {
     const ttl = v.preset === 'custom' ? v.custom : v.preset;
-    if (durationSeconds(ttl) > ttlMaxSeconds) {
+    if (ttlMaxSeconds !== undefined && durationSeconds(ttl) > ttlMaxSeconds) {
       setError(v.preset === 'custom' ? 'custom' : 'preset', { message: 'profile:ttlAboveMax' });
       return;
     }
@@ -122,6 +151,7 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
           <Button
             type="button"
             aria-label={t('profile:copyTokenAria')}
+            data-testid="issued-copy"
             onClick={() => {
               if (navigator?.clipboard?.writeText) {
                 void navigator.clipboard.writeText(issued.jwt);
@@ -142,7 +172,7 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
   return (
     <Modal
       open={open}
-      title={t('profile:issueTitle')}
+      title={aid ? t('profile:issueForTitle', { aid }) : t('profile:issueTitle')}
       onClose={close}
       footer={
         <>
@@ -158,7 +188,7 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
       <form id="issue-jwt-form" onSubmit={handleSubmit(onSubmit)} className={styles.formFields}>
         <Input
           label={t('profile:fieldLabel')}
-          hint={t('profile:fieldLabelHint')}
+          hint={aid ? t('profile:fieldLabelHintOther') : t('profile:fieldLabelHint')}
           placeholder={t('profile:fieldLabelPlaceholder')}
           data-testid="issue-jwt-label"
           error={errors.label?.message ? t(errors.label.message) : undefined}
@@ -168,7 +198,7 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
           <legend style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{t('profile:fieldTTL')}</legend>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {PRESETS.map((p) => {
-              const over = durationSeconds(p) > ttlMaxSeconds;
+              const over = !fits(p, ttlMaxSeconds);
               return (
                 <label key={p} style={{ fontSize: 13, opacity: over ? 0.45 : 1 }}>
                   <input type="radio" value={p} disabled={over} data-testid={`issue-jwt-preset-${p}`} {...register('preset')} />{' '}
@@ -187,13 +217,13 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
                 placeholder="45d"
                 data-testid="issue-jwt-custom"
                 aria-label={t('profile:presetCustom')}
-                error={errors.custom?.message ? t(errors.custom.message, { max: humanSeconds(ttlMaxSeconds) }) : undefined}
+                error={errors.custom?.message ? t(errors.custom.message, { max: ceiling }) : undefined}
                 {...register('custom')}
               />
             </div>
           ) : null}
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }} data-testid="issue-jwt-ceiling">
-            {t('profile:ttlCeiling', { max: humanSeconds(ttlMaxSeconds) })}
+            {ttlMaxSeconds === undefined ? t('profile:ttlServerCeiling') : t('profile:ttlCeiling', { max: ceiling })}
           </div>
           {expiresBy ? (
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }} data-testid="issue-jwt-expires-by">
@@ -201,11 +231,11 @@ export function IssueJwtModal({ open, ttlMaxSeconds, expiresBy, onClose, invalid
             </div>
           ) : null}
           {errors.preset?.message ? (
-            <div className={styles.errorBox}>{t(errors.preset.message, { max: humanSeconds(ttlMaxSeconds) })}</div>
+            <div className={styles.errorBox}>{t(errors.preset.message, { max: ceiling })}</div>
           ) : null}
         </fieldset>
         {serverError ? (
-          <div className={styles.errorBox} role="alert">
+          <div className={styles.errorBox} role="alert" data-testid="issue-jwt-error">
             {serverError}
           </div>
         ) : null}

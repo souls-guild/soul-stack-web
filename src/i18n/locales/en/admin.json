@@ -93,6 +93,7 @@
   "auditEventLabel_operator_created": "Archon created",
   "auditEventLabel_operator_jwt-revoked": "One token of an Archon revoked",
   "auditEventLabel_operator_login": "Archon signed in",
+  "auditEventLabel_operator_owner-set": "Owner of a machine Archon set, changed or cleared",
   "auditEventLabel_operator_password-changed": "Archon changed their own password",
   "auditEventLabel_operator_password-set": "Archon password set by an administrator",
   "auditEventLabel_operator_provisioned": "Archon auto-created on first federated sign-in",

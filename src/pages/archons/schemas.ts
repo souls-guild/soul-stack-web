@@ -22,3 +22,12 @@ export const createArchonSchema = z.object({
 });
 
 export type CreateArchonFormValues = z.infer<typeof createArchonSchema>;
+
+// The owner of a machine operator (PUT /v1/operators/{aid}/owner). Messages are
+// i18n keys, translated where they are shown.
+export const ownerSchema = z.object({
+  kind: z.enum(['archon', 'synod']),
+  value: z.string().trim().min(1, 'pages:archonOwnerRequired'),
+});
+
+export type OwnerFormValues = z.infer<typeof ownerSchema>;

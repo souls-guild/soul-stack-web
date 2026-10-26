@@ -76,6 +76,7 @@ omen.revoked
 operator.created
 operator.jwt-revoked
 operator.login
+operator.owner-set
 operator.password-changed
 operator.password-set
 operator.provisioned

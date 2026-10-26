@@ -36,6 +36,7 @@
   "synodBuiltin": "Builtin Synods cannot be deleted (server-protected).",
   "synodLockout": "Removing/modifying would leave the cluster without a `*`-admin (self-lockout protection).",
   "synodNotFound": "Synod not found.",
+  "synodOwnsOperators": "The Synod owns machine Archons: give them another owner or clear it first. Keeper: {{detail}}",
   "synodSubsetDenied": "Cannot grant a permission you don't have yourself (subset-check escalation, 403).",
   "unknown": "Unknown error.",
   "validation": "Validation: {{detail}}"

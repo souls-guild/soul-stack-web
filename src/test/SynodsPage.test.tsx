@@ -348,6 +348,31 @@ describe('SynodsList', () => {
     expect(alert).toHaveTextContent(/lock-?out|admin/i);
   });
 
+  it('Delete 409 synod-owns-operators → the operators it owns, from the detail', async () => {
+    recordingFetch({
+      conflict: {
+        path: /^\/v1\/synods\/ops-team$/,
+        method: 'DELETE',
+        status: 409,
+        type: 'https://soul-stack.com/errors/synod-owns-operators',
+        // "admin" in an AID must not read as the lock-out case.
+        detail: 'synod owns operators; give them another owner or clear it first: admin-bot, sd-gateway',
+      },
+    });
+    renderWithProviders(<SynodsList />, '/synods');
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getByText('ops-team')).toBeInTheDocument());
+    await user.click(screen.getByTestId('delete-synod-ops-team'));
+    const dialog = await screen.findByRole('dialog', { name: /Delete Synod: ops-team/i });
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }));
+
+    const alert = await within(dialog).findByTestId('delete-synod-error');
+    expect(alert).toHaveTextContent('owns machine Archons');
+    expect(alert).toHaveTextContent('admin-bot, sd-gateway');
+    expect(alert).not.toHaveTextContent(/self-lockout/i);
+  });
+
   it('Add-operator: POST /v1/synods/{name}/operators with {aid} (typeahead select)', async () => {
     const calls = recordingFetch({});
     renderWithProviders(<SynodsList />, '/synods');

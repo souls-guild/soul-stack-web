@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,7 +6,6 @@ import { X } from 'lucide-react';
 import {
   keeperApi,
   type OperatorCreateReply,
-  type IssueTokenReply,
   type OperatorAuthMethod,
   type OperatorCreatedVia,
   type Operator,
@@ -14,7 +13,10 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { Badge, Button, Input, Pager } from '../../components/primitives';
+import { IssueJwtModal } from '../profile/IssueJwtModal';
 import { RevokeArchonModal } from './RevokeArchonModal';
+import { OwnerPicker } from './OwnerPicker';
+import { isMachineOperator, ownerBody, type OwnerKind } from './owner';
 import { AID_PATTERN } from './schemas';
 import styles from '../common.module.css';
 
@@ -51,7 +53,7 @@ function createdViaTone(v: OperatorCreatedVia | string | undefined):
 }
 
 // JWT is given out once — we show it in a modal block with a copy button.
-function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: string; onClose: () => void }) {
+function JwtReveal({ jwt, onClose }: { jwt: string; onClose: () => void }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   return (
@@ -84,9 +86,6 @@ function JwtReveal({ jwt, expiresAt, onClose }: { jwt: string; expiresAt?: strin
           resize: 'vertical',
         }}
       />
-      {expiresAt ? (
-        <div className={styles.metaKey}>expires_at: <span className="mono">{expiresAt}</span></div>
-      ) : null}
       <div style={{ display: 'flex', gap: 8 }}>
         <Button
           variant="primary"
@@ -214,9 +213,32 @@ function RolesPicker({
   );
 }
 
+function OwnerCell({ op }: { op: Operator }) {
+  const { t } = useTranslation();
+  if (op.owner_aid) {
+    return (
+      <Link to={`/archons/${encodeURIComponent(op.owner_aid)}`} className="mono">
+        {op.owner_aid}
+      </Link>
+    );
+  }
+  if (op.owner_synod) {
+    return (
+      <>
+        <Link to={`/synods/${encodeURIComponent(op.owner_synod)}`} className="mono">
+          {op.owner_synod}
+        </Link>
+        <Badge tone="info">{t('pages:archonOwnerKindSynod')}</Badge>
+      </>
+    );
+  }
+  if (isMachineOperator(op)) return <Badge tone="muted">{t('pages:archonNoOwner')}</Badge>;
+  return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+}
+
 function ArchonsTable({ items, onIssue, onRevoke }: {
   items: Operator[];
-  onIssue: (aid: string) => void;
+  onIssue: (op: Operator) => void;
   onRevoke: (aid: string) => void;
 }) {
   const { t } = useTranslation();
@@ -228,6 +250,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
           <th>{t('pages:archonDisplayName')}</th>
           <th>{t('colAuth')}</th>
           <th>{t('admin:archonCreatedVia')}</th>
+          <th>{t('pages:archonColOwner')}</th>
           <th>{t('colCreated')}</th>
           <th>{t('colCreatedBy')}</th>
           <th>{t('colRevoked')}</th>
@@ -259,6 +282,11 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
                   <span style={{ color: 'var(--text-faint)' }}>—</span>
                 )}
               </td>
+              <td>
+                <span data-testid={`owner-${op.aid}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <OwnerCell op={op} />
+                </span>
+              </td>
               <td className="mono">{op.created_at}</td>
               <td className="mono">{op.created_by_aid ?? '—'}</td>
               <td className="mono">{op.revoked_at ?? '—'}</td>
@@ -268,7 +296,7 @@ function ArchonsTable({ items, onIssue, onRevoke }: {
                   <button
                     data-testid={`issue-token-${op.aid}`}
                     disabled={revoked}
-                    onClick={() => onIssue(op.aid)}
+                    onClick={() => onIssue(op)}
                     title={revoked ? t('issueTokenDisabled') : t('issueTokenTitle')}
                     style={{
                       padding: '4px 8px',
@@ -317,13 +345,16 @@ export function ArchonsList() {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   // Hint: backend rejected roles[] (404/501) — the Archon was still created without roles.
   const [rolesUnsupported, setRolesUnsupported] = useState(false);
-  const [revealed, setRevealed] = useState<{ jwt: string; expiresAt?: string } | null>(null);
+  const [revealed, setRevealed] = useState<{ jwt: string } | null>(null);
   // How the new Archon logs in. `local` is offered only when this Keeper has
   // auth.local (GET /auth/methods): it gets a password and no token.
   const [newMethod, setNewMethod] = useState<'jwt' | 'local'>('jwt');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordRepeat, setNewPasswordRepeat] = useState('');
   const [createdLocal, setCreatedLocal] = useState<string | null>(null);
+  // Optional owner of a new token-only Archon; '' kind = no owner.
+  const [newOwnerKind, setNewOwnerKind] = useState<OwnerKind | ''>('');
+  const [newOwner, setNewOwner] = useState('');
   const methodsQ = useQuery({
     queryKey: ['auth.methods'],
     queryFn: () => keeperApi.auth.methods(),
@@ -355,15 +386,27 @@ export function ArchonsList() {
   const [limit, setLimit] = useState(50);
   const [offset, setOffset] = useState(0);
   const [revokingAid, setRevokingAid] = useState<string | null>(null);
+  const [issueFor, setIssueFor] = useState<Operator | null>(null);
+  // Owner filter: server-side (owner_aid / owner_synod), typed value debounced.
+  const [ownerKind, setOwnerKind] = useState<OwnerKind | ''>('');
+  const [ownerInput, setOwnerInput] = useState('');
+  const [owner, setOwner] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setOwner(ownerInput.trim()), 300);
+    return () => clearTimeout(id);
+  }, [ownerInput]);
+  const ownerFilter = ownerKind && owner ? owner : '';
 
   const list = useQuery({
-    queryKey: ['operators.list', { authMethod, hideRevoked, limit, offset }],
+    queryKey: ['operators.list', { authMethod, hideRevoked, limit, offset, ownerKind, ownerFilter }],
     queryFn: () =>
       keeperApi.operators.list({
         auth_method: authMethod || undefined,
         // hideRevoked=true → don't request revoked (API default = active only).
         // hideRevoked=false → revoked=true, so the backend also returns revoked ones.
         revoked: hideRevoked ? undefined : true,
+        owner_aid: ownerKind === 'archon' && ownerFilter ? ownerFilter : undefined,
+        owner_synod: ownerKind === 'synod' && ownerFilter ? ownerFilter : undefined,
         limit,
         offset,
       }),
@@ -373,7 +416,11 @@ export function ArchonsList() {
     mutationFn: async (): Promise<OperatorCreateReply> => {
       const base = creatingLocal
         ? { aid: aidNew, display_name: displayName, auth_method: 'local' as const, password: newPassword }
-        : { aid: aidNew, display_name: displayName };
+        : {
+            aid: aidNew,
+            display_name: displayName,
+            ...(newOwnerKind && newOwner ? ownerBody(newOwnerKind, newOwner) : {}),
+          };
       // If the operator selected roles — try with an extended payload. A backend
       // without create-with-roles support may respond 404/501 to the extended form:
       // in that case we create without roles and set the unsupported flag.
@@ -404,14 +451,9 @@ export function ArchonsList() {
       setAidNew('');
       setDisplayName('');
       setSelectedRoles([]);
+      setNewOwnerKind('');
+      setNewOwner('');
       qc.invalidateQueries({ queryKey: ['operators.list'] });
-    },
-  });
-
-  const issueMut = useMutation({
-    mutationFn: (aid: string) => keeperApi.operators.issueToken(aid),
-    onSuccess: (reply: IssueTokenReply) => {
-      setRevealed({ jwt: reply.jwt, expiresAt: reply.expires_at });
     },
   });
 
@@ -422,6 +464,7 @@ export function ArchonsList() {
   // its 422 says what it wants.
   const passwordMismatch = creatingLocal && newPasswordRepeat !== '' && newPassword !== newPasswordRepeat;
   const passwordValid = !creatingLocal || (newPassword !== '' && newPassword === newPasswordRepeat);
+  const ownerValid = creatingLocal || newOwnerKind === '' || newOwner !== '';
 
   const rawItems = list.data?.items ?? [];
   // Belt-and-suspenders: even if the backend returns revoked in the response, we
@@ -450,7 +493,7 @@ export function ArchonsList() {
       </div>
 
       {revealed ? (
-        <JwtReveal jwt={revealed.jwt} expiresAt={revealed.expiresAt} onClose={() => setRevealed(null)} />
+        <JwtReveal jwt={revealed.jwt} onClose={() => setRevealed(null)} />
       ) : null}
       {createdLocal ? (
         <div className={styles.section} role="status" data-testid="archon-created-local">
@@ -526,11 +569,23 @@ export function ArchonsList() {
                 data-testid="archon-create-password-repeat"
               />
             </>
-          ) : null}
+          ) : (
+            <div data-testid="archon-create-owner">
+              <div className={styles.metaKey}>{t('pages:archonOwnerOptional')}</div>
+              <OwnerPicker
+                kind={newOwnerKind}
+                value={newOwner}
+                onKindChange={setNewOwnerKind}
+                onValueChange={setNewOwner}
+                allowNone
+                testidPrefix="archon-create-owner"
+              />
+            </div>
+          )}
           <div style={{ alignSelf: 'flex-end' }}>
             <Button
               variant="primary"
-              disabled={!aidNewValid || !displayNameValid || !passwordValid || createMut.isPending}
+              disabled={!aidNewValid || !displayNameValid || !passwordValid || !ownerValid || createMut.isPending}
               onClick={() => { setRolesUnsupported(false); setCreatedLocal(null); createMut.mutate(); }}
             >
               {createMut.isPending ? t('creating') : t('create')}
@@ -591,6 +646,41 @@ export function ArchonsList() {
               {AUTH_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </label>
+          <label>
+            <div className={styles.metaKey}>{t('pages:archonColOwner')}</div>
+            <select
+              value={ownerKind}
+              data-testid="archon-filter-owner-kind"
+              onChange={(e) => { setOwnerKind(e.target.value as OwnerKind | ''); setOffset(0); }}
+              style={{ padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
+            >
+              <option value="">{t('pages:archonAllOption')}</option>
+              <option value="archon">{t('pages:archonOwnerKindArchon')}</option>
+              <option value="synod">{t('pages:archonOwnerKindSynod')}</option>
+            </select>
+          </label>
+          {ownerKind ? (
+            <label>
+              <div className={styles.metaKey}>
+                {ownerKind === 'archon' ? t('pages:archonOwnerFilterAid') : t('pages:archonOwnerFilterSynod')}
+              </div>
+              <input
+                type="text"
+                value={ownerInput}
+                data-testid="archon-filter-owner"
+                onChange={(e) => { setOwnerInput(e.target.value); setOffset(0); }}
+                placeholder={ownerKind === 'archon' ? t('pages:archonAidPlaceholder') : t('synods:namePlaceholder')}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  fontFamily: 'var(--font-mono)',
+                  minWidth: 180,
+                }}
+              />
+            </label>
+          ) : null}
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span className={styles.metaKey}>{t('pages:archonHideRevoked')}</span>
             <input
@@ -639,21 +729,24 @@ export function ArchonsList() {
           <>
             <ArchonsTable
               items={items}
-              onIssue={(aid) => issueMut.mutate(aid)}
+              onIssue={setIssueFor}
               onRevoke={(aid) => setRevokingAid(aid)}
             />
             <Pager offset={offset} limit={limit} total={total} shown={items.length} onChange={setOffset} />
           </>
         ) : null}
-
-        {issueMut.error ? (
-          <div className={styles.errorBox}>
-            {issueMut.error instanceof ApiError
-              ? `Error ${issueMut.error.status}: ${issueMut.error.message}`
-              : String(issueMut.error)}
-          </div>
-        ) : null}
       </section>
+
+      {issueFor ? (
+        <IssueJwtModal
+          open
+          aid={issueFor.aid}
+          issue={(body) => keeperApi.operators.issueToken(issueFor.aid, body)}
+          defaultPreset={isMachineOperator(issueFor) ? '90d' : undefined}
+          invalidateKeys={[['operator.jwts', issueFor.aid]]}
+          onClose={() => setIssueFor(null)}
+        />
+      ) : null}
 
       {revokingAid ? (
         <RevokeArchonModal

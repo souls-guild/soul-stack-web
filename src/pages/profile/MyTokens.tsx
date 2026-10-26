@@ -86,6 +86,7 @@ export function MyTokens() {
 
       <IssueJwtModal
         open={issueOpen}
+        issue={(body) => keeperApi.me.jwts.issue(body)}
         ttlMaxSeconds={terms.data?.personal_ttl_max_seconds ?? 0}
         expiresBy={terms.data?.personal_expires_by}
         onClose={() => setIssueOpen(false)}

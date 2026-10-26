@@ -34,6 +34,8 @@ interface Props {
   onRevoked?: (row: OperatorJWT) => void;
   // Lets a parent refetch its own queries (counts, ceilings) after a revoke.
   invalidateKeys?: readonly (readonly unknown[])[];
+  // Words a refused revoke for the route at hand; the generic status line otherwise.
+  formatError?: (err: unknown) => string;
 }
 
 function stateOf(row: OperatorJWT, now: number): JWTState {
@@ -65,6 +67,7 @@ export function JwtList({
   revoke,
   onRevoked,
   invalidateKeys = [],
+  formatError,
 }: Props) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -107,7 +110,8 @@ export function JwtList({
       onRevoked?.(row);
     },
     onError: (err) => {
-      setRevokeError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
+      if (formatError) setRevokeError(formatError(err));
+      else setRevokeError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
 
@@ -307,7 +311,7 @@ export function JwtList({
               </div>
             ) : null}
             {revokeError ? (
-              <div className={styles.errorBox} role="alert">
+              <div className={styles.errorBox} role="alert" data-testid="jwt-revoke-error">
                 {revokeError}
               </div>
             ) : null}

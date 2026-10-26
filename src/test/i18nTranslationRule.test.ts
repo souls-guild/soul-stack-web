@@ -35,6 +35,7 @@ const ENTITY_NAMES = [
   'incarnations:tabChoirs', 'incarnations:voices', 'incarnations:colCovens',
   'incarnations:colTraits', 'incarnations:pageTitle',
   'notifications:heraldTitle', 'notifications:tidingTitle', 'notifications:heraldLinkLabel',
+  'pages:archonOwnerKindArchon', 'pages:archonOwnerKindSynod',
   'pages:overviewIncarnations', 'pages:overviewServicesCount',
   'run:stepIncarnations',
   'runhistory:filterServiceLabel', 'runhistory:runColPassage',
@@ -153,7 +154,7 @@ const SCAN_DIRS = ['src/pages', 'src/components'];
 const WIRE_FIELD_LABELS = [
   'arch', 'attempt', 'available_mb', 'batch_size', 'by', 'changed', 'cleanup_stale',
   'codename', 'collected_at', 'concurrency', 'count', 'coven', 'covens', 'created_at', 'destiny',
-  'distro', 'dry_run', 'duration_ms', 'error', 'exit_code', 'expires_at', 'expires_at: ',
+  'distro', 'dry_run', 'duration_ms', 'error', 'exit_code', 'expires_at',
   'family', 'finished_at', 'fqdn', 'hostname', 'init_system', 'keys', 'kind', 'label',
   'labels', 'matched', 'mode', 'model', 'module', 'on_failure', 'pkg_mgr', 'primary_ip',
   'received_at', 'recursive', 'release', 'scenario', 'scope_size', 'sid', 'ssh_provider',

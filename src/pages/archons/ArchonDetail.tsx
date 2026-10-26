@@ -10,6 +10,8 @@ import { JsonViewer } from '../../components/JsonViewer';
 import { RevokeArchonModal } from './RevokeArchonModal';
 import { ArchonTokensTab } from './ArchonTokensTab';
 import { ArchonPasswordSection } from './ArchonPasswordSection';
+import { ArchonOwnerSection } from './ArchonOwnerSection';
+import { isMachineOperator } from './owner';
 import { AssignRoleModal } from '../rbac/AssignRoleModal';
 import { prettyRbacError } from '../rbac/errors';
 import styles from '../common.module.css';
@@ -105,6 +107,7 @@ export function ArchonDetail() {
   if (!op) return <div className={styles.empty}>{t('errors:archonNotFound')}</div>;
 
   const revoked = Boolean(op.revoked_at);
+  const machine = isMachineOperator(op);
   const hasMetadata = op.metadata && Object.keys(op.metadata).length > 0;
 
   return (
@@ -302,6 +305,7 @@ export function ArchonDetail() {
               </div>
             )}
           </section>
+          {machine || op.owner_aid || op.owner_synod ? <ArchonOwnerSection op={op} /> : null}
           {op.auth_method === 'local' && !revoked ? <ArchonPasswordSection aid={op.aid} /> : null}
           <section className={styles.section} aria-label={t('common:metadataAria')}>
             <h2 className={styles.sectionTitle}>{t('secMetadata')}</h2>
@@ -329,7 +333,7 @@ export function ArchonDetail() {
 
       {tab === 'tokens' ? (
         <section className={styles.section} aria-label={t('pages:archonTabTokens')}>
-          <ArchonTokensTab aid={op.aid} />
+          <ArchonTokensTab aid={op.aid} machine={machine} revoked={revoked} />
         </section>
       ) : null}
 

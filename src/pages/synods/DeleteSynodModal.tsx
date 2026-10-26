@@ -58,7 +58,7 @@ export function DeleteSynodModal({ open, synod, onClose }: Props) {
         {t('synods:deleteSynodConfirm', { name: synod.name })}
       </p>
       {serverError ? (
-        <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert">
+        <div className={styles.errorBox} style={{ marginTop: 12 }} role="alert" data-testid="delete-synod-error">
           {serverError}
         </div>
       ) : null}

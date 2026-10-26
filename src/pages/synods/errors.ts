@@ -3,7 +3,8 @@ import i18n from '../../i18n';
 
 /**
  * Decodes server errors from Synod operations into a human-readable message.
- * Codes: synod-already-exists / synod-builtin / would-lock-out-cluster / not-found.
+ * Codes: synod-already-exists / synod-builtin / would-lock-out-cluster /
+ * synod-owns-operators / not-found.
  * 403 subset-check: server rejected grant-role/add-operator (privilege escalation).
  */
 export function prettySynodError(err: unknown): string {
@@ -12,6 +13,11 @@ export function prettySynodError(err: unknown): string {
     if (err.status === 409) {
       const ty = (err.type || '').toLowerCase();
       const d = (err.detail || '').toLowerCase();
+      // Before the detail heuristics below: the detail names the operators, and
+      // an AID like "admin-bot" would read as the lock-out case.
+      if (ty.endsWith('/synod-owns-operators')) {
+        return t('errors:synodOwnsOperators', { detail: err.detail || err.message });
+      }
       if (ty.includes('lock-out') || d.includes('lock') || d.includes('admin')) {
         return t('errors:synodLockout');
       }

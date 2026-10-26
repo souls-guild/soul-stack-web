@@ -140,6 +140,8 @@ export interface JWTListQuery {
   limit?: number;
 }
 export type OperatorIssueTokenRequest = components['schemas']['OperatorIssueTokenRequest'];
+// PUT /v1/operators/{aid}/owner: exactly one of owner_aid / owner_synod.
+export type OperatorOwnerRequest = components['schemas']['OperatorOwnerRequest'];
 
 function jwtListQuery(q: JWTListQuery) {
   return { kind: q.kind, state: q.state, q: q.q, offset: q.offset, limit: q.limit };
@@ -1215,6 +1217,8 @@ export const keeperApi = {
           auth_method: query.auth_method,
           revoked: query.revoked,
           q: query.q,
+          owner_aid: query.owner_aid,
+          owner_synod: query.owner_synod,
           offset: query.offset,
           limit: query.limit,
         },
@@ -1228,9 +1232,16 @@ export const keeperApi = {
     // 204 — no body returned.
     revoke: (aid: string, body: OperatorRevokeRequest = {}) =>
       apiSend<void>(`/v1/operators/${encodeURIComponent(aid)}/revoke`, 'POST', { body }),
-    // 200 -> IssueTokenReply (jwt returned once).
-    issueToken: (aid: string) =>
-      apiSend<IssueTokenReply>(`/v1/operators/${encodeURIComponent(aid)}/issue-token`, 'POST'),
+    // 200 -> IssueTokenReply (jwt returned once). Without a ttl the token gets
+    // auth.jwt.ttl_default; a ttl above auth.jwt.ttl_max is a 422.
+    issueToken: (aid: string, body?: OperatorIssueTokenRequest) =>
+      apiSend<IssueTokenReply>(`/v1/operators/${encodeURIComponent(aid)}/issue-token`, 'POST', { body }),
+    // PUT / DELETE /v1/operators/{aid}/owner -> 204 (operator.set-owner). 422 — not a
+    // machine operator or a bad owner (the detail says which). PUT on a revoked
+    // operator is a 409; DELETE clears a revoked operator's owner too.
+    setOwner: (aid: string, body: OperatorOwnerRequest) =>
+      apiSend<void>(`/v1/operators/${encodeURIComponent(aid)}/owner`, 'PUT', { body }),
+    clearOwner: (aid: string) => apiSend<void>(`/v1/operators/${encodeURIComponent(aid)}/owner`, 'DELETE'),
     // PUT /v1/operators/{aid}/password -> 204 (operator.set-password). Ends every
     // web session of the target. 422 — not a local Archon / policy; 409 — revoked.
     setPassword: (aid: string, password: string) =>
@@ -1255,6 +1266,24 @@ export const keeperApi = {
       // 201 -> IssueTokenReply (the personal token, returned once).
       issue: (body: OperatorIssueTokenRequest) => apiSend<IssueTokenReply>('/v1/me/jwts', 'POST', { body }),
       revoke: (jwtId: string) => apiSend<void>(`/v1/me/jwts/${encodeURIComponent(jwtId)}/revoke`, 'POST'),
+    },
+    // Machine operators the caller owns, directly or through a Synod. 404 — not
+    // one the caller owns; 403 owner-lacks-permissions — the caller's rights do
+    // not cover the operator's; 403 personal-jwt-from-personal — the request
+    // came with a personal token; 409 — the operator is revoked.
+    operators: {
+      list: (query: { offset?: number; limit?: number } = {}) =>
+        apiGet<OperatorListReply>('/v1/me/operators', { query: { offset: query.offset, limit: query.limit } }),
+      jwts: (aid: string, query: JWTListQuery = {}) =>
+        apiGet<OperatorJWTListReply>(`/v1/me/operators/${encodeURIComponent(aid)}/jwts`, { query: jwtListQuery(query) }),
+      // 201 -> IssueTokenReply (returned once).
+      issueJwt: (aid: string, body: OperatorIssueTokenRequest) =>
+        apiSend<IssueTokenReply>(`/v1/me/operators/${encodeURIComponent(aid)}/jwts`, 'POST', { body }),
+      revokeJwt: (aid: string, jwtId: string) =>
+        apiSend<void>(
+          `/v1/me/operators/${encodeURIComponent(aid)}/jwts/${encodeURIComponent(jwtId)}/revoke`,
+          'POST',
+        ),
     },
     // The caller's web sessions (tokens of kind session): listed and ended one
     // at a time through jwts above; this ends them all at once — with
@@ -1649,6 +1678,8 @@ export interface ListOperatorsQuery {
   // Full-text over aid/display_name (typeahead). Local extension until the
   // gen:api regen; after the regen it will match the native q?: string.
   q?: string;
+  owner_aid?: string;
+  owner_synod?: string;
   offset?: number;
   limit?: number;
 }

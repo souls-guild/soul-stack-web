@@ -1280,6 +1280,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Operators you own
+         * @description The active machine operators the caller owns, directly (owner_aid) or through a Synod it is a person member of (owner_synod; a machine operator owns nothing through a Synod), by AID (ADR-014 amendment NIM-1057). No permission. Read-only, no audit.
+         */
+        get: operations["listMyOperators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/operators/{aid}/jwts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tokens of an operator you own
+         * @description GET /v1/operators/{aid}/jwts for an operator the caller owns, without operator.list (ADR-014 amendment NIM-1057). Same filters. 404 - not an operator the caller owns. Read-only, no audit.
+         */
+        get: operations["listMyOperatorJWTs"];
+        put?: never;
+        /**
+         * Issue a token of an operator you own
+         * @description Mints a token (kind issued) of an operator the caller owns, without operator.issue-token (ADR-014 amendment NIM-1057). Optional body: ttl (up to auth.jwt.ttl_max; omitted -> auth.jwt.ttl_default) and label. The caller's effective permissions must cover the operator's (403 owner-lacks-permissions, naming the first one missing), and the request must not be made with a personal token (403 personal-jwt-from-personal) or with a token already revoked in the database (401 jwt-revoked). 404 - not an operator the caller owns. 409 - operator revoked. Returns the JWT once.
+         */
+        post: operations["issueMyOperatorJWT"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/operators/{aid}/jwts/{jwt_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke one token of an operator you own
+         * @description POST /v1/operators/{aid}/jwts/{jwt_id}/revoke for an operator the caller owns, without operator.jwt-revoke (ADR-014 amendment NIM-1057): the token is refused (401 jwt-revoked) on its next request on every Keeper node. 404 - not an operator the caller owns, or not a token of it. 409 - already revoked.
+         */
+        post: operations["revokeMyOperatorJWT"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/password": {
         parameters: {
             query?: never;
@@ -1499,6 +1563,30 @@ export interface paths {
          */
         post: operations["revokeOperatorJWT"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/operators/{aid}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the owner of a machine operator
+         * @description Sets or replaces the owner of an operator with auth_method jwt created through the Operator API (ADR-014 amendment NIM-1057): one person (owner_aid) or one Synod (owner_synod). The owner issues and revokes the operator's tokens under /v1/me/operators without operator.issue-token; it issues only while its own permissions cover the operator's, and revokes regardless. Not restricted by target. 404 - no such AID. 409 - operator revoked (DELETE still clears its owner). 422 - not a machine operator, both or neither field, the operator itself, an unknown or revoked Archon, an Archon that does not sign in itself, an unknown Synod.
+         */
+        put: operations["setOperatorOwner"];
+        post?: never;
+        /**
+         * Clear the owner of a machine operator
+         * @description Leaves a machine operator without an owner (ADR-014 amendment NIM-1057); its tokens stay. Idempotent: an operator with no owner answers 204 too. Works on a revoked operator, so a Synod that owned it can be deleted. 404 - no such AID. 422 - not a machine operator.
+         */
+        delete: operations["clearOperatorOwner"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2850,7 +2938,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.sessions-revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.owner-set" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.sessions-revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -4011,6 +4099,10 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             };
+            /** @description the person who owns this machine operator and rotates its tokens (NIM-1057); exclusive with owner_synod */
+            owner_aid?: string;
+            /** @description the Synod whose members (those who sign in themselves) own this machine operator and rotate its tokens (NIM-1057); exclusive with owner_aid */
+            owner_synod?: string;
             /** Format: date-time */
             revoked_at?: string;
         };
@@ -4039,6 +4131,10 @@ export interface components {
             display_name?: string;
             /** @description free text shown in the operator's token list ("Service Desk prod") */
             label?: string;
+            /** @description only with auth_method jwt: the person (an active Archon with auth_method local, ldap or oidc) who owns the new operator and rotates its tokens (NIM-1057); exclusive with owner_synod */
+            owner_aid?: string;
+            /** @description only with auth_method jwt: the Synod whose members (those who sign in themselves) own the new operator and rotate its tokens (NIM-1057); exclusive with owner_aid */
+            owner_synod?: string;
             /**
              * Format: password
              * @description initial local password, required with auth_method local (never logged, never returned)
@@ -4113,6 +4209,12 @@ export interface components {
              * @description total number of entries in set
              */
             total: number;
+        };
+        OperatorOwnerRequest: {
+            /** @description the person who owns the operator: an active Archon with auth_method local, ldap or oidc, not the operator itself; exclusive with owner_synod */
+            owner_aid?: string;
+            /** @description the Synod whose members (those who sign in themselves) own the operator; exclusive with owner_aid */
+            owner_synod?: string;
         };
         OperatorPasswordRequest: {
             /**
@@ -10668,6 +10770,277 @@ export interface operations {
             };
         };
     };
+    listMyOperators: {
+        parameters: {
+            query?: {
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description page size 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listMyOperatorJWTs: {
+        parameters: {
+            query?: {
+                /** @description multi-value ?kind=personal&kind=issued - exact-match OR; value outside enum -> 422 */
+                kind?: ("bootstrap" | "issued" | "session" | "personal")[] | null;
+                /** @description active - neither revoked nor expired; revoked - revoked (expired since or not); expired - expired without being revoked; omitted -> every state */
+                state?: "active" | "revoked" | "expired";
+                /** @description case-insensitive substring of the label; empty -> no filter */
+                q?: string;
+                /** @description offset from start of set, ≥0 (out-of-range → 400) */
+                offset?: number;
+                /** @description page size 1..1000 (out-of-range → 400) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description AID of an operator the caller owns */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorJWTListReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    issueMyOperatorJWT: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID of an operator the caller owns */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OperatorIssueTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssueTokenReply"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    revokeMyOperatorJWT: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID of the Archon the token belongs to */
+                aid: string;
+                /** @description jwt_id of the token (its jti) */
+                jwt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     changeMyPassword: {
         parameters: {
             query?: never;
@@ -11005,6 +11378,10 @@ export interface operations {
                 revoked?: boolean;
                 /** @description free search over display_name/aid (substring, case-insensitive); empty -> no filter */
                 q?: string;
+                /** @description only the operators this person owns (NIM-1057); empty -> no filter */
+                owner_aid?: string;
+                /** @description only the operators this Synod owns (NIM-1057); empty -> no filter */
+                owner_synod?: string;
                 /** @description offset from start of set, ≥0 (matches shared/api.ParsePage; out-of-range → 400) */
                 offset?: number;
                 /** @description page size 1..1000 (matches shared/api.ParsePage; out-of-range → 400) */
@@ -11401,6 +11778,142 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    setOperatorOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID of the machine operator (auth_method jwt) */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorOwnerRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    clearOperatorOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description AID of the machine operator (auth_method jwt) */
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
