@@ -36,7 +36,8 @@ export function installFetchMock(routes: FetchRoute[]): void {
         });
       }
       const status = route.status ?? 200;
-      const body = route.body === undefined ? '' : JSON.stringify(route.body);
+      // A 204 must carry a null body: the Response constructor refuses any other.
+      const body = status === 204 ? null : route.body === undefined ? '' : JSON.stringify(route.body);
       return new Response(body, {
         status,
         headers: { 'Content-Type': 'application/json' },

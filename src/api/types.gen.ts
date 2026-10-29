@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Operator login via LDAP
-         * @description Federated authentication (ADR-058): LDAP search-bind -> mapping onto operators(aid)+roles -> internal JWT in HttpOnly+Secure cookie. Response body is empty.
+         * @description Federated authentication (ADR-058): LDAP search-bind -> mapping onto operators(aid)+roles -> internal JWT in the HttpOnly soul_session cookie (Secure unless keeper.yml auth.insecure_cookies). Response body is empty.
          */
         post: operations["ldapLogin"];
         delete?: never;
@@ -35,7 +35,7 @@ export interface paths {
         put?: never;
         /**
          * Operator login with a local password
-         * @description NIM-1051: checks the AID's local password (argon2id) and puts an internal JWT into the HttpOnly+Secure soul_session cookie; exchange it at POST /auth/token. Only operators with auth_method=local log in here. Every credential refusal is the same 401, including a password reset that landed between the check and the session. 413 - body over 4 KiB (while the login rate limit runs). Mounted only when auth.local is configured. Response body is empty.
+         * @description NIM-1051: checks the AID's local password (argon2id) and puts an internal JWT into the HttpOnly soul_session cookie (Secure unless keeper.yml auth.insecure_cookies); exchange it at POST /auth/token. Only operators with auth_method=local log in here. Every credential refusal is the same 401, including a password reset that landed between the check and the session. 413 - body over 4 KiB (while the login rate limit runs). Mounted only when auth.local is configured. Response body is empty.
          */
         post: operations["localLogin"];
         delete?: never;
@@ -848,6 +848,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/incarnations/{id}/freezes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the incarnation's freezes
+         * @description Every freeze of the incarnation, past ones included, ordered by start. During a freeze no automatic run starts, with or without windows; a forced run needs explicit consent. Permission incarnation.get. Read-only, no audit.
+         */
+        get: operations["listIncarnationFreezes"];
+        put?: never;
+        /**
+         * Add a freeze to an incarnation
+         * @description Adds the freeze [starts_at, ends_at). 422 when ends_at is not after starts_at or the incarnation already has 200 freezes. Audit freeze.created. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         */
+        post: operations["createIncarnationFreeze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{id}/freezes/{freeze_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace a freeze
+         * @description Replaces every field of the freeze. 404 when no freeze with that id belongs to this incarnation. Audit freeze.updated, with the fields before the change under `previous`. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         */
+        put: operations["updateIncarnationFreeze"];
+        post?: never;
+        /**
+         * Delete a freeze
+         * @description Deletes the freeze. Not idempotent: deleting it again is 404. Audit freeze.deleted. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         */
+        delete: operations["deleteIncarnationFreeze"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/incarnations/{id}/history": {
         parameters: {
             query?: never;
@@ -883,6 +931,54 @@ export interface paths {
         put: operations["setIncarnationLabel"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{id}/maintenance-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the incarnation's maintenance windows
+         * @description Every maintenance window of the incarnation in creation order, plus `status`: whether a run may start now (`open_now`), the first instant it may (`next_start`, now itself when open) and the freeze in force (`active_freeze`). The status is computed over the windows AND the freezes: no windows means any time, and a freeze closes everything while it lasts. A window gates the start of a run; a started run is never cut off when the slot ends. Permission incarnation.get. Read-only, no audit.
+         */
+        get: operations["listIncarnationMaintenanceWindows"];
+        put?: never;
+        /**
+         * Add a maintenance window to an incarnation
+         * @description Adds a weekly slot set: on each listed day a slot starts at start_time in timezone and lasts duration_minutes (may cross midnight). 422 on a refused field or when the incarnation already has 50 windows. Audit maintenance_window.created. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         */
+        post: operations["createIncarnationMaintenanceWindow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incarnations/{id}/maintenance-windows/{window_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace a maintenance window
+         * @description Replaces every field of the window. 404 when no window with that id belongs to this incarnation. Audit maintenance_window.updated, with the fields before the change under `previous`. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         */
+        put: operations["updateIncarnationMaintenanceWindow"];
+        post?: never;
+        /**
+         * Delete a maintenance window
+         * @description Deletes the window. Not idempotent: deleting it again is 404. Deleting the last window makes the incarnation open at any time outside a freeze. Audit maintenance_window.deleted. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         */
+        delete: operations["deleteIncarnationMaintenanceWindow"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2938,7 +3034,7 @@ export interface components {
              * @description Audit event type, `<area>.<action>` (docs/naming-rules.md -> Audit-events). The enum is the full catalog keeper can write, generated from the audit event-type declarations; the catalog is open, so a new release may add values.
              * @enum {string}
              */
-            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.owner-set" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.sessions-revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
+            type: "apply.cancelled" | "apply.dispatched" | "apply.host_dropped" | "audit.disabled" | "audit.enabled" | "augur.access_denied" | "augur.fetch_brokered" | "bootstrap.delivered" | "bootstrap.issued" | "cadence.created" | "cadence.deleted" | "cadence.skipped_forbidden" | "cadence.skipped_no_window" | "cadence.skipped_overlap" | "cadence.spawned" | "cadence.updated" | "cert.issued" | "cert.registered" | "cert.rotated" | "choir.created" | "choir.deleted" | "choir.voice_added" | "choir.voice_removed" | "cloud.provisioned" | "cluster.degraded_cleared" | "cluster.degraded_set" | "command_run.cancelled" | "command_run.completed" | "command_run.failed" | "command_run.invoked" | "command_run.partial_failed" | "config.reload_failed" | "config.reload_succeeded" | "console.closed" | "console.command" | "console.opened" | "console.recording-read" | "decree.circuit_tripped" | "decree.created" | "decree.deleted" | "decree.label_changed" | "errand.cancelled" | "errand.completed" | "errand.failed" | "errand.invoked" | "errand.timed_out" | "eventstream.lease_force_released" | "freeze.created" | "freeze.deleted" | "freeze.updated" | "herald.created" | "herald.deleted" | "herald.delivered" | "herald.failed" | "herald.label_changed" | "herald.updated" | "incarnation.created" | "incarnation.destroy_completed" | "incarnation.destroy_failed" | "incarnation.destroy_started" | "incarnation.label_changed" | "incarnation.member_bound" | "incarnation.member_unbound" | "incarnation.rerun_last" | "incarnation.run_completed" | "incarnation.scenario_started" | "incarnation.secret_revealed" | "incarnation.traits_changed" | "incarnation.unlocked" | "incarnation.upgrade_started" | "input.vault_resolved" | "ldap_sync.settings_changed" | "maintenance_window.created" | "maintenance_window.deleted" | "maintenance_window.updated" | "omen.created" | "omen.label_changed" | "omen.revoked" | "operator.created" | "operator.jwt-revoked" | "operator.login" | "operator.owner-set" | "operator.password-changed" | "operator.password-set" | "operator.provisioned" | "operator.revoked" | "operator.roles-synced" | "operator.sessions-revoked" | "operator.token-issued" | "oracle.fired" | "plugin.allowed" | "plugin.revoked" | "profile.created" | "profile.deleted" | "profile.label_changed" | "provider.created" | "provider.deleted" | "provider.label_changed" | "provisioning.policy_changed" | "push-provider.created" | "push-provider.deleted" | "push-provider.imported_from_config" | "push-provider.label_changed" | "push-provider.updated" | "push.applied" | "push.completed" | "push.failed" | "push.partial_failed" | "reaper.reconcile_orphan_applying.executed" | "rite.created" | "rite.revoked" | "role.created" | "role.deleted" | "role.operator-granted" | "role.operator-revoked" | "role.permissions-updated" | "run.completed" | "scenario_run.cancelled" | "scenario_run.completed" | "scenario_run.failed" | "scenario_run.lease_lost" | "scenario_run.leg_completed" | "scenario_run.leg_started" | "scenario_run.partial_failed" | "scenario_run.started" | "service.deregistered" | "service.label_changed" | "service.registered" | "service.updated" | "setting.deleted" | "setting.updated" | "sigil.key-introduced" | "sigil.key-primary-set" | "sigil.key-retired" | "soul.bootstrapped" | "soul.coven-changed" | "soul.created" | "soul.forgotten" | "soul.seed-issued" | "soul.seed-rotated" | "soul.ssh-target.imported_from_config" | "soul.ssh-target.updated" | "soul.token-issued" | "soul.traits-changed" | "soulprint.received" | "ssh.run" | "synod.created" | "synod.deleted" | "synod.operator-added" | "synod.operator-removed" | "synod.role-granted" | "synod.role-revoked" | "synod.updated" | "task.executed" | "tiding.created" | "tiding.deleted" | "tiding.label_changed" | "tiding.updated" | "vault.kv-absent" | "vault.kv-present" | "vault.kv-read" | "vigil.created" | "vigil.deleted" | "vigil.label_changed" | "voyage.reclaimed";
         };
         AuditEventListReply: {
             items: components["schemas"]["AuditEvent"][] | null;
@@ -2988,6 +3084,8 @@ export interface components {
             fail_threshold?: number;
             /** Format: int64 */
             fail_threshold_percent?: number;
+            /** @description each spawn is deferred to the first moment every target incarnation is open (ADR-0093) */
+            in_maintenance_window: boolean;
             /** Format: int64 */
             interval_seconds?: number;
             /** @enum {string} */
@@ -3040,6 +3138,8 @@ export interface components {
             enabled?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
+            /** @description defer each spawn to the first moment every target incarnation is inside a maintenance window and outside a freeze; kind=scenario only (ADR-0093) */
+            in_maintenance_window?: boolean;
             /** @description recipe parameters */
             input?: {
                 [key: string]: unknown;
@@ -3122,6 +3222,8 @@ export interface components {
             enabled?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
+            /** @description defer each spawn to the first moment every target incarnation is inside a maintenance window and outside a freeze; kind=scenario only (ADR-0093) */
+            in_maintenance_window?: boolean;
             /** @description recipe parameters */
             input?: {
                 [key: string]: unknown;
@@ -3413,6 +3515,36 @@ export interface components {
         EventTypePoint: {
             name: string;
         };
+        Freeze: {
+            comment: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            /** @description freeze id (UUID) */
+            id: string;
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FreezeListReply: {
+            items: components["schemas"]["Freeze"][] | null;
+        };
+        FreezeRequest: {
+            /** @description free text, at most 500 characters */
+            comment?: string;
+            /**
+             * Format: date-time
+             * @description end of the freeze, RFC 3339 (exclusive); after starts_at
+             */
+            ends_at: string;
+            /**
+             * Format: date-time
+             * @description start of the freeze, RFC 3339 (inclusive)
+             */
+            starts_at: string;
+        };
         GitRef: {
             commit: string;
             is_default?: boolean;
@@ -3659,6 +3791,8 @@ export interface components {
             scenario: string;
         };
         IncarnationRerunLastRequest: {
+            /** @description consent to rerun during an active freeze; without it 409 freeze-active and the incarnation stays error_locked */
+            confirm_freeze?: boolean;
             /** @description operator input, accepted only when the attempt cannot be replayed from history */
             input?: {
                 [key: string]: unknown;
@@ -3729,13 +3863,25 @@ export interface components {
             items: components["schemas"]["IncarnationRevealableSecretItem"][] | null;
         };
         IncarnationRunReply: {
-            apply_id: string;
+            /** @description the started run; omitted when the run was deferred to the maintenance window */
+            apply_id?: string;
             incarnation: string;
             scenario: string;
+            /**
+             * Format: date-time
+             * @description when the deferred run is due to start; asked again then, and moved if a freeze was added or a window changed
+             */
+            schedule_at?: string;
+            /** @description the scheduled Voyage of a run deferred to the maintenance window; cancel it to drop the run */
+            voyage_id?: string;
         };
         IncarnationRunRequest: {
+            /** @description consent to start during an active freeze; without it such a run is refused with 409 freeze-active. Changes nothing outside a freeze */
+            confirm_freeze?: boolean;
             /** @description echo path-id (ignored) */
             id?: string;
+            /** @description start inside the incarnation's maintenance windows and outside every freeze: when closed now, the run becomes a scheduled Voyage (reply carries voyage_id + schedule_at) */
+            in_maintenance_window?: boolean;
             /** @description scenario input */
             input?: {
                 [key: string]: unknown;
@@ -3805,6 +3951,8 @@ export interface components {
             run_apply_id?: string;
         };
         IncarnationUpgradeRequest: {
+            /** @description consent to start the upgrade scenario during an active freeze; without it 409 freeze-active, nothing committed */
+            confirm_freeze?: boolean;
             /** @description echo path-id (ignored) */
             id?: string;
             /** @description target service version (git-ref) */
@@ -3906,6 +4054,52 @@ export interface components {
              * @description local password (never logged, never returned)
              */
             password: string;
+        };
+        MaintenanceStatus: {
+            /** @description the freeze in force now - the one that ends last when several overlap; absent when none */
+            active_freeze?: components["schemas"]["Freeze"];
+            /**
+             * Format: date-time
+             * @description the first instant at or after now at which a run may start; now itself when open_now
+             */
+            next_start: string;
+            /** @description a run may start now: inside a slot of some window (or there are no windows) and outside every freeze */
+            open_now: boolean;
+        };
+        MaintenanceWindow: {
+            comment: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description weekdays a slot starts on, in calendar order */
+            days: string[] | null;
+            /** Format: int64 */
+            duration_minutes: number;
+            /** @description window id (UUID) */
+            id: string;
+            /** @description HH:MM in timezone */
+            start_time: string;
+            timezone: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MaintenanceWindowListReply: {
+            items: components["schemas"]["MaintenanceWindow"][] | null;
+            status: components["schemas"]["MaintenanceStatus"];
+        };
+        MaintenanceWindowRequest: {
+            /** @description free text, at most 500 characters */
+            comment?: string;
+            /** @description weekdays a slot starts on; a slot belongs to the day it starts on, even when it crosses midnight */
+            days: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[] | null;
+            /**
+             * Format: int64
+             * @description slot length in minutes of elapsed time, at most a day; a slot over a DST change still lasts exactly this long
+             */
+            duration_minutes: number;
+            /** @description wall-clock start of each slot, HH:MM, in timezone. A time the spring DST change skips moves forward by the gap; a time the autumn change repeats is its first occurrence */
+            start_time: string;
+            /** @description IANA zone of start_time, e.g. Europe/Moscow or UTC; names that depend on the Keeper host (Local, localtime, posix/...) are refused */
+            timezone: string;
         };
         ModuleCatalogItem: {
             description?: string;
@@ -4564,6 +4758,8 @@ export interface components {
             failed_plan_index?: number;
             /** Format: int64 */
             failed_task_idx?: number;
+            /** @description true on a row whose failures a rescue handled: a failed or orphaned row that is no failure of the run, and a success row the Soul finished after handling a failure inside its message. Such a row keeps failed_task_idx, failed_plan_index and error_summary as its first failure; absent on every other row */
+            handled?: boolean;
             notices?: components["schemas"]["RunNoticeEntry"][] | null;
             /**
              * Format: int64
@@ -5591,6 +5787,8 @@ export interface components {
             batch_size?: number;
             /** Format: int64 */
             concurrency?: number;
+            /** @description freezes the operator consented to at request time; any other freeze covering the start defers the run */
+            confirmed_freeze_ids?: string[] | null;
             /** Format: date-time */
             created_at: string;
             /** Format: int64 */
@@ -5600,6 +5798,8 @@ export interface components {
             fail_threshold?: number;
             /** Format: date-time */
             finished_at?: string;
+            /** @description the run starts only inside its incarnations' maintenance windows and outside every freeze; while scheduled, schedule_at is when it is next asked */
+            in_maintenance_window?: boolean;
             kind: string;
             module?: string;
             on_failure?: string;
@@ -5642,10 +5842,14 @@ export interface components {
             batch_size?: number;
             /** Format: int64 */
             concurrency?: number;
+            /** @description kind=scenario: consent to start while a freeze covers a target at the start (now or schedule_at); without it 409 freeze-active naming every frozen target. Changes nothing outside a freeze */
+            confirm_freeze?: boolean;
             /** @description for kind=command - each per-host Errand asks the module for a Plan instead of Apply; a verb-shell module (core.cmd.shell / core.exec.run) has no pure-read Plan on any host -> 400 */
             dry_run?: boolean;
             /** Format: int64 */
             fail_threshold?: number;
+            /** @description kind=scenario: start at the first moment every target is inside its maintenance windows and outside every freeze (at or after schedule_at); freezes are waited out, windows that never meet (no common moment within 366 days after the last freeze) -> 422. kind=command -> 422 */
+            in_maintenance_window?: boolean;
             /** @description recipe parameters */
             input?: {
                 [key: string]: unknown;
@@ -8683,6 +8887,8 @@ export interface operations {
             query: {
                 /** @description confirmation-flag: true -> destroy without teardown */
                 allow_destroy: boolean;
+                /** @description consent to destroy during an active freeze of the incarnation; without it 409 freeze-active, nothing committed (ADR-0093 §4) */
+                confirm_freeze?: boolean;
             };
             header?: never;
             path: {
@@ -9144,6 +9350,252 @@ export interface operations {
             };
         };
     };
+    listIncarnationFreezes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreezeListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createIncarnationFreeze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreezeRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Freeze"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateIncarnationFreeze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+                /** @description freeze id (UUID) */
+                freeze_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FreezeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Freeze"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteIncarnationFreeze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+                /** @description freeze id (UUID) */
+                freeze_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
     getIncarnationHistory: {
         parameters: {
             query?: {
@@ -9256,6 +9708,252 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["HumaProblemError"];
                 };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    listIncarnationMaintenanceWindows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceWindowListReply"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    createIncarnationMaintenanceWindow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaintenanceWindowRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceWindow"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    updateIncarnationMaintenanceWindow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+                /** @description maintenance window id (UUID) */
+                window_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaintenanceWindowRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceWindow"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["HumaProblemError"];
+                };
+            };
+        };
+    };
+    deleteIncarnationMaintenanceWindow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description incarnation id */
+                id: string;
+                /** @description maintenance window id (UUID) */
+                window_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Forbidden */
             403: {
@@ -16925,6 +17623,8 @@ export interface operations {
                 kind?: "scenario" | "command";
                 /** @description multi-value ?status=X&status=Y OR; outside enum -> 422 */
                 status?: ("scheduled" | "pending" | "running" | "succeeded" | "failed" | "partial_failed" | "cancelled")[] | null;
+                /** @description kind=scenario Voyages naming this incarnation among their targets; malformed id -> 422 */
+                incarnation?: string;
                 /** @description offset from start of set, ≥0 (out-of-range → 400) */
                 offset?: number;
                 /** @description page size 1..1000 (out-of-range → 400) */

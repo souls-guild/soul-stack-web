@@ -1667,12 +1667,12 @@ describe('RunWizard', () => {
     expect(screen.getByLabelText('Scenario apply')).toBeChecked();
   });
 
-  it('Valid fresh draft (v=12, incarnationRegex) → state is restored', async () => {
+  it('Valid fresh draft (v=13, incarnationRegex) → state is restored', async () => {
     setupFetchStub({ incarnationNames: ['redis-prod', 'redis-staging'] });
     sessionStorage.setItem(
       'run-wizard-draft',
       JSON.stringify({
-        v: 12,
+        v: 13,
         step: 3,
         workload: 'scenario',
         runMode: 'voyage',

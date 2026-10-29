@@ -8,6 +8,8 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import type { IncarnationRerunLastReply } from '../../api/keeper';
 import { unlockSchema, type UnlockFormValues } from './schemas';
+import { useFreezeConsent } from './useFreezeConsent';
+import { FreezeConsentBlock } from './FreezeConsent';
 import styles from '../common.module.css';
 
 interface Props {
@@ -26,6 +28,8 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [serverDetail, setServerDetail] = useState<string | null>(null);
+  // Rerun-last is never deferred: during a freeze it only takes consent (ADR-0093 §4).
+  const freeze = useFreezeConsent(incarnationName, open);
 
   const {
     register,
@@ -39,14 +43,19 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
 
   const mu = useMutation({
     mutationFn: (values: UnlockFormValues) =>
-      keeperApi.incarnations.rerunLast(incarnationName, { reason: values.reason }),
+      keeperApi.incarnations.rerunLast(incarnationName, {
+        reason: values.reason,
+        ...(freeze.confirmFreeze ? { confirm_freeze: true } : {}),
+      }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
       reset();
+      freeze.reset();
       onAccepted?.(data);
       onClose();
     },
     onError: (err) => {
+      if (freeze.takeRefusal(err)) return;
       if (err instanceof ApiError && err.status === 409) {
         setServerError(
           err.type === TYPE_RERUN_INPUT_UNAVAILABLE
@@ -67,6 +76,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
   function close() {
     setServerError(null);
     setServerDetail(null);
+    freeze.reset();
     reset();
     onClose();
   }
@@ -84,7 +94,7 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
           <Button
             type="button"
             variant="primary"
-            disabled={isSubmitting || mu.isPending}
+            disabled={isSubmitting || mu.isPending || freeze.blocked}
             onClick={handleSubmit((v) => { setServerError(null); setServerDetail(null); mu.mutate(v); })}
             data-testid="rerun-submit"
           >
@@ -124,6 +134,14 @@ export function RerunLastModal({ open, incarnationName, onClose, onAccepted }: P
             </span>
           ) : null}
         </label>
+        {freeze.needed ? (
+          <FreezeConsentBlock
+            freeze={freeze.freeze}
+            refusal={freeze.refusal}
+            consent={freeze.consent}
+            onConsentChange={freeze.setConsent}
+          />
+        ) : null}
         {serverError ? (
           <div className={styles.errorBox} style={{ marginTop: 12 }} data-testid="rerun-error">
             {serverError}

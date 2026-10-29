@@ -1,5 +1,6 @@
 {
   "colEnabled": "Status",
+  "colInWindow": "Maintenance window",
   "colKind": "Kind",
   "colLastRun": "Last run",
   "colName": "Name",
@@ -21,6 +22,11 @@
   "enableConfirm": "Enable \"{{name}}\"? It will start spawning runs on schedule.",
   "enableTitle": "Enable schedule?",
   "enabled": "Active",
+  "inWindowCommandNa": "— a command addresses hosts, and a host has no window",
+  "inWindowOff": "any time outside a freeze",
+  "inWindowOn": "each run starts in the maintenance window",
+  "inWindowTurnOff": "Stop waiting for a window",
+  "inWindowTurnOn": "Start in the window",
   "notificationsHint": "Notifications about run results for this schedule are configured in the Notifications tab (persistent rule for this schedule).",
   "notificationsLinkLabel": "Set up run notifications",
   "overlap_parallel": "Parallel",

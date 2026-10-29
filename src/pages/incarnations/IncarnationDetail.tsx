@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   ArrowUp,
+  CalendarClock,
   History as HistoryIcon,
   Layers,
   Lock,
@@ -29,11 +30,13 @@ import { HostsTab } from './HostsTab';
 import { ChoirsTab } from './ChoirsTab';
 import { StateTab } from './StateTab';
 import { SchemaTab } from './SchemaTab';
+import { MaintenanceTab } from './MaintenanceTab';
+import { DeferredUntil } from '../voyages/DeferredUntil';
 import { IncarnationTraitsModal } from './IncarnationTraitsModal';
 import { TraitsChips } from './TraitsChips';
 import styles from '../common.module.css';
 
-type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'state' | 'schema';
+type Tab = 'overview' | 'hosts' | 'choirs' | 'history' | 'state' | 'schema' | 'maintenance';
 
 export function IncarnationDetail() {
   const { t } = useTranslation();
@@ -66,6 +69,16 @@ export function IncarnationDetail() {
     queryFn: () => keeperApi.incarnations.runs(name, { limit: 50 }),
     enabled: Boolean(name) && tab === 'history',
   });
+
+  // Runs deferred to a maintenance window are scheduled Voyages, not apply runs, so
+  // `/runs` cannot show them.
+  const deferred = useQuery({
+    queryKey: ['incarnation-deferred-runs', name],
+    queryFn: () => keeperApi.voyages.list({ incarnation: name, kind: 'scenario', status: ['scheduled'], limit: 200 }),
+    enabled: Boolean(name) && tab === 'history',
+    retry: false,
+  });
+  const deferredRows = (deferred.data?.items ?? []).filter((v) => v.schedule_at);
 
   // The roster for the Overview "Hosts" card — the membership relation, the same
   // list the Hosts tab shows. NOT the set a scenario run acts on: that one is
@@ -251,6 +264,9 @@ export function IncarnationDetail() {
         <button type="button" role="tab" aria-selected={tab === 'history'} className={`${styles.tab} ${tab === 'history' ? styles.tabActive : ''}`} onClick={() => setTab('history')}>
           <HistoryIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabHistory')}
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'maintenance'} className={`${styles.tab} ${tab === 'maintenance' ? styles.tabActive : ''}`} onClick={() => setTab('maintenance')} data-testid="tab-maintenance">
+          <CalendarClock size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{t('incarnations:tabMaintenance')}
+        </button>
       </div>
 
       {tab === 'overview' ? (
@@ -334,9 +350,42 @@ export function IncarnationDetail() {
         <ChoirsTab incarnationName={row.id} />
       ) : null}
 
+      {tab === 'maintenance' ? (
+        <MaintenanceTab incarnationName={row.id} />
+      ) : null}
+
       {tab === 'history' ? (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>{t('incarnations:tabHistory')}</h2>
+          {deferredRows.length > 0 ? (
+            <table className={styles.table} data-testid="incarnation-deferred-table">
+              <thead>
+                <tr>
+                  <th>{t('colScenario')}</th>
+                  <th>{t('colStatus')}</th>
+                  <th>{t('runhistory:segVoyage')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deferredRows.map((v) => (
+                  <tr key={v.voyage_id} data-testid={`deferred-run-row-${v.voyage_id}`}>
+                    <td className="mono">{v.scenario_name}</td>
+                    <td>
+                      <Badge tone={runStatusTone(v.status)}>{v.status}</Badge>
+                      <DeferredUntil
+                        voyageId={v.voyage_id}
+                        scheduleAt={v.schedule_at as string}
+                        invalidate={[['incarnation-deferred-runs', name], ['runs-feed', 'voyages']]}
+                      />
+                    </td>
+                    <td className="mono">
+                      <Link to={`/voyages/${encodeURIComponent(v.voyage_id)}`}>{v.voyage_id}</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
           {history.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
           {history.error ? (
             <div className={styles.errorBox}>

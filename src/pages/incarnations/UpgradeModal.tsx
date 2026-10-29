@@ -9,6 +9,8 @@ import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { useServiceRefs } from '../services/refs';
 import { upgradeSchema, type UpgradeFormValues } from './schemas';
+import { useFreezeConsent } from './useFreezeConsent';
+import { FreezeConsentBlock } from './FreezeConsent';
 import styles from '../common.module.css';
 
 interface Props {
@@ -58,16 +60,23 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
   const migrations = target?.state_migrations ?? [];
   // reachable=false arrives as a valid 200 (structurally broken chain) - block submit.
   const blocked = Boolean(target) && target!.reachable === false;
+  // Keeper asks freeze consent only when the upgrade starts its scenario (mode
+  // `found`). A `legacy` upgrade only migrates state; with no preview, ask anyway.
+  const freeze = useFreezeConsent(incarnationName, open, target?.mode !== 'legacy');
 
   const mu = useMutation({
     mutationFn: (values: UpgradeFormValues) =>
-      keeperApi.incarnations.upgrade(incarnationName, { to_version: values.to_version }),
+      keeperApi.incarnations.upgrade(incarnationName, {
+        to_version: values.to_version,
+        ...(freeze.confirmFreeze ? { confirm_freeze: true } : {}),
+      }),
     onSuccess: (reply) => {
       setApplyId(reply.apply_id);
       setRunApplyId(reply.run_apply_id ?? null);
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
     },
     onError: (err) => {
+      if (freeze.takeRefusal(err)) return;
       setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
@@ -76,6 +85,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
     setServerError(null);
     setApplyId(null);
     setRunApplyId(null);
+    freeze.reset();
     reset();
     onClose();
   }
@@ -118,7 +128,7 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
               type="button"
               variant="primary"
               data-testid="upgrade-submit"
-              disabled={isSubmitting || mu.isPending || blocked}
+              disabled={isSubmitting || mu.isPending || blocked || freeze.blocked}
               title={blocked ? t('incarnations:upgradeUnreachableSubmit') : undefined}
               onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
             >
@@ -286,6 +296,14 @@ export function UpgradeModal({ open, incarnationName, serviceName, currentRef, o
         >
           {t('incarnations:upgradeAccepted')} <span className="mono">{applyId}</span>
         </div>
+      ) : null}
+      {freeze.needed && !applyId ? (
+        <FreezeConsentBlock
+          freeze={freeze.freeze}
+          refusal={freeze.refusal}
+          consent={freeze.consent}
+          onConsentChange={freeze.setConsent}
+        />
       ) : null}
       {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}
     </Modal>

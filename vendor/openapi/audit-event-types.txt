@@ -14,6 +14,7 @@ bootstrap.issued
 cadence.created
 cadence.deleted
 cadence.skipped_forbidden
+cadence.skipped_no_window
 cadence.skipped_overlap
 cadence.spawned
 cadence.updated
@@ -48,6 +49,9 @@ errand.failed
 errand.invoked
 errand.timed_out
 eventstream.lease_force_released
+freeze.created
+freeze.deleted
+freeze.updated
 herald.created
 herald.deleted
 herald.delivered
@@ -70,6 +74,9 @@ incarnation.unlocked
 incarnation.upgrade_started
 input.vault_resolved
 ldap_sync.settings_changed
+maintenance_window.created
+maintenance_window.deleted
+maintenance_window.updated
 omen.created
 omen.label_changed
 omen.revoked

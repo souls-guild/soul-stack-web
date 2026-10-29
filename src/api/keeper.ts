@@ -286,6 +286,8 @@ export type VoyagePreviewReply = components['schemas']['VoyagePreviewReply'];
 export interface ListVoyagesQuery {
   kind?: VoyageKind;
   status?: VoyageStatus[];
+  // Voyages targeting this incarnation: its deferred runs among them (NIM-1074).
+  incarnation?: string;
   offset?: number;
   limit?: number;
 }
@@ -409,6 +411,16 @@ export type ChoirCreateRequest = components['schemas']['ChoirCreateRequest'];
 export type VoiceAddRequest = components['schemas']['VoiceAddRequest'];
 export type ChoirListReply = components['schemas']['ChoirListReply'];
 export type VoiceListReply = components['schemas']['VoiceListReply'];
+
+// Maintenance windows and freezes of an incarnation (NIM-1072). The list reply carries
+// the server's status block — the UI never re-derives "open now" or the next start.
+export type MaintenanceWindow = components['schemas']['MaintenanceWindow'];
+export type MaintenanceWindowRequest = components['schemas']['MaintenanceWindowRequest'];
+export type MaintenanceWindowListReply = components['schemas']['MaintenanceWindowListReply'];
+export type MaintenanceStatus = components['schemas']['MaintenanceStatus'];
+export type Freeze = components['schemas']['Freeze'];
+export type FreezeRequest = components['schemas']['FreezeRequest'];
+export type FreezeListReply = components['schemas']['FreezeListReply'];
 
 // Refs / scenarios endpoints are not yet fixed in openapi (being fixed in parallel
 // by a backend slice). Local types — narrow contract used by the UI;
@@ -889,11 +901,12 @@ export const keeperApi = {
       ),
     // DELETE /v1/incarnations/{name}?allow_destroy=<bool>. allow_destroy=true —
     // teardown without a scenario (force), false — normal path via the `destroy` scenario.
-    destroy: (name: string, allowDestroy: boolean) =>
+    // During a freeze it needs confirm_freeze=true, else 409 freeze-active (NIM-1085).
+    destroy: (name: string, allowDestroy: boolean, confirmFreeze = false) =>
       apiSend<IncarnationDestroyReply>(
         `/v1/incarnations/${encodeURIComponent(name)}`,
         'DELETE',
-        { query: { allow_destroy: allowDestroy } },
+        { query: { allow_destroy: allowDestroy, confirm_freeze: confirmFreeze || undefined } },
       ),
     // POST /v1/incarnations/{name}/rerun-last — atomic unlock + restart of the
     // last failed scenario (create or operational) with the saved input. 202 ->
@@ -1031,6 +1044,48 @@ export const keeperApi = {
     removeVoice: (incarnationName: string, choirName: string, sid: string) =>
       apiSend<void>(
         `/v1/incarnations/${encodeURIComponent(incarnationName)}/choirs/${encodeURIComponent(choirName)}/voices/${encodeURIComponent(sid)}`,
+        'DELETE',
+      ),
+  },
+
+  // Reads need incarnation.get; every write needs incarnation.maintenance-set.
+  // PUT replaces every field of the row.
+  maintenance: {
+    listWindows: (incarnation: string) =>
+      apiGet<MaintenanceWindowListReply>(
+        `/v1/incarnations/${encodeURIComponent(incarnation)}/maintenance-windows`,
+      ),
+    createWindow: (incarnation: string, body: MaintenanceWindowRequest) =>
+      apiSend<MaintenanceWindow>(
+        `/v1/incarnations/${encodeURIComponent(incarnation)}/maintenance-windows`,
+        'POST',
+        { body },
+      ),
+    updateWindow: (incarnation: string, windowId: string, body: MaintenanceWindowRequest) =>
+      apiSend<MaintenanceWindow>(
+        `/v1/incarnations/${encodeURIComponent(incarnation)}/maintenance-windows/${encodeURIComponent(windowId)}`,
+        'PUT',
+        { body },
+      ),
+    deleteWindow: (incarnation: string, windowId: string) =>
+      apiSend<void>(
+        `/v1/incarnations/${encodeURIComponent(incarnation)}/maintenance-windows/${encodeURIComponent(windowId)}`,
+        'DELETE',
+      ),
+    // Past freezes included, ordered by start.
+    listFreezes: (incarnation: string) =>
+      apiGet<FreezeListReply>(`/v1/incarnations/${encodeURIComponent(incarnation)}/freezes`),
+    createFreeze: (incarnation: string, body: FreezeRequest) =>
+      apiSend<Freeze>(`/v1/incarnations/${encodeURIComponent(incarnation)}/freezes`, 'POST', { body }),
+    updateFreeze: (incarnation: string, freezeId: string, body: FreezeRequest) =>
+      apiSend<Freeze>(
+        `/v1/incarnations/${encodeURIComponent(incarnation)}/freezes/${encodeURIComponent(freezeId)}`,
+        'PUT',
+        { body },
+      ),
+    deleteFreeze: (incarnation: string, freezeId: string) =>
+      apiSend<void>(
+        `/v1/incarnations/${encodeURIComponent(incarnation)}/freezes/${encodeURIComponent(freezeId)}`,
         'DELETE',
       ),
   },
@@ -1507,6 +1562,7 @@ export const keeperApi = {
         query: {
           kind: q.kind,
           status: q.status,
+          incarnation: q.incarnation,
           offset: q.offset,
           limit: q.limit,
         },

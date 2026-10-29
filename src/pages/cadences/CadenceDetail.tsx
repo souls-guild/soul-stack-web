@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CalendarClock } from 'lucide-react';
 import { keeperApi, type Voyage, type VoyageStatus } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { Badge } from '../../components/primitives';
+import { Badge, Button } from '../../components/primitives';
 import { runStatusTone } from '../../components/status';
+import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { DeferredUntil } from '../voyages/DeferredUntil';
 import { relative, scheduleLabel } from './format';
 import styles from '../common.module.css';
 
@@ -14,6 +16,7 @@ const NON_TERMINAL_VOYAGE: ReadonlySet<VoyageStatus> = new Set<VoyageStatus>(['p
 export function CadenceDetail() {
   const { t } = useTranslation();
   const { id = '' } = useParams<{ id: string }>();
+  const qc = useQueryClient();
 
   const cadenceQ = useQuery({
     queryKey: ['cadence.get', id],
@@ -31,6 +34,13 @@ export function CadenceDetail() {
       const hasRunning = items.some((v) => NON_TERMINAL_VOYAGE.has(v.status as VoyageStatus));
       return hasRunning ? 5000 : false;
     },
+  });
+
+  const { hasPermission } = useMyPermissions();
+  const canUpdate = hasPermission('cadence.update');
+  const inWindowMu = useMutation({
+    mutationFn: (on: boolean) => keeperApi.cadences.patch(id, { in_maintenance_window: on }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cadence.get', id] }),
   });
 
   if (cadenceQ.isLoading) return <div className={styles.loading}>{t('loading')}</div>;
@@ -86,6 +96,36 @@ export function CadenceDetail() {
 
           <dt className={styles.metaKey}>{t('cadences:colOverlap')}</dt>
           <dd className={styles.metaVal}>{t(`cadences:overlap_${c.overlap_policy}`)} ({c.overlap_policy})</dd>
+
+          <dt className={styles.metaKey}>{t('cadences:colInWindow')}</dt>
+          <dd className={styles.metaVal} data-testid="cadence-in-window-value">
+            {c.kind !== 'scenario' ? (
+              t('cadences:inWindowCommandNa')
+            ) : (
+              <>
+                {c.in_maintenance_window ? t('cadences:inWindowOn') : t('cadences:inWindowOff')}
+                {canUpdate ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => inWindowMu.mutate(!c.in_maintenance_window)}
+                    disabled={inWindowMu.isPending}
+                    style={{ marginLeft: 8, padding: '2px 8px', fontSize: 12 }}
+                    data-testid="cadence-in-window-toggle"
+                  >
+                    {c.in_maintenance_window ? t('cadences:inWindowTurnOff') : t('cadences:inWindowTurnOn')}
+                  </Button>
+                ) : null}
+                {inWindowMu.error ? (
+                  <span style={{ color: 'var(--danger)', fontSize: 12, marginLeft: 8 }}>
+                    {inWindowMu.error instanceof ApiError
+                      ? t('errors:generic', { status: inWindowMu.error.status, detail: inWindowMu.error.message })
+                      : String(inWindowMu.error)}
+                  </span>
+                ) : null}
+              </>
+            )}
+          </dd>
 
           <dt className={styles.metaKey}>{t('cadences:colNextRun')}</dt>
           <dd className={styles.metaVal}>{c.next_run_at ? `${relative(c.next_run_at)} (${c.next_run_at})` : '—'}</dd>
@@ -153,6 +193,9 @@ export function CadenceDetail() {
                   </td>
                   <td>
                     <Badge tone={runStatusTone(v.status)}>{v.status}</Badge>
+                    {v.status === 'scheduled' && v.schedule_at ? (
+                      <DeferredUntil voyageId={v.voyage_id} scheduleAt={v.schedule_at} invalidate={[['cadence.runs', id]]} />
+                    ) : null}
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
                     {v.scope_size ?? '—'}

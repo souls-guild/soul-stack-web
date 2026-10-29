@@ -78,7 +78,8 @@ export function RunScenarioForm({ incarnationName, serviceName }: Props) {
         input: args.input,
       }),
     onSuccess: (r) => {
-      setReply({ apply_id: r.apply_id, scenario: r.scenario });
+      // apply_id is absent only for a run deferred to a window, which this form never asks for.
+      setReply({ apply_id: r.apply_id ?? '', scenario: r.scenario });
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
       qc.invalidateQueries({ queryKey: ['incarnation-history', incarnationName] });
     },

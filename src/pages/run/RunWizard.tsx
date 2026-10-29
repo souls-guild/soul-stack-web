@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
@@ -72,6 +72,9 @@ import { ChipsInput } from '../incarnations/ChipsInput';
 import { NotifyBlock } from './NotifyBlock';
 import { problemIncarnations, problemStatusRank, type ProblemIncarnation } from './problemIncarnations';
 import { serializeNotify } from './notifyHelpers';
+import { MaintenanceRunOptions } from './MaintenanceGate';
+import { useTargetMaintenance } from './maintenanceProbe';
+import { isFreezeRefusal } from '../incarnations/maintenance';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
 
@@ -176,6 +179,8 @@ interface OptionsState {
   interUnitIntervalMs: string;
   // Presence filter: live hosts only. Applies to kind=command.
   requireAlive: boolean;
+  // Scenario only: defer to the next open maintenance window (ADR-0093).
+  inMaintenanceWindow: boolean;
 }
 
 const NAME_REGEX = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -200,7 +205,7 @@ const DRAFT_KEY = 'run-wizard-draft';
 // (new field, type change). loadDraft() discards drafts with a different/missing
 // version — old persisted state from a previous wizard form shape is ignored, the wizard
 // starts from defaults instead of crashing on a missing field.
-const DRAFT_VERSION = 12;
+const DRAFT_VERSION = 13;
 
 interface WizardDraft {
   v: number;
@@ -268,6 +273,7 @@ const DEFAULT_OPTIONS: OptionsState = {
   interBatchIntervalMs: '',
   interUnitIntervalMs: '',
   requireAlive: false,
+  inMaintenanceWindow: false,
 };
 
 const DEFAULT_CADENCE_STATE: CadenceState = {
@@ -786,6 +792,30 @@ export function RunWizard() {
     commandPatternErrors,
   ]);
 
+  // --- Maintenance window and freeze consent (ADR-0093, NIM-1076) ---
+  // Consent is never part of the draft: it is given for the freezes on screen now, and a
+  // different target set or a different freeze asks again.
+  const gateApplies = workload === 'scenario' && runMode === 'voyage';
+  const startAt = useMemo(() => {
+    const s = options.scheduleAt.trim();
+    const d = s ? new Date(s) : null;
+    return d && !Number.isNaN(d.getTime()) ? d : null;
+  }, [options.scheduleAt]);
+  const maintenance = useTargetMaintenance(targetIncarnations, gateApplies && step === 4, startAt);
+  // A refusal and a consent are about these targets starting at this moment: a
+  // different start can fall into a freeze nobody was shown.
+  const startKey = `${targetIncarnations.join('\n')}@${startAt?.toISOString() ?? 'now'}`;
+  const [freezeRefusal, setFreezeRefusal] = useState<{ detail: string; startKey: string } | null>(null);
+  const refusalDetail = freezeRefusal && freezeRefusal.startKey === startKey ? freezeRefusal.detail : null;
+  const consentKey = `${startKey}|${maintenance.frozenKey}|${refusalDetail ?? ''}`;
+  const [freezeConsentKey, setFreezeConsentKey] = useState<string | null>(null);
+  const freezeConsent = freezeConsentKey === consentKey;
+  const needsFreezeConsent =
+    gateApplies && !options.inMaintenanceWindow && (maintenance.frozen.length > 0 || refusalDetail !== null);
+  // Not held while the probe is out: a probe that never answers must not lock the
+  // button, and a run sent before it lands meets Keeper's 409, which opens the same block.
+  const freezeGateOpen = !needsFreezeConsent || freezeConsent;
+
   // --- Submit ---
   const submitMu = useMutation({
     mutationFn: async () => {
@@ -794,6 +824,13 @@ export function RunWizard() {
       return submitCommand();
     },
     onError: (err) => {
+      if (isFreezeRefusal(err)) {
+        // A freeze the probe did not see (added since, or past the probe limit):
+        // the consent block takes the refusal instead of a bare error line.
+        setFreezeRefusal({ detail: err.detail, startKey });
+        setSubmitError(null);
+        return;
+      }
       setSubmitError(
         err instanceof ApiError
           ? t('run:submitErrorPrefix', { status: err.status, message: err.message })
@@ -929,6 +966,8 @@ export function RunWizard() {
       dry_run: Boolean(options.dryRun),
       require_alive: options.requireAlive,
       ...opts,
+      ...(options.inMaintenanceWindow ? { in_maintenance_window: true } : {}),
+      ...(needsFreezeConsent && freezeConsent ? { confirm_freeze: true } : {}),
       ...(notifyPayload ? { notify: notifyPayload } : {}),
     });
     return `/voyages/${encodeURIComponent(reply.voyage_id)}`;
@@ -962,6 +1001,7 @@ export function RunWizard() {
       overlap_policy: cadenceState.overlapPolicy,
       ...recipe,
       ...opts,
+      ...(workload === 'scenario' && options.inMaintenanceWindow ? { in_maintenance_window: true } : {}),
       require_alive: options.requireAlive,
       ...(notifyPayload ? { notify: notifyPayload } : {}),
     });
@@ -996,7 +1036,7 @@ export function RunWizard() {
     return cadenceState.cronExpr.trim().length > 0;
   }, [runMode, cadenceState]);
 
-  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchValid && (runMode === 'cadence' ? cadenceValid : scheduleAtValid) && !submitMu.isPending;
+  const canSubmit = canAdvanceFromStep2 && canAdvanceFromStep3 && batchValid && (runMode === 'cadence' ? cadenceValid : scheduleAtValid) && freezeGateOpen && !submitMu.isPending;
 
   // --- Batch preview logic ---
   // Snapshot target: explicit SID / regex / incarnations — scope known to the client.
@@ -1279,6 +1319,20 @@ export function RunWizard() {
             snapshotScope={snapshotScope}
             notify={notify}
             onNotifyChange={setNotify}
+            maintenance={
+              workload === 'scenario' ? (
+                <MaintenanceRunOptions
+                  mode={runMode}
+                  inWindow={options.inMaintenanceWindow}
+                  onInWindowChange={(v) => setOptions({ ...options, inMaintenanceWindow: v })}
+                  scheduled={startAt !== null}
+                  probe={maintenance}
+                  serverRefusal={refusalDetail}
+                  consent={freezeConsent}
+                  onConsentChange={(v) => setFreezeConsentKey(v ? consentKey : null)}
+                />
+              ) : null
+            }
           />
         ) : null}
 
@@ -2341,6 +2395,7 @@ function Step4Options({
   snapshotScope,
   notify,
   onNotifyChange,
+  maintenance,
 }: {
   value: OptionsState;
   onChange: (next: OptionsState) => void;
@@ -2358,6 +2413,8 @@ function Step4Options({
   snapshotScope: number;
   notify: VoyageNotify[];
   onNotifyChange: (next: VoyageNotify[]) => void;
+  // The maintenance-window section; rendered under scheduling, which it qualifies.
+  maintenance: ReactNode;
 }) {
   const { t } = useTranslation();
   const isWindow = value.batchMode === 'window';
@@ -2687,6 +2744,8 @@ function Step4Options({
           </label>
         )}
       </fieldset>
+
+      {maintenance}
 
       {/* "Flags" section — boolean toggles for run behavior. */}
       <fieldset className={styles.optionsSection}>

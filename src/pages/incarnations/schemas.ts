@@ -2,8 +2,11 @@
 // (IncarnationCreateRequest / coven pattern).
 
 import { z } from 'zod';
+import { WEEKDAYS, browserTimeZone, isValidTimeZone, nextDay, wallToIso } from './maintenance';
 
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 // JSON input as a string -> parsed via .transform; empty string = `{}`.
 // On invalid JSON, mark the field as invalid with a clear message.
@@ -105,3 +108,65 @@ export type DestroyFormValues = {
   confirmName: string;
   allowDestroy: boolean;
 };
+
+// Maintenance window form (NIM-1076). The wire carries a duration; the form asks for
+// an end time, because "02:00–05:00" is how an operator says a slot.
+export const maintenanceWindowSchema = z
+  .object({
+    days: z.array(z.enum(WEEKDAYS)).min(1, 'incarnations:mwDaysRequired'),
+    start: z.string().regex(HHMM, 'incarnations:mwTimeFormat'),
+    end: z.string().regex(HHMM, 'incarnations:mwTimeFormat'),
+    timezone: z
+      .string()
+      .trim()
+      .min(1, 'incarnations:mwTimezoneRequired')
+      .max(64, 'incarnations:mwTimezoneInvalid')
+      .refine(isValidTimeZone, { message: 'incarnations:mwTimezoneInvalid' }),
+    comment: z.string().trim().max(500, 'incarnations:mwCommentMax'),
+  });
+
+export type MaintenanceWindowFormValues = z.infer<typeof maintenanceWindowSchema>;
+
+// Freeze form: whole days (date inputs, last day inclusive) or exact moments
+// (date + time). Both are wall clock in the browser's zone.
+export const freezeSchema = z
+  .object({
+    wholeDays: z.boolean(),
+    startDate: z.string().regex(YMD, 'incarnations:freezeDateRequired'),
+    startTime: z.string(),
+    endDate: z.string().regex(YMD, 'incarnations:freezeDateRequired'),
+    endTime: z.string(),
+    comment: z.string().trim().max(500, 'incarnations:mwCommentMax'),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.wholeDays) {
+      if (!HHMM.test(v.startTime)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['startTime'], message: 'incarnations:mwTimeFormat' });
+      }
+      if (!HHMM.test(v.endTime)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endTime'], message: 'incarnations:mwTimeFormat' });
+      }
+    }
+    const range = freezeRangeFromForm(v, browserTimeZone());
+    if (range && new Date(range.ends_at) <= new Date(range.starts_at)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'incarnations:freezeEndBeforeStart' });
+    }
+  });
+
+export type FreezeFormValues = z.infer<typeof freezeSchema>;
+
+/** The wire interval of a freeze form in `tz`; whole days end at midnight after the last day. */
+export function freezeRangeFromForm(
+  v: {
+    wholeDays: boolean;
+    startDate: string;
+    startTime: string;
+    endDate: string;
+    endTime: string;
+  },
+  tz: string,
+): { starts_at: string; ends_at: string } | null {
+  const starts = wallToIso(v.startDate, v.wholeDays ? '00:00' : v.startTime, tz);
+  const ends = v.wholeDays ? wallToIso(nextDay(v.endDate), '00:00', tz) : wallToIso(v.endDate, v.endTime, tz);
+  return starts && ends ? { starts_at: starts, ends_at: ends } : null;
+}

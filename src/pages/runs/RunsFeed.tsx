@@ -24,6 +24,7 @@ import { EMPTY_DATE_RANGE, inDateRange, hasDateRange, toServerRange, type DateRa
 import { DateRangeFilter } from './DateRangeFilter';
 import { scenStatusesServed } from './scenStatuses';
 import { failureLine } from '../incarnations/runFailure';
+import { DeferredUntil } from '../voyages/DeferredUntil';
 import styles from '../common.module.css';
 
 // Unified /runs page (ADR-069 part B2): segment filter by run type + column
@@ -54,6 +55,8 @@ interface FeedRow {
   status: string;
   startedAt?: string;
   finishedAt?: string;
+  // A scheduled Voyage's start: deferred to a window or set by the operator.
+  scheduleAt?: string;
 }
 
 // The Type badge of a union row maps onto the segment taxonomy (Scenario/Voyage/Push/Errand),
@@ -382,6 +385,7 @@ export function RunsFeed() {
           status: v.status,
           startedAt: v.started_at ?? v.created_at,
           finishedAt: v.finished_at,
+          scheduleAt: v.schedule_at,
         });
       }
     }
@@ -764,6 +768,9 @@ function UnionSegment({
                 </td>
                 <td>
                   <Badge tone={runStatusTone(r.status)}>{r.status}</Badge>
+                  {r.status === 'scheduled' && r.scheduleAt && r.type.startsWith('voyage') ? (
+                    <DeferredUntil voyageId={r.id} scheduleAt={r.scheduleAt} invalidate={[['runs-feed', 'voyages']]} />
+                  ) : null}
                 </td>
                 <td className="mono" title={r.startedAt}>
                   {relative(r.startedAt)}

@@ -8,6 +8,8 @@ import { Button, Input, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { makeDestroySchema, type DestroyFormValues } from './schemas';
+import { useFreezeConsent } from './useFreezeConsent';
+import { FreezeConsentBlock } from './FreezeConsent';
 import styles from '../common.module.css';
 
 interface Props {
@@ -23,6 +25,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [applyId, setApplyId] = useState<string | null>(null);
   const schema = useMemo(() => makeDestroySchema(incarnationName), [incarnationName]);
+  const freeze = useFreezeConsent(incarnationName, open);
 
   const {
     register,
@@ -36,7 +39,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
 
   const mu = useMutation({
     mutationFn: (values: DestroyFormValues) =>
-      keeperApi.incarnations.destroy(incarnationName, values.allowDestroy),
+      keeperApi.incarnations.destroy(incarnationName, values.allowDestroy, freeze.confirmFreeze),
     onSuccess: (reply) => {
       setApplyId(reply.apply_id);
       qc.invalidateQueries({ queryKey: ['incarnation', incarnationName] });
@@ -48,6 +51,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
       }, 800);
     },
     onError: (err) => {
+      if (freeze.takeRefusal(err)) return;
       setServerError(err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err));
     },
   });
@@ -56,6 +60,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
     if (mu.isPending) return;
     setServerError(null);
     setApplyId(null);
+    freeze.reset();
     reset();
     onClose();
   }
@@ -73,7 +78,7 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
           <Button
             type="button"
             variant="danger"
-            disabled={isSubmitting || mu.isPending || Boolean(applyId)}
+            disabled={isSubmitting || mu.isPending || Boolean(applyId) || freeze.blocked}
             onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
             data-testid="destroy-submit"
           >
@@ -117,6 +122,15 @@ export function DestroyModal({ open, incarnationName, onClose }: Props) {
           <code className="mono">destroy</code>.
         </span>
       </label>
+
+      {freeze.needed ? (
+        <FreezeConsentBlock
+          freeze={freeze.freeze}
+          refusal={freeze.refusal}
+          consent={freeze.consent}
+          onConsentChange={freeze.setConsent}
+        />
+      ) : null}
 
       {applyId ? (
         <div
