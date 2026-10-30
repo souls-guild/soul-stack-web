@@ -2,23 +2,26 @@ import { Fragment, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Check, Clock, Snowflake } from 'lucide-react';
-import type { Freeze, MaintenanceStatus, MaintenanceWindow } from '../../api/keeper';
+import type { Freeze, MaintenanceStatus } from '../../api/keeper';
 import {
   formatFreezeRangeShort,
   formatInstant,
   frozenUntil,
   instantParts,
   nextFreeze,
+  noWindowsInEffect,
   openRunEnd,
   slotAt,
+  type EffectiveWindow,
   type Weekday,
 } from './maintenance';
 import css from './MaintenanceStatusBlock.module.css';
 
 // The top of the maintenance windows tab: the server's status over the windows and
-// freezes, as one card whose look follows the state. `freezes` is undefined when
-// the list failed to load: the card then leaves out the end of an open stretch and
-// the freeze ahead, and shows a freeze in force to its own end.
+// freezes, as one card whose look follows the state. `windows` are the ones in
+// effect (see effectiveWindows). `freezes` is undefined when the list failed to
+// load: the card then leaves out the end of an open stretch and the freeze ahead,
+// and shows a freeze in force to its own end.
 
 export type MaintenanceState = 'closed' | 'open' | 'always' | 'frozen';
 
@@ -41,13 +44,15 @@ export function MaintenanceStatusBlock({
   now,
 }: {
   status: MaintenanceStatus;
-  windows: MaintenanceWindow[];
+  windows: EffectiveWindow[];
   freezes: Freeze[] | undefined;
   tz: string;
   now: Date;
 }) {
   const { t } = useTranslation();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
+  // A Keeper before the cluster default has no source; then the default cannot apply.
+  const fromDefault = status.source === 'default' || windows.some((w) => w.origin === 'default');
 
   let state: MaintenanceState;
   let title: string;
@@ -64,7 +69,7 @@ export function MaintenanceStatusBlock({
     title = t('incarnations:mwStatusFrozen', { until: formatInstant(until, tz, dayLabel, now) });
     if (f.comment) sub.push(f.comment);
     sub.push(t('incarnations:mwStatusConsent'));
-  } else if (status.open_now && windows.length === 0) {
+  } else if (status.open_now && noWindowsInEffect(status.source, windows, now)) {
     state = 'always';
     title = t('incarnations:mwStatusAlways');
     sub.push(t('incarnations:mwStatusNoWindows'));
@@ -125,6 +130,11 @@ export function MaintenanceStatusBlock({
         ) : null}
       </div>
       <div className={css.side}>
+        {fromDefault && state !== 'always' ? (
+          <span className={`${css.chip} ${css.neutral}`} title={t('incarnations:mwDefaultHint')} data-testid="mw-status-default">
+            {t('incarnations:mwStatusDefault')}
+          </span>
+        ) : null}
         {ahead ? (
           <span className={css.chip} title={`${ahead.starts_at} – ${ahead.ends_at}`} data-testid="mw-status-freeze-ahead">
             {t('incarnations:mwStatusFreezeAhead', { what: ahead.comment ? `${ahead.comment}, ${aheadRange}` : aheadRange })}

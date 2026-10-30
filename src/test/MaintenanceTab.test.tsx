@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './renderWithProviders';
 import { installFetchMock, type FetchRoute } from './fetchMock';
@@ -30,6 +30,7 @@ const WRITER = permissions([
 
 const NIGHT = {
   id: 'w-night',
+  kind: 'weekly',
   days: ['mon', 'tue', 'wed', 'thu', 'fri'],
   start_time: '02:00',
   duration_minutes: 180,
@@ -40,6 +41,7 @@ const NIGHT = {
 };
 const SUNDAY = {
   id: 'w-sun',
+  kind: 'weekly',
   days: ['sun'],
   start_time: '10:00',
   duration_minutes: 240,
@@ -436,6 +438,7 @@ describe('MaintenanceTab', () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId('mw-add'));
+    await user.click(screen.getByTestId('mw-add-weekly'));
     for (const d of ['mon', 'tue', 'wed', 'thu', 'fri']) await user.click(screen.getByTestId(`mw-day-${d}`));
     const start = screen.getByTestId('mw-start');
     await user.clear(start);
@@ -452,6 +455,7 @@ describe('MaintenanceTab', () => {
 
     await waitFor(() => expect(sent('POST', `${BASE}/maintenance-windows`)).toHaveLength(1));
     expect(sent('POST', `${BASE}/maintenance-windows`)[0].body).toEqual({
+      kind: 'weekly',
       days: ['mon', 'tue', 'wed', 'thu', 'fri'],
       start_time: '22:00',
       duration_minutes: 270,
@@ -466,6 +470,7 @@ describe('MaintenanceTab', () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByTestId('mw-add'));
+    await user.click(screen.getByTestId('mw-add-weekly'));
     const tz = screen.getByTestId('mw-timezone');
     await user.clear(tz);
     await user.type(tz, 'Mars/Olympus');
@@ -622,8 +627,8 @@ describe('MaintenanceTab', () => {
 
     await waitFor(() => expect(sent('POST', `${BASE}/maintenance-windows`)).toHaveLength(2));
     expect(sent('POST', `${BASE}/maintenance-windows`).map((c) => c.body)).toEqual([
-      { days: NIGHT.days, start_time: '02:00', duration_minutes: 180, timezone: 'Europe/Moscow', comment: 'night works' },
-      { days: SUNDAY.days, start_time: '10:00', duration_minutes: 240, timezone: 'Europe/Moscow', comment: 'planned maintenance' },
+      { kind: 'weekly', days: NIGHT.days, start_time: '02:00', duration_minutes: 180, timezone: 'Europe/Moscow', comment: 'night works' },
+      { kind: 'weekly', days: SUNDAY.days, start_time: '10:00', duration_minutes: 240, timezone: 'Europe/Moscow', comment: 'planned maintenance' },
     ]);
   });
 
@@ -686,5 +691,504 @@ describe('MaintenanceTab', () => {
     ]);
     renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
     expect(await screen.findByTestId('maintenance-degraded')).toBeInTheDocument();
+  });
+
+  // The calendar and the one-off windows (NIM-1136). "Now" is the mockup's: Friday
+  // 30.10 00:50 in Moscow, so the week on screen is 26.10–01.11.
+  describe('calendar and one-off windows', () => {
+    const FRI_0050 = new Date('2026-10-29T21:50:00Z');
+    const CLOSED_TILL_FRI_2 = { open_now: false, next_start: '2026-10-29T23:00:00Z' };
+    const SAT_LATE = { ...NIGHT, id: 'w-sat', days: ['sat'], start_time: '22:00', duration_minutes: 240, comment: 'weekend' };
+    const WEEKEND_SALE = { ...SALE, starts_at: '2026-10-30T21:00:00Z', ends_at: '2026-11-01T21:00:00Z' };
+    const once = (id: string, startsAt: string, endsAt: string, comment: string) => ({
+      id,
+      kind: 'once',
+      starts_at: startsAt,
+      ends_at: endsAt,
+      comment,
+      created_at: '2026-10-27T10:00:00Z',
+      updated_at: '2026-10-27T10:00:00Z',
+    });
+    // Fri 30.10 20:00–23:00 in Moscow.
+    const MIGRATION = once('o-mig', '2026-10-30T17:00:00Z', '2026-10-30T20:00:00Z', 'database migration');
+    // Tue 27.10 20:00–21:00 in Moscow: over by now.
+    const PAST_ONCE = once('o-past', '2026-10-27T17:00:00Z', '2026-10-27T18:00:00Z', 'hotfix');
+
+    beforeEach(() => vi.setSystemTime(FRI_0050));
+
+    function marks(date: string) {
+      const row = screen.getByTestId(`mw-cal-day-${date}`);
+      return Array.from(row.querySelectorAll<HTMLElement>('[data-testid="mw-cal-mark"]')).map((el) => ({
+        kind: el.dataset.kind,
+        ref: el.dataset.ref,
+        at: `${parseFloat(el.style.left).toFixed(2)}+${parseFloat(el.style.width).toFixed(2)}`,
+        text: el.textContent,
+      }));
+    }
+
+    it('[GUARD] a slot across midnight is drawn on both days, in the browser zone', async () => {
+      installFetchMock(routes({ windows: { items: [SAT_LATE], status: CLOSED_TILL_FRI_2 }, freezes: { items: [] } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      await screen.findByTestId('mw-calendar');
+      // Sat 22:00 for 4 h: 22:00–24:00 on Saturday's row, 00:00–02:00 on Sunday's.
+      expect(marks('2026-10-31')).toEqual([{ kind: 'weekly', ref: 'w-sat', at: '91.67+8.33', text: 'weekend' }]);
+      expect(marks('2026-11-01')).toEqual([{ kind: 'weekly', ref: 'w-sat', at: '0.00+8.33', text: '' }]);
+      expect(marks('2026-10-30')).toEqual([]);
+    });
+
+    it('[GUARD] a freeze cuts the windows it covers: struck through under the hatch, not drawn open', async () => {
+      installFetchMock(
+        routes({
+          windows: { items: [NIGHT, SUNDAY, SAT_LATE], status: CLOSED_TILL_FRI_2 },
+          freezes: { items: [WEEKEND_SALE] },
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      await screen.findByTestId('mw-calendar');
+      expect(marks('2026-10-30')).toEqual([{ kind: 'weekly', ref: 'w-night', at: '8.33+12.50', text: 'night works' }]);
+      expect(marks('2026-10-31')).toEqual([
+        // Under the freeze's own words the cancelled slot says nothing; its title still does.
+        { kind: 'cut', ref: 'w-sat', at: '91.67+8.33', text: '' },
+        { kind: 'freeze', ref: 'f-sale', at: '0.00+100.00', text: 'freeze · Sale' },
+      ]);
+      expect(marks('2026-11-01')).toEqual([
+        { kind: 'cut', ref: 'w-sat', at: '0.00+8.33', text: '' },
+        { kind: 'cut', ref: 'w-sun', at: '41.67+16.67', text: 'planned maintenance' },
+        { kind: 'freeze', ref: 'f-sale', at: '0.00+100.00', text: '' },
+      ]);
+    });
+
+    it('a one-off window is drawn in its own cell, dashed, and the week shows past days muted with the now line', async () => {
+      installFetchMock(routes({ windows: { items: [NIGHT, MIGRATION], status: CLOSED_TILL_FRI_2 }, freezes: { items: [] } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      await screen.findByTestId('mw-calendar');
+      expect(marks('2026-10-30')).toEqual([
+        { kind: 'weekly', ref: 'w-night', at: '8.33+12.50', text: 'night works' },
+        { kind: 'once', ref: 'o-mig', at: '83.33+12.50', text: 'database migration' },
+      ]);
+      for (const d of ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-31', '2026-11-01']) {
+        expect(marks(d).filter((m) => m.kind === 'once')).toEqual([]);
+      }
+      expect(screen.getByTestId('mw-cal-range').textContent).toBe('26 October – 1 November 2026');
+      expect(screen.getByTestId('mw-cal-day-2026-10-29').dataset.past).toBe('true');
+      expect(screen.getByTestId('mw-cal-day-2026-10-30').dataset.past).toBeUndefined();
+      const today = screen.getByTestId('mw-cal-day-2026-10-30');
+      expect(today.dataset.today).toBe('true');
+      expect(within(today).getByTestId('mw-cal-now').textContent).toBe('now 00:50');
+      expect(screen.getByTestId('mw-cal-zone').textContent).toBe('browser zone Europe/Moscow · click a block to change it');
+    });
+
+    it('[GUARD] a past one-off window does not count and is hidden from its list until asked for', async () => {
+      installFetchMock(
+        routes({
+          windows: { items: [PAST_ONCE], status: { open_now: true, next_start: FRI_0050.toISOString() } },
+          freezes: { items: [] },
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      const status = await screen.findByTestId('mw-status');
+      expect(status.getAttribute('data-state')).toBe('always');
+      expect(screen.getByTestId('mw-once-empty')).toBeInTheDocument();
+      expect(screen.queryByTestId('mw-once-row-o-past')).not.toBeInTheDocument();
+      const toggle = screen.getByTestId('mw-once-toggle-past');
+      expect(toggle.textContent).toBe('Show past windows (1)');
+      await user.click(toggle);
+      expect(screen.getByTestId('mw-once-row-o-past').textContent).toContain('27.10 20:00 – 21:00');
+    });
+
+    it('the one-off list shows what is ahead, ordered by start', async () => {
+      const later = once('o-later', '2026-11-03T08:00:00Z', '2026-11-03T09:00:00Z', 'later');
+      installFetchMock(routes({ windows: { items: [later, NIGHT, MIGRATION, PAST_ONCE], status: CLOSED_TILL_FRI_2 } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      const table = await screen.findByTestId('mw-once-table');
+      const rows = within(table).getAllByRole('row').slice(1).map((r) => r.getAttribute('data-testid'));
+      expect(rows).toEqual(['mw-once-row-o-mig', 'mw-once-row-o-later']);
+      expect(screen.getByTestId('mw-once-row-o-mig').textContent).toContain('30.10 20:00 – 23:00');
+      // Weekly windows only in their own list.
+      expect(within(screen.getByTestId('mw-table')).queryByText('database migration')).not.toBeInTheDocument();
+    });
+
+    it('[GUARD] source default: the status block says so, the calendar draws the defaults, and the list is read-only', async () => {
+      const clusterNights = {
+        kind: 'weekly',
+        days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        start_time: '02:00',
+        duration_minutes: 180,
+        timezone: 'Europe/Moscow',
+        comment: 'cluster nights',
+      };
+      installFetchMock(
+        routes({
+          windows: { items: [], defaults: [clusterNights], status: { ...CLOSED_TILL_FRI_2, source: 'default' } },
+          freezes: { items: [] },
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      const status = await screen.findByTestId('mw-status');
+      expect(status.getAttribute('data-state')).toBe('closed');
+      expect(within(status).getByTestId('mw-status-sub').textContent).toBe('Opens Fri 30.10 at 02:00 · in 1 h 10 min · cluster nights');
+      expect(within(status).getByTestId('mw-status-default').textContent).toBe('cluster default windows');
+
+      expect(marks('2026-10-30')).toEqual([{ kind: 'default', ref: 'default', at: '8.33+12.50', text: 'cluster nights' }]);
+      // A default is set in Keeper's settings: its block opens no form.
+      expect(screen.getByTestId('mw-cal-day-2026-10-30').querySelector('button[data-testid="mw-cal-mark"]')).toBeNull();
+
+      const table = screen.getByTestId('mw-defaults-table');
+      expect(within(table).getByTestId('mw-default-row-0').textContent).toContain('Mon–Fri');
+      expect(within(table).queryAllByRole('button')).toEqual([]);
+      expect(screen.getByTestId('mw-defaults-note').textContent).toContain('maintenance.default_windows');
+      expect(screen.queryByTestId('mw-empty')).not.toBeInTheDocument();
+    });
+
+    it('no cluster default: an incarnation without windows is always open, with no default marks', async () => {
+      installFetchMock(
+        routes({
+          windows: { items: [], status: { open_now: true, next_start: FRI_0050.toISOString(), source: 'none' } },
+          freezes: { items: [] },
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      expect((await screen.findByTestId('mw-status')).getAttribute('data-state')).toBe('always');
+      expect(screen.queryByTestId('mw-status-default')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('mw-defaults-table')).not.toBeInTheDocument();
+      expect(screen.getByTestId('mw-empty')).toBeInTheDocument();
+    });
+
+    it('steps through weeks, back to today, and into a month grid of whole weeks', async () => {
+      installFetchMock(routes({ windows: { items: [NIGHT, MIGRATION], status: CLOSED_TILL_FRI_2 }, freezes: { items: [WEEKEND_SALE] } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      const range = await screen.findByTestId('mw-cal-range');
+      await user.click(screen.getByTestId('mw-cal-next'));
+      expect(range.textContent).toBe('2 – 8 November 2026');
+      expect(marks('2026-11-02')).toEqual([{ kind: 'weekly', ref: 'w-night', at: '8.33+12.50', text: 'night works' }]);
+      await user.click(screen.getByTestId('mw-cal-today'));
+      expect(range.textContent).toBe('26 October – 1 November 2026');
+
+      await user.click(screen.getByTestId('mw-cal-month'));
+      expect(screen.getByTestId('mw-calendar').dataset.view).toBe('month');
+      expect(range.textContent).toBe('October 2026');
+      // Monday 28.09 to Sunday 01.11: five whole weeks.
+      expect(screen.getByTestId('mw-cal-day-2026-09-28')).toBeInTheDocument();
+      expect(screen.getByTestId('mw-cal-day-2026-11-01')).toBeInTheDocument();
+      expect(screen.queryByTestId('mw-cal-day-2026-11-02')).not.toBeInTheDocument();
+      // The same marks in a day's cell, and the one-off window and freeze by name.
+      expect(marks('2026-10-30').map((m) => m.kind)).toEqual(['weekly', 'once']);
+      expect(screen.getByTestId('mw-cal-day-2026-10-30').textContent).toContain('database migration');
+      expect(screen.getByTestId('mw-cal-day-2026-10-31').textContent).toContain('freeze · Sale');
+      await user.click(screen.getByTestId('mw-cal-prev'));
+      expect(range.textContent).toBe('September 2026');
+    });
+
+    it('a click on a block opens its own edit form; a reader gets no clickable blocks', async () => {
+      installFetchMock(routes({ windows: { items: [NIGHT, MIGRATION], status: CLOSED_TILL_FRI_2 }, freezes: { items: [WEEKEND_SALE] } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await screen.findByTestId('mw-calendar');
+      const fri = screen.getByTestId('mw-cal-day-2026-10-30');
+      await user.click(fri.querySelector<HTMLElement>('[data-kind="once"]')!);
+      expect((screen.getByTestId('mw-once-start-date') as HTMLInputElement).value).toBe('2026-10-30');
+      expect((screen.getByTestId('mw-once-start-time') as HTMLInputElement).value).toBe('20:00');
+      expect((screen.getByTestId('mw-once-end-time') as HTMLInputElement).value).toBe('23:00');
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByTestId('mw-once-start-date')).not.toBeInTheDocument());
+
+      await user.click(fri.querySelector<HTMLElement>('[data-kind="weekly"]')!);
+      expect((screen.getByTestId('mw-start') as HTMLInputElement).value).toBe('02:00');
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByTestId('mw-start')).not.toBeInTheDocument());
+
+      await user.click(screen.getByTestId('mw-cal-day-2026-10-31').querySelector<HTMLElement>('[data-kind="freeze"]')!);
+      expect((screen.getByTestId('freeze-start-date') as HTMLInputElement).value).toBe('2026-10-31');
+    });
+
+    it('a block is named in full for a reader that cannot hover: kind, days, time, zone, comment', async () => {
+      installFetchMock(routes({ windows: { items: [NIGHT, MIGRATION], status: CLOSED_TILL_FRI_2 }, freezes: { items: [WEEKEND_SALE] } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      await screen.findByTestId('mw-calendar');
+      const fri = screen.getByTestId('mw-cal-day-2026-10-30');
+      expect(within(fri).getByRole('button', { name: 'Weekly window · Mon–Fri 02:00–05:00 Europe/Moscow · night works' })).toBeInTheDocument();
+      expect(within(fri).getByRole('button', { name: 'One-off window · 30.10 20:00 – 23:00 · database migration' })).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('mw-cal-day-2026-10-31')).getByRole('button', { name: 'Freeze · 31.10.2026 – 01.11.2026 · Sale' }),
+      ).toBeInTheDocument();
+    });
+
+    it('in a month the day strips are not targets; a note opens its form and the date opens its week', async () => {
+      installFetchMock(routes({ windows: { items: [NIGHT, MIGRATION], status: CLOSED_TILL_FRI_2 }, freezes: { items: [WEEKEND_SALE] } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-cal-month'));
+      expect(screen.getByTestId('mw-calendar').querySelectorAll('button[data-testid="mw-cal-mark"]')).toHaveLength(0);
+      expect(screen.getByTestId('mw-cal-zone').textContent).toBe(
+        'browser zone Europe/Moscow · click a date for its week, a name to change it',
+      );
+      const fri = screen.getByTestId('mw-cal-day-2026-10-30');
+      await user.click(within(fri).getByRole('button', { name: /database migration/ }));
+      expect((screen.getByTestId('mw-once-start-time') as HTMLInputElement).value).toBe('20:00');
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByTestId('mw-once-start-time')).not.toBeInTheDocument());
+
+      await user.click(within(screen.getByTestId('mw-cal-day-2026-10-12')).getByRole('button', { name: 'Open the week of Mon 12.10' }));
+      expect(screen.getByTestId('mw-calendar').dataset.view).toBe('week');
+      expect(screen.getByTestId('mw-cal-range').textContent).toBe('12 – 18 October 2026');
+    });
+
+    it('without incarnation.maintenance-set the calendar blocks are not buttons', async () => {
+      installFetchMock(routes({ perms: READER, windows: { items: [NIGHT, MIGRATION], status: CLOSED_TILL_FRI_2 } }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      await screen.findByTestId('mw-calendar');
+      await waitFor(() => expect(screen.queryByTestId('mw-add')).not.toBeInTheDocument());
+      expect(screen.getByTestId('mw-calendar').querySelectorAll('button[data-testid="mw-cal-mark"]')).toHaveLength(0);
+      expect(screen.getByTestId('mw-cal-zone').textContent).toBe('browser zone Europe/Moscow');
+    });
+
+    it('adds a one-off window: «Add window» asks the kind, the form takes a start and an end in the browser zone', async () => {
+      installFetchMock(routes({ extra: [{ method: 'POST', url: `${BASE}/maintenance-windows`, status: 201, body: MIGRATION }] }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-add'));
+      expect(screen.getByTestId('mw-add-weekly')).toBeInTheDocument();
+      await user.click(screen.getByTestId('mw-add-once'));
+      const fill = async (id: string, v: string) => {
+        const el = screen.getByTestId(id);
+        await user.clear(el);
+        await user.type(el, v);
+      };
+      await fill('mw-once-start-date', '2026-10-30');
+      await fill('mw-once-start-time', '20:00');
+      await fill('mw-once-end-date', '2026-10-30');
+      await fill('mw-once-end-time', '23:00');
+      await user.type(screen.getByTestId('mw-once-comment'), 'database migration');
+      await user.click(screen.getByTestId('mw-once-submit'));
+
+      await waitFor(() => expect(sent('POST', `${BASE}/maintenance-windows`)).toHaveLength(1));
+      expect(sent('POST', `${BASE}/maintenance-windows`)[0].body).toEqual({
+        kind: 'once',
+        starts_at: '2026-10-30T17:00:00.000Z',
+        ends_at: '2026-10-30T20:00:00.000Z',
+        comment: 'database migration',
+      });
+    });
+
+    it('refuses a one-off window that ends before it starts', async () => {
+      installFetchMock(routes());
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-add'));
+      await user.click(screen.getByTestId('mw-add-once'));
+      const end = screen.getByTestId('mw-once-end-date');
+      await user.clear(end);
+      await user.type(end, '2026-10-01');
+      await user.click(screen.getByTestId('mw-once-submit'));
+
+      expect(await screen.findByText('The end must be after the start.')).toBeInTheDocument();
+      expect(sent('POST', `${BASE}/maintenance-windows`)).toHaveLength(0);
+    });
+
+    it('refuses a new one-off window that has already ended', async () => {
+      installFetchMock(routes());
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-add'));
+      await user.click(screen.getByTestId('mw-add-once'));
+      for (const [id, v] of [
+        ['mw-once-start-date', '2026-10-28'],
+        ['mw-once-start-time', '20:00'],
+        ['mw-once-end-date', '2026-10-28'],
+        ['mw-once-end-time', '23:00'],
+      ]) {
+        const el = screen.getByTestId(id);
+        await user.clear(el);
+        await user.type(el, v);
+      }
+      await user.click(screen.getByTestId('mw-once-submit'));
+
+      expect(await screen.findByText(/This end has already passed/)).toBeInTheDocument();
+      expect(sent('POST', `${BASE}/maintenance-windows`)).toHaveLength(0);
+    });
+
+    it('an edit may keep a past end as it was, but may not set a new one', async () => {
+      installFetchMock(
+        routes({
+          windows: { items: [PAST_ONCE], status: { open_now: true, next_start: FRI_0050.toISOString() } },
+          extra: [{ method: 'PUT', url: `${BASE}/maintenance-windows/o-past`, body: PAST_ONCE }],
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-once-toggle-past'));
+      await user.click(screen.getByTestId('mw-edit-o-past'));
+      const end = screen.getByTestId('mw-once-end-time');
+      await user.clear(end);
+      await user.type(end, '22:00');
+      await user.click(screen.getByTestId('mw-once-submit'));
+      expect(await screen.findByText(/This end has already passed/)).toBeInTheDocument();
+
+      await user.clear(end);
+      await user.type(end, '21:00');
+      await user.type(screen.getByTestId('mw-once-comment'), ' rolled back');
+      await user.click(screen.getByTestId('mw-once-submit'));
+      await waitFor(() => expect(sent('PUT', `${BASE}/maintenance-windows/o-past`)).toHaveLength(1));
+      expect(sent('PUT', `${BASE}/maintenance-windows/o-past`)[0].body).toMatchObject({ ends_at: '2026-10-27T18:00:00.000Z', comment: 'hotfix rolled back' });
+    });
+
+    it('Escape closes the add menu even when focus has left its items', async () => {
+      installFetchMock(routes());
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-add'));
+      act(() => (document.activeElement as HTMLElement).blur());
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+
+    it('the add menu works from the keyboard: focus on the first kind, arrows move, Escape returns', async () => {
+      installFetchMock(routes());
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      const trigger = await screen.findByTestId('mw-add');
+      await user.click(trigger);
+      expect(screen.getByTestId('mw-add-weekly')).toHaveFocus();
+      await user.keyboard('{ArrowDown}');
+      expect(screen.getByTestId('mw-add-once')).toHaveFocus();
+      await user.keyboard('{ArrowDown}');
+      expect(screen.getByTestId('mw-add-weekly')).toHaveFocus();
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
+
+    it('edits a one-off window with PUT, its kind kept', async () => {
+      installFetchMock(
+        routes({
+          windows: { items: [MIGRATION], status: CLOSED_TILL_FRI_2 },
+          extra: [{ method: 'PUT', url: `${BASE}/maintenance-windows/o-mig`, body: MIGRATION }],
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-edit-o-mig'));
+      const end = screen.getByTestId('mw-once-end-time');
+      await user.clear(end);
+      await user.type(end, '23:30');
+      await user.click(screen.getByTestId('mw-once-submit'));
+
+      await waitFor(() => expect(sent('PUT', `${BASE}/maintenance-windows/o-mig`)).toHaveLength(1));
+      expect(sent('PUT', `${BASE}/maintenance-windows/o-mig`)[0].body).toEqual({
+        kind: 'once',
+        starts_at: '2026-10-30T17:00:00.000Z',
+        ends_at: '2026-10-30T20:30:00.000Z',
+        comment: 'database migration',
+      });
+    });
+
+    it('[GUARD] copy takes weekly and future one-off windows, never past ones', async () => {
+      installFetchMock(
+        routes({
+          windows: { items: [], status: { open_now: true, next_start: FRI_0050.toISOString() } },
+          extra: [
+            { method: 'GET', url: '/v1/incarnations?', body: { items: [], offset: 0, limit: 500, total: 0 } },
+            {
+              method: 'GET',
+              url: '/v1/incarnations/df-stage/maintenance-windows',
+              body: { items: [NIGHT, PAST_ONCE, MIGRATION], status: CLOSED },
+            },
+            { method: 'POST', url: `${BASE}/maintenance-windows`, status: 201, body: NIGHT },
+          ],
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('mw-copy-open'));
+      await user.type(screen.getByTestId('mw-copy-source'), 'df-stage');
+      await user.click(screen.getByTestId('mw-copy-load'));
+      const preview = await screen.findByTestId('mw-copy-preview');
+      expect(preview.textContent).toContain('30.10 20:00 – 23:00');
+      expect(within(preview).queryByText('hotfix')).not.toBeInTheDocument();
+      expect(screen.getByTestId('mw-copy-submit').textContent).toBe('Copy windows: 2');
+      await user.click(screen.getByTestId('mw-copy-submit'));
+
+      await waitFor(() => expect(sent('POST', `${BASE}/maintenance-windows`)).toHaveLength(2));
+      expect(sent('POST', `${BASE}/maintenance-windows`).map((c) => c.body)).toEqual([
+        { kind: 'weekly', days: NIGHT.days, start_time: '02:00', duration_minutes: 180, timezone: 'Europe/Moscow', comment: 'night works' },
+        { kind: 'once', starts_at: MIGRATION.starts_at, ends_at: MIGRATION.ends_at, comment: 'database migration' },
+      ]);
+    });
+
+    it('the retention notes give the effective numbers when the settings can be read', async () => {
+      const perms = permissions([
+        { resource: 'incarnation', action: 'get' },
+        { resource: 'setting', action: 'read' },
+      ]);
+      const setting = (key: string, value: string) => ({
+        key,
+        yaml_path: '',
+        type: 'duration',
+        bounds: '',
+        default: '72h',
+        value,
+        source: 'pg',
+        description: '',
+      });
+      installFetchMock(
+        routes({
+          perms,
+          extra: [
+            {
+              method: 'GET',
+              url: '/v1/settings',
+              body: {
+                items: [
+                  setting('cfg_maintenance_window_retention', '72h'),
+                  setting('cfg_maintenance_freeze_retention', '0s'),
+                ],
+              },
+            },
+          ],
+        }),
+      );
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId('mw-retention-window').textContent).toBe(
+          "Past one-off windows are deleted after 3 days — maintenance.window_retention in Keeper's settings.",
+        ),
+      );
+      expect(screen.getByTestId('mw-retention-freeze').textContent).toBe(
+        "Past freezes are kept: maintenance.freeze_retention in Keeper's settings is 0.",
+      );
+    });
+
+    it('without setting.read the retention notes name the setting, not a number, and the catalog is not asked', async () => {
+      installFetchMock(routes({ perms: READER }));
+      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
+
+      expect((await screen.findByTestId('mw-retention-window')).textContent).toBe(
+        "Past one-off windows are deleted after the retention set by maintenance.window_retention in Keeper's settings.",
+      );
+      expect(sent('GET', '/v1/settings')).toHaveLength(0);
+    });
   });
 });

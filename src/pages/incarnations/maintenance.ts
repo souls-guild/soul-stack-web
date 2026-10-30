@@ -5,7 +5,7 @@
 // These functions only render rows and instants, and convert form input to the wire.
 
 import { ApiError } from '../../api/client';
-import type { Freeze, MaintenanceWindow } from '../../api/keeper';
+import type { Freeze, MaintenanceDefaultWindow, MaintenanceWindow } from '../../api/keeper';
 
 /** The problem type Keeper answers an act during a freeze with (409, ADR-0093 §5). */
 export function isFreezeRefusal(err: unknown): err is ApiError {
@@ -39,6 +39,61 @@ const MS_PER_DAY = MINUTES_PER_DAY * MS_PER_MINUTE;
 
 export function isWeekday(s: string): s is Weekday {
   return (WEEKDAYS as readonly string[]).includes(s);
+}
+
+/** A row from a Keeper before one-off windows carries no kind, and is weekly. */
+export function isOnce(w: { kind?: string }): boolean {
+  return w.kind === 'once';
+}
+
+/**
+ * Whether a window still counts at `now` (NIM-1137): a weekly one always, a one-off
+ * one until its end. An ended one-off window stays listed until the Reaper deletes it.
+ */
+export function windowCounts(w: { kind?: string; ends_at?: string }, now: Date): boolean {
+  if (!isOnce(w)) return true;
+  const end = Date.parse(w.ends_at ?? '');
+  return Number.isNaN(end) || end > now.getTime();
+}
+
+/** Where a slot comes from: an own weekly window, a one-off window, or the cluster default. */
+export type SlotOrigin = 'weekly' | 'once' | 'default';
+
+/** A window row, or a cluster default slot set, which has no id. */
+export type SlotWindow = Partial<Omit<MaintenanceWindow, 'comment'>> & { comment?: string | null };
+
+export interface EffectiveWindow {
+  window: SlotWindow;
+  origin: SlotOrigin;
+}
+
+/**
+ * The windows in effect, the way keeper's calculator takes them (NIM-1138): the
+ * incarnation's own weekly windows, or the cluster default when it has none, plus
+ * every one-off window. An ended one-off window yields no slot ahead of its end.
+ */
+export function effectiveWindows(
+  items: readonly MaintenanceWindow[],
+  defaults: readonly MaintenanceDefaultWindow[] | null | undefined,
+): EffectiveWindow[] {
+  const own = items.filter((w) => !isOnce(w)).map((w): EffectiveWindow => ({ window: w, origin: 'weekly' }));
+  const weekly = own.length > 0 ? own : (defaults ?? []).map((d): EffectiveWindow => ({ window: d, origin: 'default' }));
+  return [...weekly, ...items.filter(isOnce).map((w): EffectiveWindow => ({ window: w, origin: 'once' }))];
+}
+
+/** Whether any window in effect counts at `now` — with none, a run may start at any time outside a freeze. */
+export function hasCountingWindows(windows: readonly EffectiveWindow[], now: Date): boolean {
+  return windows.some((e) => e.origin !== 'once' || windowCounts(e.window, now));
+}
+
+/**
+ * Whether no window is in effect at `now`, so a run may start at any time outside a
+ * freeze. A weekly set the server names as in effect (`source`, NIM-1138) settles it
+ * even when this browser holds no slots for it; otherwise the rows decide.
+ */
+export function noWindowsInEffect(source: string | undefined, windows: readonly EffectiveWindow[], now: Date): boolean {
+  if (source === 'own' || source === 'default') return false;
+  return !hasCountingWindows(windows, now);
 }
 
 /** "text · comment", or the text alone. Comments are never quoted. */
@@ -224,8 +279,9 @@ export function formatFreezeRange(startsAt: string, endsAt: string, tz: string):
   const e = new Date(endsAt);
   if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return `${startsAt} – ${endsAt}`;
   if (isWholeDays(startsAt, endsAt, tz)) {
-    const lastDay = new Date(e.getTime() - 1);
-    return `${formatDate(s, tz, false)} – ${formatDate(lastDay, tz, false)}`;
+    const first = formatDate(s, tz, false);
+    const last = formatDate(new Date(e.getTime() - 1), tz, false);
+    return first === last ? first : `${first} – ${last}`;
   }
   return `${formatDate(s, tz, true)} – ${formatDate(e, tz, true)}`;
 }
@@ -242,7 +298,10 @@ export function formatFreezeRangeShort(startsAt: string, endsAt: string, tz: str
   const last = whole ? new Date(e.getTime() - 1) : e;
   const year = wallParts(now, tz).year;
   const withYear = wallParts(s, tz).year !== year || wallParts(last, tz).year !== year;
-  return `${formatDate(s, tz, !whole, withYear)} – ${formatDate(last, tz, !whole, withYear)}`;
+  const from = formatDate(s, tz, !whole, withYear);
+  const to = formatDate(last, tz, !whole, withYear);
+  // One whole day is its date alone.
+  return whole && from === to ? from : `${from} – ${to}`;
 }
 
 export function isWholeDays(startsAt: string, endsAt: string, tz: string): boolean {
@@ -285,7 +344,7 @@ export function frozenUntil(freezes: readonly Freeze[], active: Freeze): Date {
   return new Date(end);
 }
 
-// --- slots, for the words of the status block ---
+// --- slots, for the words of the status block and for the calendar ---
 //
 // The server's status says whether a run may start now and when it next may. It
 // does not say where the open stretch ends or which window an opening belongs to,
@@ -298,7 +357,8 @@ export function frozenUntil(freezes: readonly Freeze[], active: Freeze): Date {
 export interface Slot {
   start: number;
   end: number;
-  window: MaintenanceWindow;
+  window: SlotWindow;
+  origin: SlotOrigin;
 }
 
 /**
@@ -316,25 +376,49 @@ function wallClockMs(y: number, m: number, d: number, minuteOfDay: number, tz: s
   return matches ? early : late;
 }
 
-function slotsNear(windows: readonly MaintenanceWindow[], at: number): Slot[] {
+/**
+ * Slots of the windows in effect on the local days `from`..`to` of each weekly
+ * window's own zone, both offsets in days from the local date of `at`. A one-off
+ * window is its one interval, wherever it falls.
+ */
+function slotsAround(windows: readonly EffectiveWindow[], at: number, from: number, to: number): Slot[] {
   const out: Slot[] = [];
-  for (const w of windows) {
-    const minute = parseHHMM(w.start_time);
-    if (minute === null || !isValidTimeZone(w.timezone)) continue;
-    const local = wallParts(new Date(at), w.timezone);
-    for (let i = -2; i <= 8; i++) {
+  for (const { window: w, origin } of windows) {
+    if (origin === 'once') {
+      const start = Date.parse(w.starts_at ?? '');
+      const end = Date.parse(w.ends_at ?? '');
+      if (!Number.isNaN(start) && !Number.isNaN(end) && end > start) out.push({ start, end, window: w, origin });
+      continue;
+    }
+    const minute = parseHHMM(w.start_time ?? '');
+    const tz = w.timezone ?? '';
+    if (minute === null || !isValidTimeZone(tz) || !w.duration_minutes) continue;
+    const local = wallParts(new Date(at), tz);
+    for (let i = from; i <= to; i++) {
       const day = new Date(Date.UTC(local.year, local.month - 1, local.day + i));
       // getUTCDay counts from Sunday, WEEKDAYS from Monday.
       if (!(w.days ?? []).includes(WEEKDAYS[(day.getUTCDay() + 6) % 7])) continue;
-      const start = wallClockMs(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), minute, w.timezone);
-      out.push({ start, end: start + w.duration_minutes * MS_PER_MINUTE, window: w });
+      const start = wallClockMs(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), minute, tz);
+      out.push({ start, end: start + w.duration_minutes * MS_PER_MINUTE, window: w, origin });
     }
   }
   return out;
 }
 
+function slotsNear(windows: readonly EffectiveWindow[], at: number): Slot[] {
+  return slotsAround(windows, at, -2, 8);
+}
+
+/** Every slot that overlaps [from, to). */
+export function slotsBetween(windows: readonly EffectiveWindow[], from: number, to: number): Slot[] {
+  // A slot starts at most a day before the local date it belongs to, whatever the
+  // zones, so two days of margin on either side catch every one that reaches in.
+  const days = Math.ceil((to - from) / MS_PER_DAY);
+  return slotsAround(windows, from, -2, days + 2).filter((s) => s.start < to && s.end > from);
+}
+
 /** The slot covering `at` that started last — the one an opening at `at` belongs to. */
-export function slotAt(windows: readonly MaintenanceWindow[], at: Date): Slot | null {
+export function slotAt(windows: readonly EffectiveWindow[], at: Date): Slot | null {
   const t = at.getTime();
   let best: Slot | null = null;
   for (const s of slotsNear(windows, t)) {
@@ -358,7 +442,7 @@ const OPEN_RUN_HORIZON_MS = 8 * MS_PER_DAY;
  * Where the open stretch holding `now` ends: the end of the chain of touching or
  * overlapping slots from `now`, cut short by the first freeze that starts inside it.
  */
-export function openRunEnd(windows: readonly MaintenanceWindow[], freezes: readonly Freeze[], now: Date): OpenRunEnd {
+export function openRunEnd(windows: readonly EffectiveWindow[], freezes: readonly Freeze[], now: Date): OpenRunEnd {
   const t0 = now.getTime();
   const horizon = t0 + OPEN_RUN_HORIZON_MS;
   let end = t0;
@@ -387,8 +471,8 @@ export function openRunEnd(windows: readonly MaintenanceWindow[], freezes: reado
  * no such instant is known; `freezes` undefined is a list that failed to load.
  */
 export function statusChangeAt(
-  status: { open_now: boolean; next_start: string; active_freeze?: Freeze },
-  windows: readonly MaintenanceWindow[],
+  status: { open_now: boolean; next_start: string; active_freeze?: Freeze; source?: string },
+  windows: readonly EffectiveWindow[],
   freezes: readonly Freeze[] | undefined,
   answeredAt: Date,
 ): Date | null {
@@ -403,7 +487,7 @@ export function statusChangeAt(
     at = new Date(first);
   } else if (!status.open_now) {
     at = new Date(status.next_start);
-  } else if (windows.length === 0) {
+  } else if (noWindowsInEffect(status.source, windows, answeredAt)) {
     const ahead = freezes ? nextFreeze(freezes, answeredAt) : undefined;
     at = ahead ? new Date(ahead.starts_at) : null;
   } else {
@@ -452,7 +536,7 @@ export function isoToWall(iso: string, tz: string): { date: string; time: string
   return { date: `${p.year}-${pad2(p.month)}-${pad2(p.day)}`, time: `${pad2(p.hour)}:${pad2(p.minute)}` };
 }
 
-function shiftDay(date: string, days: number): string {
+export function shiftDay(date: string, days: number): string {
   const dm = YMD_RE.exec(date);
   if (!dm) return date;
   const d = new Date(Date.UTC(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]) + days));
@@ -461,3 +545,238 @@ function shiftDay(date: string, days: number): string {
 
 export const nextDay = (date: string) => shiftDay(date, 1);
 export const prevDay = (date: string) => shiftDay(date, -1);
+
+/**
+ * A one-off window's interval: "30.10 20:00 – 23:00" within a day, "30.10 22:00 –
+ * 31.10 02:00" across one, a year on a date outside `now`'s.
+ */
+export function formatOnceRange(startsAt: string, endsAt: string, tz: string, now: Date = new Date()): string {
+  const s = new Date(startsAt);
+  const e = new Date(endsAt);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return `${startsAt} – ${endsAt}`;
+  const year = wallParts(now, tz).year;
+  const sp = wallParts(s, tz);
+  const ep = wallParts(e, tz);
+  const start = formatDate(s, tz, true, sp.year !== year);
+  const sameDay = sp.year === ep.year && sp.month === ep.month && sp.day === ep.day;
+  return `${start} – ${sameDay ? `${pad2(ep.hour)}:${pad2(ep.minute)}` : formatDate(e, tz, true, ep.year !== year)}`;
+}
+
+/**
+ * A runtime setting's duration as keeper writes it ("72h", "90m", "1h30m0s") →
+ * milliseconds; null when it does not parse.
+ */
+export function parseGoDuration(s: string): number | null {
+  const units: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1000, ms: 1 };
+  const text = s.trim();
+  if (text === '0') return 0;
+  const re = /(\d+(?:\.\d+)?)(ms|h|m|s)/gy;
+  let total = 0;
+  let matched = 0;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    total += Number(m[1]) * units[m[2]];
+    matched = re.lastIndex;
+  }
+  return matched > 0 && matched === text.length ? total : null;
+}
+
+/**
+ * "3 days", "36 hours", "90 minutes" — the largest whole unit, in `lang`. Intl gives
+ * the nominative, so a Russian sentence must put the number where the nominative fits.
+ */
+export function formatRetention(ms: number, lang: string): string {
+  const fmt = (n: number, unit: 'day' | 'hour' | 'minute') =>
+    new Intl.NumberFormat(lang, { style: 'unit', unit, unitDisplay: 'long' }).format(n);
+  if (ms % MS_PER_DAY === 0) return fmt(ms / MS_PER_DAY, 'day');
+  if (ms % 3_600_000 === 0) return fmt(ms / 3_600_000, 'hour');
+  return fmt(Math.max(1, Math.round(ms / MS_PER_MINUTE)), 'minute');
+}
+
+// --- the calendar ---
+//
+// A day is a row from its midnight to the next one in the browser's zone, the zone
+// the status block speaks in. A slot is drawn on every day it overlaps, so one past
+// midnight shows on both; a freeze splits a slot into what may still open and what
+// it cancels. Like the slots above, this only draws: it never decides whether a
+// run may start.
+
+export type MarkKind = SlotOrigin | 'cut' | 'freeze';
+
+export interface CalendarMark {
+  kind: MarkKind;
+  /** Offset and width, in percent of the day. */
+  left: number;
+  width: number;
+  /** The piece goes on from the day before, or onto the day after. */
+  fromPrev: boolean;
+  toNext: boolean;
+  /** The first piece of its slot or freeze in view: the one that carries its words. */
+  lead: boolean;
+  slot?: Slot;
+  freeze?: Freeze;
+}
+
+export interface CalendarDay {
+  /** YYYY-MM-DD on the wall clock of the zone. */
+  date: string;
+  weekday: Weekday;
+  start: number;
+  end: number;
+  marks: CalendarMark[];
+}
+
+/** YYYY-MM-DD of the instant on the wall clock of `tz`. */
+export function wallDate(d: Date, tz: string): string {
+  const p = wallParts(d, tz);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+function ymd(date: string): [number, number, number] {
+  const dm = YMD_RE.exec(date);
+  return dm ? [Number(dm[1]), Number(dm[2]), Number(dm[3])] : [1970, 1, 1];
+}
+
+/** Weekday of a YYYY-MM-DD date. */
+export function weekdayOf(date: string): Weekday {
+  const [y, m, d] = ymd(date);
+  return WEEKDAYS[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7];
+}
+
+/** The Monday of the week holding `date`. */
+export function weekStart(date: string): string {
+  return shiftDay(date, -WEEKDAYS.indexOf(weekdayOf(date)));
+}
+
+/** The first day of the month holding `date`, and the same day shifted by `months`. */
+export function monthStart(date: string, months = 0): string {
+  const [y, m] = ymd(date);
+  const d = new Date(Date.UTC(y, m - 1 + months, 1));
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-01`;
+}
+
+/** Whole weeks, Monday to Sunday, that cover the month holding `date`. */
+export function monthGrid(date: string): { first: string; count: number } {
+  const first = weekStart(monthStart(date));
+  const last = prevDay(monthStart(date, 1));
+  const lastSunday = shiftDay(last, 6 - WEEKDAYS.indexOf(weekdayOf(last)));
+  const [y1, m1, d1] = ymd(first);
+  const [y2, m2, d2] = ymd(lastSunday);
+  return { first, count: Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / MS_PER_DAY) + 1 };
+}
+
+/**
+ * Where an instant falls on its day's row, in percent: by the wall clock, so a
+ * block lines up with the hour scale on the 23- and 25-hour days of a DST change.
+ */
+export function dayPosition(t: number, day: { start: number; end: number }, tz: string): number {
+  if (t <= day.start) return 0;
+  if (t >= day.end) return 100;
+  const p = wallParts(new Date(t), tz);
+  return ((p.hour * 60 + p.minute) / MINUTES_PER_DAY) * 100;
+}
+
+function dayStartMs(date: string, tz: string): number {
+  const [y, m, d] = ymd(date);
+  return wallClockMs(y, m, d, 0, tz);
+}
+
+/** Touching or overlapping freezes as one interval each. */
+function frozenSpans(freezes: readonly Freeze[]): Array<[number, number]> {
+  const spans = freezes
+    .map((f): [number, number] => [Date.parse(f.starts_at), Date.parse(f.ends_at)])
+    .filter(([s, e]) => !Number.isNaN(s) && !Number.isNaN(e) && e > s)
+    .sort((a, b) => a[0] - b[0]);
+  const out: Array<[number, number]> = [];
+  for (const [s, e] of spans) {
+    const last = out[out.length - 1];
+    if (last && s <= last[1]) last[1] = Math.max(last[1], e);
+    else out.push([s, e]);
+  }
+  return out;
+}
+
+/** [start, end) of a slot split into the parts a freeze cancels and the parts it leaves. */
+function cutByFreezes(start: number, end: number, spans: ReadonlyArray<[number, number]>): Array<{ start: number; end: number; cut: boolean }> {
+  const out: Array<{ start: number; end: number; cut: boolean }> = [];
+  let at = start;
+  for (const [s, e] of spans) {
+    if (e <= at || s >= end) continue;
+    if (s > at) out.push({ start: at, end: s, cut: false });
+    out.push({ start: Math.max(s, at), end: Math.min(e, end), cut: true });
+    at = Math.min(e, end);
+  }
+  if (at < end) out.push({ start: at, end, cut: false });
+  return out;
+}
+
+/** `count` days from `first` in `tz`, each with the marks of the windows in effect and the freezes. */
+export function calendarDays(
+  first: string,
+  count: number,
+  tz: string,
+  windows: readonly EffectiveWindow[],
+  freezes: readonly Freeze[],
+): CalendarDay[] {
+  const dates = Array.from({ length: count }, (_, i) => shiftDay(first, i));
+  const bounds = [...dates, shiftDay(first, count)].map((d) => dayStartMs(d, tz));
+  const from = bounds[0];
+  const to = bounds[count];
+
+  interface Piece {
+    kind: MarkKind;
+    start: number;
+    end: number;
+    // The slot or freeze the piece belongs to, whose own start decides the lead.
+    whole: number;
+    slot?: Slot;
+    freeze?: Freeze;
+  }
+  const pieces: Piece[] = [];
+  const spans = frozenSpans(freezes);
+  for (const slot of slotsBetween(windows, from, to)) {
+    for (const p of cutByFreezes(slot.start, slot.end, spans)) {
+      pieces.push({ kind: p.cut ? 'cut' : slot.origin, start: p.start, end: p.end, whole: slot.start, slot });
+    }
+  }
+  for (const f of freezes) {
+    const s = Date.parse(f.starts_at);
+    const e = Date.parse(f.ends_at);
+    if (!Number.isNaN(s) && !Number.isNaN(e) && e > s && s < to && e > from) {
+      pieces.push({ kind: 'freeze', start: s, end: e, whole: s, freeze: f });
+    }
+  }
+
+  return dates.map((date, i) => {
+    const start = bounds[i];
+    const end = bounds[i + 1];
+    const day = { start, end };
+    const marks: CalendarMark[] = [];
+    for (const p of pieces) {
+      const s = Math.max(p.start, start);
+      const e = Math.min(p.end, end);
+      if (e <= s) continue;
+      const left = dayPosition(s, day, tz);
+      const right = dayPosition(e, day, tz);
+      marks.push({
+        kind: p.kind,
+        left,
+        // An end inside the hour an autumn change repeats can read left of its start
+        // on the wall clock; the elapsed length is the honest width there.
+        width: right > left ? right - left : ((e - s) / (end - start)) * 100,
+        fromPrev: p.start < start,
+        toNext: p.end > end,
+        lead: s === Math.max(p.whole, from),
+        slot: p.slot,
+        freeze: p.freeze,
+      });
+    }
+    // Windows under freezes, each layer in time order.
+    marks.sort((a, b) => Number(a.kind === 'freeze') - Number(b.kind === 'freeze') || a.left - b.left);
+    // A freeze that starts its words on this row speaks for what it cancels under them.
+    const worded = marks.filter((m) => m.kind === 'freeze' && m.lead);
+    for (const m of marks) {
+      if (m.kind === 'cut' && worded.some((f) => m.left >= f.left && m.left < f.left + f.width)) m.lead = false;
+    }
+    return { date, weekday: weekdayOf(date), start, end, marks };
+  });
+}

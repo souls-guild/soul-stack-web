@@ -2,8 +2,10 @@ import { useQueries } from '@tanstack/react-query';
 import { keeperApi, type Freeze, type MaintenanceStatus } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import {
+  effectiveWindows,
   freezeCovers,
   freezesKey,
+  noWindowsInEffect,
   windowsKey,
 } from '../incarnations/maintenance';
 
@@ -76,7 +78,9 @@ export function useTargetMaintenance(incarnations: string[], enabled: boolean, s
     const freeze = future && startAt
       ? (freezeQs[i]?.data?.items ?? []).find((f) => freezeCovers(f, startAt))
       : w.status.active_freeze;
-    return { name, status: w.status, hasWindows: (w.items ?? []).length > 0, freeze };
+    // An ended one-off window does not count, and the cluster default does (NIM-1137/1138).
+    const hasWindows = !noWindowsInEffect(w.status.source, effectiveWindows(w.items ?? [], w.defaults), new Date());
+    return { name, status: w.status, hasWindows, freeze };
   });
   const frozen = targets.filter((x) => x.freeze);
   const frozenKey = frozen.map((x) => `${x.name}:${x.freeze?.id}`).sort().join(',');

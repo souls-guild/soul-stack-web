@@ -69,6 +69,12 @@
   color: color-mix(in srgb, var(--danger) 80%, var(--text));
 }
 
+.chip.neutral {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 75%, var(--text));
+}
+
 .closed .dot {
   background: var(--surface-2);
   border: 1px solid var(--border-strong);

@@ -416,9 +416,12 @@ export type VoiceListReply = components['schemas']['VoiceListReply'];
 // the server's status block — the UI never re-derives "open now" or the next start.
 export type MaintenanceWindow = components['schemas']['MaintenanceWindow'];
 export type MaintenanceWindowRequest = components['schemas']['MaintenanceWindowRequest'];
-export type MaintenanceWindowListReply = components['schemas']['MaintenanceWindowListReply'];
 export type MaintenanceStatus = components['schemas']['MaintenanceStatus'];
+// A slot set of the cluster default (NIM-1138): a weekly window without an id.
+export type MaintenanceDefaultWindow = components['schemas']['MaintenanceDefaultWindow'];
+export type MaintenanceWindowListReply = components['schemas']['MaintenanceWindowListReply'];
 export type Freeze = components['schemas']['Freeze'];
+export type SettingsCatalogReply = components['schemas']['SettingsCatalogReply'];
 export type FreezeRequest = components['schemas']['FreezeRequest'];
 export type FreezeListReply = components['schemas']['FreezeListReply'];
 
@@ -1088,6 +1091,11 @@ export const keeperApi = {
         `/v1/incarnations/${encodeURIComponent(incarnation)}/freezes/${encodeURIComponent(freezeId)}`,
         'DELETE',
       ),
+  },
+
+  // Runtime settings catalog: every admitted key with its effective value. Permission setting.read.
+  settings: {
+    list: () => apiGet<SettingsCatalogReply>('/v1/settings'),
   },
 
   // HA topology of the Keeper cluster (Conclave registry) + self_health of the current instance.

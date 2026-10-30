@@ -857,7 +857,7 @@ export interface paths {
         };
         /**
          * List the incarnation's freezes
-         * @description Every freeze of the incarnation, past ones included, ordered by start. During a freeze no automatic run starts, with or without windows; a forced run needs explicit consent. Permission incarnation.get. Read-only, no audit.
+         * @description Every freeze of the incarnation, past ones included until the Reaper deletes them after `maintenance.freeze_retention`, ordered by start. During a freeze no automatic run starts, with or without windows; a forced run needs explicit consent. Permission incarnation.get. Read-only, no audit.
          */
         get: operations["listIncarnationFreezes"];
         put?: never;
@@ -945,13 +945,13 @@ export interface paths {
         };
         /**
          * List the incarnation's maintenance windows
-         * @description Every maintenance window of the incarnation in creation order, plus `status`: whether a run may start now (`open_now`), the first instant it may (`next_start`, now itself when open) and the freeze in force (`active_freeze`). The status is computed over the windows AND the freezes: no windows means any time, and a freeze closes everything while it lasts. A window gates the start of a run; a started run is never cut off when the slot ends. Permission incarnation.get. Read-only, no audit.
+         * @description Every maintenance window of the incarnation in creation order, the cluster default `defaults` when it applies (the runtime setting maintenance.default_windows, for an incarnation with no weekly window of its own; its once windows add to it), plus `status`: whether a run may start now (`open_now`), the first instant it may (`next_start`, now itself when open), the freeze in force (`active_freeze`) and where the windows in effect come from (`source`: own, default or none). The status is computed over the windows in effect AND the freezes: no windows in effect means any time, and a freeze closes everything while it lasts. A `once` window counts only until its `ends_at`; one that has ended is still listed until the Reaper deletes it after `maintenance.window_retention`, and an incarnation whose only windows have ended is open at any time unless the default holds it. A window gates the start of a run; a started run is never cut off when the slot ends. Permission incarnation.get. Read-only, no audit.
          */
         get: operations["listIncarnationMaintenanceWindows"];
         put?: never;
         /**
          * Add a maintenance window to an incarnation
-         * @description Adds a weekly slot set: on each listed day a slot starts at start_time in timezone and lasts duration_minutes (may cross midnight). 422 on a refused field or when the incarnation already has 50 windows. Audit maintenance_window.created. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         * @description Adds a window. `kind: weekly` (the default when `kind` is omitted) is a slot set: on each listed day a slot starts at start_time in timezone and lasts duration_minutes (may cross midnight). `kind: once` is one interval [starts_at, ends_at). Each kind takes only its own fields: a field of the other kind is 422 naming it. 422 also on any other refused field or when the incarnation already has 50 windows of both kinds together. Audit maintenance_window.created. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
          */
         post: operations["createIncarnationMaintenanceWindow"];
         delete?: never;
@@ -970,13 +970,13 @@ export interface paths {
         get?: never;
         /**
          * Replace a maintenance window
-         * @description Replaces every field of the window. 404 when no window with that id belongs to this incarnation. Audit maintenance_window.updated, with the fields before the change under `previous`. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         * @description Replaces every field of the window, its kind included; an omitted `kind` is `weekly`. 404 when no window with that id belongs to this incarnation. Audit maintenance_window.updated, with the fields before the change under `previous`. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
          */
         put: operations["updateIncarnationMaintenanceWindow"];
         post?: never;
         /**
          * Delete a maintenance window
-         * @description Deletes the window. Not idempotent: deleting it again is 404. Deleting the last window makes the incarnation open at any time outside a freeze. Audit maintenance_window.deleted. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
+         * @description Deletes the window. Not idempotent: deleting it again is 404. Deleting the last window that counts makes the incarnation open at any time outside a freeze, or held to the cluster default when it is set. Audit maintenance_window.deleted. Permission incarnation.maintenance-set, the same incarnation scope as every other incarnation mutation; allowed in any incarnation status, since a window only decides when a FUTURE run may start.
          */
         delete: operations["deleteIncarnationMaintenanceWindow"];
         options?: never;
@@ -4055,6 +4055,25 @@ export interface components {
              */
             password: string;
         };
+        MaintenanceDefaultWindow: {
+            comment: string;
+            /** @description weekdays a slot starts on, in calendar order */
+            days: string[] | null;
+            /**
+             * Format: int64
+             * @description slot length in minutes
+             */
+            duration_minutes: number;
+            /**
+             * @description always weekly
+             * @enum {string}
+             */
+            kind: "weekly";
+            /** @description HH:MM in timezone */
+            start_time: string;
+            /** @description IANA zone of start_time */
+            timezone: string;
+        };
         MaintenanceStatus: {
             /** @description the freeze in force now - the one that ends last when several overlap; absent when none */
             active_freeze?: components["schemas"]["Freeze"];
@@ -4063,43 +4082,84 @@ export interface components {
              * @description the first instant at or after now at which a run may start; now itself when open_now
              */
             next_start: string;
-            /** @description a run may start now: inside a slot of some window (or there are no windows) and outside every freeze */
+            /** @description a run may start now: inside a window in effect (or none is in effect, a once window that has ended counting as none) and outside every freeze */
             open_now: boolean;
+            /**
+             * @description where the windows in effect come from: own - the incarnation's (a weekly window, or with no cluster default a once window that has not ended); default - the cluster default in defaults, with the incarnation's own once windows added; none - nothing counts, a run may start at any time outside a freeze
+             * @enum {string}
+             */
+            source: "own" | "default" | "none";
         };
         MaintenanceWindow: {
             comment: string;
             /** Format: date-time */
             created_at: string;
-            /** @description weekdays a slot starts on, in calendar order */
-            days: string[] | null;
-            /** Format: int64 */
-            duration_minutes: number;
+            /** @description weekly: weekdays a slot starts on, in calendar order */
+            days?: string[] | null;
+            /**
+             * Format: int64
+             * @description weekly: slot length in minutes
+             */
+            duration_minutes?: number;
+            /**
+             * Format: date-time
+             * @description once: end, exclusive. A once window whose end has passed is listed until the Reaper deletes it, and no longer counts
+             */
+            ends_at?: string;
             /** @description window id (UUID) */
             id: string;
-            /** @description HH:MM in timezone */
-            start_time: string;
-            timezone: string;
+            /**
+             * @description weekly or once
+             * @enum {string}
+             */
+            kind: "weekly" | "once";
+            /** @description weekly: HH:MM in timezone */
+            start_time?: string;
+            /**
+             * Format: date-time
+             * @description once: start, inclusive
+             */
+            starts_at?: string;
+            /** @description weekly: IANA zone of start_time */
+            timezone?: string;
             /** Format: date-time */
             updated_at: string;
         };
         MaintenanceWindowListReply: {
+            /** @description the cluster default (runtime setting maintenance.default_windows), present only when it applies: the incarnation has no weekly window of its own. Its own once windows add to it; one weekly window of its own replaces it */
+            defaults?: components["schemas"]["MaintenanceDefaultWindow"][] | null;
             items: components["schemas"]["MaintenanceWindow"][] | null;
             status: components["schemas"]["MaintenanceStatus"];
         };
         MaintenanceWindowRequest: {
             /** @description free text, at most 500 characters */
             comment?: string;
-            /** @description weekdays a slot starts on; a slot belongs to the day it starts on, even when it crosses midnight */
-            days: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[] | null;
+            /** @description weekly, required: weekdays a slot starts on; a slot belongs to the day it starts on, even when it crosses midnight */
+            days?: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[] | null;
             /**
              * Format: int64
-             * @description slot length in minutes of elapsed time, at most a day; a slot over a DST change still lasts exactly this long
+             * @description weekly, required: slot length in minutes of elapsed time, at most a day; a slot over a DST change still lasts exactly this long
              */
-            duration_minutes: number;
-            /** @description wall-clock start of each slot, HH:MM, in timezone. A time the spring DST change skips moves forward by the gap; a time the autumn change repeats is its first occurrence */
-            start_time: string;
-            /** @description IANA zone of start_time, e.g. Europe/Moscow or UTC; names that depend on the Keeper host (Local, localtime, posix/...) are refused */
-            timezone: string;
+            duration_minutes?: number;
+            /**
+             * Format: date-time
+             * @description once, required: end of the window, RFC 3339 (exclusive); after starts_at. Once it has passed the window no longer counts
+             */
+            ends_at?: string;
+            /**
+             * @description weekly (the default when omitted) or once; each kind takes only its own fields, and a field of the other kind is refused with 422 naming it
+             * @enum {string}
+             */
+            kind?: "weekly" | "once";
+            /** @description weekly, required: wall-clock start of each slot, HH:MM, in timezone. A time the spring DST change skips moves forward by the gap; a time the autumn change repeats is its first occurrence */
+            start_time?: string;
+            /**
+             * Format: date-time
+             * @description once, required: start of the window, RFC 3339 (inclusive)
+             */
+            starts_at?: string;
+            /** @description weekly, required: IANA zone of start_time, e.g. Europe/Moscow or UTC; names that depend on the Keeper host (Local, localtime, posix/...) are refused */
+            timezone?: string;
         };
         ModuleCatalogItem: {
             description?: string;
@@ -5092,13 +5152,13 @@ export interface components {
             /** @enum {string} */
             source: "default" | "file" | "pg";
             /** @enum {string} */
-            type: "float" | "int" | "duration" | "bool" | "string";
+            type: "float" | "int" | "duration" | "bool" | "string" | "weekly_windows";
             /** @description effective value on this instance */
             value: unknown;
             yaml_path: string;
         };
         SettingUpdateRequest: {
-            /** @description new value in text form (e.g. "0.5"); parsed and range-checked by the field registry */
+            /** @description new value in text form (e.g. "0.5"; a JSON array as text for a weekly_windows key); parsed and range-checked by the field registry */
             value: string;
         };
         SettingsCatalogReply: {

@@ -127,6 +127,52 @@ export const maintenanceWindowSchema = z
 
 export type MaintenanceWindowFormValues = z.infer<typeof maintenanceWindowSchema>;
 
+// One-off window form (NIM-1137): a start and an end, date + time on the wall clock
+// of the browser's zone, the end exclusive as on the wire.
+export const onceWindowSchema = z
+  .object({
+    startDate: z.string().regex(YMD, 'incarnations:freezeDateRequired'),
+    startTime: z.string().regex(HHMM, 'incarnations:mwTimeFormat'),
+    endDate: z.string().regex(YMD, 'incarnations:freezeDateRequired'),
+    endTime: z.string().regex(HHMM, 'incarnations:mwTimeFormat'),
+    comment: z.string().trim().max(500, 'incarnations:mwCommentMax'),
+  })
+  .superRefine((v, ctx) => {
+    const range = onceRangeFromForm(v, browserTimeZone());
+    if (range && new Date(range.ends_at) <= new Date(range.starts_at)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'incarnations:freezeEndBeforeStart' });
+    }
+  });
+
+export type OnceWindowFormValues = z.infer<typeof onceWindowSchema>;
+
+/**
+ * The one-off form for a window whose end is `keptEnd` (undefined → a new window).
+ * An end set now must still be ahead: a window that has ended no longer counts, and
+ * saved, it would go straight behind «Show past windows». An edit that leaves a past
+ * end as it was (fixing a comment) is let through.
+ */
+export function onceWindowSchemaFor(keptEnd?: string) {
+  return onceWindowSchema.superRefine((v, ctx) => {
+    const range = onceRangeFromForm(v, browserTimeZone());
+    if (!range) return;
+    const end = Date.parse(range.ends_at);
+    if (end <= Date.now() && end !== Date.parse(keptEnd ?? '')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'incarnations:mwOnceEndPassed' });
+    }
+  });
+}
+
+/** The wire interval of a one-off window form in `tz`. */
+export function onceRangeFromForm(
+  v: { startDate: string; startTime: string; endDate: string; endTime: string },
+  tz: string,
+): { starts_at: string; ends_at: string } | null {
+  const starts = wallToIso(v.startDate, v.startTime, tz);
+  const ends = wallToIso(v.endDate, v.endTime, tz);
+  return starts && ends ? { starts_at: starts, ends_at: ends } : null;
+}
+
 // Freeze form: whole days (date inputs, last day inclusive) or exact moments
 // (date + time). Both are wall clock in the browser's zone.
 export const freezeSchema = z

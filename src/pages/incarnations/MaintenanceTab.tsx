@@ -1,22 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, ChevronDown, Copy, Pencil, Plus, Repeat, Trash2 } from 'lucide-react';
 import { Badge, Button } from '../../components/primitives';
-import { keeperApi, type Freeze, type MaintenanceStatus, type MaintenanceWindow } from '../../api/keeper';
+import {
+  keeperApi,
+  type Freeze,
+  type MaintenanceDefaultWindow,
+  type MaintenanceStatus,
+  type MaintenanceWindow,
+} from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
 import {
   browserTimeZone,
+  effectiveWindows,
   formatDays,
   formatFreezeRange,
+  formatFreezeRangeShort,
+  formatOnceRange,
+  formatRetention,
   freezeCovers,
   freezesKey,
+  isOnce,
+  parseGoDuration,
   slotEnd,
   statusChangeAt,
   STATUS_REFRESH,
+  windowCounts,
   windowsKey,
   withComment,
+  type EffectiveWindow,
   type Weekday,
 } from './maintenance';
 import {
@@ -26,12 +40,16 @@ import {
   NextDayMark,
   WindowModal,
   type DeleteTarget,
+  type WindowKind,
 } from './MaintenanceModals';
+import { MaintenanceCalendar } from './MaintenanceCalendar';
 import { MaintenanceStatusBlock } from './MaintenanceStatusBlock';
 import styles from '../common.module.css';
+import css from './MaintenanceTab.module.css';
 
-// The maintenance windows tab (ADR-0093, NIM-1076): the server's status over an
-// incarnation's windows and freezes, then both lists.
+// The maintenance windows tab (ADR-0093, NIM-1076, NIM-1136): the server's status
+// over an incarnation's windows and freezes, a calendar of them, then the lists —
+// weekly windows, one-off windows, freezes.
 
 function isDegraded(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 404 || err.status === 501);
@@ -45,6 +63,12 @@ function freezePhase(f: Freeze, now: Date): FreezePhase {
 }
 
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
+// The runtime settings that delete past one-off windows and freezes (NIM-1137).
+const RETENTION = {
+  window: { key: 'cfg_maintenance_window_retention', path: 'maintenance.window_retention' },
+  freeze: { key: 'cfg_maintenance_freeze_retention', path: 'maintenance.freeze_retention' },
+} as const;
 
 function useNow(intervalMs: number): Date {
   const [now, setNow] = useState(() => new Date());
@@ -63,7 +87,7 @@ function useNow(intervalMs: number): Date {
  */
 function useRefetchAtChange(
   status: MaintenanceStatus | undefined,
-  windows: MaintenanceWindow[],
+  windows: EffectiveWindow[],
   freezes: Freeze[] | undefined,
   answeredAt: number,
   refetch: () => unknown,
@@ -94,18 +118,98 @@ function useRefetchAtChange(
   }, [status, windows, freezes, answeredAt, refetch]);
 }
 
-export function MaintenanceTab({ incarnationName }: { incarnationName: string }) {
+/** «Add window», which asks which kind first. */
+function AddWindowMenu({ onPick }: { onPick: (kind: WindowKind) => void }) {
   const { t } = useTranslation();
-  const { hasPermission } = useMyPermissions();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    ref.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    const away = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    // On the document, not the menu: a click on the menu's own padding takes focus off its items.
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      ref.current?.querySelector<HTMLButtonElement>('[aria-haspopup]')?.focus();
+    };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
+
+  function onMenuKey(e: React.KeyboardEvent) {
+    const list = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    const at = list.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      list[(at + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length]?.focus();
+    } else if (e.key === 'Tab') {
+      setOpen(false);
+    }
+  }
+
+  const pick = (kind: WindowKind) => {
+    setOpen(false);
+    onPick(kind);
+  };
+
+  return (
+    <div className={css.menuWrap} ref={ref}>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-testid="mw-add"
+      >
+        <Plus size={14} />
+        {t('incarnations:mwAdd')}
+        <ChevronDown size={13} className={css.caret} />
+      </Button>
+      {open ? (
+        <div className={css.menu} role="menu" onKeyDown={onMenuKey}>
+          <button type="button" role="menuitem" className={css.menuItem} onClick={() => pick('weekly')} data-testid="mw-add-weekly">
+            <Repeat size={15} className={css.menuIcon} />
+            <span>
+              <b>{t('incarnations:mwAddWeekly')}</b>
+              <small>{t('incarnations:mwAddWeeklyHint')}</small>
+            </span>
+          </button>
+          <button type="button" role="menuitem" className={css.menuItem} onClick={() => pick('once')} data-testid="mw-add-once">
+            <CalendarClock size={15} className={css.menuIcon} />
+            <span>
+              <b>{t('incarnations:mwAddOnce')}</b>
+              <small>{t('incarnations:mwAddOnceHint')}</small>
+            </span>
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function MaintenanceTab({ incarnationName }: { incarnationName: string }) {
+  const { t, i18n } = useTranslation();
+  const { hasPermission, permissions } = useMyPermissions();
   const canWrite = hasPermission('incarnation.maintenance-set');
+  // Not optimistic: a number nobody may read is not worth a 403.
+  const canReadSettings = permissions !== undefined && hasPermission('setting.read');
   const tz = browserTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
 
-  const [windowModal, setWindowModal] = useState<{ editing: MaintenanceWindow | null } | null>(null);
+  const [windowModal, setWindowModal] = useState<{ editing: MaintenanceWindow | null; kind: WindowKind } | null>(null);
   const [freezeModal, setFreezeModal] = useState<{ editing: Freeze | null } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
   const [showPast, setShowPast] = useState(false);
+  const [showPastOnce, setShowPastOnce] = useState(false);
 
   const windows = useQuery({
     queryKey: windowsKey(incarnationName),
@@ -121,26 +225,63 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
     retry: false,
     refetchInterval: STATUS_REFRESH.beatMs,
   });
+  // Only for the number in the retention notes: without setting.read they say none.
+  const settings = useQuery({
+    queryKey: ['settings-catalog'],
+    queryFn: () => keeperApi.settings.list(),
+    enabled: canReadSettings,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
 
-  const windowRows = windows.data?.items ?? [];
-  const freezeRows = freezes.data?.items ?? [];
+  const windowRows = useMemo(() => windows.data?.items ?? [], [windows.data]);
+  const freezeRows = useMemo(() => freezes.data?.items ?? [], [freezes.data]);
+  const effective = useMemo(
+    () => effectiveWindows(windows.data?.items ?? [], windows.data?.defaults),
+    [windows.data],
+  );
+  const weeklyRows = windowRows.filter((w) => !isOnce(w));
+  const defaultRows: MaintenanceDefaultWindow[] = weeklyRows.length === 0 ? (windows.data?.defaults ?? []) : [];
+  const onceRows = windowRows.filter(isOnce).sort((a, b) => Date.parse(a.starts_at ?? '') - Date.parse(b.starts_at ?? ''));
+
   // A fresh answer is read against the time it arrived, not the last tick.
   const tick = useNow(STATUS_REFRESH.tickMs);
   const now = new Date(Math.max(tick.getTime(), windows.dataUpdatedAt, freezes.dataUpdatedAt));
   const visibleFreezes = freezeRows.filter((f) => showPast || freezePhase(f, now) !== 'past');
-  const pastCount = freezeRows.length - freezeRows.filter((f) => freezePhase(f, now) !== 'past').length;
+  const pastCount = freezeRows.filter((f) => freezePhase(f, now) === 'past').length;
+  const visibleOnce = onceRows.filter((w) => showPastOnce || windowCounts(w, now));
+  const pastOnceCount = onceRows.filter((w) => !windowCounts(w, now)).length;
 
   useRefetchAtChange(
     freezes.isLoading ? undefined : windows.data?.status,
-    windowRows,
+    effective,
     freezes.data ? freezeRows : undefined,
     windows.dataUpdatedAt,
     windows.refetch,
   );
 
   function windowSummary(w: MaintenanceWindow): string {
-    const end = slotEnd(w.start_time, w.duration_minutes);
+    if (isOnce(w)) {
+      return withComment(formatOnceRange(w.starts_at ?? '', w.ends_at ?? '', tz, now), w.comment);
+    }
+    const end = slotEnd(w.start_time ?? '', w.duration_minutes ?? 0);
     return withComment(`${formatDays(w.days, dayLabel)} ${w.start_time}–${end.end} ${w.timezone}`, w.comment);
+  }
+
+  function retentionNote(kind: 'window' | 'freeze') {
+    const { key, path } = RETENTION[kind];
+    const value = settings.data?.items?.find((s) => s.key === key)?.value;
+    const ms = typeof value === 'string' ? parseGoDuration(value) : null;
+    const variant = ms === null ? 'Unknown' : ms === 0 ? 'Never' : '';
+    return (
+      <div className={css.note} data-testid={`mw-retention-${kind}`}>
+        <Trans
+          i18nKey={`incarnations:mwRetention_${kind}${variant}`}
+          values={{ span: ms ? formatRetention(ms, i18n.language === 'ru' ? 'ru' : 'en') : '', key: path }}
+          components={{ b: <b />, code: <code className={css.key} /> }}
+        />
+      </div>
+    );
   }
 
   if (isDegraded(windows.error)) {
@@ -154,22 +295,39 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
     );
   }
 
+  const editActions = (onEdit: () => void, onDelete: () => void, aria: { edit: string; del: string }, id: string, prefix: string) => (
+    <td className={css.act}>
+      <Button type="button" variant="ghost" onClick={onEdit} aria-label={aria.edit} data-testid={`${prefix}-edit-${id}`}>
+        <Pencil size={13} />
+      </Button>
+      <Button type="button" variant="ghost" onClick={onDelete} aria-label={aria.del} data-testid={`${prefix}-delete-${id}`}>
+        <Trash2 size={13} />
+      </Button>
+    </td>
+  );
+  const windowAria = { edit: t('incarnations:mwEditAria'), del: t('incarnations:mwDeleteAria') };
+  const freezeAria = { edit: t('incarnations:freezeEditAria'), del: t('incarnations:freezeDeleteAria') };
+
+  const loadError = (err: unknown) =>
+    err ? (
+      <div className={styles.errorBox}>
+        {err instanceof ApiError ? t('errors:generic', { status: err.status, detail: err.message }) : String(err)}
+      </div>
+    ) : null;
+
   return (
     <section className={styles.section} data-testid="maintenance-tab">
-      <div style={headRowStyle}>
+      <div className={css.head}>
         <h2 className={styles.sectionTitle} style={{ margin: 0, flex: 1 }}>{t('incarnations:tabMaintenance')}</h2>
         {canWrite ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div className={css.actions}>
             <Button type="button" variant="ghost" style={{ fontSize: 13 }} onClick={() => setCopyOpen(true)} data-testid="mw-copy-open">
-              <Copy size={13} style={iconStyle} />
+              <Copy size={13} />
               {t('incarnations:mwCopyOpen')}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setWindowModal({ editing: null })} data-testid="mw-add">
-              <Plus size={14} style={iconStyle} />
-              {t('incarnations:mwAdd')}
-            </Button>
+            <AddWindowMenu onPick={(kind) => setWindowModal({ editing: null, kind })} />
             <Button type="button" variant="secondary" onClick={() => setFreezeModal({ editing: null })} data-testid="freeze-add">
-              <Plus size={14} style={iconStyle} />
+              <Plus size={14} />
               {t('incarnations:freezeAdd')}
             </Button>
           </div>
@@ -179,32 +337,35 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
       {windows.data && !freezes.isLoading ? (
         <MaintenanceStatusBlock
           status={windows.data.status}
-          windows={windowRows}
+          windows={effective}
           freezes={freezes.data ? freezeRows : undefined}
           tz={tz}
           now={now}
         />
       ) : null}
 
-      <div style={groupStyle} data-testid="mw-windows-section">
-        <div style={groupHeadStyle}>
-          <h3 style={groupTitleStyle}>{t('incarnations:mwWindowsTitle')}</h3>
-          <p style={descStyle}>{t('incarnations:mwDesc')}</p>
+      {windows.data && !freezes.isLoading ? (
+        <MaintenanceCalendar
+          windows={effective}
+          freezes={freezeRows}
+          tz={tz}
+          now={now}
+          canWrite={canWrite}
+          onEditWindow={(w) => setWindowModal({ editing: w, kind: isOnce(w) ? 'once' : 'weekly' })}
+          onEditFreeze={(f) => setFreezeModal({ editing: f })}
+        />
+      ) : null}
+
+      <div className={css.group} data-testid="mw-windows-section">
+        <div className={css.groupHead}>
+          <h3 className={css.groupTitle}>{t('incarnations:mwWeeklyTitle')}</h3>
+          {defaultRows.length > 0 ? <span className={css.tag}>{t('incarnations:mwDefaultTag')}</span> : null}
         </div>
 
         {windows.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
-        {windows.error ? (
-          <div className={styles.errorBox}>
-            {windows.error instanceof ApiError
-              ? t('errors:generic', { status: windows.error.status, detail: windows.error.message })
-              : String(windows.error)}
-          </div>
-        ) : null}
+        {loadError(windows.error)}
 
-        {windows.data && windowRows.length === 0 ? (
-          <div className={styles.empty} data-testid="mw-empty">{t('incarnations:mwEmpty')}</div>
-        ) : null}
-        {windowRows.length > 0 ? (
+        {weeklyRows.length > 0 ? (
           <table className={styles.table} data-testid="mw-table">
             <thead>
               <tr>
@@ -216,126 +377,171 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
               </tr>
             </thead>
             <tbody>
-              {windowRows.map((w) => {
-                const end = slotEnd(w.start_time, w.duration_minutes);
-                return (
-                  <tr key={w.id} data-testid={`mw-row-${w.id}`}>
-                    <td style={{ fontWeight: 500 }}>{formatDays(w.days, dayLabel)}</td>
-                    <td className="mono">
-                      {w.start_time}–{end.end}
-                      {end.nextDay ? <NextDayMark /> : null}
-                    </td>
-                    <td className="mono">{w.timezone}</td>
-                    <CommentCell comment={w.comment} />
-                    {canWrite ? (
-                      <td style={actionsCellStyle}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setWindowModal({ editing: w })}
-                          aria-label={t('incarnations:mwEditAria')}
-                          data-testid={`mw-edit-${w.id}`}
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setDeleteTarget({ kind: 'window', row: w, summary: windowSummary(w) })}
-                          aria-label={t('incarnations:mwDeleteAria')}
-                          data-testid={`mw-delete-${w.id}`}
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
+              {weeklyRows.map((w) => (
+                <WeeklyRow key={w.id} w={w} testId={`mw-row-${w.id}`} dayLabel={dayLabel}>
+                  {canWrite
+                    ? editActions(
+                        () => setWindowModal({ editing: w, kind: 'weekly' }),
+                        () => setDeleteTarget({ kind: 'window', row: w, summary: windowSummary(w) }),
+                        windowAria,
+                        w.id,
+                        'mw',
+                      )
+                    : null}
+                </WeeklyRow>
+              ))}
             </tbody>
           </table>
+        ) : null}
+
+        {defaultRows.length > 0 ? (
+          <>
+            <table className={`${styles.table} ${css.readOnly}`} data-testid="mw-defaults-table">
+              <thead>
+                <tr>
+                  <th>{t('incarnations:mwColDays')}</th>
+                  <th>{t('incarnations:mwColTime')}</th>
+                  <th>{t('incarnations:mwColTimezone')}</th>
+                  <th>{t('incarnations:mwColComment')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {defaultRows.map((w, i) => (
+                  <WeeklyRow key={i} w={w} testId={`mw-default-row-${i}`} dayLabel={dayLabel} />
+                ))}
+              </tbody>
+            </table>
+            <div className={css.note} data-testid="mw-defaults-note">
+              <Trans
+                i18nKey="incarnations:mwDefaultNote"
+                values={{ key: 'maintenance.default_windows' }}
+                components={{ code: <code className={css.key} /> }}
+              />
+            </div>
+          </>
+        ) : null}
+
+        {windows.data && weeklyRows.length === 0 && defaultRows.length === 0 ? (
+          <div className={`${styles.empty} ${css.compact}`} data-testid="mw-empty">{t('incarnations:mwWeeklyEmpty')}</div>
         ) : null}
       </div>
 
-      <div style={groupStyle} data-testid="freeze-section">
-        <div style={groupHeadStyle}>
-          <h3 style={groupTitleStyle}>{t('incarnations:freezesTitle')}</h3>
-          <p style={descStyle}>{t('incarnations:freezesDesc')}</p>
+      <div className={css.two}>
+        <div className={css.group} data-testid="mw-once-section">
+          <div className={css.groupHead}>
+            <h3 className={css.groupTitle}>{t('incarnations:mwOnceTitle')}</h3>
+          </div>
+          {windows.data && visibleOnce.length === 0 ? (
+            <div className={`${styles.empty} ${css.compact}`} data-testid="mw-once-empty">{t('incarnations:mwOnceEmpty')}</div>
+          ) : null}
+          {visibleOnce.length > 0 ? (
+            <table className={styles.table} data-testid="mw-once-table">
+              <thead>
+                <tr>
+                  <th>{t('incarnations:freezeColRange', { tz })}</th>
+                  <th>{t('incarnations:mwColComment')}</th>
+                  {canWrite ? <th aria-label={t('incarnations:mwColActions')} /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleOnce.map((w) => {
+                  const past = !windowCounts(w, now);
+                  return (
+                    <tr key={w.id} data-testid={`mw-once-row-${w.id}`} className={past ? css.pastRow : undefined}>
+                      <td className="mono" title={`${w.starts_at} – ${w.ends_at}`}>
+                        {formatOnceRange(w.starts_at ?? '', w.ends_at ?? '', tz, now)}
+                      </td>
+                      <CommentCell comment={w.comment} />
+                      {canWrite
+                        ? editActions(
+                            () => setWindowModal({ editing: w, kind: 'once' }),
+                            () => setDeleteTarget({ kind: 'window', row: w, summary: windowSummary(w) }),
+                            windowAria,
+                            w.id,
+                            'mw',
+                          )
+                        : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : null}
+          {pastOnceCount > 0 ? (
+            <button type="button" className={css.linkButton} onClick={() => setShowPastOnce((v) => !v)} data-testid="mw-once-toggle-past">
+              {showPastOnce ? t('incarnations:mwOnceHidePast') : t('incarnations:mwOnceShowPast', { n: pastOnceCount })}
+            </button>
+          ) : null}
+          {windows.data ? retentionNote('window') : null}
         </div>
 
-        {freezes.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
-        {freezes.error ? (
-          <div className={styles.errorBox}>
-            {freezes.error instanceof ApiError
-              ? t('errors:generic', { status: freezes.error.status, detail: freezes.error.message })
-              : String(freezes.error)}
+        <div className={css.group} data-testid="freeze-section">
+          <div className={css.groupHead}>
+            <h3 className={css.groupTitle}>{t('incarnations:freezesTitle')}</h3>
           </div>
-        ) : null}
-        {freezes.data && visibleFreezes.length === 0 ? (
-          <div className={styles.empty} data-testid="freeze-empty">{t('incarnations:freezesEmpty')}</div>
-        ) : null}
-        {visibleFreezes.length > 0 ? (
-          <table className={styles.table} data-testid="freeze-table">
-            <thead>
-              <tr>
-                <th>{t('incarnations:freezeColRange', { tz })}</th>
-                <th>{t('incarnations:mwColComment')}</th>
-                <th>{t('common:colStatus')}</th>
-                {canWrite ? <th aria-label={t('incarnations:mwColActions')} /> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {visibleFreezes.map((f) => {
-                const phase = freezePhase(f, now);
-                const range = formatFreezeRange(f.starts_at, f.ends_at, tz);
-                return (
-                  <tr key={f.id} data-testid={`freeze-row-${f.id}`} style={phase === 'past' ? { opacity: 0.6 } : undefined}>
-                    <td className="mono" title={`${f.starts_at} – ${f.ends_at}`}>{range}</td>
-                    <CommentCell comment={f.comment} />
-                    <td>
-                      <Badge tone={phase === 'active' ? 'danger' : phase === 'upcoming' ? 'warn' : 'muted'}>
-                        {t(`incarnations:freezePhase_${phase}`)}
-                      </Badge>
-                    </td>
-                    {canWrite ? (
-                      <td style={actionsCellStyle}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setFreezeModal({ editing: f })}
-                          aria-label={t('incarnations:freezeEditAria')}
-                          data-testid={`freeze-edit-${f.id}`}
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setDeleteTarget({ kind: 'freeze', row: f, summary: withComment(range, f.comment) })}
-                          aria-label={t('incarnations:freezeDeleteAria')}
-                          data-testid={`freeze-delete-${f.id}`}
-                        >
-                          <Trash2 size={13} />
-                        </Button>
+          {freezes.isLoading ? <div className={styles.loading}>{t('loading')}</div> : null}
+          {loadError(freezes.error)}
+          {freezes.data && visibleFreezes.length === 0 ? (
+            <div className={`${styles.empty} ${css.compact}`} data-testid="freeze-empty">{t('incarnations:freezesEmpty')}</div>
+          ) : null}
+          {visibleFreezes.length > 0 ? (
+            <table className={styles.table} data-testid="freeze-table">
+              <thead>
+                <tr>
+                  <th>{t('incarnations:freezeColRange', { tz })}</th>
+                  <th>{t('incarnations:mwColComment')}</th>
+                  <th>{t('common:colStatus')}</th>
+                  {canWrite ? <th aria-label={t('incarnations:mwColActions')} /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleFreezes.map((f) => {
+                  const phase = freezePhase(f, now);
+                  return (
+                    <tr key={f.id} data-testid={`freeze-row-${f.id}`} className={phase === 'past' ? css.pastRow : undefined}>
+                      <td className="mono" title={`${f.starts_at} – ${f.ends_at}`}>
+                        {formatFreezeRangeShort(f.starts_at, f.ends_at, tz, now)}
                       </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : null}
-        {pastCount > 0 ? (
-          <button type="button" style={linkButtonStyle} onClick={() => setShowPast((v) => !v)} data-testid="freeze-toggle-past">
-            {showPast ? t('incarnations:freezeHidePast') : t('incarnations:freezeShowPast', { n: pastCount })}
-          </button>
-        ) : null}
+                      <CommentCell comment={f.comment} />
+                      <td>
+                        <Badge tone={phase === 'active' ? 'danger' : phase === 'upcoming' ? 'warn' : 'muted'}>
+                          {t(`incarnations:freezePhase_${phase}`)}
+                        </Badge>
+                      </td>
+                      {canWrite
+                        ? editActions(
+                            () => setFreezeModal({ editing: f }),
+                            () =>
+                              setDeleteTarget({
+                                kind: 'freeze',
+                                row: f,
+                                summary: withComment(formatFreezeRange(f.starts_at, f.ends_at, tz), f.comment),
+                              }),
+                            freezeAria,
+                            f.id,
+                            'freeze',
+                          )
+                        : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : null}
+          {pastCount > 0 ? (
+            <button type="button" className={css.linkButton} onClick={() => setShowPast((v) => !v)} data-testid="freeze-toggle-past">
+              {showPast ? t('incarnations:freezeHidePast') : t('incarnations:freezeShowPast', { n: pastCount })}
+            </button>
+          ) : null}
+          {freezes.data ? retentionNote('freeze') : null}
+        </div>
       </div>
 
       <WindowModal
         open={windowModal !== null}
         incarnationName={incarnationName}
         editing={windowModal?.editing ?? null}
+        kind={windowModal?.kind}
         onClose={() => setWindowModal(null)}
       />
       <FreezeModal
@@ -352,33 +558,39 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
       <CopyWindowsModal
         open={copyOpen}
         incarnationName={incarnationName}
-        currentWindows={windowRows}
+        currentWindows={windowRows.filter((w) => windowCounts(w, now))}
         onClose={() => setCopyOpen(false)}
       />
     </section>
   );
 }
 
-function CommentCell({ comment }: { comment: string | null | undefined }) {
-  return comment ? <td style={commentStyle}>{comment}</td> : <td style={noCommentStyle}>—</td>;
+function WeeklyRow({
+  w,
+  testId,
+  dayLabel,
+  children,
+}: {
+  w: Pick<MaintenanceWindow, 'days' | 'start_time' | 'duration_minutes' | 'timezone'> & { comment?: string | null };
+  testId: string;
+  dayLabel: (d: Weekday) => string;
+  children?: React.ReactNode;
+}) {
+  const end = slotEnd(w.start_time ?? '', w.duration_minutes ?? 0);
+  return (
+    <tr data-testid={testId}>
+      <td style={{ fontWeight: 500 }}>{formatDays(w.days, dayLabel)}</td>
+      <td className="mono">
+        {w.start_time}–{end.end}
+        {end.nextDay ? <NextDayMark /> : null}
+      </td>
+      <td className="mono">{w.timezone}</td>
+      <CommentCell comment={w.comment} />
+      {children}
+    </tr>
+  );
 }
 
-const headRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 };
-const groupStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 };
-const groupHeadStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2 };
-const groupTitleStyle: React.CSSProperties = { margin: 0, fontSize: 14, fontWeight: 600, letterSpacing: '-0.01em' };
-const descStyle: React.CSSProperties = { margin: 0, fontSize: 13, color: 'var(--text-muted)' };
-const iconStyle: React.CSSProperties = { marginRight: 6, verticalAlign: 'middle' };
-const commentStyle: React.CSSProperties = { color: 'var(--text-muted)' };
-const noCommentStyle: React.CSSProperties = { color: 'var(--text-faint)' };
-const actionsCellStyle: React.CSSProperties = { textAlign: 'right', whiteSpace: 'nowrap', width: 1 };
-const linkButtonStyle: React.CSSProperties = {
-  background: 'transparent',
-  border: 0,
-  padding: 0,
-  color: 'var(--text-muted)',
-  fontSize: 12.5,
-  cursor: 'pointer',
-  textDecoration: 'underline',
-  alignSelf: 'flex-start',
-};
+function CommentCell({ comment }: { comment: string | null | undefined }) {
+  return comment ? <td className={css.comment}>{comment}</td> : <td className={css.noComment}>—</td>;
+}

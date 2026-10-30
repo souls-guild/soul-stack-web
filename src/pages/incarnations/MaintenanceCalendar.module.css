@@ -1,0 +1,472 @@
+.cal {
+  --cal-label: 96px;
+  /* The accent mixed with white goes grey; the mockup's cancelled and one-off fills are mint. */
+  --cal-mint: #2dd4bf;
+  --cal-cut: color-mix(in srgb, var(--cal-mint) 45%, var(--surface));
+  --cal-once: color-mix(in srgb, var(--cal-mint) 24%, var(--surface));
+  --cal-ink: color-mix(in srgb, var(--accent) 72%, var(--text));
+  --cal-freeze-ink: color-mix(in srgb, var(--danger) 80%, var(--text));
+  --cal-freeze-edge: color-mix(in srgb, var(--danger) 42%, var(--surface));
+  --cal-freeze-hatch: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--danger) 16%, transparent) 0 6px,
+    color-mix(in srgb, var(--danger) 6%, transparent) 6px 12px
+  );
+  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px 12px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-bottom: 10px;
+}
+
+.nav {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.navBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.range {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.todayBtn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: 500 13px var(--font-sans);
+  cursor: pointer;
+}
+
+.todayBtn:hover {
+  border-color: var(--border-strong);
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.seg button {
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: 12.5px var(--font-sans);
+  cursor: pointer;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+
+.seg button.on {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.hours {
+  display: grid;
+  grid-template-columns: var(--cal-label) 1fr;
+  margin-bottom: 4px;
+  font: 11px var(--font-mono);
+  color: var(--text-faint);
+}
+
+.scale {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--cal-label) 1fr;
+  align-items: center;
+  height: 38px;
+}
+
+.row.past {
+  opacity: 0.55;
+}
+
+.day {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.day b {
+  margin-right: 6px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.row.today .day b {
+  color: var(--accent);
+}
+
+.track {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(12.5% - 1px),
+      var(--border) calc(12.5% - 1px),
+      var(--border) 12.5%
+    ),
+    var(--surface-2);
+}
+
+/*
+ * Windows lie above freezes so a click on a cancelled window reaches the window; the
+ * hatch is painted on the cancelled window itself. A freeze sets no z-index, so it
+ * forms no stacking context of its own and its words are layered among the windows,
+ * above them. Nothing on a freeze may set one — not focus, not hover — or a freeze
+ * would cover the windows it cancels. The order is guarded by a test reading this file.
+ */
+.blk {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  bottom: 3px;
+  min-width: 3px;
+  margin: 0;
+  padding: 0 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  font: 11.5px/20px var(--font-sans);
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+button.blk {
+  cursor: pointer;
+}
+
+button.blk:not(.freeze):hover {
+  filter: brightness(0.95);
+}
+
+button.freeze:hover {
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--surface));
+}
+
+button.blk:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.fromPrev {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.toNext {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.weekly {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.default {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--cal-ink);
+}
+
+.once {
+  background: var(--cal-once);
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -1.5px;
+  color: var(--cal-ink);
+}
+
+.cut {
+  background: var(--cal-freeze-hatch), var(--cal-cut);
+  color: var(--cal-ink);
+  text-decoration: line-through;
+}
+
+.freeze {
+  top: 0;
+  bottom: 0;
+  z-index: auto;
+  border: 1px solid var(--cal-freeze-edge);
+  border-radius: 6px;
+  background: var(--cal-freeze-hatch);
+  color: var(--cal-freeze-ink);
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.freezeWords {
+  position: relative;
+  z-index: 2;
+  padding: 1px 5px;
+  margin-left: -2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+
+.freeze.fromPrev {
+  border-left: 0;
+}
+
+.freeze.toNext {
+  border-right: 0;
+}
+
+.now {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--danger);
+  pointer-events: none;
+}
+
+.nowLabel {
+  position: absolute;
+  top: -11px;
+  left: 5px;
+  font: 10px/1 var(--font-mono);
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.month {
+  margin-top: 4px;
+}
+
+.monthHead {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.monthHead span {
+  padding-left: 8px;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  min-height: 84px;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.cell.past {
+  opacity: 0.55;
+}
+
+.cell.outside {
+  opacity: 0.4;
+}
+
+.cell.today {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.cellDate {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 500 12.5px var(--font-sans);
+  cursor: pointer;
+}
+
+.cellDate:hover {
+  color: var(--accent);
+}
+
+.cell.today .cellDate {
+  color: var(--accent);
+}
+
+.mini {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.mini .blk {
+  top: 2px;
+  bottom: 2px;
+  min-width: 2px;
+  padding: 0;
+  border-radius: 2px;
+}
+
+.mini .freeze {
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+}
+
+.mini .now {
+  top: -2px;
+  bottom: -2px;
+}
+
+.note {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: 11px/1.3 var(--font-sans);
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+button.note {
+  cursor: pointer;
+}
+
+button.note:hover {
+  text-decoration: underline;
+}
+
+.note::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+
+.note_once {
+  color: var(--cal-ink);
+}
+
+.note_once::before {
+  border: 1px dashed var(--accent);
+  background: var(--cal-once);
+}
+
+.note_freeze {
+  color: var(--cal-freeze-ink);
+}
+
+.note_freeze::before {
+  background: var(--danger);
+}
+
+.more {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legend i {
+  display: inline-block;
+  width: 22px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.lgWeekly {
+  background: var(--accent);
+}
+
+.lgDefault {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.lgOnce {
+  background: var(--cal-once);
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -1.5px;
+}
+
+.lgFreeze {
+  border: 1px solid var(--cal-freeze-edge);
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--danger) 25%, transparent) 0 4px,
+    color-mix(in srgb, var(--danger) 8%, transparent) 4px 8px
+  );
+}
+
+.lgCut {
+  background: var(--cal-cut);
+}
+
+.zone {
+  margin-left: auto;
+  color: var(--text-faint);
+}

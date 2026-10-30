@@ -11,7 +11,9 @@ import {
   browserTimeZone,
   durationBetween,
   formatDays,
+  formatOnceRange,
   freezesKey,
+  isOnce,
   isWeekday,
   isWholeDays,
   isoToWall,
@@ -19,6 +21,8 @@ import {
   prevDay,
   slotEnd,
   timeZoneNames,
+  wallToIso,
+  windowCounts,
   windowsKey,
   type Weekday,
 } from './maintenance';
@@ -26,8 +30,11 @@ import {
   freezeRangeFromForm,
   freezeSchema,
   maintenanceWindowSchema,
+  onceRangeFromForm,
+  onceWindowSchemaFor,
   type FreezeFormValues,
   type MaintenanceWindowFormValues,
+  type OnceWindowFormValues,
 } from './schemas';
 import styles from '../common.module.css';
 
@@ -38,11 +45,15 @@ function errorText(err: unknown, t: (k: string, o?: Record<string, unknown>) => 
 
 // --- window: create / edit ---
 
+export type WindowKind = 'weekly' | 'once';
+
 interface WindowModalProps {
   open: boolean;
   incarnationName: string;
   // null → create.
   editing: MaintenanceWindow | null;
+  // The kind to create; an edited row keeps its own.
+  kind?: WindowKind;
   onClose: () => void;
 }
 
@@ -50,29 +61,28 @@ function windowDefaults(w: MaintenanceWindow | null): MaintenanceWindowFormValue
   if (!w) {
     return { days: [], start: '02:00', end: '05:00', timezone: browserTimeZone(), comment: '' };
   }
+  const start = w.start_time ?? '02:00';
   return {
     days: (w.days ?? []).filter(isWeekday),
-    start: w.start_time,
-    end: slotEnd(w.start_time, w.duration_minutes).end,
-    timezone: w.timezone,
+    start,
+    end: slotEnd(start, w.duration_minutes ?? 0).end,
+    timezone: w.timezone ?? browserTimeZone(),
     comment: w.comment ?? '',
   };
 }
 
-export function WindowModal({ open, incarnationName, editing, onClose }: WindowModalProps) {
+export function WindowModal({ open, incarnationName, editing, kind = 'weekly', onClose }: WindowModalProps) {
   if (!open) return null;
   // Keyed so a reopened modal starts from the row it edits, not from the last draft.
-  return (
-    <WindowModalBody
-      key={editing?.id ?? 'new'}
-      incarnationName={incarnationName}
-      editing={editing}
-      onClose={onClose}
-    />
+  const once = editing ? isOnce(editing) : kind === 'once';
+  return once ? (
+    <OnceWindowModalBody key={editing?.id ?? 'new-once'} incarnationName={incarnationName} editing={editing} onClose={onClose} />
+  ) : (
+    <WindowModalBody key={editing?.id ?? 'new'} incarnationName={incarnationName} editing={editing} onClose={onClose} />
   );
 }
 
-function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModalProps, 'open'>) {
+function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModalProps, 'open' | 'kind'>) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -97,6 +107,7 @@ function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModal
   const mu = useMutation({
     mutationFn: (v: MaintenanceWindowFormValues) => {
       const body = {
+        kind: 'weekly' as const,
         days: WEEKDAYS.filter((d) => v.days.includes(d)),
         start_time: v.start,
         duration_minutes: durationBetween(v.start, v.end) ?? 0,
@@ -142,6 +153,7 @@ function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModal
       }
     >
       <form noValidate>
+        <p style={introStyle}>{t('incarnations:mwDesc')}</p>
         <fieldset style={{ ...fieldWrapStyle, border: 0, padding: 0, margin: '0 0 12px' }}>
           <legend style={labelStyle}>{t('incarnations:mwDaysLabel')}</legend>
           <Controller
@@ -221,6 +233,121 @@ function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModal
             {...register('comment')}
             style={{ ...inputStyle, fontFamily: 'inherit' }}
             data-testid="mw-comment"
+          />
+          {errors.comment ? <span style={errStyle}>{t(errors.comment.message ?? '')}</span> : null}
+        </label>
+
+        {serverError ? <div className={styles.errorBox} style={{ marginTop: 12 }}>{serverError}</div> : null}
+      </form>
+    </Modal>
+  );
+}
+
+// --- one-off window: create / edit ---
+
+/** A new one-off window starts on the next whole hour and lasts two. */
+function onceDefaults(w: MaintenanceWindow | null, tz: string): OnceWindowFormValues {
+  if (w) {
+    const s = isoToWall(w.starts_at ?? '', tz);
+    const e = isoToWall(w.ends_at ?? '', tz);
+    return { startDate: s.date, startTime: s.time, endDate: e.date, endTime: e.time, comment: w.comment ?? '' };
+  }
+  const now = isoToWall(new Date().toISOString(), tz);
+  const hour = Number(now.time.slice(0, 2)) + 1;
+  const start = wallToIso(hour > 23 ? nextDay(now.date) : now.date, `${String(hour % 24).padStart(2, '0')}:00`, tz);
+  const s = isoToWall(start ?? new Date().toISOString(), tz);
+  const e = isoToWall(new Date(Date.parse(start ?? '') + 2 * 3_600_000).toISOString(), tz);
+  return { startDate: s.date, startTime: s.time, endDate: e.date, endTime: e.time, comment: '' };
+}
+
+function OnceWindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModalProps, 'open' | 'kind'>) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [serverError, setServerError] = useState<string | null>(null);
+  const tz = browserTimeZone();
+
+  const schema = useMemo(() => onceWindowSchemaFor(editing?.ends_at), [editing?.ends_at]);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<OnceWindowFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: onceDefaults(editing, tz),
+  });
+
+  const mu = useMutation({
+    mutationFn: (v: OnceWindowFormValues) => {
+      const range = onceRangeFromForm(v, tz);
+      if (!range) throw new Error(t('incarnations:freezeDateRequired'));
+      const body = { kind: 'once' as const, ...range, comment: v.comment.trim() || undefined };
+      return editing
+        ? keeperApi.maintenance.updateWindow(incarnationName, editing.id, body)
+        : keeperApi.maintenance.createWindow(incarnationName, body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: windowsKey(incarnationName) });
+      onClose();
+    },
+    onError: (err) => setServerError(errorText(err, t)),
+  });
+
+  function close() {
+    if (mu.isPending) return;
+    onClose();
+  }
+
+  return (
+    <Modal
+      open
+      title={editing ? t('incarnations:mwOnceEditTitle') : t('incarnations:mwOnceAddTitle')}
+      onClose={close}
+      footer={
+        <>
+          <Button type="button" variant="ghost" onClick={close} disabled={mu.isPending}>
+            {t('cancel')}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={mu.isPending}
+            onClick={handleSubmit((v) => { setServerError(null); mu.mutate(v); })}
+            data-testid="mw-once-submit"
+          >
+            {mu.isPending ? t('saving') : t('save')}
+          </Button>
+        </>
+      }
+    >
+      <form noValidate>
+        <p style={introStyle}>{t('incarnations:mwOnceDesc')}</p>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <label style={{ ...fieldWrapStyle, flex: 1 }}>
+            <span style={labelStyle}>{t('incarnations:freezeStarts')}</span>
+            <input type="date" {...register('startDate')} style={inputStyle} data-testid="mw-once-start-date" />
+            <input type="time" {...register('startTime')} style={inputStyle} data-testid="mw-once-start-time" />
+            {errors.startDate ? <span style={errStyle}>{t(errors.startDate.message ?? '')}</span> : null}
+            {errors.startTime ? <span style={errStyle}>{t(errors.startTime.message ?? '')}</span> : null}
+          </label>
+          <label style={{ ...fieldWrapStyle, flex: 1 }}>
+            <span style={labelStyle}>{t('incarnations:freezeEnds')}</span>
+            <input type="date" {...register('endDate')} style={inputStyle} data-testid="mw-once-end-date" />
+            <input type="time" {...register('endTime')} style={inputStyle} data-testid="mw-once-end-time" />
+            {errors.endDate ? <span style={errStyle}>{t(errors.endDate.message ?? '')}</span> : null}
+            {errors.endTime ? <span style={errStyle}>{t(errors.endTime.message ?? '')}</span> : null}
+          </label>
+        </div>
+        <div style={hintStyle}>{t('incarnations:freezeBrowserZone', { tz })}</div>
+
+        <label style={{ ...fieldWrapStyle, marginTop: 12 }}>
+          <span style={labelStyle}>{t('incarnations:mwCommentLabel')}</span>
+          <input
+            type="text"
+            maxLength={500}
+            placeholder={t('incarnations:mwOnceCommentPlaceholder')}
+            {...register('comment')}
+            style={{ ...inputStyle, fontFamily: 'inherit' }}
+            data-testid="mw-once-comment"
           />
           {errors.comment ? <span style={errStyle}>{t(errors.comment.message ?? '')}</span> : null}
         </label>
@@ -525,26 +652,35 @@ function CopyWindowsBody({
     enabled: picked !== '',
     retry: false,
   });
-  const toCopy = sourceWindows.data?.items ?? [];
+  // An ended one-off window no longer counts: copied, it would be a dead row.
+  const [openedAt] = useState(() => new Date());
+  const toCopy = (sourceWindows.data?.items ?? []).filter((w) => windowCounts(w, openedAt));
+  const tz = browserTimeZone();
 
   // Sequential on purpose: a half-done copy must say how far it got, and parallel
   // requests would leave the order of the copied rows to the network.
   //
   // "Replace" creates first and deletes after. Deleting first and failing halfway
-  // would leave the incarnation with no windows, which means a run may start at any
-  // time — the opposite of what the operator was setting up.
+  // would leave the incarnation without its windows — open at any time, or on the
+  // cluster default — which is not what the operator was setting up.
   const mu = useMutation({
     mutationFn: async () => {
       const progress = { created: 0, removed: 0 };
       try {
         for (const w of toCopy) {
-          await keeperApi.maintenance.createWindow(incarnationName, {
-            days: (w.days ?? []).filter(isWeekday),
-            start_time: w.start_time,
-            duration_minutes: w.duration_minutes,
-            timezone: w.timezone,
-            comment: w.comment || undefined,
-          });
+          await keeperApi.maintenance.createWindow(
+            incarnationName,
+            isOnce(w)
+              ? { kind: 'once', starts_at: w.starts_at, ends_at: w.ends_at, comment: w.comment || undefined }
+              : {
+                  kind: 'weekly',
+                  days: (w.days ?? []).filter(isWeekday),
+                  start_time: w.start_time,
+                  duration_minutes: w.duration_minutes,
+                  timezone: w.timezone,
+                  comment: w.comment || undefined,
+                },
+          );
           progress.created++;
         }
         if (replace) {
@@ -648,7 +784,17 @@ function CopyWindowsBody({
         <table className={styles.table} style={{ marginTop: 12 }} data-testid="mw-copy-preview">
           <tbody>
             {toCopy.map((w) => {
-              const end = slotEnd(w.start_time, w.duration_minutes);
+              if (isOnce(w)) {
+                return (
+                  <tr key={w.id}>
+                    <td>{t('incarnations:mwOnceShort')}</td>
+                    <td className="mono">{formatOnceRange(w.starts_at ?? '', w.ends_at ?? '', tz, openedAt)}</td>
+                    <td className="mono">{tz}</td>
+                    <td style={{ color: w.comment ? 'var(--text-muted)' : 'var(--text-faint)' }}>{w.comment || '—'}</td>
+                  </tr>
+                );
+              }
+              const end = slotEnd(w.start_time ?? '', w.duration_minutes ?? 0);
               return (
                 <tr key={w.id}>
                   <td>{formatDays(w.days, dayLabel)}</td>
@@ -694,6 +840,7 @@ class CopyError extends Error {
   }
 }
 
+const introStyle: React.CSSProperties = { fontSize: 13, color: 'var(--text-muted)', margin: '0 0 12px' };
 const fieldWrapStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 };
 const labelStyle: React.CSSProperties = { fontSize: 13, padding: 0 };
 const hintStyle: React.CSSProperties = { fontSize: 11.5, color: 'var(--text-muted)' };

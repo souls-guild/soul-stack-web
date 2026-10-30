@@ -39,6 +39,7 @@ interface Incarnation {
   windows: unknown[];
   status: Record<string, unknown>;
   freezes?: unknown[];
+  defaults?: unknown[];
 }
 
 interface Captured {
@@ -81,7 +82,7 @@ function stub(incarnations: Record<string, Incarnation>, opts: { refuseFirst?: b
       if (!inc) return json({ title: 'Not Found' }, 404);
       return mw[2] === 'freezes'
         ? json({ items: inc.freezes ?? [] })
-        : json({ items: inc.windows, status: inc.status });
+        : json({ items: inc.windows, status: inc.status, ...(inc.defaults ? { defaults: inc.defaults } : {}) });
     }
     const members = url.match(/\/v1\/incarnations\/([^/?]+)\/members$/);
     if (members) return json({ items: [], offset: 0, limit: 0, total: 0 });
@@ -205,6 +206,27 @@ describe('RunWizard — maintenance window and freeze consent', () => {
     const lines = screen.getByTestId('run-next-starts').textContent ?? '';
     expect(lines).toContain('df-a: open from Fri 04.12.2099 02:00');
     expect(lines).not.toMatch(/starts at once|next start/);
+  });
+
+  it('[GUARD] an incarnation on the cluster default has windows; one whose only window has ended has none', async () => {
+    const { days, start_time, duration_minutes, timezone } = NIGHT;
+    const ended = { ...NIGHT, id: 'o-old', kind: 'once', days: undefined, starts_at: '2020-01-01T00:00:00Z', ends_at: '2020-01-01T01:00:00Z' };
+    const openNow = { open_now: true, next_start: '2026-10-27T10:00:00Z' };
+    stub({
+      'df-default': { windows: [], defaults: [{ kind: 'weekly', days, start_time, duration_minutes, timezone, comment: '' }], status: { ...openNow, source: 'default' } },
+      // The server names the default but the reply carries no slots: still windows.
+      'df-named': { windows: [], status: { ...openNow, source: 'default' } },
+      'df-ended': { windows: [ended], status: { ...openNow, source: 'none' } },
+    });
+    renderWizard('/run?workload=scenario&service=redis');
+    const user = userEvent.setup();
+    await toStep4(user, '^df-');
+
+    await user.click(screen.getByTestId('run-in-window'));
+    const lines = (await screen.findByTestId('run-next-starts')).textContent ?? '';
+    expect(lines).toContain('df-default: open now');
+    expect(lines).toContain('df-named: open now');
+    expect(lines).toContain('df-ended: no windows');
   });
 
   it('no freeze: nothing to consent to, and no gate fields are sent', async () => {
