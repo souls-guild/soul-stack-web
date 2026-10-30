@@ -12,7 +12,6 @@ import {
   formatFreezeRangeShort,
   formatInstant,
   formatOnceRange,
-  formatRetention,
   freezeCovers,
   frozenUntil,
   hasCountingWindows,
@@ -21,7 +20,6 @@ import {
   nextDay,
   noWindowsInEffect,
   openRunEnd,
-  parseGoDuration,
   prevDay,
   slotAt,
   slotEnd,
@@ -333,17 +331,6 @@ describe('one-off windows and the cluster default (NIM-1137/1138)', () => {
     expect(formatOnceRange('2026-10-30T17:00:00Z', '2026-10-30T20:00:00Z', 'Europe/Moscow', now)).toBe('30.10 20:00 – 23:00');
     expect(formatOnceRange('2026-10-30T19:00:00Z', '2026-10-30T23:00:00Z', 'Europe/Moscow', now)).toBe('30.10 22:00 – 31.10 02:00');
     expect(formatOnceRange('2027-01-04T07:00:00Z', '2027-01-04T08:00:00Z', 'Europe/Moscow', now)).toBe('04.01.2027 10:00 – 11:00');
-  });
-
-  it('a retention reads the way keeper writes a duration, and says the largest whole unit', () => {
-    expect(parseGoDuration('72h')).toBe(72 * 3_600_000);
-    expect(parseGoDuration('1h30m0s')).toBe(90 * 60_000);
-    expect(parseGoDuration('0s')).toBe(0);
-    expect(parseGoDuration('three days')).toBeNull();
-    expect(formatRetention(72 * 3_600_000, 'en')).toBe('3 days');
-    expect(formatRetention(24 * 3_600_000, 'en')).toBe('1 day');
-    expect(formatRetention(36 * 3_600_000, 'en')).toBe('36 hours');
-    expect(formatRetention(90 * 60_000, 'en')).toBe('90 minutes');
   });
 });
 

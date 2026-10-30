@@ -1137,57 +1137,32 @@ describe('MaintenanceTab', () => {
       ]);
     });
 
-    it('the retention notes give the effective numbers when the settings can be read', async () => {
-      const perms = permissions([
-        { resource: 'incarnation', action: 'get' },
-        { resource: 'setting', action: 'read' },
-      ]);
-      const setting = (key: string, value: string) => ({
-        key,
-        yaml_path: '',
-        type: 'duration',
-        bounds: '',
-        default: '72h',
-        value,
-        source: 'pg',
-        description: '',
-      });
+    // NIM-1153: the user wants the two lists without notes under them. The settings
+    // catalog was read only for the number in those notes, so it is not read at all.
+    it('[GUARD] the one-off and freeze lists carry no retention note, and the settings are never asked', async () => {
+      const PAST_FREEZE = { ...SALE, id: 'f-old', starts_at: '2026-10-20T00:00:00Z', ends_at: '2026-10-21T00:00:00Z', comment: 'old' };
       installFetchMock(
         routes({
-          perms,
-          extra: [
-            {
-              method: 'GET',
-              url: '/v1/settings',
-              body: {
-                items: [
-                  setting('cfg_maintenance_window_retention', '72h'),
-                  setting('cfg_maintenance_freeze_retention', '0s'),
-                ],
-              },
-            },
-          ],
+          perms: permissions([
+            { resource: 'incarnation', action: 'get' },
+            { resource: 'setting', action: 'read' },
+          ]),
+          windows: { items: [NIGHT, MIGRATION, PAST_ONCE], status: CLOSED_TILL_FRI_2 },
+          freezes: { items: [PAST_FREEZE, SALE] },
+          extra: [{ method: 'GET', url: '/v1/settings', body: { items: [] } }],
         }),
       );
       renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
 
-      await waitFor(() =>
-        expect(screen.getByTestId('mw-retention-window').textContent).toBe(
-          "Past one-off windows are deleted after 3 days — maintenance.window_retention in Keeper's settings.",
-        ),
-      );
-      expect(screen.getByTestId('mw-retention-freeze').textContent).toBe(
-        "Past freezes are kept: maintenance.freeze_retention in Keeper's settings is 0.",
-      );
-    });
-
-    it('without setting.read the retention notes name the setting, not a number, and the catalog is not asked', async () => {
-      installFetchMock(routes({ perms: READER }));
-      renderWithProviders(<MaintenanceTab incarnationName="df-prod" />);
-
-      expect((await screen.findByTestId('mw-retention-window')).textContent).toBe(
-        "Past one-off windows are deleted after the retention set by maintenance.window_retention in Keeper's settings.",
-      );
+      expect((await screen.findByTestId('mw-once-toggle-past')).textContent).toBe('Show past windows (1)');
+      expect((await screen.findByTestId('freeze-toggle-past')).textContent).toBe('Show past freezes (1)');
+      // The edit buttons are optimistic until the permissions arrive; once they go, a
+      // read gated on setting.read would have been sent.
+      await waitFor(() => expect(screen.queryByTestId('mw-add')).not.toBeInTheDocument());
+      expect(document.querySelector('[data-testid^="mw-retention"]')).toBeNull();
+      for (const id of ['mw-once-section', 'freeze-section']) {
+        expect(screen.getByTestId(id).textContent).not.toMatch(/retention|deleted|Keeper's settings/);
+      }
       expect(sent('GET', '/v1/settings')).toHaveLength(0);
     });
   });

@@ -19,11 +19,9 @@ import {
   formatFreezeRange,
   formatFreezeRangeShort,
   formatOnceRange,
-  formatRetention,
   freezeCovers,
   freezesKey,
   isOnce,
-  parseGoDuration,
   slotEnd,
   statusChangeAt,
   STATUS_REFRESH,
@@ -63,12 +61,6 @@ function freezePhase(f: Freeze, now: Date): FreezePhase {
 }
 
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
-
-// The runtime settings that delete past one-off windows and freezes (NIM-1137).
-const RETENTION = {
-  window: { key: 'cfg_maintenance_window_retention', path: 'maintenance.window_retention' },
-  freeze: { key: 'cfg_maintenance_freeze_retention', path: 'maintenance.freeze_retention' },
-} as const;
 
 function useNow(intervalMs: number): Date {
   const [now, setNow] = useState(() => new Date());
@@ -196,11 +188,9 @@ function AddWindowMenu({ onPick }: { onPick: (kind: WindowKind) => void }) {
 }
 
 export function MaintenanceTab({ incarnationName }: { incarnationName: string }) {
-  const { t, i18n } = useTranslation();
-  const { hasPermission, permissions } = useMyPermissions();
+  const { t } = useTranslation();
+  const { hasPermission } = useMyPermissions();
   const canWrite = hasPermission('incarnation.maintenance-set');
-  // Not optimistic: a number nobody may read is not worth a 403.
-  const canReadSettings = permissions !== undefined && hasPermission('setting.read');
   const tz = browserTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
 
@@ -224,14 +214,6 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
     enabled: Boolean(incarnationName),
     retry: false,
     refetchInterval: STATUS_REFRESH.beatMs,
-  });
-  // Only for the number in the retention notes: without setting.read they say none.
-  const settings = useQuery({
-    queryKey: ['settings-catalog'],
-    queryFn: () => keeperApi.settings.list(),
-    enabled: canReadSettings,
-    retry: false,
-    staleTime: 5 * 60_000,
   });
 
   const windowRows = useMemo(() => windows.data?.items ?? [], [windows.data]);
@@ -266,22 +248,6 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
     }
     const end = slotEnd(w.start_time ?? '', w.duration_minutes ?? 0);
     return withComment(`${formatDays(w.days, dayLabel)} ${w.start_time}–${end.end} ${w.timezone}`, w.comment);
-  }
-
-  function retentionNote(kind: 'window' | 'freeze') {
-    const { key, path } = RETENTION[kind];
-    const value = settings.data?.items?.find((s) => s.key === key)?.value;
-    const ms = typeof value === 'string' ? parseGoDuration(value) : null;
-    const variant = ms === null ? 'Unknown' : ms === 0 ? 'Never' : '';
-    return (
-      <div className={css.note} data-testid={`mw-retention-${kind}`}>
-        <Trans
-          i18nKey={`incarnations:mwRetention_${kind}${variant}`}
-          values={{ span: ms ? formatRetention(ms, i18n.language === 'ru' ? 'ru' : 'en') : '', key: path }}
-          components={{ b: <b />, code: <code className={css.key} /> }}
-        />
-      </div>
-    );
   }
 
   if (isDegraded(windows.error)) {
@@ -472,7 +438,6 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
               {showPastOnce ? t('incarnations:mwOnceHidePast') : t('incarnations:mwOnceShowPast', { n: pastOnceCount })}
             </button>
           ) : null}
-          {windows.data ? retentionNote('window') : null}
         </div>
 
         <div className={css.group} data-testid="freeze-section">
@@ -533,7 +498,6 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
               {showPast ? t('incarnations:freezeHidePast') : t('incarnations:freezeShowPast', { n: pastCount })}
             </button>
           ) : null}
-          {freezes.data ? retentionNote('freeze') : null}
         </div>
       </div>
 

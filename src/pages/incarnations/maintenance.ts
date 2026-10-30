@@ -562,36 +562,6 @@ export function formatOnceRange(startsAt: string, endsAt: string, tz: string, no
   return `${start} – ${sameDay ? `${pad2(ep.hour)}:${pad2(ep.minute)}` : formatDate(e, tz, true, ep.year !== year)}`;
 }
 
-/**
- * A runtime setting's duration as keeper writes it ("72h", "90m", "1h30m0s") →
- * milliseconds; null when it does not parse.
- */
-export function parseGoDuration(s: string): number | null {
-  const units: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1000, ms: 1 };
-  const text = s.trim();
-  if (text === '0') return 0;
-  const re = /(\d+(?:\.\d+)?)(ms|h|m|s)/gy;
-  let total = 0;
-  let matched = 0;
-  for (let m = re.exec(text); m; m = re.exec(text)) {
-    total += Number(m[1]) * units[m[2]];
-    matched = re.lastIndex;
-  }
-  return matched > 0 && matched === text.length ? total : null;
-}
-
-/**
- * "3 days", "36 hours", "90 minutes" — the largest whole unit, in `lang`. Intl gives
- * the nominative, so a Russian sentence must put the number where the nominative fits.
- */
-export function formatRetention(ms: number, lang: string): string {
-  const fmt = (n: number, unit: 'day' | 'hour' | 'minute') =>
-    new Intl.NumberFormat(lang, { style: 'unit', unit, unitDisplay: 'long' }).format(n);
-  if (ms % MS_PER_DAY === 0) return fmt(ms / MS_PER_DAY, 'day');
-  if (ms % 3_600_000 === 0) return fmt(ms / 3_600_000, 'hour');
-  return fmt(Math.max(1, Math.round(ms / MS_PER_MINUTE)), 'minute');
-}
-
 // --- the calendar ---
 //
 // A day is a row from its midnight to the next one in the browser's zone, the zone

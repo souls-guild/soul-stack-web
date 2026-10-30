@@ -147,11 +147,6 @@
   color: var(--text-muted);
 }
 
-.note b {
-  color: var(--text);
-  font-weight: 600;
-}
-
 .key {
   font-family: var(--font-mono);
   font-size: 11.5px;
