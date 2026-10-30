@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { Freeze } from '../../api/keeper';
-import { browserTimeZone, formatInstant, type Weekday } from './maintenance';
+import { browserTimeZone, formatInstant, withComment, type Weekday } from './maintenance';
 import styles from '../common.module.css';
 
 export function FreezeConsentBlock({
@@ -20,10 +20,10 @@ export function FreezeConsentBlock({
     <div className={styles.errorBox} style={{ marginTop: 12 }} data-testid="freeze-consent-block">
       {freeze ? (
         <div style={{ fontWeight: 500 }}>
-          {t('incarnations:freezeNowTitle', {
-            comment: freeze.comment ? t('incarnations:mwQuoted', { text: freeze.comment }) : '',
-            until: formatInstant(freeze.ends_at, browserTimeZone(), dayLabel),
-          }).replace(/\s+/g, ' ')}
+          {withComment(
+            t('incarnations:freezeNowTitle', { until: formatInstant(freeze.ends_at, browserTimeZone(), dayLabel) }),
+            freeze.comment,
+          )}
         </div>
       ) : null}
       {refusal ? <div>{t('incarnations:freezeRefused', { detail: refusal })}</div> : null}

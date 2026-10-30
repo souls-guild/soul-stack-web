@@ -8,7 +8,7 @@ import { RunWizard } from '../pages/run/RunWizard';
 import { MAINTENANCE_PROBE_LIMIT } from '../pages/run/maintenanceProbe';
 import { tokenStore } from '../api/tokenStore';
 
-// The Run dialog's half of ADR-0093 (NIM-1076): «Провести в тех окно» and the
+// The Run dialog's half of ADR-0093 (NIM-1076): "Run in the maintenance window" and the
 // mandatory freeze consent. Instants render in the browser zone, pinned here.
 vi.mock('../pages/incarnations/maintenance', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../pages/incarnations/maintenance')>();
@@ -156,7 +156,7 @@ describe('RunWizard — maintenance window and freeze consent', () => {
     await toStep4(user);
 
     const row = await screen.findByTestId('run-frozen-df-prod');
-    expect(row.textContent).toBe('df-prod: freeze “Sale” until Thu 03.12.2099 00:00');
+    expect(row.textContent).toBe('df-prod: freeze until Thu 03.12.2099 00:00 · Sale');
     expect(runButton()).toBeDisabled();
 
     await user.click(screen.getByTestId('run-confirm-freeze'));
@@ -235,7 +235,7 @@ describe('RunWizard — maintenance window and freeze consent', () => {
 
     expect(screen.queryByTestId('run-freeze-block')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2099-06-05T12:00' } });
-    expect((await screen.findByTestId('run-frozen-df-prod')).textContent).toContain('“Audit”');
+    expect((await screen.findByTestId('run-frozen-df-prod')).textContent).toBe('df-prod: freeze until Wed 10.06.2099 03:00 · Audit');
     expect(runButton()).toBeDisabled();
   });
 

@@ -85,7 +85,7 @@
   "excludeFromRun": "Exclude from this run",
   "existingIncarnationLabel": "Existing incarnation (filter by service)",
   "formDefaultSection": "Other",
-  "freezeActiveRow": "{{name}}: freeze {{comment}} until {{until}}",
+  "freezeActiveRow": "{{name}}: freeze until {{until}}",
   "freezeActiveTitle": "A freeze is in force when this run would start",
   "freezeConsentLabel": "I agree to carry out work during the freeze",
   "freezeConsentNeeded": "Tick the consent, or run it in the maintenance window.",

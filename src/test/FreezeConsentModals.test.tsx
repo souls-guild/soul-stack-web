@@ -69,7 +69,7 @@ describe('freeze consent on destroy, rerun-last and upgrade', () => {
     const user = userEvent.setup();
 
     const block = await screen.findByTestId('freeze-consent-block');
-    expect(block.textContent).toContain('A freeze is in force: “Sale” until Thu 03.12.2099 00:00');
+    expect(block.textContent).toContain('A freeze is in force until Thu 03.12.2099 00:00 · Sale');
     await fillDestroy(user);
     expect(screen.getByTestId('destroy-submit')).toBeDisabled();
 

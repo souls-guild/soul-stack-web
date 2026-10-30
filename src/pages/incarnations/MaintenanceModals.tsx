@@ -474,6 +474,11 @@ export function DeleteMaintenanceModal({
   );
 }
 
+export function NextDayMark() {
+  const { t } = useTranslation();
+  return <span style={nextDayStyle}>{t('incarnations:mwNextDayMark')}</span>;
+}
+
 // --- copy windows from another incarnation ---
 
 export function CopyWindowsModal({
@@ -648,10 +653,11 @@ function CopyWindowsBody({
                 <tr key={w.id}>
                   <td>{formatDays(w.days, dayLabel)}</td>
                   <td className="mono">
-                    {w.start_time}–{end.end}{end.nextDay ? ` ${t('incarnations:mwNextDayMark')}` : ''}
+                    {w.start_time}–{end.end}
+                    {end.nextDay ? <NextDayMark /> : null}
                   </td>
                   <td className="mono">{w.timezone}</td>
-                  <td>{w.comment ? t('incarnations:mwQuoted', { text: w.comment }) : ''}</td>
+                  <td style={{ color: w.comment ? 'var(--text-muted)' : 'var(--text-faint)' }}>{w.comment || '—'}</td>
                 </tr>
               );
             })}
@@ -691,6 +697,7 @@ class CopyError extends Error {
 const fieldWrapStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 };
 const labelStyle: React.CSSProperties = { fontSize: 13, padding: 0 };
 const hintStyle: React.CSSProperties = { fontSize: 11.5, color: 'var(--text-muted)' };
+const nextDayStyle: React.CSSProperties = { marginLeft: 6, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--text-faint)' };
 const errStyle: React.CSSProperties = { color: 'var(--danger)', fontSize: 12 };
 const inputStyle: React.CSSProperties = {
   padding: '8px 10px',

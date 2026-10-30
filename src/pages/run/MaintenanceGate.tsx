@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { browserTimeZone, formatInstant, type Weekday } from '../incarnations/maintenance';
+import { browserTimeZone, formatInstant, withComment, type Weekday } from '../incarnations/maintenance';
 import { MAINTENANCE_PROBE_LIMIT, type MaintenanceProbe } from './maintenanceProbe';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
 
-// The Run dialog's half of ADR-0093 (NIM-1076): «Провести в тех окно» with the next
-// start of each target, and the mandatory freeze consent that keeps «Запустить»
+// The Run dialog's half of ADR-0093 (NIM-1076): "Run in the maintenance window" with
+// the next start of each target, and the mandatory freeze consent that keeps "Run"
 // disabled until it is ticked.
 
 const SHOWN_TARGETS = 5;
@@ -118,11 +118,10 @@ export function MaintenanceRunOptions({
             <ul style={{ ...listStyle, color: 'inherit' }}>
               {probe.frozen.map((x) => (
                 <li key={x.name} data-testid={`run-frozen-${x.name}`}>
-                  {t('run:freezeActiveRow', {
-                    name: x.name,
-                    comment: x.freeze?.comment ? t('incarnations:mwQuoted', { text: x.freeze.comment }) : '',
-                    until: x.freeze ? at(x.freeze.ends_at) : '',
-                  }).replace(/\s+/g, ' ')}
+                  {withComment(
+                    t('run:freezeActiveRow', { name: x.name, until: x.freeze ? at(x.freeze.ends_at) : '' }),
+                    x.freeze?.comment,
+                  )}
                 </li>
               ))}
             </ul>
