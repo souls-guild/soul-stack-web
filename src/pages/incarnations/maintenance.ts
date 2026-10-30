@@ -170,9 +170,29 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
+// ICU lists these under names IANA has retired; both resolve, the new one reads right.
+const RENAMED_ZONES: Record<string, string> = {
+  'Africa/Asmera': 'Africa/Asmara',
+  'America/Buenos_Aires': 'America/Argentina/Buenos_Aires',
+  'America/Godthab': 'America/Nuuk',
+  'America/Indianapolis': 'America/Indiana/Indianapolis',
+  'America/Louisville': 'America/Kentucky/Louisville',
+  'Asia/Calcutta': 'Asia/Kolkata',
+  'Asia/Katmandu': 'Asia/Kathmandu',
+  'Asia/Rangoon': 'Asia/Yangon',
+  'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+  'Atlantic/Faeroe': 'Atlantic/Faroe',
+  'Europe/Kiev': 'Europe/Kyiv',
+  'Pacific/Enderbury': 'Pacific/Kanton',
+  'Pacific/Ponape': 'Pacific/Pohnpei',
+  'Pacific/Truk': 'Pacific/Chuuk',
+};
+
 export function timeZoneNames(): string[] {
   const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
-  return intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [];
+  const names = intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [];
+  const renamed = names.map((z) => (RENAMED_ZONES[z] && isValidTimeZone(RENAMED_ZONES[z]) ? RENAMED_ZONES[z] : z));
+  return [...new Set(renamed)].sort();
 }
 
 interface WallParts {
@@ -499,8 +519,8 @@ export function statusChangeAt(
 
 // --- wall-clock form values <-> RFC 3339 ---
 //
-// Freeze inputs are wall-clock values in one zone — the browser's, the same zone the
-// tab renders freezes in. <input type="date"> gives YYYY-MM-DD, <input type="time"> HH:MM.
+// Freeze inputs are wall-clock values in one zone — the display zone (NIM-1154), the
+// same zone the tab renders freezes in. <input type="date"> gives YYYY-MM-DD, <input type="time"> HH:MM.
 // The zone is explicit rather than the Date constructor's implicit local one, so what
 // is typed and what is shown can never disagree.
 
@@ -516,18 +536,28 @@ function zoneOffsetMs(utcMs: number, tz: string): number {
 
 /**
  * YYYY-MM-DD + HH:MM on the wall clock of `tz` → ISO instant; null when malformed.
- * Two passes settle the offset across a DST change; a wall time the spring change
- * skips lands on the far side of the gap.
+ * Settled as the slots are (wallClockMs): a time the spring change skips moves
+ * forward by the gap, a repeated one is its first occurrence — east or west of UTC.
  */
 export function wallToIso(date: string, time: string, tz: string): string | null {
   const dm = YMD_RE.exec(date);
   const tm = HM_RE.exec(time);
   if (!dm || !tm) return null;
-  const guess = Date.UTC(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), Number(tm[1]), Number(tm[2]));
-  if (Number.isNaN(guess)) return null;
-  const first = guess - zoneOffsetMs(guess, tz);
-  const ts = guess - zoneOffsetMs(first, tz);
-  return new Date(ts).toISOString();
+  const ts = wallClockMs(Number(dm[1]), Number(dm[2]), Number(dm[3]), Number(tm[1]) * 60 + Number(tm[2]), tz);
+  return Number.isNaN(ts) ? null : new Date(ts).toISOString();
+}
+
+/** A datetime-local value on the wall clock of `tz` → ISO; null when empty or malformed. */
+export function localInputToIso(value: string, tz: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(value.trim());
+  return m ? wallToIso(m[1], m[2], tz) : null;
+}
+
+/** "UTC+03:00", "UTC-03:30": how far `tz` is from UTC at the instant. */
+export function utcOffsetLabel(tz: string, at: Date = new Date()): string {
+  const minutes = Math.round(zoneOffsetMs(at.getTime(), tz) / MS_PER_MINUTE);
+  const abs = Math.abs(minutes);
+  return `UTC${minutes < 0 ? '-' : '+'}${pad2(Math.floor(abs / 60))}:${pad2(abs % 60)}`;
 }
 
 /** ISO instant → { date: YYYY-MM-DD, time: HH:MM } on the wall clock of `tz`. */

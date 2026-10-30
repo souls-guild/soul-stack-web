@@ -6,9 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi, type Freeze, type MaintenanceWindow } from '../../api/keeper';
 import { ApiError } from '../../api/client';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import {
   WEEKDAYS,
-  browserTimeZone,
   durationBetween,
   formatDays,
   formatOnceRange,
@@ -57,16 +57,17 @@ interface WindowModalProps {
   onClose: () => void;
 }
 
-function windowDefaults(w: MaintenanceWindow | null): MaintenanceWindowFormValues {
+// A new weekly window starts in the display zone; an edited one keeps its own.
+function windowDefaults(w: MaintenanceWindow | null, tz: string): MaintenanceWindowFormValues {
   if (!w) {
-    return { days: [], start: '02:00', end: '05:00', timezone: browserTimeZone(), comment: '' };
+    return { days: [], start: '02:00', end: '05:00', timezone: tz, comment: '' };
   }
   const start = w.start_time ?? '02:00';
   return {
     days: (w.days ?? []).filter(isWeekday),
     start,
     end: slotEnd(start, w.duration_minutes ?? 0).end,
-    timezone: w.timezone ?? browserTimeZone(),
+    timezone: w.timezone ?? tz,
     comment: w.comment ?? '',
   };
 }
@@ -87,6 +88,7 @@ function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModal
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const zones = useMemo(() => timeZoneNames(), []);
+  const { tz } = useTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
 
   const {
@@ -97,7 +99,7 @@ function WindowModalBody({ incarnationName, editing, onClose }: Omit<WindowModal
     formState: { errors },
   } = useForm<MaintenanceWindowFormValues>({
     resolver: zodResolver(maintenanceWindowSchema),
-    defaultValues: windowDefaults(editing),
+    defaultValues: windowDefaults(editing, tz),
   });
 
   const start = watch('start');
@@ -264,7 +266,7 @@ function OnceWindowModalBody({ incarnationName, editing, onClose }: Omit<WindowM
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
-  const tz = browserTimeZone();
+  const { tz, browser } = useTimeZone();
 
   const schema = useMemo(() => onceWindowSchemaFor(editing?.ends_at), [editing?.ends_at]);
   const {
@@ -337,7 +339,7 @@ function OnceWindowModalBody({ incarnationName, editing, onClose }: Omit<WindowM
             {errors.endTime ? <span style={errStyle}>{t(errors.endTime.message ?? '')}</span> : null}
           </label>
         </div>
-        <div style={hintStyle}>{t('incarnations:freezeBrowserZone', { tz })}</div>
+        <div style={hintStyle} data-testid="mw-once-zone">{t(browser ? 'incarnations:freezeBrowserZone' : 'incarnations:freezeChosenZone', { tz })}</div>
 
         <label style={{ ...fieldWrapStyle, marginTop: 12 }}>
           <span style={labelStyle}>{t('incarnations:mwCommentLabel')}</span>
@@ -413,7 +415,7 @@ function FreezeModalBody({ incarnationName, editing, onClose }: Omit<FreezeModal
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
-  const tz = browserTimeZone();
+  const { tz, browser } = useTimeZone();
 
   const {
     register,
@@ -509,7 +511,7 @@ function FreezeModalBody({ incarnationName, editing, onClose }: Omit<FreezeModal
             {errors.endTime ? <span style={errStyle}>{t(errors.endTime.message ?? '')}</span> : null}
           </label>
         </div>
-        <div style={hintStyle}>{t('incarnations:freezeBrowserZone', { tz })}</div>
+        <div style={hintStyle} data-testid="freeze-modal-zone">{t(browser ? 'incarnations:freezeBrowserZone' : 'incarnations:freezeChosenZone', { tz })}</div>
 
         <label style={{ ...fieldWrapStyle, marginTop: 12 }}>
           <span style={labelStyle}>{t('incarnations:mwCommentLabel')}</span>
@@ -655,7 +657,7 @@ function CopyWindowsBody({
   // An ended one-off window no longer counts: copied, it would be a dead row.
   const [openedAt] = useState(() => new Date());
   const toCopy = (sourceWindows.data?.items ?? []).filter((w) => windowCounts(w, openedAt));
-  const tz = browserTimeZone();
+  const { tz } = useTimeZone();
 
   // Sequential on purpose: a half-done copy must say how far it got, and parallel
   // requests would leave the order of the copied rows to the network.

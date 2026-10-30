@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { browserTimeZone, formatInstant, withComment, type Weekday } from '../incarnations/maintenance';
+import { formatInstant, withComment, type Weekday } from '../incarnations/maintenance';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import { MAINTENANCE_PROBE_LIMIT, type MaintenanceProbe } from './maintenanceProbe';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
@@ -31,7 +32,7 @@ export function MaintenanceRunOptions({
   onConsentChange: (v: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const tz = browserTimeZone();
+  const { tz } = useTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
   const at = (iso: string) => formatInstant(iso, tz, dayLabel);
 

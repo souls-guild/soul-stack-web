@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Settings } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { TimeZoneMenu } from '../TimeZonePicker';
 import styles from './Topbar.module.css';
 
 function initialsOf(aid: string): string {
@@ -67,6 +68,7 @@ export function Topbar() {
         <span className={styles.sub}>Keeper UI</span>
       </div>
       <div className={styles.right}>
+        <TimeZoneMenu variant="chip" />
         <button
           type="button"
           onClick={toggleSettings}

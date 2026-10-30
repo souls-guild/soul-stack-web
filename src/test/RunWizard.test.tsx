@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { RunWizard } from '../pages/run/RunWizard';
+import { setTimeZonePref } from '../hooks/useTimeZone';
 import { ROSTER_SIZE_FANOUT_LIMIT } from '../pages/run/useIncarnationMembers';
 import { tokenStore } from '../api/tokenStore';
 import { CONSTRAINTS } from '../api/constraints.gen';
@@ -1524,6 +1525,39 @@ describe('RunWizard', () => {
 
     const body = stub.posted?.body as Record<string, unknown>;
     expect(body.schedule_at).toBe(new Date('2099-12-31T23:59').toISOString());
+  });
+
+  // NIM-1154: «Schedule at» is typed on the wall clock of the display zone.
+  it('[GUARD] Scenario + schedule_at in a chosen zone: sent as that zone\'s instant', async () => {
+    setTimeZonePref('Asia/Kathmandu');
+    const stub = setupFetchStub({ incarnationNames: ['redis-prod'] });
+    renderWizardWithRoutes();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText(/Service/)).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Service/), 'redis');
+    await waitFor(() => expect(screen.getByRole('option', { name: /restart/ })).toBeInTheDocument());
+    await user.selectOptions(screen.getByLabelText(/Scenario/), 'restart');
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Incarnation regex')).toBeInTheDocument());
+    await user.type(screen.getByLabelText('Incarnation regex'), '*');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Matched incarnations').textContent).toContain('redis-prod'),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(screen.getByLabelText('Schedule at')).toBeInTheDocument());
+    expect(screen.getByTestId('schedule-at-zone').textContent).toBe(
+      'Time in Asia/Kathmandu, converted to UTC. Empty — run immediately.',
+    );
+    fireEvent.change(screen.getByLabelText('Schedule at'), { target: { value: '2099-12-31T23:59' } });
+    await user.click(screen.getByRole('button', { name: /Run/ }));
+    await waitFor(() => expect(screen.getByTestId('voyage-detail')).toBeInTheDocument());
+
+    // UTC+05:45, a zone no runner is in, so a revert to the runner's local time shows.
+    expect((stub.posted?.body as Record<string, unknown>).schedule_at).toBe('2099-12-31T18:14:00.000Z');
   });
 
   it('Scenario: empty schedule_at → schedule_at not in Voyage POST body', async () => {

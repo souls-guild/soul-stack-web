@@ -74,7 +74,8 @@ import { problemIncarnations, problemStatusRank, type ProblemIncarnation } from 
 import { serializeNotify } from './notifyHelpers';
 import { MaintenanceRunOptions } from './MaintenanceGate';
 import { useTargetMaintenance } from './maintenanceProbe';
-import { isFreezeRefusal } from '../incarnations/maintenance';
+import { isFreezeRefusal, localInputToIso } from '../incarnations/maintenance';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import pageStyles from '../common.module.css';
 import styles from './WizardSteps.module.css';
 
@@ -320,6 +321,8 @@ function pickInitialCommandModule(raw: string | null): { name: string; state: st
 
 export function RunWizard() {
   const { t } = useTranslation();
+  // «Schedule at» is typed on the wall clock of the display zone (NIM-1154).
+  const { tz } = useTimeZone();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -797,10 +800,9 @@ export function RunWizard() {
   // different target set or a different freeze asks again.
   const gateApplies = workload === 'scenario' && runMode === 'voyage';
   const startAt = useMemo(() => {
-    const s = options.scheduleAt.trim();
-    const d = s ? new Date(s) : null;
-    return d && !Number.isNaN(d.getTime()) ? d : null;
-  }, [options.scheduleAt]);
+    const iso = localInputToIso(options.scheduleAt, tz);
+    return iso ? new Date(iso) : null;
+  }, [options.scheduleAt, tz]);
   const maintenance = useTargetMaintenance(targetIncarnations, gateApplies && step === 4, startAt);
   // A refusal and a consent are about these targets starting at this moment: a
   // different start can fall into a freeze nobody was shown.
@@ -847,14 +849,10 @@ export function RunWizard() {
     },
   });
 
-  /** Converts a datetime-local string to ISO-8601 with a timezone for OpenAPI date-time.
-   * Empty string -> undefined. Invalid Date -> undefined (guard, never reaches submit). */
+  /** A datetime-local string in the display zone → ISO-8601 for OpenAPI date-time.
+   * Empty or invalid -> undefined (guard, never reaches submit). */
   function scheduleAtIso(raw: string): string | undefined {
-    const s = raw.trim();
-    if (!s) return undefined;
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return undefined;
-    return d.toISOString();
+    return localInputToIso(raw, tz) ?? undefined;
   }
 
   // Builds the common options part for both workloads.
@@ -1019,10 +1017,10 @@ export function RunWizard() {
 
   // scheduleAt — optional field; if set, must be in the future.
   const scheduleAtValid = useMemo(() => {
-    const s = options.scheduleAt.trim();
-    if (!s) return true; // empty — immediate start, valid
-    return new Date(s) > new Date();
-  }, [options.scheduleAt]);
+    if (!options.scheduleAt.trim()) return true; // empty — immediate start, valid
+    const iso = localInputToIso(options.scheduleAt, tz);
+    return iso !== null && new Date(iso) > new Date();
+  }, [options.scheduleAt, tz]);
 
   // Cadence-specific validation for Step 4.
   const cadenceValid = useMemo(() => {
@@ -2417,16 +2415,14 @@ function Step4Options({
   maintenance: ReactNode;
 }) {
   const { t } = useTranslation();
+  const { tz, browser } = useTimeZone();
   const isWindow = value.batchMode === 'window';
 
   // Compute the UTC equivalent of the filled field for display next to the hint.
   const scheduleAtUtc = useMemo(() => {
-    const s = value.scheduleAt.trim();
-    if (!s) return null;
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return null;
-    return d.toUTCString();
-  }, [value.scheduleAt]);
+    const iso = localInputToIso(value.scheduleAt, tz);
+    return iso ? new Date(iso).toUTCString() : null;
+  }, [value.scheduleAt, tz]);
 
   return (
     <>
@@ -2738,7 +2734,9 @@ function Step4Options({
               onChange={(e) => onChange({ ...value, scheduleAt: e.target.value })}
               aria-label={t('run:scheduleAtAria')}
             />
-            <span className={styles.hint}>{t('run:scheduleAtHint')}</span>
+            <span className={styles.hint} data-testid="schedule-at-zone">
+              {t(browser ? 'run:scheduleAtHint' : 'run:scheduleAtHintChosen', { tz })}
+            </span>
             {scheduleAtUtc ? <span className={styles.hint}>{t('run:scheduleAtUtc', { utc: scheduleAtUtc })}</span> : null}
             {!scheduleAtValid ? <span className={styles.warn}>{t('run:scheduleAtPastError')}</span> : null}
           </label>

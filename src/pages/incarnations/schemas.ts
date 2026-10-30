@@ -2,7 +2,8 @@
 // (IncarnationCreateRequest / coven pattern).
 
 import { z } from 'zod';
-import { WEEKDAYS, browserTimeZone, isValidTimeZone, nextDay, wallToIso } from './maintenance';
+import { WEEKDAYS, isValidTimeZone, nextDay, wallToIso } from './maintenance';
+import { displayTimeZone } from '../../hooks/useTimeZone';
 
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -128,7 +129,7 @@ export const maintenanceWindowSchema = z
 export type MaintenanceWindowFormValues = z.infer<typeof maintenanceWindowSchema>;
 
 // One-off window form (NIM-1137): a start and an end, date + time on the wall clock
-// of the browser's zone, the end exclusive as on the wire.
+// of the display zone, the end exclusive as on the wire.
 export const onceWindowSchema = z
   .object({
     startDate: z.string().regex(YMD, 'incarnations:freezeDateRequired'),
@@ -138,7 +139,7 @@ export const onceWindowSchema = z
     comment: z.string().trim().max(500, 'incarnations:mwCommentMax'),
   })
   .superRefine((v, ctx) => {
-    const range = onceRangeFromForm(v, browserTimeZone());
+    const range = onceRangeFromForm(v, displayTimeZone());
     if (range && new Date(range.ends_at) <= new Date(range.starts_at)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'incarnations:freezeEndBeforeStart' });
     }
@@ -154,7 +155,7 @@ export type OnceWindowFormValues = z.infer<typeof onceWindowSchema>;
  */
 export function onceWindowSchemaFor(keptEnd?: string) {
   return onceWindowSchema.superRefine((v, ctx) => {
-    const range = onceRangeFromForm(v, browserTimeZone());
+    const range = onceRangeFromForm(v, displayTimeZone());
     if (!range) return;
     const end = Date.parse(range.ends_at);
     if (end <= Date.now() && end !== Date.parse(keptEnd ?? '')) {
@@ -174,7 +175,7 @@ export function onceRangeFromForm(
 }
 
 // Freeze form: whole days (date inputs, last day inclusive) or exact moments
-// (date + time). Both are wall clock in the browser's zone.
+// (date + time). Both are wall clock in the display zone.
 export const freezeSchema = z
   .object({
     wholeDays: z.boolean(),
@@ -193,7 +194,7 @@ export const freezeSchema = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endTime'], message: 'incarnations:mwTimeFormat' });
       }
     }
-    const range = freezeRangeFromForm(v, browserTimeZone());
+    const range = freezeRangeFromForm(v, displayTimeZone());
     if (range && new Date(range.ends_at) <= new Date(range.starts_at)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'incarnations:freezeEndBeforeStart' });
     }

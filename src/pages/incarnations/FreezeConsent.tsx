@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { Freeze } from '../../api/keeper';
-import { browserTimeZone, formatInstant, withComment, type Weekday } from './maintenance';
+import { formatInstant, withComment, type Weekday } from './maintenance';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import styles from '../common.module.css';
 
 export function FreezeConsentBlock({
@@ -15,13 +16,14 @@ export function FreezeConsentBlock({
   onConsentChange: (v: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const { tz } = useTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
   return (
     <div className={styles.errorBox} style={{ marginTop: 12 }} data-testid="freeze-consent-block">
       {freeze ? (
         <div style={{ fontWeight: 500 }}>
           {withComment(
-            t('incarnations:freezeNowTitle', { until: formatInstant(freeze.ends_at, browserTimeZone(), dayLabel) }),
+            t('incarnations:freezeNowTitle', { until: formatInstant(freeze.ends_at, tz, dayLabel) }),
             freeze.comment,
           )}
         </div>

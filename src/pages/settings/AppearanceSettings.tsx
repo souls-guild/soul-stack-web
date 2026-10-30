@@ -2,8 +2,10 @@
 // Theme: useTheme() from ThemeProvider (context), displays all THEME_MODES.
 // Font: useFont() from FontProvider — independent selector (see useFont.ts), not tied to theme.
 // Language: LangToggle / changeLang from i18n (react-i18next persisted via localStorage).
+// Time zone: useTimeZone() (NIM-1154), the same picker the top bar opens.
 
 import { useTheme, THEME_MODES, type ThemeMode } from '../../hooks/useTheme';
+import { TimeZoneMenu } from '../../components/TimeZonePicker';
 import { useFont, FONT_MODES, FONT_STACKS, type FontMode } from '../../hooks/useFont';
 import { useTranslation } from 'react-i18next';
 import { changeLang, SUPPORTED_LANGS, type Lang } from '../../i18n';
@@ -173,6 +175,12 @@ export function AppearanceSettings() {
             );
           })}
         </div>
+      </section>
+
+      <section className={styles.section} data-testid="appearance-tz">
+        <h2 className={styles.sectionTitle}>{t('admin:appearanceTzTitle')}</h2>
+        <p className={styles.sectionDesc}>{t('admin:appearanceTzDesc')}</p>
+        <TimeZoneMenu variant="field" />
       </section>
     </div>
   );

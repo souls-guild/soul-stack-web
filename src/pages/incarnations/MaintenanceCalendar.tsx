@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Freeze, MaintenanceWindow } from '../../api/keeper';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import {
   WEEKDAYS,
   calendarDays,
@@ -25,7 +26,7 @@ import css from './MaintenanceCalendar.module.css';
 
 // The calendar of the maintenance windows tab (NIM-1136): a week of rows, or a
 // month of days, with the weekly windows in effect, the one-off windows and the
-// freezes, in the browser's zone. It draws what the lists hold; the status block
+// freezes, in the display zone. It draws what the lists hold; the status block
 // above is what says whether a run may start.
 
 type View = 'week' | 'month';
@@ -85,6 +86,7 @@ export function MaintenanceCalendar({
   onEditFreeze: (f: Freeze) => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { browser } = useTimeZone();
   const locale = intlLocale(i18n.language ?? 'en');
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
   const today = wallDate(now, tz);
@@ -335,7 +337,7 @@ export function MaintenanceCalendar({
           {t('incarnations:mwCalLegendCut')}
         </span>
         <span className={css.zone} data-testid="mw-cal-zone">
-          {t('incarnations:mwCalZone', { tz })}
+          {t(browser ? 'incarnations:mwCalZone' : 'incarnations:mwCalZoneChosen', { tz })}
           {view === 'month'
             ? ` · ${t(canWrite ? 'incarnations:mwCalClickHintMonth' : 'incarnations:mwCalClickHintMonthRead')}`
             : canWrite

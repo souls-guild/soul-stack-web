@@ -4,7 +4,8 @@ import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-quer
 import { Button, Modal } from '../../components/primitives';
 import { keeperApi } from '../../api/keeper';
 import { ApiError } from '../../api/client';
-import { browserTimeZone, formatInstant, type Weekday } from '../incarnations/maintenance';
+import { formatInstant, type Weekday } from '../incarnations/maintenance';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import styles from '../common.module.css';
 
 /**
@@ -25,7 +26,8 @@ export function DeferredUntil({
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
-  const at = formatInstant(scheduleAt, browserTimeZone(), dayLabel);
+  const { tz } = useTimeZone();
+  const at = formatInstant(scheduleAt, tz, dayLabel);
 
   const mu = useMutation({
     mutationFn: () => keeperApi.voyages.cancel(voyageId),

@@ -5,6 +5,8 @@
   "appearanceLangTitle": "Language",
   "appearanceThemeDesc": "Choose a color theme. Your choice is saved across sessions.",
   "appearanceThemeTitle": "Theme",
+  "appearanceTzDesc": "Maintenance windows, freezes and scheduled runs are shown and typed in this zone. Your choice is saved in this browser.",
+  "appearanceTzTitle": "Time zone",
   "archonCreatedVia": "Created via",
   "archonNewJwtAria": "New JWT",
   "archonSelectedRolesAria": "selected roles",

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Check, Clock, Snowflake } from 'lucide-react';
 import type { Freeze, MaintenanceStatus } from '../../api/keeper';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import {
   formatFreezeRangeShort,
   formatInstant,
@@ -50,6 +51,7 @@ export function MaintenanceStatusBlock({
   now: Date;
 }) {
   const { t } = useTranslation();
+  const { browser } = useTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
   // A Keeper before the cluster default has no source; then the default cannot apply.
   const fromDefault = status.source === 'default' || windows.some((w) => w.origin === 'default');
@@ -141,7 +143,7 @@ export function MaintenanceStatusBlock({
           </span>
         ) : null}
         <span data-testid="mw-status-zone">
-          {t('incarnations:mwStatusZone')} <span className={css.zone}>{tz}</span>
+          {t(browser ? 'incarnations:mwStatusZone' : 'incarnations:mwStatusZoneChosen')} <span className={css.zone}>{tz}</span>
         </span>
       </div>
     </div>

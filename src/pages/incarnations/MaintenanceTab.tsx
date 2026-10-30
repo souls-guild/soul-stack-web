@@ -12,8 +12,8 @@ import {
 } from '../../api/keeper';
 import { ApiError } from '../../api/client';
 import { useMyPermissions } from '../../hooks/useMyPermissions';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import {
-  browserTimeZone,
   effectiveWindows,
   formatDays,
   formatFreezeRange,
@@ -191,7 +191,7 @@ export function MaintenanceTab({ incarnationName }: { incarnationName: string })
   const { t } = useTranslation();
   const { hasPermission } = useMyPermissions();
   const canWrite = hasPermission('incarnation.maintenance-set');
-  const tz = browserTimeZone();
+  const { tz } = useTimeZone();
   const dayLabel = (d: Weekday) => t(`incarnations:mwDay_${d}`);
 
   const [windowModal, setWindowModal] = useState<{ editing: MaintenanceWindow | null; kind: WindowKind } | null>(null);

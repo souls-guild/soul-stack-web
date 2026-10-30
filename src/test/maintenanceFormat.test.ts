@@ -139,6 +139,14 @@ describe('wall clock <-> instant', () => {
     expect(isoToWall('2026-03-30T10:00:00.000Z', 'Europe/Berlin')).toEqual({ date: '2026-03-30', time: '12:00' });
   });
 
+  // NIM-1154: any zone can be the one typed in, so west of UTC settles as east does.
+  it('a skipped wall time moves forward by the gap and a repeated one is its first occurrence, east and west', () => {
+    expect(wallToIso('2026-03-29', '02:30', 'Europe/Berlin')).toBe('2026-03-29T01:30:00.000Z');
+    expect(wallToIso('2027-03-14', '02:30', 'America/New_York')).toBe('2027-03-14T07:30:00.000Z');
+    expect(wallToIso('2026-10-25', '02:30', 'Europe/Berlin')).toBe('2026-10-25T00:30:00.000Z');
+    expect(wallToIso('2026-11-01', '01:30', 'America/New_York')).toBe('2026-11-01T05:30:00.000Z');
+  });
+
   it('day arithmetic crosses month and year ends without a zone', () => {
     expect(nextDay('2026-12-31')).toBe('2027-01-01');
     expect(prevDay('2026-03-01')).toBe('2026-02-28');
