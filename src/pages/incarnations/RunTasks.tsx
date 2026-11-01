@@ -4,9 +4,11 @@ import type { TFunction } from 'i18next';
 import { Badge } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { taskStatusTone } from '../../components/status';
-import type { RunFailure, RunHostStatusEntry, RunTaskView } from '../../api/keeper';
+import type { RunFailure, RunHostStatusEntry, RunTaskHost, RunTaskView } from '../../api/keeper';
 import { ParamsByHostPanel, type HostFilter } from './RunTaskParamsByHost';
 import { paramValue } from './runTaskParams';
+import { clockInZone, describeTimes, elapsedSeconds, formatDuration, rowTimes, scopeSids, useNow, type StepTimes } from './runTaskTimes';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import {
   HOST_OUTCOMES,
   foldWaves,
@@ -89,6 +91,13 @@ interface WaveSlice {
   index: number;
   total: number;
   sids: string[];
+  // No host of the wave is still at the step: one that never reported a task was not
+  // sent it.
+  over: boolean;
+}
+
+function waveOver(wave: Wave): boolean {
+  return wave.state !== 'pending' && wave.busy === 0;
 }
 
 function waveKey(task: RunTaskView, wave: number): string {
@@ -200,7 +209,7 @@ export function RunTasks({
           out.push({
             key: waveKey(task, wave.index),
             task,
-            wave: { index: wave.index, total: item.waves.length, sids: wave.sids },
+            wave: { index: wave.index, total: item.waves.length, sids: wave.sids, over: waveOver(wave) },
           });
         }
       }
@@ -280,6 +289,7 @@ export function RunTasks({
                   key={entry.key}
                   entry={entry}
                   host={hostSid}
+                  live={live}
                   selected={current?.key === entry.key}
                   onSelect={setSelectedKey}
                 />
@@ -290,6 +300,7 @@ export function RunTasks({
                 key={`waves-${item.passage}`}
                 step={item}
                 host={hostSid}
+                live={live}
                 current={current}
                 summaries={summaries}
                 unfolded={unfolded.has(item.passage)}
@@ -317,6 +328,7 @@ export function RunTasks({
             task={current.task}
             wave={current.wave}
             host={hostSid}
+            live={live}
             onClearWave={() => setSelectedKey(taskKey(current.task))}
           />
         ) : null}
@@ -328,12 +340,14 @@ export function RunTasks({
 function TaskRow({
   entry,
   host,
+  live,
   selected,
   highlighted = selected,
   onSelect,
 }: {
   entry: Entry;
   host: string | null;
+  live: boolean;
   selected: boolean;
   // The panel shows this row's task without being this row: a task opened across
   // every wave lights each of its wave rows, and none of them is aria-selected.
@@ -344,6 +358,7 @@ function TaskRow({
   const suffix = wave ? `-w${wave.index + 1}` : '';
   const hosts = scopedHosts(task, wave, host);
   const absent = host != null && hosts.length === 0;
+  const times = rowTimes(task, scopeSids(wave, host), live, wave?.over ?? false);
   return (
     <button
       type="button"
@@ -358,6 +373,7 @@ function TaskRow({
         {task.id}
       </span>
       <span className={styles.modchip}>{task.module}</span>
+      <RowTime times={times} live={live} testid={`run-task-time-${task.plan_index}${suffix}`} />
       <span
         className={styles.hbar}
         // As many columns as bars, up to the stylesheet's six: a one-host wave row
@@ -381,6 +397,7 @@ function TaskRow({
 function WavesGroup({
   step,
   host,
+  live,
   current,
   summaries,
   unfolded,
@@ -389,6 +406,7 @@ function WavesGroup({
 }: {
   step: WavesStep;
   host: string | null;
+  live: boolean;
   current: Entry | undefined;
   summaries: HostSummary[];
   unfolded: boolean;
@@ -444,7 +462,7 @@ function WavesGroup({
           );
         }
         const { wave } = row;
-        const slice: WaveSlice = { index: wave.index, total, sids: wave.sids };
+        const slice: WaveSlice = { index: wave.index, total, sids: wave.sids, over: waveOver(wave) };
         const open = wave.state !== 'pending' && wave.state !== 'not_reached';
         return (
           <div
@@ -470,6 +488,7 @@ function WavesGroup({
                       key={entry.key}
                       entry={entry}
                       host={host}
+                      live={live}
                       selected={current?.key === entry.key}
                       highlighted={
                         current != null &&
@@ -603,6 +622,46 @@ function HostFilterBar({
   );
 }
 
+// The clock ticks inside these two, so a live run re-renders only its running rows.
+function RowTime({ times, live, testid }: { times: StepTimes; live: boolean; testid: string }) {
+  const { t } = useTranslation();
+  const { tz } = useTimeZone();
+  const now = useNow(live && times.startedAt != null && times.finishedAt == null);
+  const time = describeTimes(t, times, tz, live, now);
+  if (!time?.duration) return null;
+  return (
+    <span className={`${styles.rowTime} ${time.running ? styles.rowTimeRunning : ''}`} title={time.phrase} data-testid={testid}>
+      {time.duration}
+    </span>
+  );
+}
+
+function DetailTime({ times, live }: { times: StepTimes; live: boolean }) {
+  const { t } = useTranslation();
+  const { tz } = useTimeZone();
+  const now = useNow(live && times.startedAt != null && times.finishedAt == null);
+  const time = describeTimes(t, times, tz, live, now);
+  if (!time) return null;
+  return (
+    <span className={`${styles.detailTime} ${time.running ? styles.rowTimeRunning : ''}`} data-testid="run-task-detail-time">
+      {time.phrase}
+    </span>
+  );
+}
+
+// A host's own time on the task: "14:03:27 · 4 s". hosts[] carries only hosts with a
+// result, so a host here has finished; without a start the Keeper saw, only the dash.
+function HostTimeCell({ host, tz }: { host: RunTaskHost; tz: string }) {
+  const { t } = useTranslation();
+  const at = host.started_at ? clockInZone(host.started_at, tz) : '';
+  const sec = host.started_at && host.finished_at ? elapsedSeconds(host.started_at, host.finished_at) : null;
+  return (
+    <span className={styles.out} data-testid={`run-task-host-time-${host.sid}`}>
+      {at ? (sec === null ? at : `${at} · ${formatDuration(t, sec)}`) : '—'}
+    </span>
+  );
+}
+
 function ParamsPanel({ entries }: { entries: [string, unknown][] }) {
   const { t } = useTranslation();
   return (
@@ -630,14 +689,17 @@ function TaskDetail({
   task,
   wave,
   host,
+  live,
   onClearWave,
 }: {
   task: RunTaskView;
   wave?: WaveSlice;
   host: string | null;
+  live: boolean;
   onClearWave: () => void;
 }) {
   const { t } = useTranslation();
+  const { tz } = useTimeZone();
   const [filter, setFilter] = useState<HostFilter | null>(null);
   const paramEntries = task.params ? Object.entries(task.params) : [];
   const allHosts = scopedHosts(task, wave, host);
@@ -659,6 +721,7 @@ function TaskDetail({
             {t('runhistory:runWaveOf', { n: wave.index + 1, total: wave.total })} ✕
           </button>
         ) : null}
+        <DetailTime times={rowTimes(task, scopeSids(wave, host), live, wave?.over ?? false)} live={live} />
       </div>
 
       {/* No masking here any more: `no_log:` was retired in favour of a module
@@ -693,6 +756,7 @@ function TaskDetail({
           <tr>
             <th>{t('common:colSid')}</th>
             <th>{t('colStatus')}</th>
+            <th>{t('runhistory:runTasksColTime')}</th>
             <th>{t('colOutput')}</th>
             <th>{t('colError')}</th>
           </tr>
@@ -705,6 +769,9 @@ function TaskDetail({
               </td>
               <td>
                 <Badge tone={taskStatusTone(h.status)}>{h.status}</Badge>
+              </td>
+              <td>
+                <HostTimeCell host={h} tz={tz} />
               </td>
               <td>
                 <OutputCell output={h.output} sid={h.sid} />

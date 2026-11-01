@@ -173,7 +173,7 @@ describe('summarizeHosts', () => {
 
 describe('foldWaves', () => {
   it('keeps short rollouts whole', () => {
-    const waves: Wave[] = [0, 1, 2].map((index) => ({ index, sids: [`h${index}`], state: 'done', failed: 0 }));
+    const waves: Wave[] = [0, 1, 2].map((index) => ({ index, sids: [`h${index}`], state: 'done', failed: 0, busy: 0 }));
     expect(foldWaves(waves).every((r) => r.kind === 'wave')).toBe(true);
   });
 
@@ -185,6 +185,7 @@ describe('foldWaves', () => {
       sids: [`h${index + 1}`],
       state: index === 0 ? 'done' : index === 1 ? 'failed' : 'not_reached',
       failed: index === 1 ? 1 : 0,
+      busy: 0,
     }));
     const rows = foldWaves(waves).map((r) =>
       r.kind === 'wave' ? `w${r.wave.index + 1}` : `fold:${r.waves[0].index + 1}-${r.waves[r.waves.length - 1].index + 1}`,

@@ -17,6 +17,9 @@ export interface Wave {
   // Hosts of the wave that failed the step: a failed or timed-out task result, or a
   // failed detail row.
   failed: number;
+  // Hosts of the wave still at the step in a live run: a running detail row, or no
+  // row yet and results for fewer tasks than the step has. A failed wave can have some.
+  busy: number;
 }
 
 export interface WavesStep {
@@ -86,6 +89,7 @@ function settle(step: WavesStep, live: boolean, rows: readonly RunHostStatusEntr
       if (row ? tone === 'info' : statuses.length < step.tasks.length) busy++;
     }
     wave.failed = failed;
+    wave.busy = live ? busy : 0;
     if (failed > 0) wave.state = 'failed';
     else if (cancelled > 0) wave.state = 'cancelled';
     else if (reached === 0) wave.state = live ? 'pending' : 'not_reached';
@@ -117,7 +121,7 @@ export function groupRunTasks(
         kind: 'waves',
         passage: task.passage,
         tasks: [],
-        waves: waves.map((sids, index) => ({ index, sids, state: 'pending', failed: 0 })),
+        waves: waves.map((sids, index) => ({ index, sids, state: 'pending', failed: 0, busy: 0 })),
         width: Math.max(...waves.map((w) => w.length)),
         outside: [],
       };

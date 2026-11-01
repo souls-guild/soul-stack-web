@@ -4849,6 +4849,11 @@ export interface components {
             status: "applying" | "success" | "failed" | "partial_failed" | "cancelled";
         };
         RunTaskEntry: {
+            /**
+             * Format: date-time
+             * @description when the last host finished the task; absent while any host it was sent to has not finished it. A host in a later wave of a serial: step is sent the task only with its wave, so between waves the task reads finished
+             */
+            finished_at?: string;
             hosts: components["schemas"]["RunTaskHostEntry"][] | null;
             id: string;
             module: string;
@@ -4865,6 +4870,11 @@ export interface components {
             passage: number;
             /** Format: int64 */
             plan_index: number;
+            /**
+             * Format: date-time
+             * @description when the first host started the task, hosts still running it included (hosts[] lists only hosts with a result). Absent until a host started it
+             */
+            started_at?: string;
             /** @description present only for a host task of a serial: step sent in more than one wave: the step's hosts per wave in dispatch order, the same on every host task of the step. It lists the hosts of a wave the run ended before; a host the Keeper settled before the first wave without sending it anything is in no wave */
             waves?: (string[] | null)[] | null;
         };
@@ -4875,11 +4885,21 @@ export interface components {
         };
         RunTaskHostEntry: {
             error?: components["schemas"]["RunTaskErrorEntry"];
+            /**
+             * Format: date-time
+             * @description when the host finished the task: a Keeper task when it returned, a Soul task when its result arrived; for a host whose run ended without reporting the task, when that run ended. Absent when the Keeper recorded no finish
+             */
+            finished_at?: string;
             output?: {
                 [key: string]: unknown;
             };
             /** @description host FQDN OR synthetic run sid (keeper=on:keeper) */
             sid: string;
+            /**
+             * Format: date-time
+             * @description when the host started the task, as the Keeper saw it: a Keeper task (sid keeper) when it began to run; a Soul task when the host was sent its tasks (the first of them) or when the result of the task before it arrived, so it includes the network. Absent when the Keeper saw no start: a run older than this field, or the task right after an async: one, which runs beside it (that task may also read a late start)
+             */
+            started_at?: string;
             /** @enum {string} */
             status: "TASK_STATUS_UNSPECIFIED" | "TASK_STATUS_OK" | "TASK_STATUS_CHANGED" | "TASK_STATUS_SKIPPED" | "TASK_STATUS_FAILED" | "TASK_STATUS_TIMED_OUT" | "TASK_STATUS_CANCELLED";
         };

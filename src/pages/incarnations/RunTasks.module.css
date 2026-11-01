@@ -98,6 +98,24 @@
    single row of bars grows with the host count — nine hosts took 160px and a
    23-entry batch over 400px, pushing the name out (NIM-896). Six columns cap the
    width at 106px and spend height instead, which the row has to give. */
+.rowTime {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rowTimeRunning {
+  color: var(--info);
+}
+
+.detailTime {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .hbar {
   display: grid;
   grid-template-columns: repeat(6, 16px);
