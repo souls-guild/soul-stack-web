@@ -8,7 +8,6 @@ import { ApiError } from '../../api/client';
 import { Badge } from '../../components/primitives';
 import { KeeperSidCell } from '../../components/KeeperSidCell';
 import { RUN_SENTINEL_SID } from '../../components/keeperSid';
-import { JsonViewer } from '../../components/JsonViewer';
 import { runStatusTone } from '../../components/status';
 import { subscribeRunEvents } from '../../api/runEvents';
 import { useTimeZone } from '../../hooks/useTimeZone';
@@ -18,6 +17,7 @@ import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
 import { noticesByHost } from './runNotices';
 import { RunFailureRow } from './RunFailureRow';
+import { RunInputView } from './RunInputView';
 import { failedTask } from './runFailure';
 import styles from '../common.module.css';
 
@@ -224,10 +224,13 @@ export function RunDetail() {
       {run.input && Object.keys(run.input).length > 0 ? (
         <section className={styles.section} aria-label={t('incarnations:runInputAria')} data-testid="run-input-section">
           <h2 className={styles.sectionTitle}>{t('runhistory:runInputTitle')}</h2>
-          <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text-muted)' }}>
-            {t('runhistory:runInputMaskedHint')}
-          </p>
-          <JsonViewer value={run.input} />
+          <RunInputView
+            incarnation={name}
+            scenario={run.scenario}
+            input={run.input}
+            serviceVersion={run.service_version}
+            live={isApplying}
+          />
         </section>
       ) : null}
 

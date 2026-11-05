@@ -143,8 +143,10 @@ describe('RunDetail', () => {
     );
 
     const section = await waitFor(() => screen.getByTestId('run-input-section'));
-    // Secret masked as-is (not re-masked), non-secret and nested fields intact.
-    expect(section).toHaveTextContent('***MASKED***');
+    // A masked secret reads as hidden, not as the placeholder; non-secret and nested
+    // fields intact.
+    expect(section).not.toHaveTextContent('***MASKED***');
+    expect(screen.getByTestId('run-input-row-db_password')).toContainElement(screen.getByTestId('run-input-masked'));
     expect(section).toHaveTextContent('7.2');
     expect(section).toHaveTextContent('alice');
     expect(section).toHaveTextContent('write');

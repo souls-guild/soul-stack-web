@@ -4747,6 +4747,8 @@ export interface components {
                 [key: string]: unknown;
             };
             scenario: string;
+            /** @description git ref of the Service repo the run was asked to render, as the incarnation's service_version names one (a tag or branch, never the commit a linear step pinned); an upgrade since does not change it. Absent when the run recorded none: no snapshot on its terminal history row and no recipe on a non-step planned line - a linear run before its terminal, an inline or keeper-side run, a terminal that wrote no snapshot */
+            service_version?: string;
             /** Format: date-time */
             started_at: string;
             started_by_aid?: string;

@@ -25,11 +25,8 @@ export type IncarnationHistoryReply = components['schemas']['IncarnationHistoryR
 export type RunSummaryEntry = components['schemas']['RunSummaryEntry'];
 export type IncarnationRunsReply = components['schemas']['IncarnationRunsReply'];
 // input — masked snapshot of the operator input for the run (secrets already
-// ***MASKED*** on the backend write path). Extended manually until the vendor
-// openapi is re-synced and `npm run gen:api` picks the field into the base schema.
-export type RunDetailReply = components['schemas']['RunDetailReply'] & {
-  input?: Record<string, unknown>;
-};
+// ***MASKED*** on the backend write path).
+export type RunDetailReply = components['schemas']['RunDetailReply'];
 export type RunHostStatusEntry = components['schemas']['RunHostStatusEntry'];
 // Why and where a failed run stopped (NIM-1000): on the run detail and on both run lists.
 export type RunFailure = components['schemas']['RunFailureEntry'];
