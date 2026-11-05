@@ -11,6 +11,7 @@ import {
   describeTimes,
   elapsedSeconds,
   formatDuration,
+  instantInZone,
   rowTimes,
   scopeSids,
 } from '../pages/incarnations/runTaskTimes';
@@ -33,6 +34,17 @@ describe('runTaskTimes', () => {
     expect(clockInZone(iso, 'Europe/Moscow')).toBe('15:00:01');
     expect(clockInZone(iso, 'America/Sao_Paulo')).toBe('09:00:01');
     expect(clockInZone('not a time', 'UTC')).toBe('');
+  });
+
+  it('draws a whole instant with its date in the display zone, which can be the next day', () => {
+    const iso = '2026-10-31T22:00:01Z';
+    expect(instantInZone(iso, 'UTC')).toBe('31.10.2026 22:00:01');
+    expect(instantInZone(iso, 'Europe/Moscow')).toBe('01.11.2026 01:00:01');
+    expect(instantInZone(iso, 'America/Sao_Paulo')).toBe('31.10.2026 19:00:01');
+    // Midnight is hour 00 of the new day, never 24 of the old one.
+    expect(instantInZone('2026-10-31T21:00:00Z', 'Europe/Moscow')).toBe('01.11.2026 00:00:00');
+    expect(clockInZone('2026-10-31T21:00:00Z', 'Europe/Moscow')).toBe('00:00:00');
+    expect(instantInZone('not a time', 'UTC')).toBe('');
   });
 
   it('counts whole seconds and never runs backwards', () => {

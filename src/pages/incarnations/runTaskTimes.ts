@@ -1,5 +1,6 @@
-// When a run's step started and how long it ran (NIM-1170). The Keeper sends the
-// instants; the wall clock and the duration are drawn here, in the display time zone.
+// When a run and its steps started and how long they ran (NIM-1170, NIM-1177). The
+// Keeper sends the instants; the wall clock and the duration are drawn here, in the
+// display time zone.
 import { useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import type { RunTaskView } from '../../api/keeper';
@@ -9,26 +10,39 @@ export interface StepTimes {
   finishedAt?: string;
 }
 
-const clockFormatters = new Map<string, Intl.DateTimeFormat>();
+const wallFormatters = new Map<string, Intl.DateTimeFormat>();
 
-/** "14:03:27" of an instant in `tz`; '' for a broken one. */
-export function clockInZone(iso: string, tz: string): string {
+function wallParts(iso: string, tz: string): ((type: string) => string) | null {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  let f = clockFormatters.get(tz);
+  if (Number.isNaN(d.getTime())) return null;
+  let f = wallFormatters.get(tz);
   if (!f) {
     f = new Intl.DateTimeFormat('en-GB', {
       timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hourCycle: 'h23',
     });
-    clockFormatters.set(tz, f);
+    wallFormatters.set(tz, f);
   }
   const parts = f.formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
-  return `${get('hour')}:${get('minute')}:${get('second')}`;
+  return (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+}
+
+/** "14:03:27" of an instant in `tz`; '' for a broken one. */
+export function clockInZone(iso: string, tz: string): string {
+  const get = wallParts(iso, tz);
+  return get ? `${get('hour')}:${get('minute')}:${get('second')}` : '';
+}
+
+/** "31.10.2026 14:03:27" of an instant in `tz`; '' for a broken one. */
+export function instantInZone(iso: string, tz: string): string {
+  const get = wallParts(iso, tz);
+  return get ? `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}:${get('second')}` : '';
 }
 
 /** Whole seconds from `from` to `to`; null when either is broken. A clock behind the Keeper's reads 0, not a negative. */

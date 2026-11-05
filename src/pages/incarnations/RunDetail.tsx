@@ -11,7 +11,9 @@ import { RUN_SENTINEL_SID } from '../../components/keeperSid';
 import { JsonViewer } from '../../components/JsonViewer';
 import { runStatusTone } from '../../components/status';
 import { subscribeRunEvents } from '../../api/runEvents';
+import { useTimeZone } from '../../hooks/useTimeZone';
 import { RunHostOutcomes, RunTasks } from './RunTasks';
+import { instantInZone } from './runTaskTimes';
 import { TaskTimeline } from './TaskTimeline';
 import { normalizeAuditTaskPayload, sortTaskRows, type TaskRow } from './taskRow';
 import { noticesByHost } from './runNotices';
@@ -34,6 +36,7 @@ const NON_TERMINAL = new Set(['applying']);
 
 export function RunDetail() {
   const { t } = useTranslation();
+  const { tz } = useTimeZone();
   const { name = '', applyId = '' } = useParams<{ name: string; applyId: string }>();
   const qc = useQueryClient();
 
@@ -204,11 +207,15 @@ export function RunDetail() {
             </>
           ) : null}
           <span className={styles.metaKey}>started_at</span>
-          <span className={styles.metaVal}>{run.started_at}</span>
+          <span className={styles.metaVal} title={run.started_at} data-testid="run-started-at">
+            {instantInZone(run.started_at, tz) || run.started_at}
+          </span>
           {run.finished_at ? (
             <>
               <span className={styles.metaKey}>finished_at</span>
-              <span className={styles.metaVal}>{run.finished_at}</span>
+              <span className={styles.metaVal} title={run.finished_at} data-testid="run-finished-at">
+                {instantInZone(run.finished_at, tz) || run.finished_at}
+              </span>
             </>
           ) : null}
         </div>

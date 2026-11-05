@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './renderWithProviders';
 import { RunDetail } from '../pages/incarnations/RunDetail';
+import { setTimeZonePref } from '../hooks/useTimeZone';
 import { installFetchMock } from './fetchMock';
 import { tokenStore } from '../api/tokenStore';
 
@@ -51,6 +52,64 @@ describe('RunDetail', () => {
     expect(screen.queryByText('Failed task')).not.toBeInTheDocument();
     // No input in the response (omitempty) -- the Input block is not rendered.
     expect(screen.queryByTestId('run-input-section')).not.toBeInTheDocument();
+  });
+
+  it('shows the run start and end in the display zone and follows a change of zone (NIM-1177)', async () => {
+    setTimeZonePref('Europe/Moscow');
+    installFetchMock([
+      {
+        method: 'GET',
+        url: `/v1/incarnations/redis-prod/runs/${APPLY_ID}`,
+        body: {
+          apply_id: APPLY_ID,
+          scenario: 'create',
+          status: 'success',
+          started_at: '2026-06-30T22:59:58.306205Z',
+          finished_at: '2026-06-30T23:05:00Z',
+          hosts: [],
+        },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name/runs/:applyId" element={<RunDetail />} />
+      </Routes>,
+      `/incarnations/redis-prod/runs/${APPLY_ID}`,
+    );
+
+    const started = await screen.findByTestId('run-started-at');
+    const finished = screen.getByTestId('run-finished-at');
+    expect(started.textContent).toBe('01.07.2026 01:59:58');
+    expect(finished.textContent).toBe('01.07.2026 02:05:00');
+    // The Keeper's own string stays one hover away.
+    expect(started).toHaveAttribute('title', '2026-06-30T22:59:58.306205Z');
+    expect(finished).toHaveAttribute('title', '2026-06-30T23:05:00Z');
+
+    act(() => setTimeZonePref('UTC'));
+    expect(screen.getByTestId('run-started-at').textContent).toBe('30.06.2026 22:59:58');
+    expect(screen.getByTestId('run-finished-at').textContent).toBe('30.06.2026 23:05:00');
+  });
+
+  it('shows an unreadable start as the Keeper sent it, and no end for a run still going (NIM-1177)', async () => {
+    installFetchMock([
+      {
+        method: 'GET',
+        url: `/v1/incarnations/redis-prod/runs/${APPLY_ID}`,
+        body: { apply_id: APPLY_ID, scenario: 'create', status: 'applying', started_at: 'garbage', hosts: [] },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/incarnations/:name/runs/:applyId" element={<RunDetail />} />
+      </Routes>,
+      `/incarnations/redis-prod/runs/${APPLY_ID}`,
+    );
+
+    expect((await screen.findByTestId('run-started-at')).textContent).toBe('garbage');
+    expect(screen.queryByTestId('run-finished-at')).not.toBeInTheDocument();
+    expect(screen.queryByText('finished_at')).not.toBeInTheDocument();
   });
 
   it('renders the Input block with masked secret and intact non-secret fields', async () => {
